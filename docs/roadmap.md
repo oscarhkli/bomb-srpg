@@ -45,7 +45,8 @@
 - **DoD:** A character can move across varied terrain with accurate movement point deductions, roll back gathered power-ups correctly on turn reset, and permanently collect buffs that modify backend stats upon commitment.
 
 ### TODO
-- [ ]
+- [ ] Terrains: Lava, Water
+- [ ] Softblock with / without items
 
 ## Phase 4: Add Computer Player with AI
 - **Goal:** Introduce a single-player mode against an automated opponent.
