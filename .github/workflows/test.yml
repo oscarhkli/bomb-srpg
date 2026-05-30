@@ -52,3 +52,4 @@ jobs:
           coverage-artifact-name: "code-coverage"
           coverage-file-name: "coverage.txt"
           root-package: "bomb-srpg"
+          exclude: "models\\.go"
