@@ -31,12 +31,18 @@ type Cell struct {
 	OccupantID   int // ID of the occupant for cross reference
 }
 
-type MapPreset struct {
+type SoftBlock struct {
+	ID         int
+	Position   Coordinate
+	HiddenItem string // later implementationo
+}
+
+type StagePreset struct {
 	Name                string
 	Description         string
 	Width               int
 	Height              int
-	Terrains            [][]TerrainType
+	LayoutGrid          []string // Visual layout matrix. Each string in the slice represents a row of the grid
 	SoftBlocks          []Coordinate
 	P1StartingPositions [5]Coordinate // 31024, by default, P1 starts at the bottom side
 	P2StartingPositions [5]Coordinate // 42013, by default, P2 starts at the top side
@@ -85,10 +91,11 @@ type Bomb struct {
 
 type GameState struct {
 	Grid         [][]Cell
-	Units        map[int]*Unit // Keyed by Unit ID
-	Bombs        map[int]*Bomb // Keyed by Bomb ID
-	TurnCommands []TurnCommand // Commands issued by players for the current turn
-	Turn         int           // 1 = Player 1's turn, 2 = Player 2's turn
+	Units        map[int]*Unit      // Keyed by Unit ID
+	Bombs        map[int]*Bomb      // Keyed by Bomb ID
+	SoftBlocks   map[int]*SoftBlock // Keyed by SoftBlock ID
+	TurnCommands []TurnCommand      // Commands issued by players for the current turn
+	Turn         int                // 1 = Player 1's turn, 2 = Player 2's turn
 }
 
 type ActionType int
