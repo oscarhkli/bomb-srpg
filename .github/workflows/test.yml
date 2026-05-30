@@ -1,0 +1,27 @@
+name: Unit Tests
+
+on:
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write # Required to let the tool post a comment on your PR
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: 'stable'
+
+    - name: Run unit tests with coverage
+      run: go test -v -coverprofile=coverage.out ./...
+
+    - name: Post Coverage Report to PR
+      uses: fgouteroux/go-coverage-report@v1.2.0
+      with:
+        coverage-file: coverage.out
