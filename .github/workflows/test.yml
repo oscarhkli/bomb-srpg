@@ -22,6 +22,6 @@ jobs:
       run: go test -v -coverprofile=coverage.out ./...
 
     - name: Post Coverage Report to PR
-      uses: fgouteroux/go-coverage-report@v1.2.0
+      uses: fgrosse/go-coverage-report@v1.2.0
       with:
         coverage-file: coverage.out
