@@ -30,7 +30,7 @@ var archetypesRegistry = map[string]Archetype{
 		BombMinRange: 1,
 		BombPower:    2,
 		MaxBombCount: 2,
-		BaseHP:       60,
+		BaseHP:       1,
 		PresetSkills: map[SkillType]bool{},
 	},
 	"Thief": {

@@ -89,6 +89,16 @@ type Bomb struct {
 	Countdown int // Turns until explosion
 }
 
+type GameCfg struct {
+	StagePreset                 string   // Name of the stage preset to use
+	P1Teams                     []string // List of archetype names for Player 1's units
+	P2Teams                     []string // List of archetype names for Player 2's units
+	MaxTurns                    int
+	GlobalSpeedOverride         int // For testing purposes, allows overriding the default speed for all units. 0 means no override.
+	GlobalBombCountdownOverride int // For testing purposes, allows overriding the default bomb countdown. 0 means no override.
+	GlobalBombMaxRangeOverride  int // For testing purposes, allows overriding the default max bomb range. 0 means no override.
+}
+
 type GameState struct {
 	Grid         [][]Cell
 	Units        map[int]*Unit      // Keyed by Unit ID
