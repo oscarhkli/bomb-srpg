@@ -8,7 +8,8 @@ jobs:
   test:
     runs-on: ubuntu-latest
     permissions:
-      pull-requests: write # Required to let the tool post a comment on your PR
+      pull-requests: write # Required to post the coverage table to your PR chat
+      contents: write      # Required to save and compare baseline coverage files
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -19,9 +20,7 @@ jobs:
         go-version: 'stable'
 
     - name: Run unit tests with coverage
-      run: go test -v -coverprofile=coverage.out ./...
+      run: go test -v -coverprofile=cover.out ./...
 
     - name: Post Coverage Report to PR
       uses: fgrosse/go-coverage-report@v1.2.0
-      with:
-        coverage-file: coverage.out
