@@ -37,7 +37,7 @@
 - **DoD:** New characters can be selected and use their unique skills inside the game, with both the web frontend rendering the visuals and the Go backend fully validating the custom actions.
 
 ### TODO
-- [ ]
+- [ ] Skill, e.g., prolonging the count down
 
 ## Phase 3c: Terrain & Power-Up Items (Optional Branch C)
 - **Goal:** Expand game depth by adding reactive terrain effects and power-up items. The latter will dynamically alter the character's stats during turn validation.
