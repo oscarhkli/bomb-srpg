@@ -5,6 +5,9 @@ import "fmt"
 var terrainToken = map[byte]TerrainType{
 	'.': TerrainPlain,
 	'H': TerrainBlock,
+	'T': TerrainTower,
+	'W': TerrainWater,
+	'L': TerrainLava,
 }
 
 func initGameState(gameCfg GameCfg) (*GameState, error) {
@@ -26,6 +29,16 @@ func initGameState(gameCfg GameCfg) (*GameState, error) {
 	}
 	if !hasExactlyOneAndFirstIsKing(gameCfg.P2Teams) {
 		return nil, fmt.Errorf("Player 2 must have exactly one King as the first unit")
+	}
+
+	// verify stage layout dimensions match the specified width and height
+	if len(stagePreset.LayoutGrid) != stagePreset.Height {
+		return nil, fmt.Errorf("stage preset layout grid row count %d does not match specified height %d", len(stagePreset.LayoutGrid), stagePreset.Height)
+	}
+	for y, row := range stagePreset.LayoutGrid {
+		if len(row) != stagePreset.Width {
+			return nil, fmt.Errorf("stage preset layout grid row %d column count %d does not match specified width %d", y, len(row), stagePreset.Width)
+		}
 	}
 
 	units := map[int]*Unit{}

@@ -174,6 +174,42 @@ func TestInitGameState_TDD_Suite(t *testing.T) {
 			expectError:   true,
 			errorContains: "stage preset 'NonExistentStage' not found",
 		},
+		{
+			name: "Success: With Global Overrides for Speed and Bomb Range Positive",
+			cfg: GameCfg{
+				StagePreset: "Plain",
+				P1Teams:     []string{"King", "Fighter"},
+				P2Teams:     []string{"King", "Fighter"},
+				GlobalSpeedOverride:        10,
+				GlobalBombMaxRangeOverride: 5,
+			},
+			expectError:   false,
+			expectedTotalUnits: 4,
+		},
+		{
+			name: "Success: With Global Overrides for Speed and Bomb Range Zero (No Override)",
+			cfg: GameCfg{
+				StagePreset: "Plain",
+				P1Teams:     []string{"King", "Fighter"},
+				P2Teams:     []string{"King", "Fighter"},
+				GlobalSpeedOverride:        0,
+				GlobalBombMaxRangeOverride: 0,
+			},
+			expectError:   false,
+			expectedTotalUnits: 4,
+		},
+		{
+			name: "Success: With Global Overrides for Speed and Bomb Range Negative (Treated as No Override)",
+			cfg: GameCfg{
+				StagePreset: "Plain",
+				P1Teams:     []string{"King", "Fighter"},
+				P2Teams:     []string{"King", "Fighter"},
+				GlobalSpeedOverride:        -5,
+				GlobalBombMaxRangeOverride: -3,
+			},
+			expectError:   false,
+			expectedTotalUnits: 4,
+		},
 	}
 
 	for _, tt := range tests {
@@ -277,6 +313,124 @@ func TestInitGameState_TDD_Suite(t *testing.T) {
 			// Verify turn and max turns
 			if gameState.Turn != 0 {
 				t.Errorf("Expected turn to start at 0, got %d", gameState.Turn)
+			}
+		})
+	}
+}
+
+func TestInitGameState_LayoutGridCompilation(t *testing.T) {
+	tests := []struct {
+		name          string
+		presetName   string
+		customPreset StagePreset // mock sandbox layout for testing
+		expectError   bool
+	}{
+		{
+			name:       "Success: Compile Diverse Terrain Matrix",
+			presetName: "Sandbox3x3",
+			customPreset: StagePreset{
+				Name:   "Sandbox3x3",
+				Width:  3,
+				Height: 3,
+				LayoutGrid: []string{
+					"T.T", // 
+					".HH", // 
+					".LW", // 
+				},
+				P1StartingPositions: [5]Coordinate{{1, 0}},
+				P2StartingPositions: [5]Coordinate{{0, 2}},
+			},
+			expectError: false,
+		},
+		{
+			name:       "Failure: Extra Width Layout typo",
+			presetName: "BrokenWidth3x3",
+			customPreset: StagePreset{
+				Name:   "BrokenWidth3x3",
+				Width:  3,
+				Height: 3,
+				LayoutGrid: []string{
+					"...",
+					"....",
+					"...",
+				},
+				P1StartingPositions: [5]Coordinate{{0, 0}},
+				P2StartingPositions: [5]Coordinate{{2, 2}},
+			},
+			expectError: true,
+		},
+		{
+			name:       "Failure: Extra Height Layout typo",
+			presetName: "BrokenHeight3x3",
+			customPreset: StagePreset{
+				Name:   "BrokenHeight3x3",
+				Width:  3,
+				Height: 3,
+				LayoutGrid: []string{
+					"...",
+					"...",
+					"...",
+					"...",
+				},
+				P1StartingPositions: [5]Coordinate{{0, 0}},
+				P2StartingPositions: [5]Coordinate{{2, 2}},
+			},
+			expectError: true,
+		},
+		{
+			name:       "Failure: Invalid Token Symbol",
+			presetName: "InvalidToken3x3",
+			customPreset: StagePreset{
+				Name:   "InvalidToken3x3",
+				Width:  3,
+				Height: 3,
+				LayoutGrid: []string{
+					"...",
+					".X.",
+					"...",
+				},
+				P1StartingPositions: [5]Coordinate{{0, 0}},
+				P2StartingPositions: [5]Coordinate{{2, 2}},
+			},
+			expectError: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Temporarily add the custom preset to the registry for testing
+			stagePresetsRegistry[tt.customPreset.Name] = tt.customPreset
+			defer delete(stagePresetsRegistry, tt.customPreset.Name) // Clean up after test
+
+			gameState, err := initGameState(GameCfg{
+				StagePreset: tt.presetName,
+				P1Teams:     []string{"King"},
+				P2Teams:     []string{"King"},
+			})
+			
+			if (err != nil) != tt.expectError {
+				t.Fatalf("Expected error: %v, got: %v", tt.expectError, err)
+			}
+
+			if tt.expectError {
+				return // No need to check further if we expected an error
+			}
+
+			expectedMatrix := [][]TerrainType{
+				{TerrainTower, TerrainPlain, TerrainTower},
+				{TerrainPlain, TerrainBlock, TerrainBlock},
+				{TerrainPlain, TerrainLava, TerrainWater},
+			}
+
+			for y, row := range gameState.Grid {
+				for x, cell := range row {
+					if cell.Type != expectedMatrix[y][x] {
+						t.Errorf("Expected terrain at (%d,%d) to be %v, got %v", x, y, expectedMatrix[y][x], cell.Type)
+					}
+
+					if cell.OccupantType != ObjectNone || cell.OccupantID != 0 {
+						t.Errorf("Expected cell at (%d,%d) to have no occupant, got type %v with ID %d", x, y, cell.OccupantType, cell.OccupantID)
+					}
+				}
 			}
 		})
 	}
