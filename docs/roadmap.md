@@ -38,6 +38,7 @@
 
 ### TODO
 - [ ] Skill, e.g., prolonging the count down
+- [ ] Advance path finding algorithm (e.g., float, jump, etc.)
 
 ## Phase 3c: Terrain & Power-Up Items (Optional Branch C)
 - **Goal:** Expand game depth by adding reactive terrain effects and power-up items. The latter will dynamically alter the character's stats during turn validation.

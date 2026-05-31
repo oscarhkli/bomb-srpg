@@ -19,3 +19,19 @@
 - **Turn Secrecy Pattern:** Active turn planning is fully hidden from the opposing player to preserve the Turn Reset capability. Opponents see a passive waiting status during the planning phase.
 - **Unified Event Broadcast:** Upon turn commitment, the backend generates an identical chronological Action Queue array and distributes it to both clients.
 - **Frontend Queue Playback:** Clients process incoming batch payloads using a sequential async loop, ensuring both players watch animations unfold with perfect deterministic lockstep alignment.
+
+# File Structure (Draft)
+
+```text
+bomb-srpg
+├── cmd/
+│   └── srpg-cli/          <-- Phase 1 use. Terminal CLI version
+├── docs/                  <-- Design, roadmap and other docs
+├── engine/                <-- Pure Core Logic
+│   └── game.go            <-- Game initializer
+│   └── match.go           <-- Match life cycle transactions
+│   └── models.go          <-- Pure blueprints
+│   └── pathfinder.go      <-- Stage navigation
+│   └── presets.go         <-- Static database
+└── web/                   <-- Frontend (Phase 2+)
+```
