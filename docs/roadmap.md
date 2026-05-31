@@ -7,13 +7,13 @@
 
 ### TODO
 - [x] Basic models & presets Archetype and Stages
-- [ ] New game
+- [x] New game
 - [ ] Path finding algorithm (for movement, bomb range, stage sanity check, etc.)
-- [ ] Turn, turn action, commit/reset
+- [ ] Turn, TurnCommand, commit/reset
+- [ ] GameEvent
 - [ ] Bomb detonation, chain reaction
 - [ ] Mid-turn calculation
 - [ ] Result
-
 
 ## Phase 2: Web Server & Transition from Terminal Driver
 - **Goal:** Drop the console interface and build a graphical browser client.
