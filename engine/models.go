@@ -89,13 +89,23 @@ type Bomb struct {
 	Countdown int // Turns until explosion
 }
 
+type GameCfg struct {
+	StagePreset                 string   // Name of the stage preset to use
+	P1Teams                     []string // List of archetype names for Player 1's units
+	P2Teams                     []string // List of archetype names for Player 2's units
+	MaxTurns                    int
+	GlobalSpeedOverride         int // For testing purposes, allows overriding the default speed for all units. 0 means no override.
+	GlobalBombCountdownOverride int // For testing purposes, allows overriding the default bomb countdown. 0 means no override.
+	GlobalBombMaxRangeOverride  int // For testing purposes, allows overriding the default max bomb range. 0 means no override.
+}
+
 type GameState struct {
+	Turn         int // Turn counter, starting from 1
 	Grid         [][]Cell
 	Units        map[int]*Unit      // Keyed by Unit ID
 	Bombs        map[int]*Bomb      // Keyed by Bomb ID
 	SoftBlocks   map[int]*SoftBlock // Keyed by SoftBlock ID
 	TurnCommands []TurnCommand      // Commands issued by players for the current turn
-	Turn         int                // 1 = Player 1's turn, 2 = Player 2's turn
 }
 
 type ActionType int
@@ -103,11 +113,53 @@ type ActionType int
 const (
 	ActionMove ActionType = iota
 	ActionPlaceBomb
-	ActionEndTurn
+	ActionCommitTurn
 )
 
 type TurnCommand struct {
 	Action         ActionType
 	ActorID        int
 	TargetPosition Coordinate // For move and place bomb actions
+}
+
+type GameEvent interface {
+	isGameEvent()
+}
+
+type UnitMovedEvent struct {
+	UnitID int
+	From   Coordinate
+	To     Coordinate
+}
+
+func (UnitMovedEvent) isGameEvent() {}
+
+type UnitDiedEvent struct {
+	UnitID int
+}
+
+func (UnitDiedEvent) isGameEvent() {}
+
+type BombPlacedEvent struct {
+	UnitID    int
+	BombID    int
+	Position  Coordinate
+	Range     int
+	Countdown int
+}
+
+func (BombPlacedEvent) isGameEvent() {}
+
+type BombExplodedEvent struct {
+	BombID            int
+	AffectedPositions []Coordinate
+}
+
+func (BombExplodedEvent) isGameEvent() {}
+
+type Match struct {
+	GameCfg      GameCfg
+	TrueState    *GameState
+	WorkingState *GameState
+	PlaybackLog  []GameEvent
 }
