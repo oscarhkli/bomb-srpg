@@ -2,6 +2,7 @@ package engine
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -177,37 +178,37 @@ func TestInitGameState_TDD_Suite(t *testing.T) {
 		{
 			name: "Success: With Global Overrides for Speed and Bomb Range Positive",
 			cfg: GameCfg{
-				StagePreset: "Plain",
-				P1Teams:     []string{"King", "Fighter"},
-				P2Teams:     []string{"King", "Fighter"},
+				StagePreset:                "Plain",
+				P1Teams:                    []string{"King", "Fighter"},
+				P2Teams:                    []string{"King", "Fighter"},
 				GlobalSpeedOverride:        10,
 				GlobalBombMaxRangeOverride: 5,
 			},
-			expectError:   false,
+			expectError:        false,
 			expectedTotalUnits: 4,
 		},
 		{
 			name: "Success: With Global Overrides for Speed and Bomb Range Zero (No Override)",
 			cfg: GameCfg{
-				StagePreset: "Plain",
-				P1Teams:     []string{"King", "Fighter"},
-				P2Teams:     []string{"King", "Fighter"},
+				StagePreset:                "Plain",
+				P1Teams:                    []string{"King", "Fighter"},
+				P2Teams:                    []string{"King", "Fighter"},
 				GlobalSpeedOverride:        0,
 				GlobalBombMaxRangeOverride: 0,
 			},
-			expectError:   false,
+			expectError:        false,
 			expectedTotalUnits: 4,
 		},
 		{
 			name: "Success: With Global Overrides for Speed and Bomb Range Negative (Treated as No Override)",
 			cfg: GameCfg{
-				StagePreset: "Plain",
-				P1Teams:     []string{"King", "Fighter"},
-				P2Teams:     []string{"King", "Fighter"},
+				StagePreset:                "Plain",
+				P1Teams:                    []string{"King", "Fighter"},
+				P2Teams:                    []string{"King", "Fighter"},
 				GlobalSpeedOverride:        -5,
 				GlobalBombMaxRangeOverride: -3,
 			},
-			expectError:   false,
+			expectError:        false,
 			expectedTotalUnits: 4,
 		},
 	}
@@ -225,6 +226,11 @@ func TestInitGameState_TDD_Suite(t *testing.T) {
 					t.Errorf("Expected error to contain '%s', got '%s'", tt.errorContains, err.Error())
 				}
 				return // No need to check further if we expected an error
+			}
+
+			// Verify turn starts at 1
+			if gameState.Turn != 1 {
+				t.Errorf("Expected turn to start at 1, got %d", gameState.Turn)
 			}
 
 			if len(gameState.Units) != tt.expectedTotalUnits {
@@ -309,21 +315,16 @@ func TestInitGameState_TDD_Suite(t *testing.T) {
 			if len(gameState.SoftBlocks) != 0 {
 				t.Errorf("Expected no soft blocks in 'Plain' stage, got %d", len(gameState.SoftBlocks))
 			}
-
-			// Verify turn and max turns
-			if gameState.Turn != 0 {
-				t.Errorf("Expected turn to start at 0, got %d", gameState.Turn)
-			}
 		})
 	}
 }
 
 func TestInitGameState_LayoutGridCompilation(t *testing.T) {
 	tests := []struct {
-		name          string
+		name         string
 		presetName   string
 		customPreset StagePreset // mock sandbox layout for testing
-		expectError   bool
+		expectError  bool
 	}{
 		{
 			name:       "Success: Compile Diverse Terrain Matrix",
@@ -333,9 +334,9 @@ func TestInitGameState_LayoutGridCompilation(t *testing.T) {
 				Width:  3,
 				Height: 3,
 				LayoutGrid: []string{
-					"T.T", // 
-					".HH", // 
-					".LW", // 
+					"T.T", //
+					".HH", //
+					".LW", //
 				},
 				P1StartingPositions: [5]Coordinate{{1, 0}},
 				P2StartingPositions: [5]Coordinate{{0, 2}},
@@ -406,7 +407,7 @@ func TestInitGameState_LayoutGridCompilation(t *testing.T) {
 				P1Teams:     []string{"King"},
 				P2Teams:     []string{"King"},
 			})
-			
+
 			if (err != nil) != tt.expectError {
 				t.Fatalf("Expected error: %v, got: %v", tt.expectError, err)
 			}
@@ -433,5 +434,83 @@ func TestInitGameState_LayoutGridCompilation(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestInitGame_AllGood(t *testing.T) {
+	gameCfg := GameCfg{
+		StagePreset: "Plain",
+		P1Teams:     []string{"King", "Fighter"},
+		P2Teams:     []string{"King", "Thief"},
+	}
+	match, err := InitGame(gameCfg)
+	if err != nil {
+		t.Fatalf("Expected game initialization to succeed, got error: %v", err)
+	}
+	if match.TrueState == match.WorkingState {
+		t.Errorf("Expected TrueState and WorkingState to be different instances, but they are the same")
+	}
+	if !reflect.DeepEqual(match.GameCfg, gameCfg) {
+		t.Errorf("Expected GameCfg to be preserved in Match, got %+v", match.GameCfg)
+	}
+}
+
+func TestInitGame_ErrorConditions(t *testing.T) {
+	invalidCfgs := GameCfg{
+		StagePreset: "NonExistentStage",
+		P1Teams:     []string{"King"},
+		P2Teams:     []string{"King"},
+	}
+	_, err := InitGame(invalidCfgs)
+
+	if err == nil {
+		t.Fatalf("Expected game initialization to fail due to invalid config, but it succeeded")
+	}
+
+	expectedErrorMessage := "stage preset 'NonExistentStage' not found"
+	if err.Error() != expectedErrorMessage {
+		t.Errorf("Expected error message '%s', got '%s'", expectedErrorMessage, err.Error())
+	}
+}
+
+func TestGameStateDeepCopy_Isolation(t *testing.T) {
+	original := &GameState{
+		Turn:       1,
+		Grid:       [][]Cell{},
+		Units:      make(map[int]*Unit),
+		Bombs:      make(map[int]*Bomb),
+		SoftBlocks: make(map[int]*SoftBlock),
+	}
+	original.Grid = append(original.Grid, []Cell{{Type: TerrainPlain, OccupantType: ObjectNone, OccupantID: 0}})
+	original.Units[1] = &Unit{ID: 1, Type: Archetype{Name: "King"}, Team: 1, Position: Coordinate{X: 0, Y: 0}, HP: 3}
+	original.Bombs[1] = &Bomb{ID: 1, OwnerID: 1, Position: Coordinate{X: 1, Y: 1}, Range: 2, Countdown: 3}
+	original.SoftBlocks[1] = &SoftBlock{ID: 1, Position: Coordinate{X: 2, Y: 2}}
+
+	clone := original.DeepCopy()
+
+	clone.Turn = 2
+	clone.Grid[0][0].Type = TerrainTower
+	clone.Units[1].HP = 100
+	clone.Units[1].Position = Coordinate{X: 5, Y: 5}
+	clone.Bombs[1].Range = 10
+	clone.SoftBlocks[1].Position = Coordinate{X: 10, Y: 10}
+
+	if original.Turn == clone.Turn {
+		t.Errorf("Expected original Turn to be unaffected by changes to clone, got %d", original.Turn)
+	}
+	if original.Grid[0][0].Type == clone.Grid[0][0].Type {
+		t.Errorf("Expected original Grid cell to be unaffected by changes to clone, got %v", original.Grid[0][0].Type)
+	}
+	if original.Units[1].HP == clone.Units[1].HP {
+		t.Errorf("Expected original unit HP to be unaffected by changes to clone, got %d", original.Units[1].HP)
+	}
+	if original.Units[1].Position == clone.Units[1].Position {
+		t.Errorf("Expected original unit Position to be unaffected by changes to clone, got (%d,%d)", original.Units[1].Position.X, original.Units[1].Position.Y)
+	}
+	if original.Bombs[1].Range == clone.Bombs[1].Range {
+		t.Errorf("Expected original bomb Range to be unaffected by changes to clone, got %d", original.Bombs[1].Range)
+	}
+	if original.SoftBlocks[1].Position == clone.SoftBlocks[1].Position {
+		t.Errorf("Expected original soft block Position to be unaffected by changes to clone, got (%d,%d)", original.SoftBlocks[1].Position.X, original.SoftBlocks[1].Position.Y)
 	}
 }

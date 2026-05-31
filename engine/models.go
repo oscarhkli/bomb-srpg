@@ -100,12 +100,12 @@ type GameCfg struct {
 }
 
 type GameState struct {
+	Turn         int // Turn counter, starting from 1
 	Grid         [][]Cell
 	Units        map[int]*Unit      // Keyed by Unit ID
 	Bombs        map[int]*Bomb      // Keyed by Bomb ID
 	SoftBlocks   map[int]*SoftBlock // Keyed by SoftBlock ID
 	TurnCommands []TurnCommand      // Commands issued by players for the current turn
-	Turn         int                // 1 = Player 1's turn, 2 = Player 2's turn
 }
 
 type ActionType int
@@ -113,11 +113,53 @@ type ActionType int
 const (
 	ActionMove ActionType = iota
 	ActionPlaceBomb
-	ActionEndTurn
+	ActionCommitTurn
 )
 
 type TurnCommand struct {
 	Action         ActionType
 	ActorID        int
 	TargetPosition Coordinate // For move and place bomb actions
+}
+
+type GameEvent interface {
+	isGameEvent()
+}
+
+type UnitMovedEvent struct {
+	UnitID int
+	From   Coordinate
+	To     Coordinate
+}
+
+func (UnitMovedEvent) isGameEvent() {}
+
+type UnitDiedEvent struct {
+	UnitID int
+}
+
+func (UnitDiedEvent) isGameEvent() {}
+
+type BombPlacedEvent struct {
+	UnitID    int
+	BombID    int
+	Position  Coordinate
+	Range     int
+	Countdown int
+}
+
+func (BombPlacedEvent) isGameEvent() {}
+
+type BombExplodedEvent struct {
+	BombID            int
+	AffectedPositions []Coordinate
+}
+
+func (BombExplodedEvent) isGameEvent() {}
+
+type Match struct {
+	GameCfg      GameCfg
+	TrueState    *GameState
+	WorkingState *GameState
+	PlaybackLog  []GameEvent
 }

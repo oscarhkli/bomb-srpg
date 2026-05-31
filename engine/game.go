@@ -10,6 +10,20 @@ var terrainToken = map[byte]TerrainType{
 	'L': TerrainLava,
 }
 
+func InitGame(gameCfg GameCfg) (*Match, error) {
+	gameState, err := initGameState(gameCfg)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Match{
+		TrueState:    gameState,
+		WorkingState: gameState.DeepCopy(),
+		GameCfg:      gameCfg,
+		PlaybackLog:  []GameEvent{},
+	}, nil
+}
+
 func initGameState(gameCfg GameCfg) (*GameState, error) {
 	stagePreset, exists := GetStagePreset(gameCfg.StagePreset)
 	if !exists {
@@ -75,11 +89,11 @@ func initGameState(gameCfg GameCfg) (*GameState, error) {
 	}
 
 	return &GameState{
+		Turn:       1,
 		Grid:       grid,
 		Units:      units,
 		Bombs:      make(map[int]*Bomb),
 		SoftBlocks: softBlocks,
-		Turn:       0,
 	}, nil
 }
 
@@ -132,4 +146,81 @@ func applyGlobalOverride(orig, newVal int) int {
 		return newVal
 	}
 	return orig
+}
+
+// DeepCopy creates a deep copy of the GameState.
+// This is used to create an independent working state for planning stage, allowing player to reset to the original state if needed without affecting the true state.
+func (gs *GameState) DeepCopy() *GameState {
+	if gs == nil {
+		return nil
+	}
+
+	clone := &GameState{
+		Turn: gs.Turn,
+	}
+
+	if gs.Grid != nil {
+		clone.Grid = make([][]Cell, len(gs.Grid))
+		for y := range gs.Grid {
+			clone.Grid[y] = make([]Cell, len(gs.Grid[y]))
+			copy(clone.Grid[y], gs.Grid[y])
+		}
+	}
+
+	if gs.Units != nil {
+		clone.Units = make(map[int]*Unit, len(gs.Units))
+		for id, unit := range gs.Units {
+			if unit == nil {
+				continue
+			}
+			clone.Units[id] = &Unit{
+				ID:           unit.ID,
+				Type:         unit.Type, // Archetype is immutable, can share reference
+				Position:     unit.Position,
+				Speed:        unit.Speed,
+				BombMaxRange: unit.BombMaxRange,
+				BombMinRange: unit.BombMinRange,
+				BombPower:    unit.BombPower,
+				MaxBombCount: unit.MaxBombCount,
+				BombUsed:     unit.BombUsed,
+				Team:         unit.Team,
+				HP:           unit.HP,
+				Skills:       make(map[SkillType]bool),
+			}
+			for skill, hasSkill := range unit.Skills {
+				clone.Units[id].Skills[skill] = hasSkill
+			}
+		}
+	}
+
+	if gs.Bombs != nil {
+		clone.Bombs = make(map[int]*Bomb, len(gs.Bombs))
+		for id, bomb := range gs.Bombs {
+			if bomb == nil {
+				continue
+			}
+			clone.Bombs[id] = &Bomb{
+				ID:        bomb.ID,
+				OwnerID:   bomb.OwnerID,
+				Position:  bomb.Position,
+				Range:     bomb.Range,
+				Countdown: bomb.Countdown,
+			}
+		}
+	}
+
+	if gs.SoftBlocks != nil {
+		clone.SoftBlocks = make(map[int]*SoftBlock, len(gs.SoftBlocks))
+		for id, sb := range gs.SoftBlocks {
+			if sb == nil {
+				continue
+			}
+			clone.SoftBlocks[id] = &SoftBlock{
+				ID:       sb.ID,
+				Position: sb.Position,
+			}
+		}
+	}
+
+	return clone
 }
