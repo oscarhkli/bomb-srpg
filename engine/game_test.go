@@ -335,7 +335,7 @@ func TestInitGameState_LayoutGridCompilation(t *testing.T) {
 				Height: 3,
 				LayoutGrid: []string{
 					"T.T", //
-					".HH", //
+					".BB", //
 					".LW", //
 				},
 				P1StartingPositions: [5]Coordinate{{1, 0}},

@@ -4,7 +4,7 @@ import "fmt"
 
 var terrainToken = map[byte]TerrainType{
 	'.': TerrainPlain,
-	'H': TerrainBlock,
+	'B': TerrainBlock,
 	'T': TerrainTower,
 	'W': TerrainWater,
 	'L': TerrainLava,
