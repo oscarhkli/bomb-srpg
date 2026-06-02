@@ -1,6 +1,8 @@
 package engine
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestGetArchetype(t *testing.T) {
 	tests := []struct {
@@ -141,6 +143,7 @@ func TestStagePresets(t *testing.T) {
 			if stagePreset.Height < 5 {
 				t.Errorf("Height for %s should be minimum 5, got %d", name, stagePreset.Height)
 			}
+
 			// Check if layout grid dimensions match width and height
 			if len(stagePreset.LayoutGrid) != stagePreset.Height {
 				t.Errorf("LayoutGrid row count for %s should match Height, got %d rows, expected %d", name, len(stagePreset.LayoutGrid), stagePreset.Height)
@@ -151,6 +154,7 @@ func TestStagePresets(t *testing.T) {
 					}
 				}
 			}
+
 			// Check if all SoftBlocks are in terrainPlain (.) positions
 			for _, softBlock := range stagePreset.SoftBlocks {
 				if softBlock.X < 0 || softBlock.X >= stagePreset.Width || softBlock.Y < 0 || softBlock.Y >= stagePreset.Height {
@@ -168,6 +172,7 @@ func TestStagePresets(t *testing.T) {
 				}
 				softBlockPositions[pos] = true
 			}
+
 			// Check if starting positions for P1 and P2 are on plain terrain (.)
 			for i, pos := range stagePreset.P1StartingPositions {
 				if pos.X < 0 || pos.X >= stagePreset.Width || pos.Y < 0 || pos.Y >= stagePreset.Height {
@@ -187,4 +192,43 @@ func TestStagePresets(t *testing.T) {
 	}
 }
 
-// TODO: Stage sanity checks on whether all characters' starting positions can reach the opponent's starting position by walking
+// Stage sanity checks on whether all characters' starting positions can reach the opponent's starting position by walking
+func TestStagePrests_Sanity(t *testing.T) {
+	stagePresets := []string{"Plain", "Standard"}
+	rule := MovementRule{
+		MaxSteps:        -1,
+		Pattern:         PatternCardinal,
+		CanTurn:         true,
+		PassPermissions: PassUnits | PassSoftBlocks | PassItems,
+	}
+
+	for _, name := range stagePresets {
+		t.Run(name, func(t *testing.T) {
+			gs, err := initGameState(GameCfg{
+				StagePreset: name,
+				P1Teams:     []string{"King"}, // we don't care this value in this test, as long as it can create a GameState
+				P2Teams:     []string{"King"}, // same as above
+			})
+
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			stagePreset, exists := GetStagePreset(name)
+			if !exists {
+				t.Fatalf("Stage preset %s should exist", name)
+			}
+
+			for i, p1Pos := range stagePreset.P1StartingPositions {
+				tiles := gs.FindReachableTiles(p1Pos, rule)
+
+				for j, p2Pos := range stagePreset.P2StartingPositions {
+					if _, ok := tiles[p2Pos]; !ok {
+						t.Errorf("Reachable validation failed for %s: P1 Starting Position %d at (%d, %d) cannot reach P2 Starting Position %d at (%d, %d)",
+							name, i, p1Pos.X, p1Pos.Y, j, p2Pos.X, p2Pos.Y)
+					}
+				}
+			}
+		})
+	}
+}
