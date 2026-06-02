@@ -8,12 +8,15 @@
 ### TODO
 - [x] Basic models & presets Archetype and Stages
 - [x] New game
-- [ ] Path finding algorithm (for movement, bomb range, stage sanity check, etc.)
-- [ ] Turn, TurnCommand, commit/reset
+- [x] Path finding algorithm (for movement, bomb range, stage sanity check, etc.)
+- [ ] Sandbox transaction handling (commit/reset)
+- [ ] Turn, TurnCommand
+- [ ] Actions (movement, set bombs)
 - [ ] GameEvent
 - [ ] Bomb detonation, chain reaction
 - [ ] Mid-turn calculation
-- [ ] Result
+- [ ] Result calculation
+- [ ] CLI terminal
 
 ## Phase 2: Web Server & Transition from Terminal Driver
 - **Goal:** Drop the console interface and build a graphical browser client.
@@ -38,6 +41,7 @@
 
 ### TODO
 - [ ] Skill, e.g., prolonging the count down
+- [ ] Advance path finding algorithm (e.g., float, jump, etc.)
 
 ## Phase 3c: Terrain & Power-Up Items (Optional Branch C)
 - **Goal:** Expand game depth by adding reactive terrain effects and power-up items. The latter will dynamically alter the character's stats during turn validation.

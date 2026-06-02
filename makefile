@@ -7,7 +7,7 @@ fmt:
 vet: fmt
 	go vet ./...
 
-test:
+test: vet
 	go test -cover -coverprofile=coverage.txt ./...
 
 coverage: test

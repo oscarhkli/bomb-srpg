@@ -1,10 +1,13 @@
 package engine
 
-import "fmt"
+import (
+	"fmt"
+	"maps"
+)
 
 var terrainToken = map[byte]TerrainType{
 	'.': TerrainPlain,
-	'H': TerrainBlock,
+	'B': TerrainBlock,
 	'T': TerrainTower,
 	'W': TerrainWater,
 	'L': TerrainLava,
@@ -66,15 +69,15 @@ func initGameState(gameCfg GameCfg) (*GameState, error) {
 		return nil, err
 	}
 
-	grid := make([][]Cell, stagePreset.Height)
+	grid := make([][]Tile, stagePreset.Height)
 	for y, row := range stagePreset.LayoutGrid {
-		grid[y] = make([]Cell, stagePreset.Width)
+		grid[y] = make([]Tile, stagePreset.Width)
 		for x, char := range row {
 			terrain, exists := terrainToken[byte(char)]
 			if !exists {
 				return nil, fmt.Errorf("invalid terrain character '%c' at (%d, %d)", char, x, y)
 			}
-			grid[y][x] = Cell{
+			grid[y][x] = Tile{
 				Type: terrain,
 			}
 		}
@@ -159,15 +162,19 @@ func (gs *GameState) DeepCopy() *GameState {
 		Turn: gs.Turn,
 	}
 
-	if gs.Grid != nil {
-		clone.Grid = make([][]Cell, len(gs.Grid))
+	if gs.Grid == nil {
+		clone.Grid = make([][]Tile, 0)
+	} else {
+		clone.Grid = make([][]Tile, len(gs.Grid))
 		for y := range gs.Grid {
-			clone.Grid[y] = make([]Cell, len(gs.Grid[y]))
+			clone.Grid[y] = make([]Tile, len(gs.Grid[y]))
 			copy(clone.Grid[y], gs.Grid[y])
 		}
 	}
 
-	if gs.Units != nil {
+	if gs.Units == nil {
+		clone.Units = make(map[int]*Unit)
+	} else {
 		clone.Units = make(map[int]*Unit, len(gs.Units))
 		for id, unit := range gs.Units {
 			if unit == nil {
@@ -187,13 +194,13 @@ func (gs *GameState) DeepCopy() *GameState {
 				HP:           unit.HP,
 				Skills:       make(map[SkillType]bool),
 			}
-			for skill, hasSkill := range unit.Skills {
-				clone.Units[id].Skills[skill] = hasSkill
-			}
+			maps.Copy(clone.Units[id].Skills, unit.Skills)
 		}
 	}
 
-	if gs.Bombs != nil {
+	if gs.Bombs == nil {
+		clone.Bombs = make(map[int]*Bomb)
+	} else {
 		clone.Bombs = make(map[int]*Bomb, len(gs.Bombs))
 		for id, bomb := range gs.Bombs {
 			if bomb == nil {
@@ -209,7 +216,9 @@ func (gs *GameState) DeepCopy() *GameState {
 		}
 	}
 
-	if gs.SoftBlocks != nil {
+	if gs.SoftBlocks == nil {
+		clone.SoftBlocks = make(map[int]*SoftBlock)
+	} else {
 		clone.SoftBlocks = make(map[int]*SoftBlock, len(gs.SoftBlocks))
 		for id, sb := range gs.SoftBlocks {
 			if sb == nil {
