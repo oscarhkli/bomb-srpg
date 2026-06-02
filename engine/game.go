@@ -1,6 +1,9 @@
 package engine
 
-import "fmt"
+import (
+	"fmt"
+	"maps"
+)
 
 var terrainToken = map[byte]TerrainType{
 	'.': TerrainPlain,
@@ -159,7 +162,9 @@ func (gs *GameState) DeepCopy() *GameState {
 		Turn: gs.Turn,
 	}
 
-	if gs.Grid != nil {
+	if gs.Grid == nil {
+		clone.Grid = make([][]Tile, 0)
+	} else {
 		clone.Grid = make([][]Tile, len(gs.Grid))
 		for y := range gs.Grid {
 			clone.Grid[y] = make([]Tile, len(gs.Grid[y]))
@@ -167,7 +172,9 @@ func (gs *GameState) DeepCopy() *GameState {
 		}
 	}
 
-	if gs.Units != nil {
+	if gs.Units == nil {
+		clone.Units = make(map[int]*Unit)
+	} else {
 		clone.Units = make(map[int]*Unit, len(gs.Units))
 		for id, unit := range gs.Units {
 			if unit == nil {
@@ -187,13 +194,13 @@ func (gs *GameState) DeepCopy() *GameState {
 				HP:           unit.HP,
 				Skills:       make(map[SkillType]bool),
 			}
-			for skill, hasSkill := range unit.Skills {
-				clone.Units[id].Skills[skill] = hasSkill
-			}
+			maps.Copy(clone.Units[id].Skills, unit.Skills)
 		}
 	}
 
-	if gs.Bombs != nil {
+	if gs.Bombs == nil {
+		clone.Bombs = make(map[int]*Bomb)
+	} else {
 		clone.Bombs = make(map[int]*Bomb, len(gs.Bombs))
 		for id, bomb := range gs.Bombs {
 			if bomb == nil {
@@ -209,7 +216,9 @@ func (gs *GameState) DeepCopy() *GameState {
 		}
 	}
 
-	if gs.SoftBlocks != nil {
+	if gs.SoftBlocks == nil {
+		clone.SoftBlocks = make(map[int]*SoftBlock)
+	} else {
 		clone.SoftBlocks = make(map[int]*SoftBlock, len(gs.SoftBlocks))
 		for id, sb := range gs.SoftBlocks {
 			if sb == nil {

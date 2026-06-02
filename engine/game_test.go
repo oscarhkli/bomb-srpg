@@ -514,3 +514,24 @@ func TestGameStateDeepCopy_Isolation(t *testing.T) {
 		t.Errorf("Expected original soft block Position to be unaffected by changes to clone, got (%d,%d)", original.SoftBlocks[1].Position.X, original.SoftBlocks[1].Position.Y)
 	}
 }
+
+func TestGameStateDeepCopy_MemoryHandling(t *testing.T) {
+	original := &GameState{
+		Turn: 1,
+	}
+
+	clone := original.DeepCopy()
+
+	if original.Turn != clone.Turn {
+		t.Errorf("Expected colone Turn to be the same as original, got %d", clone.Turn)
+	}
+	if clone.Grid == nil {
+		t.Error("Allocation boundary breach: clone Grid was uninitialized or returned as nil.")
+	}
+	if clone.Bombs == nil {
+		t.Error("Panic guard failure: original.Bombs was nil, but clone.Bombs failed to initialize into an active writable map.")
+	}
+	if clone.SoftBlocks == nil {
+		t.Error("Panic guard failure: original.SoftBlocks was nil, but clone.SoftBlocks failed to initialize into an active writable map.")
+	}
+}
