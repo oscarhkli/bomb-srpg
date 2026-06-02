@@ -287,3 +287,37 @@ func TestGameState_FindReachableTiles_0WidthDimensionGrid(t *testing.T) {
 		t.Errorf("Expected no reachable tiles for 0-width grid, got %v", result)
 	}
 }
+
+func TestUnit_NewMovementRule_BasicWalking(t *testing.T) {
+	unit := Unit{Type: Archetype{Name: "King"}}
+
+	mr := unit.NewMovementRule()
+
+	if mr.MaxSteps != unit.Speed {
+		t.Errorf("Expected MaxSteps to match unit speed (%d), got %d", unit.Speed, mr.MaxSteps)
+	}
+
+	if mr.Pattern != PatternCardinal {
+		t.Errorf("Expected step pattern to be PatternCardinal, got %v", mr.Pattern)
+	}
+
+	if mr.CanTurn {
+		t.Error("Expected CanTurn to be false for baseline walking profiles")
+	}
+
+	if mr.StopOnNonUnitOccupant {
+		t.Error("Expected StopOnNonUnitOccupant to be false for character pedestrian walking")
+	}
+
+	// Verify that the correct permission bit flag is flipped ON
+	if mr.PassPermissions&PassItems == 0 {
+		t.Error("Security flaw: Baseline movement rule is missing the PassItems permission gate!")
+	}
+
+	// Verify that all other barriers are locked DOWN (default-fail)
+	forbiddenFlags := PassUnits | PassSoftBlocks | PassHardBlocks | PassBombs
+	if mr.PassPermissions&forbiddenFlags != 0 {
+		t.Errorf("Boundary leak: Baseline walking rule was granted unauthorized privileges (Bitmask: %b)",
+			mr.PassPermissions)
+	}
+}

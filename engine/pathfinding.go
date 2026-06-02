@@ -105,3 +105,13 @@ func (mr MovementRule) CheckPassability(tile Tile) (canPass bool, canLand bool) 
 
 	return false, false
 }
+
+// NewMovementRule builds a snapshot configuration for a unit's movement action.
+// Currently restricted to simple Phase 1 walking rules.
+func (u Unit) NewMovementRule() MovementRule {
+	return MovementRule{
+		MaxSteps:        u.Speed,
+		Pattern:         PatternCardinal,
+		PassPermissions: PassItems,
+	}
+}
