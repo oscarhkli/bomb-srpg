@@ -9,11 +9,14 @@
 - [x] Basic models & presets Archetype and Stages
 - [x] New game
 - [x] Path finding algorithm (for movement, bomb range, stage sanity check, etc.)
-- [ ] Turn, TurnCommand, commit/reset
+- [ ] Sandbox transaction handling (commit/reset)
+- [ ] Turn, TurnCommand
+- [ ] Actions (movement, set bombs)
 - [ ] GameEvent
 - [ ] Bomb detonation, chain reaction
 - [ ] Mid-turn calculation
-- [ ] Result
+- [ ] Result calculation
+- [ ] CLI terminal
 
 ## Phase 2: Web Server & Transition from Terminal Driver
 - **Goal:** Drop the console interface and build a graphical browser client.
