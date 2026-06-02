@@ -8,7 +8,7 @@
 ### TODO
 - [x] Basic models & presets Archetype and Stages
 - [x] New game
-- [ ] Path finding algorithm (for movement, bomb range, stage sanity check, etc.)
+- [x] Path finding algorithm (for movement, bomb range, stage sanity check, etc.)
 - [ ] Turn, TurnCommand, commit/reset
 - [ ] GameEvent
 - [ ] Bomb detonation, chain reaction

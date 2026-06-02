@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestInitGameState_TDD_Suite(t *testing.T) {
+func TestInitGameState_Suite(t *testing.T) {
 	tests := []struct {
 		name               string
 		cfg                GameCfg
@@ -423,13 +423,13 @@ func TestInitGameState_LayoutGridCompilation(t *testing.T) {
 			}
 
 			for y, row := range gameState.Grid {
-				for x, cell := range row {
-					if cell.Type != expectedMatrix[y][x] {
-						t.Errorf("Expected terrain at (%d,%d) to be %v, got %v", x, y, expectedMatrix[y][x], cell.Type)
+				for x, tile := range row {
+					if tile.Type != expectedMatrix[y][x] {
+						t.Errorf("Expected terrain at (%d,%d) to be %v, got %v", x, y, expectedMatrix[y][x], tile.Type)
 					}
 
-					if cell.OccupantType != ObjectNone || cell.OccupantID != 0 {
-						t.Errorf("Expected cell at (%d,%d) to have no occupant, got type %v with ID %d", x, y, cell.OccupantType, cell.OccupantID)
+					if tile.OccupantType != ObjectNone || tile.OccupantID != 0 {
+						t.Errorf("Expected tile at (%d,%d) to have no occupant, got type %v with ID %d", x, y, tile.OccupantType, tile.OccupantID)
 					}
 				}
 			}
@@ -476,12 +476,12 @@ func TestInitGame_ErrorConditions(t *testing.T) {
 func TestGameStateDeepCopy_Isolation(t *testing.T) {
 	original := &GameState{
 		Turn:       1,
-		Grid:       [][]Cell{},
+		Grid:       [][]Tile{},
 		Units:      make(map[int]*Unit),
 		Bombs:      make(map[int]*Bomb),
 		SoftBlocks: make(map[int]*SoftBlock),
 	}
-	original.Grid = append(original.Grid, []Cell{{Type: TerrainPlain, OccupantType: ObjectNone, OccupantID: 0}})
+	original.Grid = append(original.Grid, []Tile{{Type: TerrainPlain, OccupantType: ObjectNone, OccupantID: 0}})
 	original.Units[1] = &Unit{ID: 1, Type: Archetype{Name: "King"}, Team: 1, Position: Coordinate{X: 0, Y: 0}, HP: 3}
 	original.Bombs[1] = &Bomb{ID: 1, OwnerID: 1, Position: Coordinate{X: 1, Y: 1}, Range: 2, Countdown: 3}
 	original.SoftBlocks[1] = &SoftBlock{ID: 1, Position: Coordinate{X: 2, Y: 2}}
@@ -499,7 +499,7 @@ func TestGameStateDeepCopy_Isolation(t *testing.T) {
 		t.Errorf("Expected original Turn to be unaffected by changes to clone, got %d", original.Turn)
 	}
 	if original.Grid[0][0].Type == clone.Grid[0][0].Type {
-		t.Errorf("Expected original Grid cell to be unaffected by changes to clone, got %v", original.Grid[0][0].Type)
+		t.Errorf("Expected original Grid tile to be unaffected by changes to clone, got %v", original.Grid[0][0].Type)
 	}
 	if original.Units[1].HP == clone.Units[1].HP {
 		t.Errorf("Expected original unit HP to be unaffected by changes to clone, got %d", original.Units[1].HP)

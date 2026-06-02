@@ -19,13 +19,13 @@ type ObjectType int
 
 const (
 	ObjectNone ObjectType = iota
-	ObjectCharacter
+	ObjectUnit
 	ObjectBomb
 	ObjectSoftBlock // later implementation
-	ObjectPowerUp   // later implementation
+	ObjectItem      // later implementation
 )
 
-type Cell struct {
+type Tile struct {
 	Type         TerrainType
 	OccupantType ObjectType
 	OccupantID   int // ID of the occupant for cross reference
@@ -34,7 +34,7 @@ type Cell struct {
 type SoftBlock struct {
 	ID         int
 	Position   Coordinate
-	HiddenItem string // later implementationo
+	HiddenItem string // later implementation
 }
 
 type StagePreset struct {
@@ -48,11 +48,11 @@ type StagePreset struct {
 	P2StartingPositions [5]Coordinate // 42013, by default, P2 starts at the top side
 }
 
-type SkillType int
+type SkillType uint32
 
 const (
-	SkillCanJump SkillType = iota
-	SkillCanFly
+	SkillCanJump SkillType = 1 << iota // 1 (binary 00000001)
+	SkillCanFly                        // 2 (binary 00000010)
 )
 
 type Archetype struct {
@@ -76,7 +76,7 @@ type Unit struct {
 	BombPower    int
 	MaxBombCount int
 	BombUsed     int
-	Team         int // 1 = Player 1, 2 = Player 2 / AI
+	Team         int // 1 = P1, 2 = P2 / COM
 	HP           int // 1 = alive, 0 = dead, could be extended to more HP in later implementation
 	Skills       map[SkillType]bool
 }
@@ -101,7 +101,7 @@ type GameCfg struct {
 
 type GameState struct {
 	Turn         int // Turn counter, starting from 1
-	Grid         [][]Cell
+	Grid         [][]Tile
 	Units        map[int]*Unit      // Keyed by Unit ID
 	Bombs        map[int]*Bomb      // Keyed by Bomb ID
 	SoftBlocks   map[int]*SoftBlock // Keyed by SoftBlock ID
@@ -162,4 +162,28 @@ type Match struct {
 	TrueState    *GameState
 	WorkingState *GameState
 	PlaybackLog  []GameEvent
+}
+
+type StepPattern int
+
+const (
+	PatternCardinal StepPattern = iota // Up, Down, Left, Right
+)
+
+type PassFlag uint8
+
+const (
+	PassUnits      PassFlag = 1 << iota // 1  (binary 00000001)
+	PassSoftBlocks                      // 2  (binary 00000010)
+	PassHardBlocks                      // 4  (binary 00000100)
+	PassItems                           // 8  (binary 00001000)
+	PassBombs                           // 16 (binary 00010000)
+)
+
+type MovementRule struct {
+	MaxSteps              int // Maximum number of steps allowed; -1 for unlimited
+	Pattern               StepPattern
+	CanTurn               bool     // If true, the unit can change direction at each step; if false, the unit must move in a straight line
+	PassPermissions       PassFlag // Bitmask for what types of obstacles the unit can pass through
+	StopOnNonUnitOccupant bool     // If true, the unit will stop if it encounters any non-unit occupant; if false, it will stop before the tile with the non-unit occupant
 }

@@ -66,15 +66,15 @@ func initGameState(gameCfg GameCfg) (*GameState, error) {
 		return nil, err
 	}
 
-	grid := make([][]Cell, stagePreset.Height)
+	grid := make([][]Tile, stagePreset.Height)
 	for y, row := range stagePreset.LayoutGrid {
-		grid[y] = make([]Cell, stagePreset.Width)
+		grid[y] = make([]Tile, stagePreset.Width)
 		for x, char := range row {
 			terrain, exists := terrainToken[byte(char)]
 			if !exists {
 				return nil, fmt.Errorf("invalid terrain character '%c' at (%d, %d)", char, x, y)
 			}
-			grid[y][x] = Cell{
+			grid[y][x] = Tile{
 				Type: terrain,
 			}
 		}
@@ -160,9 +160,9 @@ func (gs *GameState) DeepCopy() *GameState {
 	}
 
 	if gs.Grid != nil {
-		clone.Grid = make([][]Cell, len(gs.Grid))
+		clone.Grid = make([][]Tile, len(gs.Grid))
 		for y := range gs.Grid {
-			clone.Grid[y] = make([]Cell, len(gs.Grid[y]))
+			clone.Grid[y] = make([]Tile, len(gs.Grid[y]))
 			copy(clone.Grid[y], gs.Grid[y])
 		}
 	}
