@@ -14,11 +14,11 @@ func (gs *GameState) ClearStageTile(pos Coordinate) {
 		return
 	}
 
-	gs.Grid[pos.Y][pos.X].OccupantType = ObjectNone
+	gs.Grid[pos.Y][pos.X].OccupantType = OccupantNone
 	gs.Grid[pos.Y][pos.X].OccupantID = 0
 }
 
-func (gs *GameState) UpdateStageOccupant(pos Coordinate, occupantType ObjectType, id int) {
+func (gs *GameState) UpdateStageOccupant(pos Coordinate, occupantType OccupantType, id int) {
 	if !gs.IsWithinBounds(pos) {
 		return
 	}

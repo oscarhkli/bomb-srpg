@@ -428,7 +428,7 @@ func TestInitGameState_LayoutGridCompilation(t *testing.T) {
 						t.Errorf("Expected terrain at (%d,%d) to be %v, got %v", x, y, expectedMatrix[y][x], tile.Type)
 					}
 
-					if tile.OccupantType != ObjectNone || tile.OccupantID != 0 {
+					if tile.OccupantType != OccupantNone || tile.OccupantID != 0 {
 						t.Errorf("Expected tile at (%d,%d) to have no occupant, got type %v with ID %d", x, y, tile.OccupantType, tile.OccupantID)
 					}
 				}
@@ -481,7 +481,7 @@ func TestGameStateDeepCopy_Isolation(t *testing.T) {
 		Bombs:      make(map[int]*Bomb),
 		SoftBlocks: make(map[int]*SoftBlock),
 	}
-	original.Grid = append(original.Grid, []Tile{{Type: TerrainPlain, OccupantType: ObjectNone, OccupantID: 0}})
+	original.Grid = append(original.Grid, []Tile{{Type: TerrainPlain, OccupantType: OccupantNone, OccupantID: 0}})
 	original.Units[1] = &Unit{ID: 1, Type: Archetype{Name: "King"}, Team: 1, Position: Coordinate{X: 0, Y: 0}, HP: 3}
 	original.Bombs[1] = &Bomb{ID: 1, OwnerID: 1, Position: Coordinate{X: 1, Y: 1}, Range: 2, Countdown: 3}
 	original.SoftBlocks[1] = &SoftBlock{ID: 1, Position: Coordinate{X: 2, Y: 2}}

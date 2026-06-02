@@ -77,21 +77,21 @@ func (mr MovementRule) CheckPassability(tile Tile) (canPass bool, canLand bool) 
 		return false, false
 	}
 
-	if tile.OccupantType == ObjectUnit && (mr.PassPermissions&PassUnits == 0) {
+	if tile.OccupantType == OccupantUnit && (mr.PassPermissions&PassUnits == 0) {
 		return false, false
 	}
 
-	if tile.OccupantType == ObjectNone || tile.OccupantType == ObjectUnit {
+	if tile.OccupantType == OccupantNone || tile.OccupantType == OccupantUnit {
 		return true, false
 	}
 
 	var permissionFlag PassFlag
 	switch tile.OccupantType {
-	case ObjectBomb:
+	case OccupantBomb:
 		permissionFlag = PassBombs
-	case ObjectSoftBlock:
+	case OccupantSoftBlock:
 		permissionFlag = PassSoftBlocks
-	case ObjectItem:
+	case OccupantItem:
 		permissionFlag = PassItems
 	}
 

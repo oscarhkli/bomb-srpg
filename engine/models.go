@@ -15,19 +15,19 @@ type Coordinate struct {
 	Y int
 }
 
-type ObjectType int
+type OccupantType int
 
 const (
-	ObjectNone ObjectType = iota
-	ObjectUnit
-	ObjectBomb
-	ObjectSoftBlock // later implementation
-	ObjectItem      // later implementation
+	OccupantNone OccupantType = iota
+	OccupantUnit
+	OccupantBomb
+	OccupantSoftBlock
+	OccupantItem
 )
 
 type Tile struct {
 	Type         TerrainType
-	OccupantType ObjectType
+	OccupantType OccupantType
 	OccupantID   int // ID of the occupant for cross reference
 }
 
@@ -48,7 +48,7 @@ type StagePreset struct {
 	P2StartingPositions [5]Coordinate // 42013, by default, P2 starts at the top side
 }
 
-type SkillType uint32
+type SkillType uint32 // 32-bit is forseenable
 
 const (
 	SkillCanJump SkillType = 1 << iota // 1 (binary 00000001)
@@ -94,9 +94,11 @@ type GameCfg struct {
 	P1Teams                     []string // List of archetype names for Player 1's units
 	P2Teams                     []string // List of archetype names for Player 2's units
 	MaxTurns                    int
-	GlobalSpeedOverride         int // For testing purposes, allows overriding the default speed for all units. 0 means no override.
-	GlobalBombCountdownOverride int // For testing purposes, allows overriding the default bomb countdown. 0 means no override.
-	GlobalBombMaxRangeOverride  int // For testing purposes, allows overriding the default max bomb range. 0 means no override.
+	AllowResetTurn              bool // false = no way back. Multiplaying gaming experience will be changed accordingly
+	SuddenDeath                 bool // false = draw if Turn >= MaxTurn
+	GlobalSpeedOverride         int  // For testing purposes, allows overriding the default speed for all units. 0 means no override.
+	GlobalBombCountdownOverride int  // For testing purposes, allows overriding the default bomb countdown. 0 means no override.
+	GlobalBombMaxRangeOverride  int  // For testing purposes, allows overriding the default max bomb range. 0 means no override.
 }
 
 type GameState struct {

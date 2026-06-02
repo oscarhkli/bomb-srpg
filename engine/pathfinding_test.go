@@ -117,11 +117,11 @@ func TestGameState_FindReachableTiles_TerrainAndBoundaries(t *testing.T) {
 }
 
 func TestGameState_FindReachableTiles_OccupiedTiles(t *testing.T) {
-	occupants := [][]ObjectType{
-		{ObjectNone, ObjectUnit, ObjectSoftBlock, ObjectUnit, ObjectItem, ObjectBomb, ObjectBomb, ObjectSoftBlock},
-		{ObjectUnit, ObjectUnit, ObjectSoftBlock, ObjectUnit, ObjectBomb, ObjectBomb, ObjectItem, ObjectSoftBlock},
-		{ObjectUnit, ObjectUnit, ObjectSoftBlock, ObjectUnit, ObjectNone, ObjectNone, ObjectBomb, ObjectBomb},
-		{ObjectUnit, ObjectUnit, ObjectUnit, ObjectUnit, ObjectBomb, ObjectSoftBlock, ObjectBomb, ObjectNone},
+	occupants := [][]OccupantType{
+		{OccupantNone, OccupantUnit, OccupantSoftBlock, OccupantUnit, OccupantItem, OccupantBomb, OccupantBomb, OccupantSoftBlock},
+		{OccupantUnit, OccupantUnit, OccupantSoftBlock, OccupantUnit, OccupantBomb, OccupantBomb, OccupantItem, OccupantSoftBlock},
+		{OccupantUnit, OccupantUnit, OccupantSoftBlock, OccupantUnit, OccupantNone, OccupantNone, OccupantBomb, OccupantBomb},
+		{OccupantUnit, OccupantUnit, OccupantUnit, OccupantUnit, OccupantBomb, OccupantSoftBlock, OccupantBomb, OccupantNone},
 	}
 	grid := make([][]Tile, len(occupants))
 	for y, row := range occupants {

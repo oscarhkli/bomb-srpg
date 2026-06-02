@@ -89,21 +89,21 @@ func TestGameState_ClearStageTile(t *testing.T) {
 		name         string
 		clearPos     Coordinate
 		verifyPos    Coordinate
-		expectedType ObjectType
+		expectedType OccupantType
 		expectedID   int
 	}{
 		{
 			name:         "Within bound, can clear",
 			clearPos:     Coordinate{1, 0},
 			verifyPos:    Coordinate{1, 0},
-			expectedType: ObjectNone,
+			expectedType: OccupantNone,
 			expectedID:   0,
 		},
 		{
 			name:         "Out of bound, do nothing",
 			clearPos:     Coordinate{1000, 1000},
 			verifyPos:    Coordinate{1, 0},
-			expectedType: ObjectUnit,
+			expectedType: OccupantUnit,
 			expectedID:   unitID,
 		},
 	}
@@ -113,9 +113,9 @@ func TestGameState_ClearStageTile(t *testing.T) {
 			// Arrange: Create a sterile 1x3 grid row for this test case run
 			state := &GameState{
 				Grid: [][]Tile{{
-					{Type: TerrainPlain, OccupantType: ObjectUnit, OccupantID: 123},
-					{Type: TerrainPlain, OccupantType: ObjectUnit, OccupantID: unitID},
-					{Type: TerrainPlain, OccupantType: ObjectUnit, OccupantID: 456},
+					{Type: TerrainPlain, OccupantType: OccupantUnit, OccupantID: 123},
+					{Type: TerrainPlain, OccupantType: OccupantUnit, OccupantID: unitID},
+					{Type: TerrainPlain, OccupantType: OccupantUnit, OccupantID: 456},
 				}},
 			}
 
@@ -142,21 +142,21 @@ func TestGameState_UpdateStageOccupant(t *testing.T) {
 		name         string
 		updatePos    Coordinate
 		verifyPos    Coordinate
-		expectedType ObjectType
+		expectedType OccupantType
 		expectedID   int
 	}{
 		{
 			name:         "Within bound, can update",
 			updatePos:    Coordinate{1, 0},
 			verifyPos:    Coordinate{1, 0},
-			expectedType: ObjectBomb,
+			expectedType: OccupantBomb,
 			expectedID:   200,
 		},
 		{
 			name:         "Out of bound, do nothing",
 			updatePos:    Coordinate{1000, 1000},
 			verifyPos:    Coordinate{1, 0},
-			expectedType: ObjectUnit,
+			expectedType: OccupantUnit,
 			expectedID:   100,
 		},
 	}
@@ -166,9 +166,9 @@ func TestGameState_UpdateStageOccupant(t *testing.T) {
 			// Arrange: Create a sterile 1x3 grid row for this test case run
 			state := &GameState{
 				Grid: [][]Tile{{
-					{Type: TerrainPlain, OccupantType: ObjectUnit, OccupantID: 123},
-					{Type: TerrainPlain, OccupantType: ObjectUnit, OccupantID: 100},
-					{Type: TerrainPlain, OccupantType: ObjectUnit, OccupantID: 456},
+					{Type: TerrainPlain, OccupantType: OccupantUnit, OccupantID: 123},
+					{Type: TerrainPlain, OccupantType: OccupantUnit, OccupantID: 100},
+					{Type: TerrainPlain, OccupantType: OccupantUnit, OccupantID: 456},
 				}},
 			}
 
