@@ -291,11 +291,12 @@ func TestInitGameState_Suite(t *testing.T) {
 				})
 
 				var expectedPosition Coordinate
+				_, index := DecodeUnitID(id)
 				switch unit.Team {
 				case 1:
-					expectedPosition = preset.P1StartingPositions[id&0x0F] // Player 1 IDs start from 16
+					expectedPosition = preset.P1StartingPositions[index]
 				case 2:
-					expectedPosition = preset.P2StartingPositions[id&0x0F] // Player 2 IDs start from 32
+					expectedPosition = preset.P2StartingPositions[index]
 				default:
 					t.Errorf("Unit ID %d has invalid team %d", id, unit.Team)
 				}
@@ -487,6 +488,7 @@ func TestGameStateDeepCopy_Isolation(t *testing.T) {
 	clone := original.DeepCopy()
 
 	clone.Turn = 2
+	clone.TurnBombCounter = 10
 	clone.Grid[0][0].Type = TerrainTower
 	clone.Units[1].HP = 100
 	clone.Units[1].Position = Coordinate{X: 5, Y: 5}
@@ -495,6 +497,9 @@ func TestGameStateDeepCopy_Isolation(t *testing.T) {
 
 	if original.Turn == clone.Turn {
 		t.Errorf("Expected original Turn to be unaffected by changes to clone, got %d", original.Turn)
+	}
+	if original.TurnBombCounter == clone.TurnBombCounter {
+		t.Errorf("Expected original TurnBombCounter to be unaffected by changes to clone, got %d", original.TurnBombCounter)
 	}
 	if original.Grid[0][0].Type == clone.Grid[0][0].Type {
 		t.Errorf("Expected original Grid tile to be unaffected by changes to clone, got %v", original.Grid[0][0].Type)

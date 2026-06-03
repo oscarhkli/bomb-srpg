@@ -125,7 +125,7 @@ func createUnits(
 		if !exists {
 			return fmt.Errorf("archetype '%s' for Player %d not found", archetypeName, teamID)
 		}
-		id := (teamID << 4) | i // Player 1 units have IDs starting from 8, Player 2 units have IDs starting from 16
+		id := NewUnitID(teamID, i) // Player 1 units have IDs starting from 8, Player 2 units have IDs starting from 16
 		units[id] = &Unit{
 			ID:           id,
 			Type:         archetype,
