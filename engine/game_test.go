@@ -290,19 +290,17 @@ func TestInitGameState_Suite(t *testing.T) {
 					}
 				})
 
+				var expectedPosition Coordinate
 				switch unit.Team {
 				case 1:
-					expectedPosition := preset.P1StartingPositions[id-8] // Player 1 IDs start from 8
-					if unit.Position != expectedPosition {
-						t.Errorf("Expected Player 1 unit ID %d to start at (%d,%d), got (%d,%d)", id, expectedPosition.X, expectedPosition.Y, unit.Position.X, unit.Position.Y)
-					}
+					expectedPosition = preset.P1StartingPositions[id&0x0F] // Player 1 IDs start from 16
 				case 2:
-					expectedPosition := preset.P2StartingPositions[id-16] // Player 2 IDs start from 16
-					if unit.Position != expectedPosition {
-						t.Errorf("Expected Player 2 unit ID %d to start at (%d,%d), got (%d,%d)", id, expectedPosition.X, expectedPosition.Y, unit.Position.X, unit.Position.Y)
-					}
+					expectedPosition = preset.P2StartingPositions[id&0x0F] // Player 2 IDs start from 32
 				default:
 					t.Errorf("Unit ID %d has invalid team %d", id, unit.Team)
+				}
+				if unit.Position != expectedPosition {
+					t.Errorf("Expected Player %d unit ID %d to start at (%d,%d), got (%d,%d)", unit.Team, id, expectedPosition.X, expectedPosition.Y, unit.Position.X, unit.Position.Y)
 				}
 			}
 
