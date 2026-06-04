@@ -26,3 +26,9 @@ func (gs *GameState) UpdateStageOccupant(pos Coordinate, occupantType OccupantTy
 	gs.Grid[pos.Y][pos.X].OccupantType = occupantType
 	gs.Grid[pos.Y][pos.X].OccupantID = id
 }
+
+// DeduceBombCountDown inspects the target position and unit's skill and deduces the count down of the bomb.
+// Since terrains and skills are in later phase, it always return 5 at the moment
+func (gs *GameState) DeduceBombCountDown(pos Coordinate, unit *Unit) int {
+	return BombDefaultCountDown
+}

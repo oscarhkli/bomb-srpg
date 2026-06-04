@@ -321,3 +321,31 @@ func TestUnit_NewMovementRule_BasicWalking(t *testing.T) {
 			mr.PassPermissions)
 	}
 }
+
+func TestUnit_NewBombPlacementRule(t *testing.T) {
+	unit := Unit{Type: Archetype{Name: "King"}}
+
+	br := unit.NewBombPlacementRule()
+
+	if br.MaxSteps != unit.BombMaxRange {
+		t.Errorf("Expected MaxSteps to match unit BombMaxRange (%d), got %d", unit.BombMaxRange, br.MaxSteps)
+	}
+
+	if br.Pattern != PatternCardinal {
+		t.Errorf("Expected step pattern to be PatternCardinal, got %v", br.Pattern)
+	}
+
+	requiredFlags := PassUnits | PassSoftBlocks | PassHardBlocks | PassItems | PassBombs
+
+	// Verify that the placement rule permits passing through all required objects
+	if br.PassPermissions&requiredFlags != requiredFlags {
+		t.Errorf("Security flaw: Bomb placement rule is missing required pass permissions. Expected mask %b, got %b",
+			requiredFlags, br.PassPermissions)
+	}
+
+	// Verify that no undefined/unauthorized high bits are set outside our expected flags
+	if br.PassPermissions&^requiredFlags != 0 {
+		t.Errorf("Boundary leak: Bomb placement rule was granted unauthorized privileges (Bitmask: %b)",
+			br.PassPermissions)
+	}
+}

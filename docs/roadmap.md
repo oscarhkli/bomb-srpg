@@ -10,9 +10,9 @@
 - [x] New game
 - [x] Path finding algorithm (for movement, bomb range, stage sanity check, etc.)
 - [x] Sandbox transaction handling (commit/reset)
-- [ ] Match management
-  - [x] Actions - Movement
-  - [ ] Set bombs
+- [x] Match action management
+  - [x] Unit movement
+  - [x] Bomb placement
 - [ ] Resolving turns
   - [ ] Bomb ticking
   - [ ] Bomb detonation, chain reaction

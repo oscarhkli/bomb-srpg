@@ -19,6 +19,9 @@ func (m *Match) SubmitAction(gameEvent GameEvent) {
 	}
 }
 
+// CommandMoveUnit executes a unit relocation after verifying game rule compliance.
+// It calculates the active range, updates the board matrix, and commits a UnitMovedEvent.
+// Returns an error if the pathing rules are violated or if the target cell is blocked.
 func (m *Match) CommandMoveUnit(unitID int, target Coordinate) error {
 	unit, err := m.validateActiveUnit(unitID)
 	if err != nil {
@@ -49,6 +52,9 @@ func (m *Match) CommandMoveUnit(unitID int, target Coordinate) error {
 	return nil
 }
 
+// validateActiveUnit performs systemic and structural sanity checks on a requested unit.
+// It sequentially validates presence, vitality, phase ownership, bounds, and grid desync.
+// Returns a pointer to the verified Unit, or a detailed error blocking action execution.
 func (m *Match) validateActiveUnit(unitID int) (*Unit, error) {
 	unit, ok := m.WorkingState.Units[unitID]
 	if !ok {
@@ -77,8 +83,50 @@ func (m *Match) validateActiveUnit(unitID int) (*Unit, error) {
 	return unit, nil
 }
 
+// CommandPlaceBomb executes a bomb deployment after verifying unit's bomb availability and grid compliance.
+// It validates placement range, registers a new Bomb state tracking instance, and commits a BombPlacedEvent.
+// Returns an error if the unit is running out of bombs, the target is out of range, or the cell is blocked.
 func (m *Match) CommandPlaceBomb(unitID int, target Coordinate) error {
-	// TODO
+
+	// identify the unit and check the availability
+	unit, err := m.validateActiveUnit(unitID)
+	if err != nil {
+		return err
+	}
+
+	if unit.BombUsed >= unit.MaxBombCount {
+		return fmt.Errorf("unit restriction: unit %d has used up all his bombs", unitID)
+	}
+
+	tiles := m.WorkingState.FindReachableTiles(unit.Position, unit.NewBombPlacementRule())
+
+	if _, ok := tiles[target]; !ok {
+		return fmt.Errorf("bomb placement restriction: target coordinate is out of placement range")
+	}
+
+	if err = m.WorkingState.IsLandingLegal(target, OccupantBomb); err != nil {
+		return fmt.Errorf("bomb placement rejected: %w", err)
+	}
+
+	m.WorkingState.TurnBombCounter++
+	bomb := &Bomb{
+		ID:        NewBombID(m.WorkingState.Turn, m.WorkingState.TurnBombCounter, unitID),
+		OwnerID:   unitID,
+		Position:  target,
+		Range:     unit.BombPower,
+		Countdown: m.WorkingState.DeduceBombCountDown(target, unit),
+	}
+	m.WorkingState.Bombs[bomb.ID] = bomb
+	m.WorkingState.UpdateStageOccupant(target, OccupantBomb, bomb.ID)
+
+	m.SubmitAction(BombPlacedEvent{
+		UnitID:    unitID,
+		BombID:    bomb.ID,
+		Position:  target,
+		Range:     bomb.Range,
+		Countdown: bomb.Countdown,
+	})
+
 	return nil
 }
 

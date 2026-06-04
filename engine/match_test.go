@@ -8,7 +8,7 @@ import (
 )
 
 func TestMatch_ResetTurn(t *testing.T) {
-	unitID := 8
+	unitID := 16
 	m := Match{
 		TrueState: &GameState{
 			Turn: 1,
@@ -32,7 +32,7 @@ func TestMatch_ResetTurn(t *testing.T) {
 }
 
 func TestMatch_SubmitAction_AllowResetTurn(t *testing.T) {
-	unitID := 8
+	unitID := 16
 	m := Match{
 		TrueState: &GameState{
 			Turn: 1,
@@ -66,7 +66,7 @@ func TestMatch_SubmitAction_AllowResetTurn(t *testing.T) {
 }
 
 func TestMatch_SubmitAction_DisallowResetTurn(t *testing.T) {
-	unitID := 8
+	unitID := 16
 	m := Match{
 		TrueState: &GameState{
 			Turn: 1,
@@ -260,6 +260,10 @@ func TestCommandMoveUnit(t *testing.T) {
 				if len(m.PlaybackLog) != 1 {
 					t.Errorf("expected 1 action submitted, got %d", len(m.PlaybackLog))
 				}
+				event, ok := m.PlaybackLog[0].(UnitMovedEvent)
+				if !ok || event.UnitID != validUnitID || event.From != origin || event.To != validTarget {
+					t.Errorf("malformed UnitMovedEvent logged: %+v", m.PlaybackLog[0])
+				}
 			},
 		},
 	}
@@ -280,6 +284,256 @@ func TestCommandMoveUnit(t *testing.T) {
 			}
 
 			// State validation checking
+			if tt.verifyResults != nil {
+				tt.verifyResults(t, match)
+			}
+		})
+	}
+}
+
+func TestCommandPlaceBomb(t *testing.T) {
+	// Define the schema for our table rows matching the style of TestCommandMoveUnit
+	type testCase struct {
+		name          string
+		unitID        int
+		target        Coordinate
+		setupState    func() *Match // Context setup helper
+		wantErr       bool
+		errContains   string
+		verifyResults func(t *testing.T, m *Match) // Post-execution state check
+	}
+
+	// Constants for easy setup
+	const (
+		validUnitID = 42
+		deadUnitID  = 99
+	)
+	origin := Coordinate{X: 1, Y: 1}
+	validTarget := Coordinate{X: 1, Y: 2}
+	outOfRangeTarget := Coordinate{X: 5, Y: 5}
+
+	tests := []testCase{
+		{
+			name:   "Failure: Unit does not exist",
+			unitID: 999, // Missing ID
+			target: validTarget,
+			setupState: func() *Match {
+				return newTestMatch(2, 2) // Empty map, no units
+			},
+			wantErr:     true,
+			errContains: "security violation: unit ID 999 does not exist",
+		},
+		{
+			name:   "Failure: Unit is dead",
+			unitID: deadUnitID,
+			target: validTarget,
+			setupState: func() *Match {
+				m := newTestMatch(2, 2)
+				m.WorkingState.Units[deadUnitID] = &Unit{ID: deadUnitID, HP: 0, Team: 1, Position: origin}
+				return m
+			},
+			wantErr:     true,
+			errContains: "tactical restriction: unit 99 is dead",
+		},
+		{
+			name:   "Failure: Wrong team turn",
+			unitID: validUnitID,
+			target: validTarget,
+			setupState: func() *Match {
+				m := newTestMatch(2, 2)
+				m.WorkingState.Turn = 1 // Team 1's turn
+				m.WorkingState.Units[validUnitID] = &Unit{
+					ID:       validUnitID,
+					HP:       1,
+					Team:     2, // Team 2 Unit
+					Position: origin,
+				}
+				return m
+			},
+			wantErr:     true,
+			errContains: "turn restriction: unit 42 belongs to Team 2 but it's currently Team 1's turn",
+		},
+		{
+			name:   "Failure: Data corruption - unit out of bounds",
+			unitID: validUnitID,
+			target: validTarget,
+			setupState: func() *Match {
+				m := newTestMatch(3, 3)
+				m.WorkingState.Turn = 1
+				m.WorkingState.Units[validUnitID] = &Unit{
+					ID:       validUnitID,
+					HP:       1,
+					Team:     1,
+					Position: Coordinate{X: -5, Y: -5}, // Out of stage bounds
+				}
+				return m
+			},
+			wantErr:     true,
+			errContains: "data corruption: unit 42 current position",
+		},
+		{
+			name:   "Failure: Grid data desync",
+			unitID: validUnitID,
+			target: validTarget,
+			setupState: func() *Match {
+				m := newTestMatch(2, 2)
+				m.WorkingState.Turn = 1
+				m.WorkingState.Units[validUnitID] = &Unit{
+					ID:       validUnitID,
+					HP:       1,
+					Team:     1,
+					Position: origin,
+				}
+				m.WorkingState.Grid[origin.Y][origin.X] = Tile{OccupantType: OccupantNone}
+				return m
+			},
+			wantErr:     true,
+			errContains: "data desync: grid matrix at",
+		},
+		{
+			name:   "Failure: Unit has used up all bombs",
+			unitID: validUnitID,
+			target: validTarget,
+			setupState: func() *Match {
+				m := newTestMatch(3, 3)
+				m.WorkingState.Turn = 1
+				m.WorkingState.Units[validUnitID] = &Unit{
+					ID:           validUnitID,
+					HP:           1,
+					Team:         1,
+					Position:     origin,
+					MaxBombCount: 2,
+					BombUsed:     2, // All bombs deployed
+				}
+				m.WorkingState.Grid[origin.Y][origin.X] = Tile{OccupantType: OccupantUnit, OccupantID: validUnitID}
+				return m
+			},
+			wantErr:     true,
+			errContains: "unit restriction: unit 42 has used up all his bombs",
+		},
+		{
+			name:   "Failure: Target out of placement range",
+			unitID: validUnitID,
+			target: outOfRangeTarget,
+			setupState: func() *Match {
+				m := newTestMatch(10, 10)
+				m.WorkingState.Turn = 1
+				m.WorkingState.Units[validUnitID] = &Unit{
+					ID:           validUnitID,
+					HP:           1,
+					Team:         1,
+					Position:     origin,
+					BombMaxRange: 1,
+					MaxBombCount: 1,
+					BombUsed:     0,
+				}
+				m.WorkingState.Grid[origin.Y][origin.X] = Tile{OccupantType: OccupantUnit, OccupantID: validUnitID}
+				return m
+			},
+			wantErr:     true,
+			errContains: "bomb placement restriction: target coordinate is out of placement range",
+		},
+		{
+			name:   "Failure: Illegal target wanding",
+			unitID: validUnitID,
+			target: validTarget,
+			setupState: func() *Match {
+				m := newTestMatch(3, 3)
+				m.WorkingState.Turn = 3
+				m.WorkingState.TurnBombCounter = 0
+				m.WorkingState.Bombs = make(map[int]*Bomb)
+				m.WorkingState.Units[validUnitID] = &Unit{
+					ID:           validUnitID,
+					HP:           1,
+					Team:         1,
+					Position:     origin,
+					BombPower:    3,
+					BombMaxRange: 3,
+					MaxBombCount: 2,
+					BombUsed:     0,
+				}
+				m.WorkingState.Grid[validTarget.Y][validTarget.X].Type = TerrainBlock // make the target tile illegal to place a bomb
+				m.WorkingState.Grid[origin.Y][origin.X] = Tile{OccupantType: OccupantUnit, OccupantID: validUnitID}
+				return m
+			},
+			wantErr:     true,
+			errContains: "bomb placement rejected: terrain restriction",
+		},
+		{
+			name:   "Success: Bomb placed successfully",
+			unitID: validUnitID,
+			target: validTarget,
+			setupState: func() *Match {
+				m := newTestMatch(3, 3)
+				m.WorkingState.Turn = 3
+				m.WorkingState.TurnBombCounter = 0
+				m.WorkingState.Bombs = make(map[int]*Bomb)
+				m.WorkingState.Units[validUnitID] = &Unit{
+					ID:           validUnitID,
+					HP:           1,
+					Team:         1,
+					Position:     origin,
+					BombPower:    3,
+					BombMaxRange: 3,
+					MaxBombCount: 2,
+					BombUsed:     0,
+				}
+				m.WorkingState.Grid[origin.Y][origin.X] = Tile{OccupantType: OccupantUnit, OccupantID: validUnitID}
+				return m
+			},
+			wantErr: false,
+			verifyResults: func(t *testing.T, m *Match) {
+				if m.WorkingState.TurnBombCounter != 1 {
+					t.Errorf("expected TurnBombCounter to be 1, got %d", m.WorkingState.TurnBombCounter)
+				}
+
+				expectedBombID := NewBombID(3, 1, validUnitID)
+				bomb, exists := m.WorkingState.Bombs[expectedBombID]
+				if !exists {
+					t.Fatalf("expected bomb tracking map entry under ID 0x%X missing", expectedBombID)
+				}
+
+				if bomb.OwnerID != validUnitID || bomb.Position != validTarget || bomb.Range != 3 || bomb.Countdown != 5 {
+					t.Errorf("registered bomb structural parameters mismatched: %+v", bomb)
+				}
+
+				targetCell := m.WorkingState.Grid[validTarget.Y][validTarget.X]
+				if targetCell.OccupantType != OccupantBomb || targetCell.OccupantID != expectedBombID {
+					t.Errorf("expected target grid tile to hold bomb entity, got type %v, id %d", targetCell.OccupantType, targetCell.OccupantID)
+				}
+
+				originCell := m.WorkingState.Grid[origin.Y][origin.X]
+				if originCell.OccupantType != OccupantUnit || originCell.OccupantID != validUnitID {
+					t.Errorf("expected origin unit tile to remain intact, got type %v, id %d", originCell.OccupantType, originCell.OccupantID)
+				}
+
+				if len(m.PlaybackLog) != 1 {
+					t.Fatalf("expected 1 action submitted, got %d", len(m.PlaybackLog))
+				}
+				event, ok := m.PlaybackLog[0].(BombPlacedEvent)
+				if !ok || event.UnitID != validUnitID || event.BombID != expectedBombID || event.Position != validTarget || event.Range != 3 || event.Countdown != 5 {
+					t.Errorf("malformed BombPlacedEvent logged: %+v", m.PlaybackLog[0])
+				}
+			},
+		},
+	}
+
+	// Execution loop matching TestCommandMoveUnit
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			match := tt.setupState()
+
+			err := match.CommandPlaceBomb(tt.unitID, tt.target)
+
+			// Error validation checking
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("CommandPlaceBomb() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if err != nil && !strings.Contains(err.Error(), tt.errContains) {
+				t.Errorf("expected error containing %q, got %q", tt.errContains, err.Error())
+			}
+
+			// State transformation post-checks
 			if tt.verifyResults != nil {
 				tt.verifyResults(t, match)
 			}

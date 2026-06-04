@@ -189,3 +189,23 @@ func TestGameState_UpdateStageOccupant(t *testing.T) {
 		})
 	}
 }
+
+func TestGameState_DeduceBombCountDown(t *testing.T) {
+	unitID := 16
+	unit := &Unit{
+		ID: unitID,
+	}
+	gs := &GameState{
+		Grid: [][]Tile{{
+			{Type: TerrainPlain},
+		}},
+		Units: map[int]*Unit{
+			unitID: unit,
+		},
+	}
+
+	want := 5
+	if got := gs.DeduceBombCountDown(Coordinate{0, 0}, unit); got != want {
+		t.Errorf("DeduceBombCountDown() = %v, want %v", got, want)
+	}
+}

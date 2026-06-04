@@ -66,6 +66,9 @@ type Archetype struct {
 	PresetSkills map[SkillType]bool
 }
 
+type UnitID uint8 // will be used later on
+type BombID uint32
+
 type Unit struct {
 	ID           int
 	Type         Archetype
@@ -102,12 +105,13 @@ type GameCfg struct {
 }
 
 type GameState struct {
-	Turn         int // Turn counter, starting from 1
-	Grid         [][]Tile
-	Units        map[int]*Unit      // Keyed by Unit ID
-	Bombs        map[int]*Bomb      // Keyed by Bomb ID
-	SoftBlocks   map[int]*SoftBlock // Keyed by SoftBlock ID
-	TurnCommands []TurnCommand      // Commands issued by players for the current turn
+	Turn            int // Turn counter, starting from 1
+	TurnBombCounter int // To record how many bombs placed during the turn
+	Grid            [][]Tile
+	Units           map[int]*Unit      // Keyed by Unit ID
+	Bombs           map[int]*Bomb      // Keyed by Bomb ID
+	SoftBlocks      map[int]*SoftBlock // Keyed by SoftBlock ID
+	TurnCommands    []TurnCommand      // Commands issued by players for the current turn
 }
 
 type ActionType int

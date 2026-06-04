@@ -115,3 +115,14 @@ func (u Unit) NewMovementRule() MovementRule {
 		PassPermissions: PassItems,
 	}
 }
+
+// NewBombPlacementRule builds a snapshot configuration for a unit's bomb placement action.
+// It covers almost all situation, unless we want to add MinStep in far future
+func (u Unit) NewBombPlacementRule() MovementRule {
+	return MovementRule{
+		MaxSteps: u.BombMaxRange,
+		Pattern:  PatternCardinal,
+		// All pass, but can't land on any occupant. Landing is handled in other place.
+		PassPermissions: PassUnits | PassSoftBlocks | PassHardBlocks | PassItems | PassBombs,
+	}
+}
