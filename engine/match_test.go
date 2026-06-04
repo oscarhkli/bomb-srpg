@@ -113,9 +113,9 @@ func TestCommandMoveUnit(t *testing.T) {
 
 	validUnitID := NewUnitID(1, 0)
 	deadUnitID := NewUnitID(1, 2)
-	origin := Coordinate{X: 1, Y: 1}
-	validTarget := Coordinate{X: 1, Y: 2}
-	outOfRangeTarget := Coordinate{X: 5, Y: 5}
+	origin := Coordinate{1, 1}
+	validTarget := Coordinate{1, 2}
+	outOfRangeTarget := Coordinate{5, 5}
 
 	tests := []testCase{
 		{
@@ -174,7 +174,7 @@ func TestCommandMoveUnit(t *testing.T) {
 					ID:       validUnitID,
 					HP:       1,
 					Team:     1,
-					Position: Coordinate{X: -5, Y: -5}, // Out of stage bounds
+					Position: Coordinate{-5, -5}, // Out of stage bounds
 					Speed:    3,
 				}
 				// Do not add it to the Grid matrix since the coordinate is invalid
@@ -303,9 +303,9 @@ func TestCommandPlaceBomb(t *testing.T) {
 	// Constants for easy setup
 	validUnitID := NewUnitID(1, 0)
 	deadUnitID := NewUnitID(1, 2)
-	origin := Coordinate{X: 1, Y: 1}
-	validTarget := Coordinate{X: 1, Y: 2}
-	outOfRangeTarget := Coordinate{X: 5, Y: 5}
+	origin := Coordinate{1, 1}
+	validTarget := Coordinate{1, 2}
+	outOfRangeTarget := Coordinate{5, 5}
 
 	tests := []testCase{
 		{
@@ -359,7 +359,7 @@ func TestCommandPlaceBomb(t *testing.T) {
 					ID:       validUnitID,
 					HP:       1,
 					Team:     1,
-					Position: Coordinate{X: -5, Y: -5}, // Out of stage bounds
+					Position: Coordinate{-5, -5}, // Out of stage bounds
 				}
 				return m
 			},
@@ -607,4 +607,159 @@ func TestGameState_IsLandingLegal_OccupantBomb(t *testing.T) {
 			}
 		})
 	}
+}
+
+// Helper function to build a clean, manual test board matrix with zero noise
+func setupCleanTestMatch() *Match {
+	m := &Match{
+		PlaybackLog: []GameEvent{},
+	}
+	grid := make([][]Tile, 16)
+	for y := range 16 {
+		grid[y] = make([]Tile, 16)
+		for x := range 16 {
+			grid[y][x] = Tile{Type: TerrainPlain, OccupantType: OccupantNone}
+		}
+	}
+	m.WorkingState = &GameState{
+		Turn:            1,
+		TurnBombCounter: 0,
+		Grid:            grid,
+		Units:           make(map[UnitID]*Unit),
+		Bombs:           make(map[BombID]*Bomb),
+		SoftBlocks:      make(map[int]*SoftBlock),
+	}
+	m.TrueState = m.WorkingState.DeepCopy()
+	return m
+}
+
+func TestMatch_ResolveTurn_ExplosionAndCombustion(t *testing.T) {
+	t.Run("Natural countdown tick reduces fuse and does not detonate early", func(t *testing.T) {
+		m := setupCleanTestMatch()
+		bID := NewBombID(1, 1, NewUnitID(1, 0))
+		m.WorkingState.Bombs[bID] = &Bomb{ID: bID, Countdown: 3, Range: 2, Position: Coordinate{5, 5}}
+		m.WorkingState.Grid[5][5] = Tile{OccupantType: OccupantBomb, OccupantID: int64(bID)}
+
+		events := m.ResolveTurn()
+
+		if len(events) != 0 {
+			t.Errorf("Expected zero events for ticking fuse, got %d", len(events))
+		}
+		if m.WorkingState.Bombs[bID].Countdown != 2 {
+			t.Errorf("Expected fuse to reduce to 2, got %d", m.WorkingState.Bombs[bID].Countdown)
+		}
+	})
+
+	t.Run("Units caught in overlapping blast patterns receive exactly 1 flat HP damage max", func(t *testing.T) {
+		m := setupCleanTestMatch()
+		uID := NewUnitID(1, 0)
+		m.WorkingState.Units[uID] = &Unit{ID: uID, HP: 3, Position: Coordinate{2, 2}}
+		m.WorkingState.Grid[2][2] = Tile{OccupantType: OccupantUnit, OccupantID: int64(uID)}
+
+		b1 := NewBombID(1, 1, uID)
+		m.WorkingState.Bombs[b1] = &Bomb{ID: b1, Countdown: 1, Range: 3, Position: Coordinate{2, 0}}
+		m.WorkingState.Grid[0][2] = Tile{OccupantType: OccupantBomb, OccupantID: int64(b1)}
+
+		b2 := NewBombID(1, 2, uID)
+		m.WorkingState.Bombs[b2] = &Bomb{ID: b2, Countdown: 1, Range: 3, Position: Coordinate{0, 2}}
+		m.WorkingState.Grid[2][0] = Tile{OccupantType: OccupantBomb, OccupantID: int64(b2)}
+
+		events := m.ResolveTurn()
+
+		if m.WorkingState.Units[uID].HP != 2 {
+			t.Errorf("Flat injury rule failed! Expected Unit HP = 2, got %d", m.WorkingState.Units[uID].HP)
+		}
+
+		damageEventsCount := 0
+		for _, e := range events {
+			if _, ok := e.(UnitDamagedEvent); ok {
+				damageEventsCount++
+			}
+		}
+		if damageEventsCount != 1 {
+			t.Errorf("Expected exactly 1 damage log packet event, found %d", damageEventsCount)
+		}
+	})
+}
+
+func TestMatch_ResolveTurn_CascadingChainReactions(t *testing.T) {
+	t.Run("Ticking bomb triggers secondary explosive via proximity chain reaction", func(t *testing.T) {
+		m := setupCleanTestMatch()
+		uID := NewUnitID(1, 0)
+
+		b1 := NewBombID(1, 1, uID)
+		m.WorkingState.Bombs[b1] = &Bomb{ID: b1, Countdown: 1, Range: 2, Position: Coordinate{1, 1}}
+		m.WorkingState.Grid[1][1] = Tile{OccupantType: OccupantBomb, OccupantID: int64(b1)}
+
+		b2 := NewBombID(1, 2, uID)
+		m.WorkingState.Bombs[b2] = &Bomb{ID: b2, Countdown: 3, Range: 2, Position: Coordinate{1, 2}}
+		m.WorkingState.Grid[2][1] = Tile{OccupantType: OccupantBomb, OccupantID: int64(b2)}
+
+		events := m.ResolveTurn()
+
+		if _, exists := m.WorkingState.Bombs[b1]; exists {
+			t.Error("Bomb 1 failed to clear")
+		}
+		if _, exists := m.WorkingState.Bombs[b2]; exists {
+			t.Error("Bomb 2 failed to ignite and clear via chain reaction!")
+		}
+
+		explosionPackets := 0
+		for _, e := range events {
+			if _, ok := e.(BombExplodedEvent); ok {
+				explosionPackets++
+			}
+		}
+		if explosionPackets != 2 {
+			t.Errorf("Expected 2 separate explosion log streams inside replay, found %d", explosionPackets)
+		}
+	})
+
+	t.Run("Soft blocks act as solid line of sight obstacles shielding behind tiles during turn", func(t *testing.T) {
+		m := setupCleanTestMatch()
+		uID := NewUnitID(1, 0)
+
+		bID := NewBombID(1, 1, uID)
+		m.WorkingState.Bombs[bID] = &Bomb{ID: bID, Countdown: 1, Range: 5, Position: Coordinate{0, 0}}
+		m.WorkingState.Grid[0][0] = Tile{OccupantType: OccupantBomb, OccupantID: int64(bID)}
+
+		sbID := 55
+		m.WorkingState.SoftBlocks[sbID] = &SoftBlock{ID: sbID, Position: Coordinate{1, 0}}
+		m.WorkingState.Grid[0][1] = Tile{OccupantType: OccupantSoftBlock, OccupantID: int64(sbID)}
+
+		b2 := NewBombID(1, 2, uID)
+		m.WorkingState.Bombs[b2] = &Bomb{ID: b2, Countdown: 3, Range: 2, Position: Coordinate{2, 0}}
+		m.WorkingState.Grid[0][2] = Tile{OccupantType: OccupantBomb, OccupantID: int64(b2)}
+
+		_ = m.ResolveTurn()
+
+		// Verification: Wall must be flagged for destruction, but its active shielding body
+		// must prevent the blast ray from crossing over to touch Bomb 2 in this frame pass.
+		if _, wallActive := m.WorkingState.SoftBlocks[sbID]; wallActive {
+			t.Error("Soft block failed to be destroyed by direct ray hit")
+		}
+		if _, bomb2Ignited := m.WorkingState.Bombs[b2]; !bomb2Ignited {
+			t.Error("Security Breach: Bomb 2 ignited through a solid shielding soft block!")
+		}
+	})
+}
+
+func TestMatch_ResolveTurn_TimelineSystemTransitions(t *testing.T) {
+	t.Run("Empty turn resolution executes smoothly with zero structural mutations", func(t *testing.T) {
+		m := setupCleanTestMatch()
+
+		events := m.ResolveTurn()
+
+		if len(events) != 0 {
+			t.Errorf("Expected clean slice array from empty resolution pass, got %d items", len(events))
+		}
+
+		if m.WorkingState.Turn != 2 {
+			t.Errorf("Expected Turn will increment to 2, go %d", m.WorkingState.Turn)
+		}
+
+		// 📝 FUTURE PLACEHOLDER EXTENSIONS:
+		// Requirement 4: assert m.WinnerTeamID values to verify victory conditions.
+		// Requirement 6: assert deep equality matching across m.TrueState and m.WorkingState.
+	})
 }

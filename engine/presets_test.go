@@ -166,7 +166,7 @@ func TestStagePresets(t *testing.T) {
 			// Check if all SoftBlocks are not overlapping with each other
 			softBlockPositions := make(map[Coordinate]bool)
 			for _, softBlock := range stagePreset.SoftBlocks {
-				pos := Coordinate{X: softBlock.X, Y: softBlock.Y}
+				pos := Coordinate{softBlock.X, softBlock.Y}
 				if softBlockPositions[pos] {
 					t.Errorf("SoftBlock at (%d, %d) for %s is overlapping with another SoftBlock", softBlock.X, softBlock.Y, name)
 				}

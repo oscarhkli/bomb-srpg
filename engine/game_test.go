@@ -481,9 +481,9 @@ func TestGameStateDeepCopy_Isolation(t *testing.T) {
 		SoftBlocks: make(map[int]*SoftBlock),
 	}
 	original.Grid = append(original.Grid, []Tile{{Type: TerrainPlain, OccupantType: OccupantNone, OccupantID: 0}})
-	original.Units[1] = &Unit{ID: 1, Type: Archetype{Name: "King"}, Team: 1, Position: Coordinate{X: 0, Y: 0}, HP: 3}
-	original.Bombs[1] = &Bomb{ID: 1, OwnerID: 1, Position: Coordinate{X: 1, Y: 1}, Range: 2, Countdown: 3}
-	original.SoftBlocks[1] = &SoftBlock{ID: 1, Position: Coordinate{X: 2, Y: 2}}
+	original.Units[1] = &Unit{ID: 1, Type: Archetype{Name: "King"}, Team: 1, Position: Coordinate{0, 0}, HP: 3}
+	original.Bombs[1] = &Bomb{ID: 1, OwnerID: 1, Position: Coordinate{1, 1}, Range: 2, Countdown: 3}
+	original.SoftBlocks[1] = &SoftBlock{ID: 1, Position: Coordinate{2, 2}}
 
 	clone := original.DeepCopy()
 
@@ -491,9 +491,9 @@ func TestGameStateDeepCopy_Isolation(t *testing.T) {
 	clone.TurnBombCounter = 10
 	clone.Grid[0][0].Type = TerrainTower
 	clone.Units[1].HP = 100
-	clone.Units[1].Position = Coordinate{X: 5, Y: 5}
+	clone.Units[1].Position = Coordinate{5, 5}
 	clone.Bombs[1].Range = 10
-	clone.SoftBlocks[1].Position = Coordinate{X: 10, Y: 10}
+	clone.SoftBlocks[1].Position = Coordinate{10, 10}
 
 	if original.Turn == clone.Turn {
 		t.Errorf("Expected original Turn to be unaffected by changes to clone, got %d", original.Turn)

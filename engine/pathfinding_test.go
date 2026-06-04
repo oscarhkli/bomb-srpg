@@ -288,6 +288,31 @@ func TestGameState_FindReachableTiles_0WidthDimensionGrid(t *testing.T) {
 	}
 }
 
+// to test if FindReachableTilesOnSnapshot uses snapshot to calculate
+func TestGameState_FindReachableTilesOnSnapshot(t *testing.T) {
+	state := &GameState{
+		Grid: [][]Tile{
+			{{Type: TerrainPlain, OccupantType: OccupantUnit}, {Type: TerrainPlain, OccupantType: OccupantNone}},
+		},
+	}
+
+	snapshot := [][]Tile{
+		{{Type: TerrainPlain, OccupantType: OccupantUnit}, {Type: TerrainPlain, OccupantType: OccupantSoftBlock}},
+	}
+
+	startPos := Coordinate{0, 0}
+	rule := MovementRule{
+		MaxSteps: -1,
+	}
+
+	result := state.FindReachableTilesOnSnapshot(startPos, snapshot, rule)
+	resultWithRealtimeData := state.FindReachableTiles(startPos, rule)
+
+	if maps.Equal(result, resultWithRealtimeData) {
+		t.Error("Expected to yield different result in FindReachableTilesOnSnapshot vs FindReachableTiles, got same result")
+	}
+}
+
 func TestUnit_NewMovementRule_BasicWalking(t *testing.T) {
 	unit := Unit{Type: Archetype{Name: "King"}}
 

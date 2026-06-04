@@ -1,8 +1,19 @@
 package engine
 
-// FindReachableTiles uses a breadth-first search to find all tiles reachable from the starting position
-func (gs *GameState) FindReachableTiles(startPos Coordinate, rule MovementRule) map[Coordinate]int {
-	if len(gs.Grid) == 0 || len(gs.Grid[0]) == 0 {
+// FindReachableTiles runs standard pathfinding using the live, active game grid state.
+func (gs *GameState) FindReachableTiles(start Coordinate, rule MovementRule) map[Coordinate]int {
+	return gs.findReachableTiles(start, rule, gs.Grid)
+}
+
+// FindReachableTilesOnSnapshot runs pathfinding using a frozen, read-only grid snapshot matrix.
+// This is what allows overlapping explosions to evaluate line-of-sight blocks correctly.
+func (gs *GameState) FindReachableTilesOnSnapshot(start Coordinate, snapshot [][]Tile, rule MovementRule) map[Coordinate]int {
+	return gs.findReachableTiles(start, rule, snapshot)
+}
+
+// findReachableTiles uses a breadth-first search to find all tiles reachable from the starting position.
+func (gs *GameState) findReachableTiles(startPos Coordinate, rule MovementRule, grid [][]Tile) map[Coordinate]int {
+	if len(grid) == 0 || len(grid[0]) == 0 {
 		return make(map[Coordinate]int)
 	}
 
@@ -37,7 +48,7 @@ func (gs *GameState) FindReachableTiles(startPos Coordinate, rule MovementRule) 
 				continue
 			}
 
-			canPass, canLand := rule.CheckPassability(gs.Grid[nextPos.Y][nextPos.X])
+			canPass, canLand := rule.CheckPassability(grid[nextPos.Y][nextPos.X])
 			// can't pass and can't land means we skip this tile entirely
 			if !canPass && !canLand {
 				continue

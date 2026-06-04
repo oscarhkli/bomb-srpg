@@ -14,15 +14,19 @@
   - [x] Unit movement
   - [x] Bomb placement
 - [ ] Resolving turns
-  - [ ] Bomb ticking
-  - [ ] Bomb detonation, chain reaction
-  - [ ] Casualty updates
+  - [x] Bomb ticking
+  - [x] Bomb detonation, chain reaction
+  - [x] Casualty updates
   - [ ] Result calculation
-- [ ] GameEvent
 - [ ] CLI terminal
+  - [ ] CLI Controller
   - [ ] Display
-  - [ ] Control
-  - [ ] TurnCommand
+  - [ ] GameEvent
+  - [ ] Command
+  - [ ] TurnCommand;
+- [ ] Starting turns
+  - [ ] Environment setup
+  - [ ] Sudden death
 
 ## Phase 2: Web Server & Transition from Terminal Driver
 - **Goal:** Drop the console interface and build a graphical browser client.
