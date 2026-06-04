@@ -37,6 +37,7 @@ bomb-srpg
 │   └── srpg-cli/          <-- Phase 1: Interactive Terminal CLI Driver
 ├── docs/                  <-- Design, roadmap and other docs
 ├── engine/                <-- Pure Core Logic
+│   └── codecs.go          <-- Bitmask encoders, decoders for UnitID and BombID
 │   └── game.go            <-- Game initializer
 │   └── match.go           <-- Match life cycle transactions
 │   └── models.go          <-- Pure blueprints

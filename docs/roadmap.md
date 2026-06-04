@@ -9,14 +9,20 @@
 - [x] Basic models & presets Archetype and Stages
 - [x] New game
 - [x] Path finding algorithm (for movement, bomb range, stage sanity check, etc.)
-- [ ] Sandbox transaction handling (commit/reset)
-- [ ] Turn, TurnCommand
-- [ ] Actions (movement, set bombs)
+- [x] Sandbox transaction handling (commit/reset)
+- [x] Match action management
+  - [x] Unit movement
+  - [x] Bomb placement
+- [ ] Resolving turns
+  - [ ] Bomb ticking
+  - [ ] Bomb detonation, chain reaction
+  - [ ] Casualty updates
+  - [ ] Result calculation
 - [ ] GameEvent
-- [ ] Bomb detonation, chain reaction
-- [ ] Mid-turn calculation
-- [ ] Result calculation
 - [ ] CLI terminal
+  - [ ] Display
+  - [ ] Control
+  - [ ] TurnCommand
 
 ## Phase 2: Web Server & Transition from Terminal Driver
 - **Goal:** Drop the console interface and build a graphical browser client.
@@ -24,7 +30,10 @@
 - **DoD:** Two local human players can play a full pass-and-play match on a single browser window using standard HTTP requests. Terminal runner is deprecated or isolated.
 
 ### TODO
-- [ ]
+- [ ] Web Server & HTTP request migration
+- [ ] Frontend display
+- [ ] Frontend navigation
+- [ ] Deployment
 
 ## Phase 3a: Add WebSockets (Optional Branch A)
 - **Goal:** Upgrade the networking layer to support live, real-time online multiplayer between separate machines.
@@ -32,7 +41,12 @@
 - **DoD:** Two players on completely separate computers/browsers can join a unique game room via a URL and play a full match with real-time UI synchronization without manual page refreshes.
 
 ### TODO
-- [ ]
+- [ ] WebSockets setup
+- [ ] Room
+- [ ] Multiplayer management
+  - [ ] Join/leave room
+  - [ ] Room admin
+  - [ ] Interruption handling
 
 ## Phase 3b: More Character Classes & Skills (Optional Branch B)
 - **Goal:** Expand game depth by transitioning from basic stats to a flexible, component-based unit and ability engine.
@@ -58,8 +72,8 @@
 - **DoD:** A player can play a match against a local AI opponent that automatically calculates and executes its movements when its turn segment activates.
 
 ### TODO
-- [ ]
+- [ ] Risk management???
 
 ## Wish list
-- Story Mode
-- Replay
+- Story Mode (pre-req: Computer Player)
+- Replay (pre-req: Web server)

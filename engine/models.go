@@ -15,20 +15,20 @@ type Coordinate struct {
 	Y int
 }
 
-type ObjectType int
+type OccupantType int
 
 const (
-	ObjectNone ObjectType = iota
-	ObjectUnit
-	ObjectBomb
-	ObjectSoftBlock // later implementation
-	ObjectItem      // later implementation
+	OccupantNone OccupantType = iota
+	OccupantUnit
+	OccupantBomb
+	OccupantSoftBlock
+	OccupantItem
 )
 
 type Tile struct {
 	Type         TerrainType
-	OccupantType ObjectType
-	OccupantID   int // ID of the occupant for cross reference
+	OccupantType OccupantType
+	OccupantID   int64 // ID of the occupant for cross reference
 }
 
 type SoftBlock struct {
@@ -48,7 +48,7 @@ type StagePreset struct {
 	P2StartingPositions [5]Coordinate // 42013, by default, P2 starts at the top side
 }
 
-type SkillType uint32
+type SkillType uint32 // 32-bit is forseenable
 
 const (
 	SkillCanJump SkillType = 1 << iota // 1 (binary 00000001)
@@ -66,8 +66,11 @@ type Archetype struct {
 	PresetSkills map[SkillType]bool
 }
 
+type UnitID uint8 // will be used later on
+type BombID uint32
+
 type Unit struct {
-	ID           int
+	ID           UnitID
 	Type         Archetype
 	Position     Coordinate
 	Speed        int
@@ -82,8 +85,8 @@ type Unit struct {
 }
 
 type Bomb struct {
-	ID        int
-	OwnerID   int // ID of the character who placed the bomb
+	ID        BombID
+	OwnerID   UnitID // ID of the character who placed the bomb
 	Position  Coordinate
 	Range     int
 	Countdown int // Turns until explosion
@@ -94,18 +97,21 @@ type GameCfg struct {
 	P1Teams                     []string // List of archetype names for Player 1's units
 	P2Teams                     []string // List of archetype names for Player 2's units
 	MaxTurns                    int
-	GlobalSpeedOverride         int // For testing purposes, allows overriding the default speed for all units. 0 means no override.
-	GlobalBombCountdownOverride int // For testing purposes, allows overriding the default bomb countdown. 0 means no override.
-	GlobalBombMaxRangeOverride  int // For testing purposes, allows overriding the default max bomb range. 0 means no override.
+	AllowResetTurn              bool // false = no way back. Multiplaying gaming experience will be changed accordingly
+	SuddenDeath                 bool // false = draw if Turn >= MaxTurn
+	GlobalSpeedOverride         int  // For testing purposes, allows overriding the default speed for all units. 0 means no override.
+	GlobalBombCountdownOverride int  // For testing purposes, allows overriding the default bomb countdown. 0 means no override.
+	GlobalBombMaxRangeOverride  int  // For testing purposes, allows overriding the default max bomb range. 0 means no override.
 }
 
 type GameState struct {
-	Turn         int // Turn counter, starting from 1
-	Grid         [][]Tile
-	Units        map[int]*Unit      // Keyed by Unit ID
-	Bombs        map[int]*Bomb      // Keyed by Bomb ID
-	SoftBlocks   map[int]*SoftBlock // Keyed by SoftBlock ID
-	TurnCommands []TurnCommand      // Commands issued by players for the current turn
+	Turn            int // Turn counter, starting from 1
+	TurnBombCounter int // To record how many bombs placed during the turn
+	Grid            [][]Tile
+	Units           map[UnitID]*Unit   // Keyed by Unit ID
+	Bombs           map[BombID]*Bomb   // Keyed by Bomb ID
+	SoftBlocks      map[int]*SoftBlock // Keyed by SoftBlock ID
+	TurnCommands    []TurnCommand      // Commands issued by players for the current turn
 }
 
 type ActionType int
@@ -118,7 +124,7 @@ const (
 
 type TurnCommand struct {
 	Action         ActionType
-	ActorID        int
+	ActorID        UnitID
 	TargetPosition Coordinate // For move and place bomb actions
 }
 
@@ -127,7 +133,7 @@ type GameEvent interface {
 }
 
 type UnitMovedEvent struct {
-	UnitID int
+	UnitID UnitID
 	From   Coordinate
 	To     Coordinate
 }
@@ -135,14 +141,14 @@ type UnitMovedEvent struct {
 func (UnitMovedEvent) isGameEvent() {}
 
 type UnitDiedEvent struct {
-	UnitID int
+	UnitID UnitID
 }
 
 func (UnitDiedEvent) isGameEvent() {}
 
 type BombPlacedEvent struct {
-	UnitID    int
-	BombID    int
+	UnitID    UnitID
+	BombID    BombID
 	Position  Coordinate
 	Range     int
 	Countdown int
@@ -151,7 +157,7 @@ type BombPlacedEvent struct {
 func (BombPlacedEvent) isGameEvent() {}
 
 type BombExplodedEvent struct {
-	BombID            int
+	BombID            BombID
 	AffectedPositions []Coordinate
 }
 

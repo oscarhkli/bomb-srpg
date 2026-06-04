@@ -33,3 +33,5 @@ go.work.sum
 
 # Test coverage artifacts
 coverage.txt
+
+.DS_Store

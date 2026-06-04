@@ -117,11 +117,11 @@ func TestGameState_FindReachableTiles_TerrainAndBoundaries(t *testing.T) {
 }
 
 func TestGameState_FindReachableTiles_OccupiedTiles(t *testing.T) {
-	occupants := [][]ObjectType{
-		{ObjectNone, ObjectUnit, ObjectSoftBlock, ObjectUnit, ObjectItem, ObjectBomb, ObjectBomb, ObjectSoftBlock},
-		{ObjectUnit, ObjectUnit, ObjectSoftBlock, ObjectUnit, ObjectBomb, ObjectBomb, ObjectItem, ObjectSoftBlock},
-		{ObjectUnit, ObjectUnit, ObjectSoftBlock, ObjectUnit, ObjectNone, ObjectNone, ObjectBomb, ObjectBomb},
-		{ObjectUnit, ObjectUnit, ObjectUnit, ObjectUnit, ObjectBomb, ObjectSoftBlock, ObjectBomb, ObjectNone},
+	occupants := [][]OccupantType{
+		{OccupantNone, OccupantUnit, OccupantSoftBlock, OccupantUnit, OccupantItem, OccupantBomb, OccupantBomb, OccupantSoftBlock},
+		{OccupantUnit, OccupantUnit, OccupantSoftBlock, OccupantUnit, OccupantBomb, OccupantBomb, OccupantItem, OccupantSoftBlock},
+		{OccupantUnit, OccupantUnit, OccupantSoftBlock, OccupantUnit, OccupantNone, OccupantNone, OccupantBomb, OccupantBomb},
+		{OccupantUnit, OccupantUnit, OccupantUnit, OccupantUnit, OccupantBomb, OccupantSoftBlock, OccupantBomb, OccupantNone},
 	}
 	grid := make([][]Tile, len(occupants))
 	for y, row := range occupants {
@@ -285,5 +285,67 @@ func TestGameState_FindReachableTiles_0WidthDimensionGrid(t *testing.T) {
 	result := state.FindReachableTiles(startPos, rule)
 	if len(result) != 0 {
 		t.Errorf("Expected no reachable tiles for 0-width grid, got %v", result)
+	}
+}
+
+func TestUnit_NewMovementRule_BasicWalking(t *testing.T) {
+	unit := Unit{Type: Archetype{Name: "King"}}
+
+	mr := unit.NewMovementRule()
+
+	if mr.MaxSteps != unit.Speed {
+		t.Errorf("Expected MaxSteps to match unit speed (%d), got %d", unit.Speed, mr.MaxSteps)
+	}
+
+	if mr.Pattern != PatternCardinal {
+		t.Errorf("Expected step pattern to be PatternCardinal, got %v", mr.Pattern)
+	}
+
+	if mr.CanTurn {
+		t.Error("Expected CanTurn to be false for baseline walking profiles")
+	}
+
+	if mr.StopOnNonUnitOccupant {
+		t.Error("Expected StopOnNonUnitOccupant to be false for character pedestrian walking")
+	}
+
+	// Verify that the correct permission bit flag is flipped ON
+	if mr.PassPermissions&PassItems == 0 {
+		t.Error("Security flaw: Baseline movement rule is missing the PassItems permission gate!")
+	}
+
+	// Verify that all other barriers are locked DOWN (default-fail)
+	forbiddenFlags := PassUnits | PassSoftBlocks | PassHardBlocks | PassBombs
+	if mr.PassPermissions&forbiddenFlags != 0 {
+		t.Errorf("Boundary leak: Baseline walking rule was granted unauthorized privileges (Bitmask: %b)",
+			mr.PassPermissions)
+	}
+}
+
+func TestUnit_NewBombPlacementRule(t *testing.T) {
+	unit := Unit{Type: Archetype{Name: "King"}}
+
+	br := unit.NewBombPlacementRule()
+
+	if br.MaxSteps != unit.BombMaxRange {
+		t.Errorf("Expected MaxSteps to match unit BombMaxRange (%d), got %d", unit.BombMaxRange, br.MaxSteps)
+	}
+
+	if br.Pattern != PatternCardinal {
+		t.Errorf("Expected step pattern to be PatternCardinal, got %v", br.Pattern)
+	}
+
+	requiredFlags := PassUnits | PassSoftBlocks | PassHardBlocks | PassItems | PassBombs
+
+	// Verify that the placement rule permits passing through all required objects
+	if br.PassPermissions&requiredFlags != requiredFlags {
+		t.Errorf("Security flaw: Bomb placement rule is missing required pass permissions. Expected mask %b, got %b",
+			requiredFlags, br.PassPermissions)
+	}
+
+	// Verify that no undefined/unauthorized high bits are set outside our expected flags
+	if br.PassPermissions&^requiredFlags != 0 {
+		t.Errorf("Boundary leak: Bomb placement rule was granted unauthorized privileges (Bitmask: %b)",
+			br.PassPermissions)
 	}
 }

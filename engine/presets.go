@@ -1,5 +1,7 @@
 package engine
 
+const BombDefaultCountDown int = 5
+
 // ArchetypeRegistry stores the base templates. We keep it unexported (lowercase 'a')
 // so code outside this package cannot alter the map items directly.
 var archetypesRegistry = map[string]Archetype{

@@ -290,19 +290,18 @@ func TestInitGameState_Suite(t *testing.T) {
 					}
 				})
 
+				var expectedPosition Coordinate
+				_, index := id.Decode()
 				switch unit.Team {
 				case 1:
-					expectedPosition := preset.P1StartingPositions[id-8] // Player 1 IDs start from 8
-					if unit.Position != expectedPosition {
-						t.Errorf("Expected Player 1 unit ID %d to start at (%d,%d), got (%d,%d)", id, expectedPosition.X, expectedPosition.Y, unit.Position.X, unit.Position.Y)
-					}
+					expectedPosition = preset.P1StartingPositions[index]
 				case 2:
-					expectedPosition := preset.P2StartingPositions[id-16] // Player 2 IDs start from 16
-					if unit.Position != expectedPosition {
-						t.Errorf("Expected Player 2 unit ID %d to start at (%d,%d), got (%d,%d)", id, expectedPosition.X, expectedPosition.Y, unit.Position.X, unit.Position.Y)
-					}
+					expectedPosition = preset.P2StartingPositions[index]
 				default:
 					t.Errorf("Unit ID %d has invalid team %d", id, unit.Team)
+				}
+				if unit.Position != expectedPosition {
+					t.Errorf("Expected Player %d unit ID %d to start at (%d,%d), got (%d,%d)", unit.Team, id, expectedPosition.X, expectedPosition.Y, unit.Position.X, unit.Position.Y)
 				}
 			}
 
@@ -428,7 +427,7 @@ func TestInitGameState_LayoutGridCompilation(t *testing.T) {
 						t.Errorf("Expected terrain at (%d,%d) to be %v, got %v", x, y, expectedMatrix[y][x], tile.Type)
 					}
 
-					if tile.OccupantType != ObjectNone || tile.OccupantID != 0 {
+					if tile.OccupantType != OccupantNone || tile.OccupantID != 0 {
 						t.Errorf("Expected tile at (%d,%d) to have no occupant, got type %v with ID %d", x, y, tile.OccupantType, tile.OccupantID)
 					}
 				}
@@ -477,11 +476,11 @@ func TestGameStateDeepCopy_Isolation(t *testing.T) {
 	original := &GameState{
 		Turn:       1,
 		Grid:       [][]Tile{},
-		Units:      make(map[int]*Unit),
-		Bombs:      make(map[int]*Bomb),
+		Units:      make(map[UnitID]*Unit),
+		Bombs:      make(map[BombID]*Bomb),
 		SoftBlocks: make(map[int]*SoftBlock),
 	}
-	original.Grid = append(original.Grid, []Tile{{Type: TerrainPlain, OccupantType: ObjectNone, OccupantID: 0}})
+	original.Grid = append(original.Grid, []Tile{{Type: TerrainPlain, OccupantType: OccupantNone, OccupantID: 0}})
 	original.Units[1] = &Unit{ID: 1, Type: Archetype{Name: "King"}, Team: 1, Position: Coordinate{X: 0, Y: 0}, HP: 3}
 	original.Bombs[1] = &Bomb{ID: 1, OwnerID: 1, Position: Coordinate{X: 1, Y: 1}, Range: 2, Countdown: 3}
 	original.SoftBlocks[1] = &SoftBlock{ID: 1, Position: Coordinate{X: 2, Y: 2}}
@@ -489,6 +488,7 @@ func TestGameStateDeepCopy_Isolation(t *testing.T) {
 	clone := original.DeepCopy()
 
 	clone.Turn = 2
+	clone.TurnBombCounter = 10
 	clone.Grid[0][0].Type = TerrainTower
 	clone.Units[1].HP = 100
 	clone.Units[1].Position = Coordinate{X: 5, Y: 5}
@@ -497,6 +497,9 @@ func TestGameStateDeepCopy_Isolation(t *testing.T) {
 
 	if original.Turn == clone.Turn {
 		t.Errorf("Expected original Turn to be unaffected by changes to clone, got %d", original.Turn)
+	}
+	if original.TurnBombCounter == clone.TurnBombCounter {
+		t.Errorf("Expected original TurnBombCounter to be unaffected by changes to clone, got %d", original.TurnBombCounter)
 	}
 	if original.Grid[0][0].Type == clone.Grid[0][0].Type {
 		t.Errorf("Expected original Grid tile to be unaffected by changes to clone, got %v", original.Grid[0][0].Type)

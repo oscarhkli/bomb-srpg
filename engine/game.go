@@ -58,7 +58,7 @@ func initGameState(gameCfg GameCfg) (*GameState, error) {
 		}
 	}
 
-	units := map[int]*Unit{}
+	units := map[UnitID]*Unit{}
 
 	err := createUnits(units, gameCfg.P1Teams, stagePreset.P1StartingPositions, 1, gameCfg)
 	if err != nil {
@@ -95,7 +95,7 @@ func initGameState(gameCfg GameCfg) (*GameState, error) {
 		Turn:       1,
 		Grid:       grid,
 		Units:      units,
-		Bombs:      make(map[int]*Bomb),
+		Bombs:      make(map[BombID]*Bomb),
 		SoftBlocks: softBlocks,
 	}, nil
 }
@@ -114,7 +114,7 @@ func hasExactlyOneAndFirstIsKing(team []string) bool {
 }
 
 func createUnits(
-	units map[int]*Unit,
+	units map[UnitID]*Unit,
 	teams []string,
 	startingPositions [5]Coordinate,
 	teamID int,
@@ -125,7 +125,7 @@ func createUnits(
 		if !exists {
 			return fmt.Errorf("archetype '%s' for Player %d not found", archetypeName, teamID)
 		}
-		id := (teamID << 3) | i // Player 1 units have IDs starting from 8, Player 2 units have IDs starting from 16
+		id := NewUnitID(teamID, i) // Player 1 units have IDs starting from 8, Player 2 units have IDs starting from 16
 		units[id] = &Unit{
 			ID:           id,
 			Type:         archetype,
@@ -173,9 +173,9 @@ func (gs *GameState) DeepCopy() *GameState {
 	}
 
 	if gs.Units == nil {
-		clone.Units = make(map[int]*Unit)
+		clone.Units = make(map[UnitID]*Unit)
 	} else {
-		clone.Units = make(map[int]*Unit, len(gs.Units))
+		clone.Units = make(map[UnitID]*Unit, len(gs.Units))
 		for id, unit := range gs.Units {
 			if unit == nil {
 				continue
@@ -199,9 +199,9 @@ func (gs *GameState) DeepCopy() *GameState {
 	}
 
 	if gs.Bombs == nil {
-		clone.Bombs = make(map[int]*Bomb)
+		clone.Bombs = make(map[BombID]*Bomb)
 	} else {
-		clone.Bombs = make(map[int]*Bomb, len(gs.Bombs))
+		clone.Bombs = make(map[BombID]*Bomb, len(gs.Bombs))
 		for id, bomb := range gs.Bombs {
 			if bomb == nil {
 				continue
