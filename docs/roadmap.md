@@ -13,11 +13,11 @@
 - [x] Match action management
   - [x] Unit movement
   - [x] Bomb placement
-- [ ] Resolving turns
+- [x] Resolving turns
   - [x] Bomb ticking
   - [x] Bomb detonation, chain reaction
   - [x] Casualty updates
-  - [ ] Result calculation
+  - [x] Result calculation
 - [ ] CLI terminal
   - [ ] CLI Controller
   - [ ] Display

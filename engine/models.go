@@ -184,12 +184,28 @@ type ItemDestroyedEvent struct {
 
 func (ItemDestroyedEvent) isGameEvent() {}
 
+type MatchEndedEvent struct {
+	WinnerTeamID int // TeamID, -1 means draw game
+	IsDraw       bool
+}
+
+func (MatchEndedEvent) isGameEvent() {}
+
 type Match struct {
 	GameCfg      GameCfg
 	TrueState    *GameState
 	WorkingState *GameState
 	PlaybackLog  []GameEvent
+	WinnerTeamID int
 }
+
+type VictoryResult int
+
+const (
+	MatchInProgress VictoryResult = iota
+	MatchWin
+	MatchDraw
+)
 
 type StepPattern int
 

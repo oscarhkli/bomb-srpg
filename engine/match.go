@@ -167,9 +167,23 @@ func (m *Match) StartNewTurn() {
 func (m *Match) ResolveTurn() []GameEvent {
 	m.resolveBombExplosionAndDamage()
 
-	// TODO: Action 4
+	if m.WinnerTeamID == 0 {
+		result, winner := m.evaluateVictoryConditions()
 
-	m.WorkingState.Turn++
+		switch result {
+		case MatchDraw:
+			m.WinnerTeamID = -1
+			m.SubmitAction(MatchEndedEvent{WinnerTeamID: -1, IsDraw: true})
+
+		case MatchWin:
+			m.WinnerTeamID = winner
+			m.SubmitAction(MatchEndedEvent{WinnerTeamID: winner, IsDraw: false})
+
+		case MatchInProgress:
+			m.WorkingState.Turn++
+		}
+	}
+
 	m.TrueState = m.WorkingState.DeepCopy()
 
 	// Flush animation log arrays from the sandbox replay history buffer to the caller
@@ -273,6 +287,7 @@ func (m *Match) processChainDetonations(
 			}
 		}
 
+		m.WorkingState.ClearStageTile(currBomb.Position)
 		delete(m.WorkingState.Bombs, currBombID)
 		m.SubmitAction(BombExplodedEvent{
 			BombID:            currBombID,
@@ -331,4 +346,28 @@ func (m *Match) handleDelayedBatchDamage(
 	}
 
 	// TODO: Item destruction in future phase
+}
+
+func (m *Match) evaluateVictoryConditions() (VictoryResult, int) {
+	livingTeams := make(map[int]bool)
+	for _, unit := range m.WorkingState.Units {
+		if unit.HP > 0 {
+			livingTeams[unit.Team] = true
+		}
+	}
+
+	switch len(livingTeams) {
+	case 0:
+		return MatchDraw, -1
+
+	case 1:
+		winner := 0
+		for teamID := range livingTeams {
+			winner = teamID
+		}
+		return MatchWin, winner
+
+	default:
+		return MatchInProgress, 0
+	}
 }

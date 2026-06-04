@@ -633,51 +633,100 @@ func setupCleanTestMatch() *Match {
 	return m
 }
 
-func TestMatch_ResolveTurn_ExplosionAndCombustion(t *testing.T) {
-	t.Run("Natural countdown tick reduces fuse and does not detonate early", func(t *testing.T) {
+func TestMatch_ResolveTurn_ExplosionAndBlast(t *testing.T) {
+	t.Run("Natural countdown tick reduces for countdown bombs and does not detonate early", func(t *testing.T) {
 		m := setupCleanTestMatch()
-		bID := NewBombID(1, 1, NewUnitID(1, 0))
-		m.WorkingState.Bombs[bID] = &Bomb{ID: bID, Countdown: 3, Range: 2, Position: Coordinate{5, 5}}
-		m.WorkingState.Grid[5][5] = Tile{OccupantType: OccupantBomb, OccupantID: int64(bID)}
+		u1 := NewUnitID(1, 0)
+		u2 := NewUnitID(2, 0)
+		b1 := NewBombID(1, 1, u1)
+		b2 := NewBombID(1, 2, u2)
+		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1}
+		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1}
+		m.WorkingState.Bombs[b1] = &Bomb{ID: b1, Countdown: 3, Range: 2, Position: Coordinate{5, 5}}
+		m.WorkingState.Bombs[b2] = &Bomb{ID: b2, Countdown: -1, Range: 2, Position: Coordinate{15, 15}}
+		m.WorkingState.Grid[5][5] = Tile{OccupantType: OccupantBomb, OccupantID: int64(b1)}
+		m.WorkingState.Grid[15][15] = Tile{OccupantType: OccupantBomb, OccupantID: int64(b2)}
 
 		events := m.ResolveTurn()
 
 		if len(events) != 0 {
-			t.Errorf("Expected zero events for ticking fuse, got %d", len(events))
+			t.Errorf("Expected zero events for ticking fuse, got %v", len(events))
 		}
-		if m.WorkingState.Bombs[bID].Countdown != 2 {
-			t.Errorf("Expected fuse to reduce to 2, got %d", m.WorkingState.Bombs[bID].Countdown)
+		if m.WorkingState.Bombs[b1].Countdown != 2 {
+			t.Errorf("Expected Bomb 0x%x to reduce to 2, got %d", b1, m.WorkingState.Bombs[b1].Countdown)
+		}
+		if m.WorkingState.Bombs[b2].Countdown != -1 {
+			t.Errorf("Expected Bomb 0x%x to remains at -1, got %d", b2, m.WorkingState.Bombs[b2].Countdown)
+		}
+		if m.WorkingState.Grid[5][5].OccupantType != OccupantBomb {
+			t.Errorf("Grid corruption: Ticking bomb cleared prematurely from cell footprint")
+		}
+		if m.WorkingState.Grid[15][15].OccupantType != OccupantBomb {
+			t.Errorf("Grid corruption: Ticking bomb cleared prematurely from cell footprint")
+		}
+		if len(m.PlaybackLog) != 0 {
+			t.Errorf("Expectd clean slice array from PlaybackLog, got %d items", len(m.PlaybackLog))
 		}
 	})
 
 	t.Run("Units caught in overlapping blast patterns receive exactly 1 flat HP damage max", func(t *testing.T) {
 		m := setupCleanTestMatch()
-		uID := NewUnitID(1, 0)
-		m.WorkingState.Units[uID] = &Unit{ID: uID, HP: 3, Position: Coordinate{2, 2}}
-		m.WorkingState.Grid[2][2] = Tile{OccupantType: OccupantUnit, OccupantID: int64(uID)}
+		u1 := NewUnitID(1, 0)
+		m.WorkingState.Units[u1] = &Unit{ID: u1, HP: 3, Position: Coordinate{2, 2}}
+		m.WorkingState.Grid[2][2] = Tile{OccupantType: OccupantUnit, OccupantID: int64(u1)}
 
-		b1 := NewBombID(1, 1, uID)
+		u2 := NewUnitID(2, 0)
+		m.WorkingState.Units[u2] = &Unit{ID: u2, HP: 1, Position: Coordinate{1, 0}}
+		m.WorkingState.Grid[0][1] = Tile{OccupantType: OccupantUnit, OccupantID: int64(u2)}
+
+		b1 := NewBombID(1, 1, u1)
 		m.WorkingState.Bombs[b1] = &Bomb{ID: b1, Countdown: 1, Range: 3, Position: Coordinate{2, 0}}
 		m.WorkingState.Grid[0][2] = Tile{OccupantType: OccupantBomb, OccupantID: int64(b1)}
 
-		b2 := NewBombID(1, 2, uID)
+		b2 := NewBombID(1, 2, u1)
 		m.WorkingState.Bombs[b2] = &Bomb{ID: b2, Countdown: 1, Range: 3, Position: Coordinate{0, 2}}
 		m.WorkingState.Grid[2][0] = Tile{OccupantType: OccupantBomb, OccupantID: int64(b2)}
 
 		events := m.ResolveTurn()
 
-		if m.WorkingState.Units[uID].HP != 2 {
-			t.Errorf("Flat injury rule failed! Expected Unit HP = 2, got %d", m.WorkingState.Units[uID].HP)
+		if m.WorkingState.Units[u1].HP != 2 {
+			t.Errorf("Flat injury rule failed for Unit 0x%x! Expected Unit HP = 2, got %d", u1, m.WorkingState.Units[u1].HP)
+		}
+		if m.WorkingState.Units[u2].HP != 0 {
+			t.Errorf("Flat injury rule failed for Unit 0x%x! Expected Unit HP = 0, got %d", u2, m.WorkingState.Units[u2].HP)
 		}
 
 		damageEventsCount := 0
+		unitDieEventsCount := 0
 		for _, e := range events {
 			if _, ok := e.(UnitDamagedEvent); ok {
 				damageEventsCount++
+				continue
+			}
+			if _, ok := e.(UnitDiedEvent); ok {
+				unitDieEventsCount++
 			}
 		}
-		if damageEventsCount != 1 {
-			t.Errorf("Expected exactly 1 damage log packet event, found %d", damageEventsCount)
+		if damageEventsCount != 2 {
+			t.Errorf("Expected exactly 2 damage log packet event, found %d", damageEventsCount)
+		}
+		if unitDieEventsCount != 1 {
+			t.Errorf("Expected exactly 1 casulty log packet event, found %d", unitDieEventsCount)
+		}
+		if m.WorkingState.Grid[0][2].OccupantType != OccupantNone {
+			t.Errorf("Grid Clearance Bug: Exploded bomb positions %#v failed to revert to OccupantNone, got %v", Coordinate{2, 0}, m.WorkingState.Grid[0][2].OccupantType)
+		}
+		if m.WorkingState.Grid[2][0].OccupantType != OccupantNone {
+			t.Errorf("Grid Clearance Bug: Exploded bomb positions %#v failed to revert to OccupantNone, got %v", Coordinate{0, 2}, m.WorkingState.Grid[2][0].OccupantType)
+		}
+		if m.WorkingState.Grid[2][2].OccupantType != OccupantUnit {
+			t.Errorf("Grid Cleared Erroneously: Living unit was scrubbed from position %#v footprint, got %v", Coordinate{2, 2}, m.WorkingState.Grid[2][2].OccupantType)
+		}
+		if m.WorkingState.Grid[0][1].OccupantType != OccupantNone {
+			t.Errorf("Grid Clearance Bug: Dead unit positions %#v failed to revert to OccupantNone, got %v", Coordinate{1, 0}, m.WorkingState.Grid[0][1].OccupantType)
+		}
+		if len(m.PlaybackLog) != 0 {
+			t.Errorf("Expectd clean slice array from PlaybackLog, got %d items", len(m.PlaybackLog))
 		}
 	})
 }
@@ -702,6 +751,12 @@ func TestMatch_ResolveTurn_CascadingChainReactions(t *testing.T) {
 		}
 		if _, exists := m.WorkingState.Bombs[b2]; exists {
 			t.Error("Bomb 2 failed to ignite and clear via chain reaction!")
+		}
+		if m.WorkingState.Grid[1][1].OccupantType != OccupantNone {
+			t.Errorf("Grid Clearance Bug: Exploded bomb positions %#v failed to revert to OccupantNone, got %v", Coordinate{1, 1}, m.WorkingState.Grid[1][1].OccupantType)
+		}
+		if m.WorkingState.Grid[2][1].OccupantType != OccupantNone {
+			t.Errorf("Grid Clearance Bug: Exploded bomb positions %#v failed to revert to OccupantNone, got %v", Coordinate{1, 2}, m.WorkingState.Grid[1][2].OccupantType)
 		}
 
 		explosionPackets := 0
@@ -731,15 +786,28 @@ func TestMatch_ResolveTurn_CascadingChainReactions(t *testing.T) {
 		m.WorkingState.Bombs[b2] = &Bomb{ID: b2, Countdown: 3, Range: 2, Position: Coordinate{2, 0}}
 		m.WorkingState.Grid[0][2] = Tile{OccupantType: OccupantBomb, OccupantID: int64(b2)}
 
-		_ = m.ResolveTurn()
+		events := m.ResolveTurn()
 
-		// Verification: Wall must be flagged for destruction, but its active shielding body
+		// Verification: SoftBlock must be flagged for destruction, but its active shielding body
 		// must prevent the blast ray from crossing over to touch Bomb 2 in this frame pass.
-		if _, wallActive := m.WorkingState.SoftBlocks[sbID]; wallActive {
+		if _, ok := m.WorkingState.SoftBlocks[sbID]; ok {
 			t.Error("Soft block failed to be destroyed by direct ray hit")
 		}
-		if _, bomb2Ignited := m.WorkingState.Bombs[b2]; !bomb2Ignited {
+		if _, ok := m.WorkingState.Bombs[b2]; !ok {
 			t.Error("Security Breach: Bomb 2 ignited through a solid shielding soft block!")
+		}
+		if m.WorkingState.Grid[0][1].OccupantType != OccupantNone {
+			t.Errorf("Grid Clearance Bug: Exploded SoftBlock positions %#v failed to revert to OccupantNone, got %v", Coordinate{1, 0}, m.WorkingState.Grid[0][1].OccupantType)
+		}
+
+		softBlockDestroyedPackets := 0
+		for _, e := range events {
+			if _, ok := e.(SoftBlockDestroyedEvent); ok {
+				softBlockDestroyedPackets++
+			}
+		}
+		if softBlockDestroyedPackets != 1 {
+			t.Errorf("Expected 1 soft block destroyed log streams inside replay, found %d", softBlockDestroyedPackets)
 		}
 	})
 }
@@ -747,6 +815,10 @@ func TestMatch_ResolveTurn_CascadingChainReactions(t *testing.T) {
 func TestMatch_ResolveTurn_TimelineSystemTransitions(t *testing.T) {
 	t.Run("Empty turn resolution executes smoothly with zero structural mutations", func(t *testing.T) {
 		m := setupCleanTestMatch()
+		u1 := NewUnitID(1, 0)
+		u2 := NewUnitID(2, 0)
+		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1}
+		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1}
 
 		events := m.ResolveTurn()
 
@@ -758,8 +830,114 @@ func TestMatch_ResolveTurn_TimelineSystemTransitions(t *testing.T) {
 			t.Errorf("Expected Turn will increment to 2, go %d", m.WorkingState.Turn)
 		}
 
-		// 📝 FUTURE PLACEHOLDER EXTENSIONS:
-		// Requirement 4: assert m.WinnerTeamID values to verify victory conditions.
-		// Requirement 6: assert deep equality matching across m.TrueState and m.WorkingState.
+		if len(m.PlaybackLog) != 0 {
+			t.Errorf("Expectd clean slice array from PlaybackLog, got %d items", len(m.PlaybackLog))
+		}
+	})
+
+	t.Run("Solid Victory is decreed when exactly one team has living units left standing", func(t *testing.T) {
+		m := setupCleanTestMatch()
+		m.TrueState.Turn = 1
+		m.WorkingState.Turn = 1
+
+		u1 := NewUnitID(1, 0)
+		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1, Position: Coordinate{1, 1}}
+		m.WorkingState.Grid[1][1] = Tile{Type: TerrainPlain, OccupantType: OccupantUnit, OccupantID: int64(u1)}
+
+		u2 := NewUnitID(2, 0)
+		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1, Position: Coordinate{5, 5}}
+		m.WorkingState.Grid[5][5] = Tile{Type: TerrainPlain, OccupantType: OccupantUnit, OccupantID: int64(u2)}
+
+		bID := NewBombID(1, 1, u1)
+		m.WorkingState.Bombs[bID] = &Bomb{ID: bID, Countdown: 1, Range: 2, Position: Coordinate{5, 4}}
+		m.WorkingState.Grid[4][5] = Tile{Type: TerrainPlain, OccupantType: OccupantBomb, OccupantID: int64(bID)}
+
+		events := m.ResolveTurn()
+
+		if m.WinnerTeamID != 1 {
+			t.Errorf("Victory Guard Failed! Expected WinnerTeamID = 1, got %d", m.WinnerTeamID)
+		}
+
+		var foundEndedEvent bool
+		for _, event := range events {
+			if ended, ok := event.(MatchEndedEvent); ok {
+				foundEndedEvent = true
+				if ended.WinnerTeamID != 1 || ended.IsDraw {
+					t.Errorf("Malformed MatchEndedEvent! Got winner %d, draw %t", ended.WinnerTeamID, ended.IsDraw)
+				}
+			}
+		}
+		if !foundEndedEvent {
+			t.Error("Missing critical MatchEndedEvent token inside returned telemetry array stream")
+		}
+	})
+
+	t.Run("Mutual destruction Draw condition is logged when a blast vaporises all players simultaneously", func(t *testing.T) {
+		m := setupCleanTestMatch()
+		m.TrueState.Turn = 1
+		m.WorkingState.Turn = 1
+
+		u1 := NewUnitID(1, 0)
+		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1, Position: Coordinate{4, 5}}
+		m.WorkingState.Grid[5][4] = Tile{Type: TerrainPlain, OccupantType: OccupantUnit, OccupantID: int64(u1)}
+
+		u2 := NewUnitID(2, 0)
+		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1, Position: Coordinate{6, 5}}
+		m.WorkingState.Grid[5][6] = Tile{Type: TerrainPlain, OccupantType: OccupantUnit, OccupantID: int64(u2)}
+
+		bID := NewBombID(1, 1, SystemUnitID)
+		m.WorkingState.Bombs[bID] = &Bomb{ID: bID, Countdown: 1, Range: 3, Position: Coordinate{5, 5}}
+		m.WorkingState.Grid[5][5] = Tile{Type: TerrainPlain, OccupantType: OccupantBomb, OccupantID: int64(bID)}
+
+		events := m.ResolveTurn()
+
+		if m.WinnerTeamID != -1 {
+			t.Errorf("Draw Guard Failed! Expected WinnerTeamID = -1, got %d", m.WinnerTeamID)
+		}
+
+		var foundDrawEvent bool
+		for _, event := range events {
+			if ended, ok := event.(MatchEndedEvent); ok {
+				if ended.IsDraw {
+					foundDrawEvent = true
+				}
+			}
+		}
+		if !foundDrawEvent {
+			t.Error("Missing critical Draw configuration flag inside MatchEndedEvent log packet")
+		}
+	})
+
+	t.Run("Successful turn resolution advances true match clock and deep copies sandbox workspace", func(t *testing.T) {
+		m := setupCleanTestMatch()
+		m.TrueState.Turn = 1
+		m.WorkingState.Turn = 1
+
+		u1 := NewUnitID(1, 0)
+		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 2, Position: Coordinate{0, 0}}
+		u2 := NewUnitID(2, 0)
+		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 2, Position: Coordinate{0, 1}}
+
+		m.WorkingState.Grid[0][0] = Tile{Type: TerrainPlain, OccupantType: OccupantUnit, OccupantID: int64(u1)}
+		m.WorkingState.Grid[1][0] = Tile{Type: TerrainPlain, OccupantType: OccupantUnit, OccupantID: int64(u2)}
+
+		_ = m.ResolveTurn()
+
+		if m.TrueState.Turn != 2 {
+			t.Errorf("TrueState clock failed to advance! Got turn %d, want 2", m.TrueState.Turn)
+		}
+
+		promotedUnit, exists := m.TrueState.Units[u1]
+		if !exists {
+			t.Fatal("Master Promotion Error: Sandbox mutations missing from TrueState history after commit!")
+		}
+		if promotedUnit.HP != 2 {
+			t.Errorf("Data Corruption: Expected promoted unit HP = 2, found %d", promotedUnit.HP)
+		}
+
+		m.ResetTurn()
+		if m.WorkingState.Turn != 2 {
+			t.Errorf("Sandbox rollback broke timeline integrity! WorkingState turn clock reset to %d, want 2", m.WorkingState.Turn)
+		}
 	})
 }
