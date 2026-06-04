@@ -8,11 +8,11 @@ import (
 )
 
 func TestMatch_ResetTurn(t *testing.T) {
-	unitID := 16
+	unitID := NewUnitID(1, 0)
 	m := Match{
 		TrueState: &GameState{
 			Turn: 1,
-			Units: map[int]*Unit{
+			Units: map[UnitID]*Unit{
 				unitID: {HP: 5},
 			},
 		},
@@ -32,11 +32,11 @@ func TestMatch_ResetTurn(t *testing.T) {
 }
 
 func TestMatch_SubmitAction_AllowResetTurn(t *testing.T) {
-	unitID := 16
+	unitID := NewUnitID(1, 0)
 	m := Match{
 		TrueState: &GameState{
 			Turn: 1,
-			Units: map[int]*Unit{
+			Units: map[UnitID]*Unit{
 				unitID: {Position: Coordinate{1, 0}},
 			},
 		},
@@ -66,11 +66,11 @@ func TestMatch_SubmitAction_AllowResetTurn(t *testing.T) {
 }
 
 func TestMatch_SubmitAction_DisallowResetTurn(t *testing.T) {
-	unitID := 16
+	unitID := NewUnitID(1, 0)
 	m := Match{
 		TrueState: &GameState{
 			Turn: 1,
-			Units: map[int]*Unit{
+			Units: map[UnitID]*Unit{
 				unitID: {Position: Coordinate{1, 0}},
 			},
 		},
@@ -103,7 +103,7 @@ func TestCommandMoveUnit(t *testing.T) {
 	// Define the schema for our table rows
 	type testCase struct {
 		name          string
-		unitID        int
+		unitID        UnitID
 		target        Coordinate
 		setupState    func() *Match // Context setup helper
 		wantErr       bool
@@ -111,11 +111,8 @@ func TestCommandMoveUnit(t *testing.T) {
 		verifyResults func(t *testing.T, m *Match) // Post-execution state check
 	}
 
-	// Constants for easy setup
-	const (
-		validUnitID = 42
-		deadUnitID  = 99
-	)
+	validUnitID := NewUnitID(1, 0)
+	deadUnitID := NewUnitID(1, 2)
 	origin := Coordinate{X: 1, Y: 1}
 	validTarget := Coordinate{X: 1, Y: 2}
 	outOfRangeTarget := Coordinate{X: 5, Y: 5}
@@ -123,13 +120,13 @@ func TestCommandMoveUnit(t *testing.T) {
 	tests := []testCase{
 		{
 			name:   "Failure: Unit does not exist",
-			unitID: 999, // Missing ID
+			unitID: NewUnitID(3, 3), // Missing ID
 			target: validTarget,
 			setupState: func() *Match {
 				return newTestMatch(2, 2) // Empty map, no units
 			},
 			wantErr:     true,
-			errContains: "security violation: unit ID 999 does not exist",
+			errContains: "security violation: unit ID 51 does not exist",
 		},
 		{
 			name:   "Failure: Unit is dead",
@@ -141,7 +138,7 @@ func TestCommandMoveUnit(t *testing.T) {
 				return m
 			},
 			wantErr:     true,
-			errContains: "tactical restriction: unit 99 is dead",
+			errContains: "tactical restriction: unit 18 is dead",
 		},
 		{
 			name:   "Failure: Wrong team turn",
@@ -159,7 +156,7 @@ func TestCommandMoveUnit(t *testing.T) {
 				return m
 			},
 			wantErr:     true,
-			errContains: "turn restriction: unit 42 belongs to Team 2 but it's currently Team 1's turn",
+			errContains: "turn restriction: unit 16 belongs to Team 2 but it's currently Team 1's turn",
 		},
 		// { This test is not available at the moment - not until the Skills implementation in Phase 3
 		// 	name:   "Failure: Unit passes through but cannot land on HardRock",
@@ -184,7 +181,7 @@ func TestCommandMoveUnit(t *testing.T) {
 				return m
 			},
 			wantErr:     true,
-			errContains: "data corruption: unit 42 current position",
+			errContains: "data corruption: unit 16 current position",
 		},
 		{
 			name:   "Failure: Grid data desync",
@@ -220,7 +217,7 @@ func TestCommandMoveUnit(t *testing.T) {
 					Position: origin,
 					Speed:    3,
 				}
-				m.WorkingState.Grid[origin.Y][origin.X] = Tile{OccupantType: OccupantUnit, OccupantID: validUnitID}
+				m.WorkingState.Grid[origin.Y][origin.X] = Tile{OccupantType: OccupantUnit, OccupantID: int64(validUnitID)}
 				// Mock rule where target won't be found in reachable tiles
 				return m
 			},
@@ -241,7 +238,7 @@ func TestCommandMoveUnit(t *testing.T) {
 					Position: origin,
 					Speed:    3,
 				}
-				m.WorkingState.Grid[origin.Y][origin.X] = Tile{OccupantType: OccupantUnit, OccupantID: validUnitID}
+				m.WorkingState.Grid[origin.Y][origin.X] = Tile{OccupantType: OccupantUnit, OccupantID: int64(validUnitID)}
 				// FindReachableTiles/IsLandingLegal pass this target
 				return m
 			},
@@ -253,7 +250,7 @@ func TestCommandMoveUnit(t *testing.T) {
 				}
 
 				newCell := m.WorkingState.Grid[validTarget.Y][validTarget.X]
-				if newCell.OccupantID != validUnitID {
+				if newCell.OccupantID != int64(validUnitID) {
 					t.Errorf("expected unit %d at target, got %d", validUnitID, newCell.OccupantID)
 				}
 
@@ -295,7 +292,7 @@ func TestCommandPlaceBomb(t *testing.T) {
 	// Define the schema for our table rows matching the style of TestCommandMoveUnit
 	type testCase struct {
 		name          string
-		unitID        int
+		unitID        UnitID
 		target        Coordinate
 		setupState    func() *Match // Context setup helper
 		wantErr       bool
@@ -304,10 +301,8 @@ func TestCommandPlaceBomb(t *testing.T) {
 	}
 
 	// Constants for easy setup
-	const (
-		validUnitID = 42
-		deadUnitID  = 99
-	)
+	validUnitID := NewUnitID(1, 0)
+	deadUnitID := NewUnitID(1, 2)
 	origin := Coordinate{X: 1, Y: 1}
 	validTarget := Coordinate{X: 1, Y: 2}
 	outOfRangeTarget := Coordinate{X: 5, Y: 5}
@@ -315,13 +310,13 @@ func TestCommandPlaceBomb(t *testing.T) {
 	tests := []testCase{
 		{
 			name:   "Failure: Unit does not exist",
-			unitID: 999, // Missing ID
+			unitID: NewUnitID(3, 3), // Missing ID
 			target: validTarget,
 			setupState: func() *Match {
 				return newTestMatch(2, 2) // Empty map, no units
 			},
 			wantErr:     true,
-			errContains: "security violation: unit ID 999 does not exist",
+			errContains: "security violation: unit ID 51 does not exist",
 		},
 		{
 			name:   "Failure: Unit is dead",
@@ -333,7 +328,7 @@ func TestCommandPlaceBomb(t *testing.T) {
 				return m
 			},
 			wantErr:     true,
-			errContains: "tactical restriction: unit 99 is dead",
+			errContains: "tactical restriction: unit 18 is dead",
 		},
 		{
 			name:   "Failure: Wrong team turn",
@@ -351,7 +346,7 @@ func TestCommandPlaceBomb(t *testing.T) {
 				return m
 			},
 			wantErr:     true,
-			errContains: "turn restriction: unit 42 belongs to Team 2 but it's currently Team 1's turn",
+			errContains: "turn restriction: unit 16 belongs to Team 2 but it's currently Team 1's turn",
 		},
 		{
 			name:   "Failure: Data corruption - unit out of bounds",
@@ -369,7 +364,7 @@ func TestCommandPlaceBomb(t *testing.T) {
 				return m
 			},
 			wantErr:     true,
-			errContains: "data corruption: unit 42 current position",
+			errContains: "data corruption: unit 16 current position",
 		},
 		{
 			name:   "Failure: Grid data desync",
@@ -405,11 +400,11 @@ func TestCommandPlaceBomb(t *testing.T) {
 					MaxBombCount: 2,
 					BombUsed:     2, // All bombs deployed
 				}
-				m.WorkingState.Grid[origin.Y][origin.X] = Tile{OccupantType: OccupantUnit, OccupantID: validUnitID}
+				m.WorkingState.Grid[origin.Y][origin.X] = Tile{OccupantType: OccupantUnit, OccupantID: int64(validUnitID)}
 				return m
 			},
 			wantErr:     true,
-			errContains: "unit restriction: unit 42 has used up all his bombs",
+			errContains: "unit restriction: unit 16 has used up all his bombs",
 		},
 		{
 			name:   "Failure: Target out of placement range",
@@ -427,7 +422,7 @@ func TestCommandPlaceBomb(t *testing.T) {
 					MaxBombCount: 1,
 					BombUsed:     0,
 				}
-				m.WorkingState.Grid[origin.Y][origin.X] = Tile{OccupantType: OccupantUnit, OccupantID: validUnitID}
+				m.WorkingState.Grid[origin.Y][origin.X] = Tile{OccupantType: OccupantUnit, OccupantID: int64(validUnitID)}
 				return m
 			},
 			wantErr:     true,
@@ -441,7 +436,7 @@ func TestCommandPlaceBomb(t *testing.T) {
 				m := newTestMatch(3, 3)
 				m.WorkingState.Turn = 3
 				m.WorkingState.TurnBombCounter = 0
-				m.WorkingState.Bombs = make(map[int]*Bomb)
+				m.WorkingState.Bombs = make(map[BombID]*Bomb)
 				m.WorkingState.Units[validUnitID] = &Unit{
 					ID:           validUnitID,
 					HP:           1,
@@ -453,7 +448,7 @@ func TestCommandPlaceBomb(t *testing.T) {
 					BombUsed:     0,
 				}
 				m.WorkingState.Grid[validTarget.Y][validTarget.X].Type = TerrainBlock // make the target tile illegal to place a bomb
-				m.WorkingState.Grid[origin.Y][origin.X] = Tile{OccupantType: OccupantUnit, OccupantID: validUnitID}
+				m.WorkingState.Grid[origin.Y][origin.X] = Tile{OccupantType: OccupantUnit, OccupantID: int64(validUnitID)}
 				return m
 			},
 			wantErr:     true,
@@ -467,7 +462,7 @@ func TestCommandPlaceBomb(t *testing.T) {
 				m := newTestMatch(3, 3)
 				m.WorkingState.Turn = 3
 				m.WorkingState.TurnBombCounter = 0
-				m.WorkingState.Bombs = make(map[int]*Bomb)
+				m.WorkingState.Bombs = make(map[BombID]*Bomb)
 				m.WorkingState.Units[validUnitID] = &Unit{
 					ID:           validUnitID,
 					HP:           1,
@@ -478,7 +473,7 @@ func TestCommandPlaceBomb(t *testing.T) {
 					MaxBombCount: 2,
 					BombUsed:     0,
 				}
-				m.WorkingState.Grid[origin.Y][origin.X] = Tile{OccupantType: OccupantUnit, OccupantID: validUnitID}
+				m.WorkingState.Grid[origin.Y][origin.X] = Tile{OccupantType: OccupantUnit, OccupantID: int64(validUnitID)}
 				return m
 			},
 			wantErr: false,
@@ -498,12 +493,12 @@ func TestCommandPlaceBomb(t *testing.T) {
 				}
 
 				targetCell := m.WorkingState.Grid[validTarget.Y][validTarget.X]
-				if targetCell.OccupantType != OccupantBomb || targetCell.OccupantID != expectedBombID {
+				if targetCell.OccupantType != OccupantBomb || targetCell.OccupantID != int64(expectedBombID) {
 					t.Errorf("expected target grid tile to hold bomb entity, got type %v, id %d", targetCell.OccupantType, targetCell.OccupantID)
 				}
 
 				originCell := m.WorkingState.Grid[origin.Y][origin.X]
-				if originCell.OccupantType != OccupantUnit || originCell.OccupantID != validUnitID {
+				if originCell.OccupantType != OccupantUnit || originCell.OccupantID != int64(validUnitID) {
 					t.Errorf("expected origin unit tile to remain intact, got type %v, id %d", originCell.OccupantType, originCell.OccupantID)
 				}
 
@@ -551,7 +546,7 @@ func newTestMatch(width, height int) *Match {
 	return &Match{
 		WorkingState: &GameState{
 			Turn:  1,
-			Units: make(map[int]*Unit),
+			Units: make(map[UnitID]*Unit),
 			Grid:  grid,
 		},
 		PlaybackLog: []GameEvent{},

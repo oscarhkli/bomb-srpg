@@ -28,7 +28,7 @@ const (
 type Tile struct {
 	Type         TerrainType
 	OccupantType OccupantType
-	OccupantID   int // ID of the occupant for cross reference
+	OccupantID   int64 // ID of the occupant for cross reference
 }
 
 type SoftBlock struct {
@@ -70,7 +70,7 @@ type UnitID uint8 // will be used later on
 type BombID uint32
 
 type Unit struct {
-	ID           int
+	ID           UnitID
 	Type         Archetype
 	Position     Coordinate
 	Speed        int
@@ -85,8 +85,8 @@ type Unit struct {
 }
 
 type Bomb struct {
-	ID        int
-	OwnerID   int // ID of the character who placed the bomb
+	ID        BombID
+	OwnerID   UnitID // ID of the character who placed the bomb
 	Position  Coordinate
 	Range     int
 	Countdown int // Turns until explosion
@@ -108,8 +108,8 @@ type GameState struct {
 	Turn            int // Turn counter, starting from 1
 	TurnBombCounter int // To record how many bombs placed during the turn
 	Grid            [][]Tile
-	Units           map[int]*Unit      // Keyed by Unit ID
-	Bombs           map[int]*Bomb      // Keyed by Bomb ID
+	Units           map[UnitID]*Unit   // Keyed by Unit ID
+	Bombs           map[BombID]*Bomb   // Keyed by Bomb ID
 	SoftBlocks      map[int]*SoftBlock // Keyed by SoftBlock ID
 	TurnCommands    []TurnCommand      // Commands issued by players for the current turn
 }
@@ -124,7 +124,7 @@ const (
 
 type TurnCommand struct {
 	Action         ActionType
-	ActorID        int
+	ActorID        UnitID
 	TargetPosition Coordinate // For move and place bomb actions
 }
 
@@ -133,7 +133,7 @@ type GameEvent interface {
 }
 
 type UnitMovedEvent struct {
-	UnitID int
+	UnitID UnitID
 	From   Coordinate
 	To     Coordinate
 }
@@ -141,14 +141,14 @@ type UnitMovedEvent struct {
 func (UnitMovedEvent) isGameEvent() {}
 
 type UnitDiedEvent struct {
-	UnitID int
+	UnitID UnitID
 }
 
 func (UnitDiedEvent) isGameEvent() {}
 
 type BombPlacedEvent struct {
-	UnitID    int
-	BombID    int
+	UnitID    UnitID
+	BombID    BombID
 	Position  Coordinate
 	Range     int
 	Countdown int
@@ -157,7 +157,7 @@ type BombPlacedEvent struct {
 func (BombPlacedEvent) isGameEvent() {}
 
 type BombExplodedEvent struct {
-	BombID            int
+	BombID            BombID
 	AffectedPositions []Coordinate
 }
 

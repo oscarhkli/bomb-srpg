@@ -22,7 +22,7 @@ func (m *Match) SubmitAction(gameEvent GameEvent) {
 // CommandMoveUnit executes a unit relocation after verifying game rule compliance.
 // It calculates the active range, updates the board matrix, and commits a UnitMovedEvent.
 // Returns an error if the pathing rules are violated or if the target cell is blocked.
-func (m *Match) CommandMoveUnit(unitID int, target Coordinate) error {
+func (m *Match) CommandMoveUnit(unitID UnitID, target Coordinate) error {
 	unit, err := m.validateActiveUnit(unitID)
 	if err != nil {
 		return err
@@ -41,7 +41,7 @@ func (m *Match) CommandMoveUnit(unitID int, target Coordinate) error {
 
 	oldPos := unit.Position
 	m.WorkingState.ClearStageTile(oldPos)
-	m.WorkingState.UpdateStageOccupant(target, OccupantUnit, unitID)
+	m.WorkingState.UpdateStageOccupant(target, OccupantUnit, int64(unitID))
 
 	m.SubmitAction(UnitMovedEvent{
 		UnitID: unitID,
@@ -55,7 +55,7 @@ func (m *Match) CommandMoveUnit(unitID int, target Coordinate) error {
 // validateActiveUnit performs systemic and structural sanity checks on a requested unit.
 // It sequentially validates presence, vitality, phase ownership, bounds, and grid desync.
 // Returns a pointer to the verified Unit, or a detailed error blocking action execution.
-func (m *Match) validateActiveUnit(unitID int) (*Unit, error) {
+func (m *Match) validateActiveUnit(unitID UnitID) (*Unit, error) {
 	unit, ok := m.WorkingState.Units[unitID]
 	if !ok {
 		return nil, fmt.Errorf("security violation: unit ID %d does not exist in active sandbox context", unitID)
@@ -75,7 +75,7 @@ func (m *Match) validateActiveUnit(unitID int) (*Unit, error) {
 	}
 
 	cell := m.WorkingState.Grid[unit.Position.Y][unit.Position.X]
-	if cell.OccupantType != OccupantUnit || cell.OccupantID != unitID {
+	if cell.OccupantType != OccupantUnit || cell.OccupantID != int64(unitID) {
 		return nil, fmt.Errorf("data desync: grid matrix at %v does not acknowledge unit %d as its occupant (found type: %v, id: %d)",
 			unit.Position, unitID, cell.OccupantType, cell.OccupantID)
 	}
@@ -86,7 +86,7 @@ func (m *Match) validateActiveUnit(unitID int) (*Unit, error) {
 // CommandPlaceBomb executes a bomb deployment after verifying unit's bomb availability and grid compliance.
 // It validates placement range, registers a new Bomb state tracking instance, and commits a BombPlacedEvent.
 // Returns an error if the unit is running out of bombs, the target is out of range, or the cell is blocked.
-func (m *Match) CommandPlaceBomb(unitID int, target Coordinate) error {
+func (m *Match) CommandPlaceBomb(unitID UnitID, target Coordinate) error {
 
 	// identify the unit and check the availability
 	unit, err := m.validateActiveUnit(unitID)
@@ -117,7 +117,7 @@ func (m *Match) CommandPlaceBomb(unitID int, target Coordinate) error {
 		Countdown: m.WorkingState.DeduceBombCountDown(target, unit),
 	}
 	m.WorkingState.Bombs[bomb.ID] = bomb
-	m.WorkingState.UpdateStageOccupant(target, OccupantBomb, bomb.ID)
+	m.WorkingState.UpdateStageOccupant(target, OccupantBomb, int64(bomb.ID))
 
 	m.SubmitAction(BombPlacedEvent{
 		UnitID:    unitID,

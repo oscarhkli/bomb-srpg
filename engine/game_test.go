@@ -291,7 +291,7 @@ func TestInitGameState_Suite(t *testing.T) {
 				})
 
 				var expectedPosition Coordinate
-				_, index := DecodeUnitID(id)
+				_, index := id.Decode()
 				switch unit.Team {
 				case 1:
 					expectedPosition = preset.P1StartingPositions[index]
@@ -476,8 +476,8 @@ func TestGameStateDeepCopy_Isolation(t *testing.T) {
 	original := &GameState{
 		Turn:       1,
 		Grid:       [][]Tile{},
-		Units:      make(map[int]*Unit),
-		Bombs:      make(map[int]*Bomb),
+		Units:      make(map[UnitID]*Unit),
+		Bombs:      make(map[BombID]*Bomb),
 		SoftBlocks: make(map[int]*SoftBlock),
 	}
 	original.Grid = append(original.Grid, []Tile{{Type: TerrainPlain, OccupantType: OccupantNone, OccupantID: 0}})

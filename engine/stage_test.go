@@ -90,7 +90,7 @@ func TestGameState_ClearStageTile(t *testing.T) {
 		clearPos     Coordinate
 		verifyPos    Coordinate
 		expectedType OccupantType
-		expectedID   int
+		expectedID   int64
 	}{
 		{
 			name:         "Within bound, can clear",
@@ -143,7 +143,7 @@ func TestGameState_UpdateStageOccupant(t *testing.T) {
 		updatePos    Coordinate
 		verifyPos    Coordinate
 		expectedType OccupantType
-		expectedID   int
+		expectedID   int64
 	}{
 		{
 			name:         "Within bound, can update",
@@ -191,7 +191,7 @@ func TestGameState_UpdateStageOccupant(t *testing.T) {
 }
 
 func TestGameState_DeduceBombCountDown(t *testing.T) {
-	unitID := 16
+	unitID := NewUnitID(1, 0)
 	unit := &Unit{
 		ID: unitID,
 	}
@@ -199,7 +199,7 @@ func TestGameState_DeduceBombCountDown(t *testing.T) {
 		Grid: [][]Tile{{
 			{Type: TerrainPlain},
 		}},
-		Units: map[int]*Unit{
+		Units: map[UnitID]*Unit{
 			unitID: unit,
 		},
 	}
