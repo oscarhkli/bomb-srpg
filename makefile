@@ -8,7 +8,7 @@ vet: fmt
 	go vet ./...
 
 test: vet
-	go test -cover ./engine/... ./cmd/cli/... -coverprofile=coverage.out
+	go test -cover -coverprofile=coverage.out ./engine/... ./cmd/cli/... 
 
 coverage: test
 	go tool cover -html=coverage.txt

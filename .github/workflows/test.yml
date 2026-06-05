@@ -7,6 +7,9 @@ on:
     branches:
       - "main"
 
+permissions:
+  contents: read
+
 jobs:
   unit_tests:
     name: "Run Unit Tests"
@@ -21,7 +24,7 @@ jobs:
           go-version: "^1.26.3"
 
       - name: Run Tests with Coverage
-        run: go test -cover -coverprofile=coverage.txt ./...
+        run: go test -cover -coverprofile=coverage.txt ./engine/... ./cmd/cli/...
 
       - name: Archive code coverage results
         uses: actions/upload-artifact@v4
