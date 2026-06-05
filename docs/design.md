@@ -45,6 +45,48 @@
 * **Turn Startup Sudden Death Checks**: State machine transition and boundary rules—such as checking if `TrueState.Turn >= Config.MaxTurn`—are evaluated at the very beginning of a new turn (`StartNewTurn()`). This ensures map alterations and automated sudden-death bomb injections are fully populated and rendered before a player can input commands. Setting `MaxTurn = 0` forces instant sudden death on Turn 1.
 * **Decoupled Analytical Queries**: Victory evaluations (`EvaluateVictoryConditions()`) are written as pure, read-only, stateless functions that return data structures without producing side effects. The top-level `ResolveTurn()` orchestrator handles updating properties and injecting the definitive termination token (`MatchEndedEvent`) into the public stream, allowing AI modules to securely query hypothetical sandboxes without corrupting telemetry arrays.
 
+## 6. Monolithic Architectural Separation & Presentation Boundaries
+
+```text
++-------------------+      Uses Pointer (*)     +---------------------+
+
+|  MatchController  | ------------------------> |     engine.Match    |
+|   (UI Handler)    |                           | (Authoritative Core)|
++-------------------+                           +---------------------+
+
+          |
+          | Calls Contract
+          v
++-------------------+
+
+|   <<interface>>   |
+|     MatchView     |
++-------------------+
+
+          |
+          +-----------------------+-----------------------+
+          | (Phase 1)             | (Phase 2)             | (Phase 3 Future)
+          v                       v                       v
++-------------------+   +-------------------+   +-------------------+
+
+|   TerminalView    |   |      WebView      |   |   WebSocketView   |
+|   (ASCII Text)    |   |  (JSON streaming) |   | (Live Event Pump) |
++-------------------+   +-------------------+   +-------------------+
+```
+
+- **Data-Isolated Presentation Boundary**: Decouples rendering from the core transaction state machine. To enforce turn secrecy and prevent sandbox memory leaks across boundaries, UI layouts receive an isolated pointer to `engine.GameState` (`WorkingState`) instead of the parent `engine.Match` orchestrator.
+- **Abstract Rendering Contract (`MatchView`)**: Insulates input mechanics from layout layers via a stateless interface contract. Implementations satisfy compliance implicitly:
+  - **TerminalView (Phase 1)**: Synchronously maps the 2D grid matrix into single-byte ASCII tokens (`█`, `B`, `U`) for raw terminal streaming.
+  - **WebView (Phase 2)**: Directly serializes the active `GameState` struct into flat JSON arrays for HTTP response targets.
+- **Pointer-Driven Memory Persistence (`*engine.Match`)**: Controller pipelines execute actions exclusively via `*engine.Match` references. This guarantees user interactions mutate master allocation frames natively, eliminating the memory duplication overhead of dynamic matrix slices.
+
+## 7. Network Sync, Transaction Pipeline & Idempotency Invariants
+
+- **Localized Client-Side State Machine**: UI sub-phases—including tile discovery, reachability shading, and trajectory selection—execute strictly inside the client container to hit zero network overhead. Phase 1 leverages the local CLI controller; Phase 2 mirrors this via decoupled canvas logic utilizing static memory snapshots of the movement grid.
+- **Atomic Command Transaction Execution**: Turn commitment passes actions through a single atomic `POST /api/match/actions` transaction. The backend parses the payload packet, pushes it into the master engine loop, applies verification rules, and drops a consolidated state bundle containing the evaluation snapshot and resolution log vectors.
+- **Retained Playback Logs**: The sequence remains preserved throughout the turn resolution pass to drive localized client actions (raw terminal text traces in Phase 1; canvas animation frames and audio triggers in Phase 2). The array is wiped clean on the initialization boundary of a new turn sequence.
+- **Idempotency and Self-Healing Synchronization**: Network drops and state desynchronizations drop down to zero-overhead overwriting loops. Because the engine treats every network interaction as an absolute state delivery event, the client handles incoming engine payloads as immutable truth, instantly wiping and rewriting local memory allocations without complex rolling diff checks.
+
 # File Structure (WIP)
 
 ```text
