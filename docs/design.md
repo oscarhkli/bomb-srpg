@@ -50,15 +50,21 @@
 ```text
 bomb-srpg
 ├── cmd/
-│   └── srpg-cli/          <-- Phase 1: Interactive Terminal CLI Driver
-├── docs/                  <-- Design, roadmap and other docs
-├── engine/                <-- Pure Core Logic
-│   └── codecs.go          <-- Bitmask encoders, decoders for UnitID and BombID
-│   └── game.go            <-- Game initializer
-│   └── match.go           <-- Match life cycle transactions
-│   └── models.go          <-- Pure blueprints
-│   └── pathfinding.go     <-- Stage navigation
-│   └── presets.go         <-- Static database
-|   └── stage.go           <-- Centralized Stage verification and manipulation (IsInBound, ClearTile, UpdateTileOccupant, etc.)
-└── web/                   <-- Phase 2+: Frontend
+│   └── cli/                    <-- Phase 1: Interactive Terminal CLI Driver
+│       ├── main.go             <-- Initialises engine and drives the 1-time render
+│       ├── match_controller.go <-- Reads inputs and maps to engine actions
+│       ├── views.go            <-- Defines the read-only MatchView interface
+│       └── terminal_view.go    <-- Implements the ASCII map grid rendering logic
+├── srpg-cli.go                 <-- Phase 1 entry point
+├── srpg-cli.go                 <-- Phase 2 entry point
+├── docs/                       <-- Design, roadmap and other docs
+├── engine/                     <-- Pure Core Logic
+│   └── codecs.go               <-- Bitmask encoders, decoders for UnitID and BombID
+│   └── game.go                 <-- Game initializer
+│   └── match.go                <-- Match life cycle transactions
+│   └── models.go               <-- Pure blueprints
+│   └── pathfinding.go          <-- Stage navigation
+│   └── presets.go              <-- Static database
+|   └── stage.go                <-- Centralized Stage verification and manipulation (IsInBound, ClearTile, UpdateTileOccupant, etc.)
+└── web/                        <-- Phase 2+: Frontend
 ```
