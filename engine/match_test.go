@@ -485,7 +485,7 @@ func TestCommandPlaceBomb(t *testing.T) {
 				expectedBombID := NewBombID(3, 1, validUnitID)
 				bomb, exists := m.WorkingState.Bombs[expectedBombID]
 				if !exists {
-					t.Fatalf("expected bomb tracking map entry under ID 0x%X missing", expectedBombID)
+					t.Fatalf("expected bomb tracking map entry under ID %#X missing", expectedBombID)
 				}
 
 				if bomb.OwnerID != validUnitID || bomb.Position != validTarget || bomb.Range != 3 || bomb.Countdown != 5 {
@@ -705,6 +705,7 @@ func TestMatch_StartTurn_SuddenDeath(t *testing.T) {
 		m.WorkingState.Grid[1][0].OccupantID = int64(u2)
 		m.WorkingState.Grid[2][0].Type = TerrainBlock
 		m.WorkingState.Grid[3][0].OccupantType = OccupantBomb
+		m.WorkingState.Grid[3][0].OccupantID = int64(bID)
 		m.WorkingState.Grid[4][0].OccupantType = OccupantSoftBlock
 		m.WorkingState.Grid[5][0].OccupantType = OccupantItem
 
@@ -757,10 +758,10 @@ func TestMatch_ResolveTurn_ExplosionAndBlast(t *testing.T) {
 			t.Errorf("Expected zero events for ticking fuse, got %v", len(events))
 		}
 		if m.WorkingState.Bombs[b1].Countdown != 2 {
-			t.Errorf("Expected Bomb 0x%x to reduce to 2, got %d", b1, m.WorkingState.Bombs[b1].Countdown)
+			t.Errorf("Expected Bomb %#X to reduce to 2, got %d", b1, m.WorkingState.Bombs[b1].Countdown)
 		}
 		if m.WorkingState.Bombs[b2].Countdown != -1 {
-			t.Errorf("Expected Bomb 0x%x to remains at -1, got %d", b2, m.WorkingState.Bombs[b2].Countdown)
+			t.Errorf("Expected Bomb %#X to remains at -1, got %d", b2, m.WorkingState.Bombs[b2].Countdown)
 		}
 		if m.WorkingState.Grid[5][5].OccupantType != OccupantBomb {
 			t.Errorf("Grid corruption: Ticking bomb cleared prematurely from cell footprint")
@@ -794,10 +795,10 @@ func TestMatch_ResolveTurn_ExplosionAndBlast(t *testing.T) {
 		events := m.ResolveTurn()
 
 		if m.WorkingState.Units[u1].HP != 2 {
-			t.Errorf("Flat injury rule failed for Unit 0x%x! Expected Unit HP = 2, got %d", u1, m.WorkingState.Units[u1].HP)
+			t.Errorf("Flat injury rule failed for Unit %#X! Expected Unit HP = 2, got %d", u1, m.WorkingState.Units[u1].HP)
 		}
 		if m.WorkingState.Units[u2].HP != 0 {
-			t.Errorf("Flat injury rule failed for Unit 0x%x! Expected Unit HP = 0, got %d", u2, m.WorkingState.Units[u2].HP)
+			t.Errorf("Flat injury rule failed for Unit %#X! Expected Unit HP = 0, got %d", u2, m.WorkingState.Units[u2].HP)
 		}
 
 		damageEventsCount := 0

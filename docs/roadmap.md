@@ -24,7 +24,7 @@
 - [ ] CLI terminal
   - [ ] CLI Controller
   - [ ] Start/Restart Game
-  - [ ] Display
+  - [x] Display
   - [ ] GameEvent
   - [ ] Command
   - [ ] Surrender
