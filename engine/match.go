@@ -1,6 +1,9 @@
 package engine
 
-import "fmt"
+import (
+	"fmt"
+	"math/rand"
+)
 
 // ResetTurn discards the mid-turn WorkingState
 // and rollback to the beginning of the turn with deep copy of TrueState
@@ -87,7 +90,6 @@ func (m *Match) validateActiveUnit(unitID UnitID) (*Unit, error) {
 // It validates placement range, registers a new Bomb state tracking instance, and commits a BombPlacedEvent.
 // Returns an error if the unit is running out of bombs, the target is out of range, or the cell is blocked.
 func (m *Match) CommandPlaceBomb(unitID UnitID, target Coordinate) error {
-
 	// identify the unit and check the availability
 	unit, err := m.validateActiveUnit(unitID)
 	if err != nil {
@@ -108,13 +110,19 @@ func (m *Match) CommandPlaceBomb(unitID UnitID, target Coordinate) error {
 		return fmt.Errorf("bomb placement rejected: %w", err)
 	}
 
+	m.placeBomb(unitID, target, unit.BombPower)
+
+	return nil
+}
+
+func (m *Match) placeBomb(unitID UnitID, target Coordinate, bombPower int) {
 	m.WorkingState.TurnBombCounter++
 	bomb := &Bomb{
 		ID:        NewBombID(m.WorkingState.Turn, m.WorkingState.TurnBombCounter, unitID),
 		OwnerID:   unitID,
 		Position:  target,
-		Range:     unit.BombPower,
-		Countdown: m.WorkingState.DeduceBombCountDown(target, unit),
+		Range:     bombPower,
+		Countdown: m.WorkingState.DeduceBombCountDown(target),
 	}
 	m.WorkingState.Bombs[bomb.ID] = bomb
 	m.WorkingState.UpdateStageOccupant(target, OccupantBomb, int64(bomb.ID))
@@ -126,8 +134,6 @@ func (m *Match) CommandPlaceBomb(unitID UnitID, target Coordinate) error {
 		Range:     bomb.Range,
 		Countdown: bomb.Countdown,
 	})
-
-	return nil
 }
 
 // IsLandingLegal checks if the target is legal to be landed by a certain occupantType.
@@ -154,7 +160,38 @@ func (gs GameState) IsLandingLegal(target Coordinate, occupantType OccupantType)
 
 // StartNewTurn sets up the environmental boundaries for the upcoming round.
 func (m *Match) StartNewTurn() {
-	// TODO: Sudden death trigger check: If Turn >= MaxTurn: enter sudden death
+	victoryResult, _ := m.evaluateVictoryConditions()
+	if victoryResult != MatchInProgress {
+		return // Match has reached a conclusion; abort round initialization
+	}
+
+	if m.GameCfg.SuddenDeath && m.TrueState.Turn > m.GameCfg.MaxTurns {
+		m.injectSuddenDeathHazards()
+	}
+}
+
+// injectSuddenDeathHazards picks 2 random unoccupied tiles and drop bombs there.
+func (m *Match) injectSuddenDeathHazards() error {
+	emptyTilePos := []Coordinate{}
+	for y, row := range m.WorkingState.Grid {
+		for x, tile := range row {
+			if tile.OccupantType == OccupantNone && tile.Type != TerrainBlock {
+				emptyTilePos = append(emptyTilePos, Coordinate{x, y})
+			}
+		}
+	}
+
+	rand.Shuffle(len(emptyTilePos), func(i int, j int) {
+		emptyTilePos[i], emptyTilePos[j] = emptyTilePos[j], emptyTilePos[i]
+	})
+
+	limit := min(len(emptyTilePos), SuddenDeathBombs)
+
+	for _, target := range emptyTilePos[:limit] {
+		m.placeBomb(SystemUnitID, target, BombDefaultPower)
+	}
+
+	return nil
 }
 
 // ResolveTurn controls everything in between turns:

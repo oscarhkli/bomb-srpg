@@ -539,18 +539,28 @@ func TestCommandPlaceBomb(t *testing.T) {
 // newTestMatch generates a clean slate grid environment
 func newTestMatch(width, height int) *Match {
 	grid := make([][]Tile, height)
-	for i := range grid {
-		grid[i] = make([]Tile, width)
+	for y, row := range grid {
+		grid[y] = make([]Tile, width)
+		for x := range row {
+			grid[y][x] = Tile{Type: TerrainPlain, OccupantType: OccupantNone}
+		}
 	}
 
-	return &Match{
+	m := &Match{
+		GameCfg: GameCfg{MaxTurns: 100},
 		WorkingState: &GameState{
-			Turn:  1,
-			Units: make(map[UnitID]*Unit),
-			Grid:  grid,
+			Turn:            1,
+			TurnBombCounter: 0,
+			Grid:            grid,
+			Units:           make(map[UnitID]*Unit),
+			Bombs:           make(map[BombID]*Bomb),
+			SoftBlocks:      make(map[int]*SoftBlock),
 		},
 		PlaybackLog: []GameEvent{},
 	}
+	m.TrueState = m.WorkingState.DeepCopy()
+
+	return m
 }
 
 func TestGameState_IsLandingLegal_OccupantBomb(t *testing.T) {
@@ -609,33 +619,127 @@ func TestGameState_IsLandingLegal_OccupantBomb(t *testing.T) {
 	}
 }
 
-// Helper function to build a clean, manual test board matrix with zero noise
-func setupCleanTestMatch() *Match {
-	m := &Match{
-		PlaybackLog: []GameEvent{},
-	}
-	grid := make([][]Tile, 16)
-	for y := range 16 {
-		grid[y] = make([]Tile, 16)
-		for x := range 16 {
-			grid[y][x] = Tile{Type: TerrainPlain, OccupantType: OccupantNone}
+func TestMatch_StartTurn_NotTriggeringSuddenDeath(t *testing.T) {
+	t.Run("match has reached a conclusion", func(t *testing.T) {
+		m := newTestMatch(3, 3)
+		m.GameCfg.SuddenDeath = true
+		u1 := NewUnitID(1, 0)
+		u2 := NewUnitID(2, 0)
+		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 0}
+		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1}
+
+		m.StartNewTurn()
+
+		if got, want := len(m.WorkingState.Bombs), 0; got != want {
+			t.Errorf("Victory Evaluation failure: Bomb count = %d, want: %d", got, want)
 		}
-	}
-	m.WorkingState = &GameState{
-		Turn:            1,
-		TurnBombCounter: 0,
-		Grid:            grid,
-		Units:           make(map[UnitID]*Unit),
-		Bombs:           make(map[BombID]*Bomb),
-		SoftBlocks:      make(map[int]*SoftBlock),
-	}
-	m.TrueState = m.WorkingState.DeepCopy()
-	return m
+	})
+
+	t.Run("sudden disabled", func(t *testing.T) {
+		m := newTestMatch(3, 3)
+		m.GameCfg.SuddenDeath = false
+		u1 := NewUnitID(1, 0)
+		u2 := NewUnitID(2, 0)
+		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1}
+		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1}
+
+		m.StartNewTurn()
+
+		if got, want := len(m.WorkingState.Bombs), 0; got != want {
+			t.Errorf("Sudden Death check failure: Bomb count = %d, want: %d", got, want)
+		}
+	})
+
+	t.Run("turn limit not exceed yet", func(t *testing.T) {
+		m := newTestMatch(3, 3)
+		m.GameCfg.SuddenDeath = true
+		m.TrueState.Turn = 100
+		m.WorkingState.Turn = 100
+		u1 := NewUnitID(1, 0)
+		u2 := NewUnitID(2, 0)
+		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1}
+		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1}
+
+		m.StartNewTurn()
+
+		if got, want := len(m.WorkingState.Bombs), 0; got != want {
+			t.Errorf("Turn limit check failure: Bomb count = %d, want: %d", got, want)
+		}
+	})
+}
+
+func TestMatch_StartTurn_SuddenDeath(t *testing.T) {
+	t.Run("stage has many available tiles", func(t *testing.T) {
+		m := newTestMatch(3, 3)
+		m.GameCfg.SuddenDeath = true
+		m.TrueState.Turn = 101
+		u1 := NewUnitID(1, 0)
+		u2 := NewUnitID(2, 0)
+		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1, Position: Coordinate{0, 0}}
+		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1, Position: Coordinate{0, 1}}
+		m.WorkingState.Grid[0][0].OccupantType = OccupantUnit
+		m.WorkingState.Grid[0][0].OccupantID = int64(u1)
+		m.WorkingState.Grid[1][0].OccupantType = OccupantUnit
+		m.WorkingState.Grid[1][0].OccupantID = int64(u2)
+
+		m.StartNewTurn()
+
+		if got, want := len(m.WorkingState.Bombs), SuddenDeathBombs; got != want {
+			t.Errorf("Sudden death bomb drop failure: Bomb count = %d, want: %d", got, want)
+		}
+	})
+
+	t.Run("stage has many 1 available tile", func(t *testing.T) {
+		m := newTestMatch(1, 7)
+		m.GameCfg.SuddenDeath = true
+		m.TrueState.Turn = 101
+		u1 := NewUnitID(1, 0)
+		u2 := NewUnitID(2, 0)
+		bID := NewBombID(100, 1, u1)
+		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1, Position: Coordinate{0, 0}}
+		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1, Position: Coordinate{0, 1}}
+		m.WorkingState.Bombs[bID] = &Bomb{ID: bID, OwnerID: u2, Position: Coordinate{0, 3}}
+		m.WorkingState.Grid[0][0].OccupantType = OccupantUnit
+		m.WorkingState.Grid[0][0].OccupantID = int64(u1)
+		m.WorkingState.Grid[1][0].OccupantType = OccupantUnit
+		m.WorkingState.Grid[1][0].OccupantID = int64(u2)
+		m.WorkingState.Grid[2][0].Type = TerrainBlock
+		m.WorkingState.Grid[3][0].OccupantType = OccupantBomb
+		m.WorkingState.Grid[4][0].OccupantType = OccupantSoftBlock
+		m.WorkingState.Grid[5][0].OccupantType = OccupantItem
+
+		m.StartNewTurn()
+
+		if got, want := len(m.WorkingState.Bombs), 2; got != want {
+			t.Errorf("Sudden death bomb drop failure: Bomb count = %d, want: %d", got, want)
+		}
+	})
+
+	t.Run("stage has no available tile", func(t *testing.T) {
+		m := newTestMatch(1, 3)
+		m.GameCfg.SuddenDeath = true
+		m.TrueState.Turn = 101
+		u1 := NewUnitID(1, 0)
+		u2 := NewUnitID(2, 0)
+		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1, Position: Coordinate{0, 0}}
+		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1, Position: Coordinate{0, 1}}
+		m.WorkingState.Grid[0][0].OccupantType = OccupantUnit
+		m.WorkingState.Grid[0][0].OccupantID = int64(u1)
+		m.WorkingState.Grid[1][0].OccupantType = OccupantUnit
+		m.WorkingState.Grid[1][0].OccupantID = int64(u2)
+		m.WorkingState.Grid[2][0].Type = TerrainBlock
+
+		m.StartNewTurn()
+
+		if got, want := len(m.WorkingState.Bombs), 0; got != want {
+			t.Errorf("Sudden death bomb drop failure: Bomb count = %d, want: %d", got, want)
+		}
+	})
 }
 
 func TestMatch_ResolveTurn_ExplosionAndBlast(t *testing.T) {
 	t.Run("Natural countdown tick reduces for countdown bombs and does not detonate early", func(t *testing.T) {
-		m := setupCleanTestMatch()
+		m := newTestMatch(16, 16)
 		u1 := NewUnitID(1, 0)
 		u2 := NewUnitID(2, 0)
 		b1 := NewBombID(1, 1, u1)
@@ -670,7 +774,7 @@ func TestMatch_ResolveTurn_ExplosionAndBlast(t *testing.T) {
 	})
 
 	t.Run("Units caught in overlapping blast patterns receive exactly 1 flat HP damage max", func(t *testing.T) {
-		m := setupCleanTestMatch()
+		m := newTestMatch(16, 16)
 		u1 := NewUnitID(1, 0)
 		m.WorkingState.Units[u1] = &Unit{ID: u1, HP: 3, Position: Coordinate{2, 2}}
 		m.WorkingState.Grid[2][2] = Tile{OccupantType: OccupantUnit, OccupantID: int64(u1)}
@@ -733,7 +837,7 @@ func TestMatch_ResolveTurn_ExplosionAndBlast(t *testing.T) {
 
 func TestMatch_ResolveTurn_CascadingChainReactions(t *testing.T) {
 	t.Run("Ticking bomb triggers secondary explosive via proximity chain reaction", func(t *testing.T) {
-		m := setupCleanTestMatch()
+		m := newTestMatch(16, 16)
 		uID := NewUnitID(1, 0)
 
 		b1 := NewBombID(1, 1, uID)
@@ -771,7 +875,7 @@ func TestMatch_ResolveTurn_CascadingChainReactions(t *testing.T) {
 	})
 
 	t.Run("Soft blocks act as solid line of sight obstacles shielding behind tiles during turn", func(t *testing.T) {
-		m := setupCleanTestMatch()
+		m := newTestMatch(16, 16)
 		uID := NewUnitID(1, 0)
 
 		bID := NewBombID(1, 1, uID)
@@ -814,7 +918,7 @@ func TestMatch_ResolveTurn_CascadingChainReactions(t *testing.T) {
 
 func TestMatch_ResolveTurn_TimelineSystemTransitions(t *testing.T) {
 	t.Run("Empty turn resolution executes smoothly with zero structural mutations", func(t *testing.T) {
-		m := setupCleanTestMatch()
+		m := newTestMatch(16, 16)
 		u1 := NewUnitID(1, 0)
 		u2 := NewUnitID(2, 0)
 		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1}
@@ -836,7 +940,7 @@ func TestMatch_ResolveTurn_TimelineSystemTransitions(t *testing.T) {
 	})
 
 	t.Run("Solid Victory is decreed when exactly one team has living units left standing", func(t *testing.T) {
-		m := setupCleanTestMatch()
+		m := newTestMatch(16, 16)
 		m.TrueState.Turn = 1
 		m.WorkingState.Turn = 1
 
@@ -873,7 +977,7 @@ func TestMatch_ResolveTurn_TimelineSystemTransitions(t *testing.T) {
 	})
 
 	t.Run("Mutual destruction Draw condition is logged when a blast vaporises all players simultaneously", func(t *testing.T) {
-		m := setupCleanTestMatch()
+		m := newTestMatch(16, 16)
 		m.TrueState.Turn = 1
 		m.WorkingState.Turn = 1
 
@@ -909,7 +1013,7 @@ func TestMatch_ResolveTurn_TimelineSystemTransitions(t *testing.T) {
 	})
 
 	t.Run("Successful turn resolution advances true match clock and deep copies sandbox workspace", func(t *testing.T) {
-		m := setupCleanTestMatch()
+		m := newTestMatch(16, 16)
 		m.TrueState.Turn = 1
 		m.WorkingState.Turn = 1
 

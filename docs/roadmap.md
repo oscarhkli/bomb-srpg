@@ -18,15 +18,17 @@
   - [x] Bomb detonation, chain reaction
   - [x] Casualty updates
   - [x] Result calculation
+- [x] Starting turns
+  - [x] Environment setup
+  - [x] Sudden death
 - [ ] CLI terminal
   - [ ] CLI Controller
+  - [ ] Start/Restart Game
   - [ ] Display
   - [ ] GameEvent
   - [ ] Command
-  - [ ] TurnCommand;
-- [ ] Starting turns
-  - [ ] Environment setup
-  - [ ] Sudden death
+  - [ ] Surrender
+  - [ ] TurnCommand
 
 ## Phase 2: Web Server & Transition from Terminal Driver
 - **Goal:** Drop the console interface and build a graphical browser client.
