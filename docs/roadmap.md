@@ -13,15 +13,21 @@
 - [x] Match action management
   - [x] Unit movement
   - [x] Bomb placement
-- [ ] Resolving turns
-  - [ ] Bomb ticking
-  - [ ] Bomb detonation, chain reaction
-  - [ ] Casualty updates
-  - [ ] Result calculation
-- [ ] GameEvent
+- [x] Resolving turns
+  - [x] Bomb ticking
+  - [x] Bomb detonation, chain reaction
+  - [x] Casualty updates
+  - [x] Result calculation
+- [x] Starting turns
+  - [x] Environment setup
+  - [x] Sudden death
 - [ ] CLI terminal
+  - [ ] CLI Controller
+  - [ ] Start/Restart Game
   - [ ] Display
-  - [ ] Control
+  - [ ] GameEvent
+  - [ ] Command
+  - [ ] Surrender
   - [ ] TurnCommand
 
 ## Phase 2: Web Server & Transition from Terminal Driver

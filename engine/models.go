@@ -140,6 +140,13 @@ type UnitMovedEvent struct {
 
 func (UnitMovedEvent) isGameEvent() {}
 
+type UnitDamagedEvent struct {
+	UnitID UnitID
+	NewHP  int
+}
+
+func (UnitDamagedEvent) isGameEvent() {}
+
 type UnitDiedEvent struct {
 	UnitID UnitID
 }
@@ -163,12 +170,42 @@ type BombExplodedEvent struct {
 
 func (BombExplodedEvent) isGameEvent() {}
 
+type SoftBlockDestroyedEvent struct {
+	SoftBlockID int
+	Position    Coordinate
+}
+
+func (SoftBlockDestroyedEvent) isGameEvent() {}
+
+type ItemDestroyedEvent struct {
+	ItemID   int
+	Position Coordinate
+}
+
+func (ItemDestroyedEvent) isGameEvent() {}
+
+type MatchEndedEvent struct {
+	WinnerTeamID int // TeamID, -1 means draw game
+	IsDraw       bool
+}
+
+func (MatchEndedEvent) isGameEvent() {}
+
 type Match struct {
 	GameCfg      GameCfg
 	TrueState    *GameState
 	WorkingState *GameState
 	PlaybackLog  []GameEvent
+	WinnerTeamID int
 }
+
+type VictoryResult int
+
+const (
+	MatchInProgress VictoryResult = iota
+	MatchWin
+	MatchDraw
+)
 
 type StepPattern int
 

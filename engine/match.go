@@ -1,6 +1,9 @@
 package engine
 
-import "fmt"
+import (
+	"fmt"
+	"math/rand"
+)
 
 // ResetTurn discards the mid-turn WorkingState
 // and rollback to the beginning of the turn with deep copy of TrueState
@@ -87,7 +90,6 @@ func (m *Match) validateActiveUnit(unitID UnitID) (*Unit, error) {
 // It validates placement range, registers a new Bomb state tracking instance, and commits a BombPlacedEvent.
 // Returns an error if the unit is running out of bombs, the target is out of range, or the cell is blocked.
 func (m *Match) CommandPlaceBomb(unitID UnitID, target Coordinate) error {
-
 	// identify the unit and check the availability
 	unit, err := m.validateActiveUnit(unitID)
 	if err != nil {
@@ -108,13 +110,19 @@ func (m *Match) CommandPlaceBomb(unitID UnitID, target Coordinate) error {
 		return fmt.Errorf("bomb placement rejected: %w", err)
 	}
 
+	m.placeBomb(unitID, target, unit.BombPower)
+
+	return nil
+}
+
+func (m *Match) placeBomb(unitID UnitID, target Coordinate, bombPower int) {
 	m.WorkingState.TurnBombCounter++
 	bomb := &Bomb{
 		ID:        NewBombID(m.WorkingState.Turn, m.WorkingState.TurnBombCounter, unitID),
 		OwnerID:   unitID,
 		Position:  target,
-		Range:     unit.BombPower,
-		Countdown: m.WorkingState.DeduceBombCountDown(target, unit),
+		Range:     bombPower,
+		Countdown: m.WorkingState.DeduceBombCountDown(target),
 	}
 	m.WorkingState.Bombs[bomb.ID] = bomb
 	m.WorkingState.UpdateStageOccupant(target, OccupantBomb, int64(bomb.ID))
@@ -126,12 +134,10 @@ func (m *Match) CommandPlaceBomb(unitID UnitID, target Coordinate) error {
 		Range:     bomb.Range,
 		Countdown: bomb.Countdown,
 	})
-
-	return nil
 }
 
 // IsLandingLegal checks if the target is legal to be landed by a certain occupantType.
-// In Phase 1 it's used by placing Bomb only, but in future it will be used for skills like jump
+// In Phase 1 it's used by placing Bomb only, but in future it will be used for skills like jump.
 func (gs GameState) IsLandingLegal(target Coordinate, occupantType OccupantType) error {
 	if !gs.IsWithinBounds(target) {
 		return fmt.Errorf("boundary restriction: coordinate %v is out of stage dimensions", target)
@@ -152,15 +158,253 @@ func (gs GameState) IsLandingLegal(target Coordinate, occupantType OccupantType)
 	return nil
 }
 
-// ResolveTurn controls everything in between turns
+// StartNewTurn sets up the environmental boundaries for the upcoming round.
+func (m *Match) StartNewTurn() {
+	victoryResult, _ := m.evaluateVictoryConditions()
+	if victoryResult != MatchInProgress {
+		return // Match has reached a conclusion; abort round initialization
+	}
+
+	if m.GameCfg.SuddenDeath && m.TrueState.Turn > m.GameCfg.MaxTurns {
+		m.injectSuddenDeathHazards()
+	}
+}
+
+// injectSuddenDeathHazards picks 2 random unoccupied tiles and drop bombs there.
+func (m *Match) injectSuddenDeathHazards() error {
+	emptyTilePos := []Coordinate{}
+	for y, row := range m.WorkingState.Grid {
+		for x, tile := range row {
+			if tile.OccupantType == OccupantNone && tile.Type != TerrainBlock {
+				emptyTilePos = append(emptyTilePos, Coordinate{x, y})
+			}
+		}
+	}
+
+	rand.Shuffle(len(emptyTilePos), func(i int, j int) {
+		emptyTilePos[i], emptyTilePos[j] = emptyTilePos[j], emptyTilePos[i]
+	})
+
+	limit := min(len(emptyTilePos), SuddenDeathBombs)
+
+	for _, target := range emptyTilePos[:limit] {
+		m.placeBomb(SystemUnitID, target, BombDefaultPower)
+	}
+
+	return nil
+}
+
+// ResolveTurn controls everything in between turns:
 // 1. Tick Bomb Countdowns
 // 2. Detonate Zero-Timer Bombs & Cascade Chain Reactions
 // 3. Calculate Occupant Destruction (Units, SoftBlocks, Items)
 // 4. Victory audit guard: Check who has living units left on the board
-// 5. Sudden death trigger check: If Turn >= MaxTurn: enter sudden death
-// 6. Advance Turn Counter (Turn++)
-// 7. Overwrite TrueState with clean DeepCopy
+// 5. Advance Turn Counter (Turn++)
+// 6. Overwrite TrueState with clean DeepCopy
 func (m *Match) ResolveTurn() []GameEvent {
-	// TODO
-	return []GameEvent{}
+	m.resolveBombExplosionAndDamage()
+
+	if m.WinnerTeamID == 0 {
+		result, winner := m.evaluateVictoryConditions()
+
+		switch result {
+		case MatchDraw:
+			m.WinnerTeamID = -1
+			m.SubmitAction(MatchEndedEvent{WinnerTeamID: -1, IsDraw: true})
+
+		case MatchWin:
+			m.WinnerTeamID = winner
+			m.SubmitAction(MatchEndedEvent{WinnerTeamID: winner, IsDraw: false})
+
+		case MatchInProgress:
+			m.WorkingState.Turn++
+		}
+	}
+
+	m.TrueState = m.WorkingState.DeepCopy()
+
+	// Flush animation log arrays from the sandbox replay history buffer to the caller
+	gameEvents := make([]GameEvent, len(m.PlaybackLog))
+	copy(gameEvents, m.PlaybackLog)
+	m.PlaybackLog = []GameEvent{}
+
+	return gameEvents
+}
+
+// resolveBombExplosionAndDamage resolves bomb explosion, chain reaction and the damages made, and fire related GameEvents.
+// Note: All cascading chain reactions occur at the exact same physical millisecond within a turn.
+// Soft block / Item destroyed by an early explosion must continue to exist as a solid, ray-blocking obstacle for all subsequent waves of bombs
+// until the entire chain reaction loop is completely finished.
+func (m *Match) resolveBombExplosionAndDamage() {
+	explosionQueue, ignitedBombs := m.tickCountdownsAndQueueFuses()
+
+	frozenGrid := m.WorkingState.cloneGridSnapshot()
+
+	// Setup delayed batch damange handling
+	damagedUnits := make(map[UnitID]bool)
+	destroyedSoftBlocks := make(map[int]bool)
+	destroyedItems := make(map[int]bool)
+
+	m.processChainDetonations(explosionQueue, ignitedBombs, frozenGrid, damagedUnits, destroyedSoftBlocks, destroyedItems)
+	m.handleDelayedBatchDamage(damagedUnits, destroyedSoftBlocks)
+}
+
+func (m *Match) tickCountdownsAndQueueFuses() ([]BombID, map[BombID]bool) {
+	var queue []BombID
+	ignited := make(map[BombID]bool)
+
+	for id, bomb := range m.WorkingState.Bombs {
+		if bomb.Countdown < 0 {
+			continue // Skip non-countdown bombs
+		}
+
+		bomb.Countdown--
+		if bomb.Countdown == 0 {
+			queue = append(queue, id)
+			ignited[id] = true
+		}
+	}
+	return queue, ignited
+}
+
+// processChainDetonations handles Occupant Destruction & Chain reaction.
+func (m *Match) processChainDetonations(
+	explosionQueue []BombID,
+	ignitedBombs map[BombID]bool,
+	frozenGrid [][]Tile,
+	damagedUnits map[UnitID]bool,
+	destroyedSoftBlocks map[int]bool,
+	destroyedItems map[int]bool,
+) {
+	for len(explosionQueue) > 0 {
+		currBombID := explosionQueue[0]
+		explosionQueue = explosionQueue[1:]
+
+		currBomb, ok := m.WorkingState.Bombs[currBombID]
+		if !ok {
+			continue
+		}
+
+		affectedTiles := m.WorkingState.FindReachableTilesOnSnapshot(currBomb.Position, frozenGrid, MovementRule{
+			MaxSteps:              currBomb.Range,
+			Pattern:               PatternCardinal,
+			PassPermissions:       PassUnits,
+			StopOnNonUnitOccupant: true,
+		})
+
+		affectedPos := []Coordinate{}
+
+		for pos := range affectedTiles {
+			affectedPos = append(affectedPos, pos)
+
+			tile := &m.WorkingState.Grid[pos.Y][pos.X]
+			switch tile.OccupantType {
+			case OccupantBomb:
+				// chain reaction
+				nextBombID := BombID(tile.OccupantID)
+				if ignitedBombs[nextBombID] {
+					continue
+				}
+
+				nextBomb, ok := m.WorkingState.Bombs[nextBombID]
+				if !ok {
+					continue
+				}
+
+				nextBomb.Countdown = 0
+				explosionQueue = append(explosionQueue, nextBombID)
+				ignitedBombs[nextBombID] = true
+
+			case OccupantUnit:
+				damagedUnits[UnitID(tile.OccupantID)] = true
+			case OccupantSoftBlock:
+				destroyedSoftBlocks[int(tile.OccupantID)] = true
+			case OccupantItem:
+				destroyedItems[int(tile.OccupantID)] = true
+			}
+		}
+
+		m.WorkingState.ClearStageTile(currBomb.Position)
+		delete(m.WorkingState.Bombs, currBombID)
+		m.SubmitAction(BombExplodedEvent{
+			BombID:            currBombID,
+			AffectedPositions: affectedPos,
+		})
+	}
+}
+
+// cloneGridSnapshot captures the exact state of the board before any bomb goes off.
+// This ensures soft blocks continue to block rays for the entire duration of the turn.
+func (gs *GameState) cloneGridSnapshot() [][]Tile {
+	frozenGrid := make([][]Tile, len(gs.Grid))
+	for y := range gs.Grid {
+		frozenGrid[y] = make([]Tile, len(gs.Grid[y]))
+		copy(frozenGrid[y], gs.Grid[y])
+	}
+	return frozenGrid
+}
+
+// handleDelayedBatchDamage handles delayed batch damange after all ignited bombs detonated
+func (m *Match) handleDelayedBatchDamage(
+	damagedUnits map[UnitID]bool,
+	destroyedSoftBlocks map[int]bool,
+	// destroyedItems map[int]bool,
+) {
+	for unitID := range damagedUnits {
+		unit, ok := m.WorkingState.Units[unitID]
+		if !ok {
+			continue
+		}
+
+		unit.HP -= 1
+		m.SubmitAction(UnitDamagedEvent{
+			UnitID: unitID,
+			NewHP:  unit.HP,
+		})
+
+		if unit.HP <= 0 {
+			m.WorkingState.ClearStageTile(unit.Position)
+			m.SubmitAction(UnitDiedEvent{UnitID: unitID})
+		}
+	}
+
+	for softBlockID := range destroyedSoftBlocks {
+		softBlock, ok := m.WorkingState.SoftBlocks[softBlockID]
+		if !ok {
+			continue
+		}
+
+		m.WorkingState.ClearStageTile(softBlock.Position)
+		delete(m.WorkingState.SoftBlocks, softBlockID)
+		m.SubmitAction(SoftBlockDestroyedEvent{
+			SoftBlockID: softBlockID,
+			Position:    softBlock.Position,
+		})
+	}
+
+	// TODO: Item destruction in future phase
+}
+
+func (m *Match) evaluateVictoryConditions() (VictoryResult, int) {
+	livingTeams := make(map[int]bool)
+	for _, unit := range m.WorkingState.Units {
+		if unit.HP > 0 {
+			livingTeams[unit.Team] = true
+		}
+	}
+
+	switch len(livingTeams) {
+	case 0:
+		return MatchDraw, -1
+
+	case 1:
+		winner := 0
+		for teamID := range livingTeams {
+			winner = teamID
+		}
+		return MatchWin, winner
+
+	default:
+		return MatchInProgress, 0
+	}
 }
