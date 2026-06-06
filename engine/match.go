@@ -66,6 +66,7 @@ func (m *Match) CommandMoveUnit(unitID UnitID, target Coordinate) error {
 	oldPos := unit.Position
 	m.WorkingState.ClearStageTile(oldPos)
 	m.WorkingState.UpdateStageOccupant(target, OccupantUnit, int64(unitID))
+	unit.Position = target
 
 	m.SubmitAction(UnitMovedEvent{
 		UnitID: unitID,

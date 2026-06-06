@@ -134,7 +134,7 @@ func (v *TerminalView) RenderTurnHeader(turn, activeTeamID int) error {
 
 func (v *TerminalView) RenderGameEvents(events []engine.GameEvent) error {
 	for _, event := range events {
-		v.RenderMessage(fmt.Sprintf("%#v", event))
+		v.RenderMessage(fmt.Sprintf("%#v\n", event))
 	}
 	return nil
 }

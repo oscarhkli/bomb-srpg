@@ -300,6 +300,11 @@ func TestMatch_CommandMoveUnit(t *testing.T) {
 					t.Errorf("expected unit %d at target, got %d", validUnitID, newCell.OccupantID)
 				}
 
+				newPos := m.WorkingState.Units[validUnitID].Position
+				if newPos != validTarget {
+					t.Errorf("expect unit %d pos at %#v, got %#v", validUnitID, validTarget, newPos)
+				}
+
 				if len(m.PlaybackLog) != 1 {
 					t.Errorf("expected 1 action submitted, got %d", len(m.PlaybackLog))
 				}
