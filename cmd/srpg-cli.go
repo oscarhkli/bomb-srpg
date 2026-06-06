@@ -20,7 +20,7 @@ func main() {
 	}
 
 	terminalView := cli.NewTerminalView(os.Stdout)
-	controller := cli.NewMatchController(match, terminalView)
+	controller := cli.NewMatchController(match, terminalView, os.Stdin)
 
 	controller.StartInputLoop()
 }

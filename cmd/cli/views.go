@@ -6,4 +6,8 @@ import "bomb-srpg/engine"
 type MatchView interface {
 	RenderBoard(gs *engine.GameState) error
 	RenderGameConfig(cfg *engine.GameCfg) error
+	RenderMessage(message string) error
+	RenderFeedback(success bool, message string) error
+	RenderTurnHeader(turn, activeTeamID int) error
+	RenderGameEvents(events []engine.GameEvent) error
 }
