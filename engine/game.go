@@ -93,6 +93,7 @@ func initGameState(gameCfg GameCfg) (*GameState, error) {
 
 	return &GameState{
 		Turn:       1,
+		ActiveTeam: 1,
 		Grid:       grid,
 		Units:      units,
 		Bombs:      make(map[BombID]*Bomb),

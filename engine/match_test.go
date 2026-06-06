@@ -147,6 +147,7 @@ func TestCommandMoveUnit(t *testing.T) {
 			setupState: func() *Match {
 				m := newTestMatch(2, 2)
 				m.WorkingState.Turn = 1 // Team 1's turn
+				m.WorkingState.ActiveTeam = 1
 				m.WorkingState.Units[validUnitID] = &Unit{
 					ID:       validUnitID,
 					HP:       1,
@@ -168,6 +169,7 @@ func TestCommandMoveUnit(t *testing.T) {
 			setupState: func() *Match {
 				m := newTestMatch(3, 3)
 				m.WorkingState.Turn = 1
+				m.WorkingState.ActiveTeam = 1
 
 				// Intentionally corrupt the position data
 				m.WorkingState.Units[validUnitID] = &Unit{
@@ -190,6 +192,7 @@ func TestCommandMoveUnit(t *testing.T) {
 			setupState: func() *Match {
 				m := newTestMatch(2, 2)
 				m.WorkingState.Turn = 1
+				m.WorkingState.ActiveTeam = 1
 				m.WorkingState.Units[validUnitID] = &Unit{
 					ID:       validUnitID,
 					HP:       1,
@@ -210,6 +213,7 @@ func TestCommandMoveUnit(t *testing.T) {
 			setupState: func() *Match {
 				m := newTestMatch(10, 10)
 				m.WorkingState.Turn = 1
+				m.WorkingState.ActiveTeam = 1
 				m.WorkingState.Units[validUnitID] = &Unit{
 					ID:       validUnitID,
 					HP:       1,
@@ -231,6 +235,7 @@ func TestCommandMoveUnit(t *testing.T) {
 			setupState: func() *Match {
 				m := newTestMatch(3, 3)
 				m.WorkingState.Turn = 1
+				m.WorkingState.ActiveTeam = 1
 				m.WorkingState.Units[validUnitID] = &Unit{
 					ID:       validUnitID,
 					HP:       1,
@@ -337,6 +342,7 @@ func TestCommandPlaceBomb(t *testing.T) {
 			setupState: func() *Match {
 				m := newTestMatch(2, 2)
 				m.WorkingState.Turn = 1 // Team 1's turn
+				m.WorkingState.ActiveTeam = 1
 				m.WorkingState.Units[validUnitID] = &Unit{
 					ID:       validUnitID,
 					HP:       1,
@@ -355,6 +361,7 @@ func TestCommandPlaceBomb(t *testing.T) {
 			setupState: func() *Match {
 				m := newTestMatch(3, 3)
 				m.WorkingState.Turn = 1
+				m.WorkingState.ActiveTeam = 1
 				m.WorkingState.Units[validUnitID] = &Unit{
 					ID:       validUnitID,
 					HP:       1,
@@ -373,6 +380,7 @@ func TestCommandPlaceBomb(t *testing.T) {
 			setupState: func() *Match {
 				m := newTestMatch(2, 2)
 				m.WorkingState.Turn = 1
+				m.WorkingState.ActiveTeam = 1
 				m.WorkingState.Units[validUnitID] = &Unit{
 					ID:       validUnitID,
 					HP:       1,
@@ -392,6 +400,7 @@ func TestCommandPlaceBomb(t *testing.T) {
 			setupState: func() *Match {
 				m := newTestMatch(3, 3)
 				m.WorkingState.Turn = 1
+				m.WorkingState.ActiveTeam = 1
 				m.WorkingState.Units[validUnitID] = &Unit{
 					ID:           validUnitID,
 					HP:           1,
@@ -413,6 +422,7 @@ func TestCommandPlaceBomb(t *testing.T) {
 			setupState: func() *Match {
 				m := newTestMatch(10, 10)
 				m.WorkingState.Turn = 1
+				m.WorkingState.ActiveTeam = 1
 				m.WorkingState.Units[validUnitID] = &Unit{
 					ID:           validUnitID,
 					HP:           1,
@@ -429,12 +439,13 @@ func TestCommandPlaceBomb(t *testing.T) {
 			errContains: "bomb placement restriction: target coordinate is out of placement range",
 		},
 		{
-			name:   "Failure: Illegal target wanding",
+			name:   "Failure: Illegal target",
 			unitID: validUnitID,
 			target: validTarget,
 			setupState: func() *Match {
 				m := newTestMatch(3, 3)
 				m.WorkingState.Turn = 3
+				m.WorkingState.ActiveTeam = 1
 				m.WorkingState.TurnBombCounter = 0
 				m.WorkingState.Bombs = make(map[BombID]*Bomb)
 				m.WorkingState.Units[validUnitID] = &Unit{
@@ -461,6 +472,7 @@ func TestCommandPlaceBomb(t *testing.T) {
 			setupState: func() *Match {
 				m := newTestMatch(3, 3)
 				m.WorkingState.Turn = 3
+				m.WorkingState.ActiveTeam = 1
 				m.WorkingState.TurnBombCounter = 0
 				m.WorkingState.Bombs = make(map[BombID]*Bomb)
 				m.WorkingState.Units[validUnitID] = &Unit{
@@ -655,6 +667,7 @@ func TestMatch_StartTurn_NotTriggeringSuddenDeath(t *testing.T) {
 		m.GameCfg.SuddenDeath = true
 		m.TrueState.Turn = 100
 		m.WorkingState.Turn = 100
+		m.WorkingState.ActiveTeam = 2
 		u1 := NewUnitID(1, 0)
 		u2 := NewUnitID(2, 0)
 		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1}
@@ -944,6 +957,7 @@ func TestMatch_ResolveTurn_TimelineSystemTransitions(t *testing.T) {
 		m := newTestMatch(16, 16)
 		m.TrueState.Turn = 1
 		m.WorkingState.Turn = 1
+		m.WorkingState.ActiveTeam = 1
 
 		u1 := NewUnitID(1, 0)
 		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1, Position: Coordinate{1, 1}}
@@ -981,6 +995,7 @@ func TestMatch_ResolveTurn_TimelineSystemTransitions(t *testing.T) {
 		m := newTestMatch(16, 16)
 		m.TrueState.Turn = 1
 		m.WorkingState.Turn = 1
+		m.WorkingState.ActiveTeam = 1
 
 		u1 := NewUnitID(1, 0)
 		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1, Position: Coordinate{4, 5}}
@@ -1017,6 +1032,7 @@ func TestMatch_ResolveTurn_TimelineSystemTransitions(t *testing.T) {
 		m := newTestMatch(16, 16)
 		m.TrueState.Turn = 1
 		m.WorkingState.Turn = 1
+		m.WorkingState.ActiveTeam = 1
 
 		u1 := NewUnitID(1, 0)
 		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 2, Position: Coordinate{0, 0}}

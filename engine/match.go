@@ -68,9 +68,8 @@ func (m *Match) validateActiveUnit(unitID UnitID) (*Unit, error) {
 		return nil, fmt.Errorf("tactical restriction: unit %d is dead and cannot declare actions", unitID)
 	}
 
-	currentTeamTurn := ((m.WorkingState.Turn - 1) & 1) + 1
-	if unit.Team != currentTeamTurn {
-		return nil, fmt.Errorf("turn restriction: unit %d belongs to Team %d but it's currently Team %d's turn", unitID, unit.Team, currentTeamTurn)
+	if unit.Team != m.WorkingState.ActiveTeam {
+		return nil, fmt.Errorf("turn restriction: unit %d belongs to Team %d but it's currently Team %d's turn", unitID, unit.Team, m.WorkingState.ActiveTeam)
 	}
 
 	if !m.WorkingState.IsWithinBounds(unit.Position) {
@@ -218,6 +217,7 @@ func (m *Match) ResolveTurn() []GameEvent {
 
 		case MatchInProgress:
 			m.WorkingState.Turn++
+			m.WorkingState.ActiveTeam = ((m.WorkingState.Turn - 1) & 1) + 1
 		}
 	}
 
