@@ -16,9 +16,9 @@ func TestInitGameState_Suite(t *testing.T) {
 		expectedTotalUnits int
 	}{
 		{
-			name: "Success: Full Teams (5 vs 5) with Plain Stage",
+			name: "Success: Full Teams (5 vs 5) with MAP01 Stage",
 			cfg: GameCfg{
-				StagePreset: "Plain",
+				StagePreset: "MAP01",
 				P1Teams:     []string{"King", "Fighter", "Witch", "Fighter", "Fighter"},
 				P2Teams:     []string{"King", "Fighter", "Witch", "Thief", "Witch"},
 			},
@@ -26,9 +26,9 @@ func TestInitGameState_Suite(t *testing.T) {
 			expectedTotalUnits: 10, // 5 for each player
 		},
 		{
-			name: "Success: Minimum Teams (1 vs 1) with Plain Stage",
+			name: "Success: Minimum Teams (1 vs 1) with MAP01 Stage",
 			cfg: GameCfg{
-				StagePreset: "Plain",
+				StagePreset: "MAP01",
 				P1Teams:     []string{"King"},
 				P2Teams:     []string{"King"},
 			},
@@ -36,9 +36,9 @@ func TestInitGameState_Suite(t *testing.T) {
 			expectedTotalUnits: 2, // 1 for each player
 		},
 		{
-			name: "Success: Mixed Teams (3 vs 2) with Standard Stage",
+			name: "Success: Mixed Teams (3 vs 2) with MAP02 Stage",
 			cfg: GameCfg{
-				StagePreset: "Standard",
+				StagePreset: "MAP02",
 				P1Teams:     []string{"King", "Fighter", "Witch"},
 				P2Teams:     []string{"King", "Fighter"},
 			},
@@ -48,7 +48,7 @@ func TestInitGameState_Suite(t *testing.T) {
 		{
 			name: "Failure: Player 1 has no King",
 			cfg: GameCfg{
-				StagePreset: "Plain",
+				StagePreset: "MAP01",
 				P1Teams:     []string{"Fighter", "Witch", "Fighter"},
 				P2Teams:     []string{"King", "Fighter"},
 			},
@@ -58,7 +58,7 @@ func TestInitGameState_Suite(t *testing.T) {
 		{
 			name: "Failure: Player 2 has no King",
 			cfg: GameCfg{
-				StagePreset: "Plain",
+				StagePreset: "MAP01",
 				P1Teams:     []string{"King", "Fighter"},
 				P2Teams:     []string{"Fighter", "Witch"},
 			},
@@ -68,7 +68,7 @@ func TestInitGameState_Suite(t *testing.T) {
 		{
 			name: "Failure: Player 1 has more than 1 King",
 			cfg: GameCfg{
-				StagePreset: "Plain",
+				StagePreset: "MAP01",
 				P1Teams:     []string{"King", "King", "Fighter"},
 				P2Teams:     []string{"King", "Fighter"},
 			},
@@ -78,7 +78,7 @@ func TestInitGameState_Suite(t *testing.T) {
 		{
 			name: "Failure: Player 2 has more than 1 King",
 			cfg: GameCfg{
-				StagePreset: "Plain",
+				StagePreset: "MAP01",
 				P1Teams:     []string{"King", "Fighter"},
 				P2Teams:     []string{"King", "King", "Fighter"},
 			},
@@ -88,7 +88,7 @@ func TestInitGameState_Suite(t *testing.T) {
 		{
 			name: "Failure: Player 1's King is not the first unit",
 			cfg: GameCfg{
-				StagePreset: "Plain",
+				StagePreset: "MAP01",
 				P1Teams:     []string{"Fighter", "King", "Witch"},
 				P2Teams:     []string{"King", "Fighter"},
 			},
@@ -98,7 +98,7 @@ func TestInitGameState_Suite(t *testing.T) {
 		{
 			name: "Failure: Player 2's King is not the first unit",
 			cfg: GameCfg{
-				StagePreset: "Plain",
+				StagePreset: "MAP01",
 				P1Teams:     []string{"King", "Fighter"},
 				P2Teams:     []string{"Fighter", "King", "Witch"},
 			},
@@ -108,7 +108,7 @@ func TestInitGameState_Suite(t *testing.T) {
 		{
 			name: "Failure: Player 1 has more than 5 units",
 			cfg: GameCfg{
-				StagePreset: "Plain",
+				StagePreset: "MAP01",
 				P1Teams:     []string{"King", "Fighter", "Witch", "Thief", "Witch", "Fighter"},
 				P2Teams:     []string{"King", "Fighter"},
 			},
@@ -118,7 +118,7 @@ func TestInitGameState_Suite(t *testing.T) {
 		{
 			name: "Failure: Player 2 has more than 5 units",
 			cfg: GameCfg{
-				StagePreset: "Plain",
+				StagePreset: "MAP01",
 				P1Teams:     []string{"King", "Fighter"},
 				P2Teams:     []string{"King", "Fighter", "Witch", "Thief", "Witch", "Fighter"},
 			},
@@ -128,7 +128,7 @@ func TestInitGameState_Suite(t *testing.T) {
 		{
 			name: "Failure: Player 1 has no units",
 			cfg: GameCfg{
-				StagePreset: "Plain",
+				StagePreset: "MAP01",
 				P1Teams:     []string{},
 				P2Teams:     []string{"King", "Fighter"},
 			},
@@ -138,7 +138,7 @@ func TestInitGameState_Suite(t *testing.T) {
 		{
 			name: "Failure: Player 2 has no units",
 			cfg: GameCfg{
-				StagePreset: "Plain",
+				StagePreset: "MAP01",
 				P1Teams:     []string{"King", "Fighter"},
 				P2Teams:     []string{},
 			},
@@ -148,7 +148,7 @@ func TestInitGameState_Suite(t *testing.T) {
 		{
 			name: "Failure: Player 1 has an invalid archetype",
 			cfg: GameCfg{
-				StagePreset: "Plain",
+				StagePreset: "MAP01",
 				P1Teams:     []string{"King", "InvalidArchetype"},
 				P2Teams:     []string{"King", "Fighter"},
 			},
@@ -158,7 +158,7 @@ func TestInitGameState_Suite(t *testing.T) {
 		{
 			name: "Failure: Player 2 has an invalid archetype",
 			cfg: GameCfg{
-				StagePreset: "Plain",
+				StagePreset: "MAP01",
 				P1Teams:     []string{"King", "Fighter"},
 				P2Teams:     []string{"King", "InvalidArchetype"},
 			},
@@ -178,7 +178,7 @@ func TestInitGameState_Suite(t *testing.T) {
 		{
 			name: "Success: With Global Overrides for Speed and Bomb Range Positive",
 			cfg: GameCfg{
-				StagePreset:                "Plain",
+				StagePreset:                "MAP01",
 				P1Teams:                    []string{"King", "Fighter"},
 				P2Teams:                    []string{"King", "Fighter"},
 				GlobalSpeedOverride:        10,
@@ -190,7 +190,7 @@ func TestInitGameState_Suite(t *testing.T) {
 		{
 			name: "Success: With Global Overrides for Speed and Bomb Range Zero (No Override)",
 			cfg: GameCfg{
-				StagePreset:                "Plain",
+				StagePreset:                "MAP01",
 				P1Teams:                    []string{"King", "Fighter"},
 				P2Teams:                    []string{"King", "Fighter"},
 				GlobalSpeedOverride:        0,
@@ -202,7 +202,7 @@ func TestInitGameState_Suite(t *testing.T) {
 		{
 			name: "Success: With Global Overrides for Speed and Bomb Range Negative (Treated as No Override)",
 			cfg: GameCfg{
-				StagePreset:                "Plain",
+				StagePreset:                "MAP01",
 				P1Teams:                    []string{"King", "Fighter"},
 				P2Teams:                    []string{"King", "Fighter"},
 				GlobalSpeedOverride:        -5,
@@ -302,6 +302,11 @@ func TestInitGameState_Suite(t *testing.T) {
 				}
 				if unit.Position != expectedPosition {
 					t.Errorf("Expected Player %d unit ID %d to start at (%d,%d), got (%d,%d)", unit.Team, id, expectedPosition.X, expectedPosition.Y, unit.Position.X, unit.Position.Y)
+				}
+
+				tile := gameState.Grid[unit.Position.Y][unit.Position.X]
+				if tile.OccupantType != OccupantUnit && tile.OccupantID != int64(unit.ID) {
+					t.Errorf("Expected tile at (%d,%d) contains OccupantUnit with unit ID %d, got %#v", unit.Position.X, unit.Position.Y, unit.ID, tile)
 				}
 			}
 
@@ -427,7 +432,7 @@ func TestInitGameState_LayoutGridCompilation(t *testing.T) {
 						t.Errorf("Expected terrain at (%d,%d) to be %v, got %v", x, y, expectedMatrix[y][x], tile.Type)
 					}
 
-					if tile.OccupantType != OccupantNone || tile.OccupantID != 0 {
+					if tile.Type != TerrainPlain && (tile.OccupantType != OccupantNone || tile.OccupantID != 0) {
 						t.Errorf("Expected tile at (%d,%d) to have no occupant, got type %v with ID %d", x, y, tile.OccupantType, tile.OccupantID)
 					}
 				}
@@ -438,7 +443,7 @@ func TestInitGameState_LayoutGridCompilation(t *testing.T) {
 
 func TestInitGame_AllGood(t *testing.T) {
 	gameCfg := GameCfg{
-		StagePreset: "Plain",
+		StagePreset: "MAP01",
 		P1Teams:     []string{"King", "Fighter"},
 		P2Teams:     []string{"King", "Thief"},
 	}
@@ -475,6 +480,7 @@ func TestInitGame_ErrorConditions(t *testing.T) {
 func TestGameStateDeepCopy_Isolation(t *testing.T) {
 	original := &GameState{
 		Turn:       1,
+		ActiveTeam: 1,
 		Grid:       [][]Tile{},
 		Units:      make(map[UnitID]*Unit),
 		Bombs:      make(map[BombID]*Bomb),
@@ -488,6 +494,7 @@ func TestGameStateDeepCopy_Isolation(t *testing.T) {
 	clone := original.DeepCopy()
 
 	clone.Turn = 2
+	clone.ActiveTeam = 2
 	clone.TurnBombCounter = 10
 	clone.Grid[0][0].Type = TerrainTower
 	clone.Units[1].HP = 100
@@ -497,6 +504,9 @@ func TestGameStateDeepCopy_Isolation(t *testing.T) {
 
 	if original.Turn == clone.Turn {
 		t.Errorf("Expected original Turn to be unaffected by changes to clone, got %d", original.Turn)
+	}
+	if original.ActiveTeam == clone.ActiveTeam {
+		t.Errorf("Expected original ActiveTeam to be unaffected by changes to clone, got %d", original.ActiveTeam)
 	}
 	if original.TurnBombCounter == clone.TurnBombCounter {
 		t.Errorf("Expected original TurnBombCounter to be unaffected by changes to clone, got %d", original.TurnBombCounter)
@@ -520,7 +530,8 @@ func TestGameStateDeepCopy_Isolation(t *testing.T) {
 
 func TestGameStateDeepCopy_MemoryHandling(t *testing.T) {
 	original := &GameState{
-		Turn: 1,
+		Turn:       1,
+		ActiveTeam: 1,
 	}
 
 	clone := original.DeepCopy()

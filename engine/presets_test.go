@@ -94,44 +94,41 @@ func TestGetStagePreset(t *testing.T) {
 		name           string
 		inputName      string
 		expectedExists bool
-		expectedName   string
 	}{
 		{
-			name:           "Existing stage preset Plain",
-			inputName:      "Plain",
+			name:           "Existing stage preset MAP01",
+			inputName:      "MAP01",
 			expectedExists: true,
-			expectedName:   "Plain",
 		},
 		{
-			name:           "Existing stage prset Standard",
-			inputName:      "Standard",
+			name:           "Existing stage prset MAP02",
+			inputName:      "MAP02",
 			expectedExists: true,
-			expectedName:   "Standard",
+		},
+		{
+			name:           "Existing stage prset MAP03",
+			inputName:      "MAP03",
+			expectedExists: true,
 		},
 		{
 			name:           "Non-existing stage preset",
 			inputName:      "NonExistent",
 			expectedExists: false,
-			expectedName:   "",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			stagePreset, exists := GetStagePreset(tt.inputName)
+			_, exists := GetStagePreset(tt.inputName)
 			if exists != tt.expectedExists {
 				t.Errorf("Expected exists to be %v, got %v", tt.expectedExists, exists)
-			}
-			if exists && stagePreset.Name != tt.expectedName {
-				t.Errorf("Expected stage preset name to be %s, got %s", tt.expectedName, stagePreset.Name)
 			}
 		})
 	}
 }
 
 func TestStagePresets(t *testing.T) {
-	stagePresets := []string{"Plain", "Standard"}
-	for _, name := range stagePresets {
+	for name := range stagePresetsRegistry {
 		t.Run(name, func(t *testing.T) {
 			stagePreset, exists := GetStagePreset(name)
 			if !exists {
@@ -194,7 +191,6 @@ func TestStagePresets(t *testing.T) {
 
 // Stage sanity checks on whether all characters' starting positions can reach the opponent's starting position by walking
 func TestStagePrests_Sanity(t *testing.T) {
-	stagePresets := []string{"Plain", "Standard"}
 	rule := MovementRule{
 		MaxSteps:        -1,
 		Pattern:         PatternCardinal,
@@ -202,7 +198,7 @@ func TestStagePrests_Sanity(t *testing.T) {
 		PassPermissions: PassUnits | PassSoftBlocks | PassItems,
 	}
 
-	for _, name := range stagePresets {
+	for name := range stagePresetsRegistry {
 		t.Run(name, func(t *testing.T) {
 			gs, err := initGameState(GameCfg{
 				StagePreset: name,

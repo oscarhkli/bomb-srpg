@@ -57,7 +57,7 @@ func GetArchetype(name string) (Archetype, bool) {
 }
 
 var stagePresetsRegistry = map[string]StagePreset{
-	"Plain": {
+	"MAP01": {
 		Name:        "Plain",
 		Description: "A simple open field with no obstacles.",
 		Width:       9,
@@ -77,7 +77,7 @@ var stagePresetsRegistry = map[string]StagePreset{
 		P1StartingPositions: [5]Coordinate{{4, 8}, {3, 8}, {5, 8}, {2, 8}, {6, 8}},
 		P2StartingPositions: [5]Coordinate{{4, 0}, {5, 0}, {3, 0}, {6, 0}, {2, 0}},
 	},
-	"Standard": {
+	"MAP02": {
 		Name:        "Standard",
 		Description: "A balanced stage with hard blocks evenly distributed.",
 		Width:       9,
@@ -94,6 +94,26 @@ var stagePresetsRegistry = map[string]StagePreset{
 			".........",
 		},
 		SoftBlocks:          []Coordinate{},
+		P1StartingPositions: [5]Coordinate{{4, 8}, {3, 8}, {5, 8}, {2, 8}, {6, 8}},
+		P2StartingPositions: [5]Coordinate{{4, 0}, {5, 0}, {3, 0}, {6, 0}, {2, 0}},
+	},
+	"MAP03": {
+		Name:        "Divided",
+		Description: "A stage divided by soft block",
+		Width:       9,
+		Height:      9,
+		LayoutGrid: []string{
+			".........",
+			".........",
+			".........",
+			".........",
+			".B.B.B.B.",
+			".........",
+			".........",
+			".........",
+			".........",
+		},
+		SoftBlocks:          []Coordinate{{0, 4}, {2, 4}, {6, 4}, {8, 4}},
 		P1StartingPositions: [5]Coordinate{{4, 8}, {3, 8}, {5, 8}, {2, 8}, {6, 8}},
 		P2StartingPositions: [5]Coordinate{{4, 0}, {5, 0}, {3, 0}, {6, 0}, {2, 0}},
 	},
