@@ -106,6 +106,7 @@ type GameCfg struct {
 
 type GameState struct {
 	Turn            int // Turn counter, starting from 1
+	ActiveTeam      int
 	TurnBombCounter int // To record how many bombs placed during the turn
 	Grid            [][]Tile
 	Units           map[UnitID]*Unit   // Keyed by Unit ID

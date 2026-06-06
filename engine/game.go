@@ -58,17 +58,6 @@ func initGameState(gameCfg GameCfg) (*GameState, error) {
 		}
 	}
 
-	units := map[UnitID]*Unit{}
-
-	err := createUnits(units, gameCfg.P1Teams, stagePreset.P1StartingPositions, 1, gameCfg)
-	if err != nil {
-		return nil, err
-	}
-	err = createUnits(units, gameCfg.P2Teams, stagePreset.P2StartingPositions, 2, gameCfg)
-	if err != nil {
-		return nil, err
-	}
-
 	grid := make([][]Tile, stagePreset.Height)
 	for y, row := range stagePreset.LayoutGrid {
 		grid[y] = make([]Tile, stagePreset.Width)
@@ -83,16 +72,31 @@ func initGameState(gameCfg GameCfg) (*GameState, error) {
 		}
 	}
 
+	units := map[UnitID]*Unit{}
+
+	err := createUnits(units, grid, gameCfg.P1Teams, stagePreset.P1StartingPositions, 1, gameCfg)
+	if err != nil {
+		return nil, err
+	}
+	err = createUnits(units, grid, gameCfg.P2Teams, stagePreset.P2StartingPositions, 2, gameCfg)
+	if err != nil {
+		return nil, err
+	}
+
 	softBlocks := make(map[int]*SoftBlock)
 	for i, pos := range stagePreset.SoftBlocks {
 		softBlocks[i] = &SoftBlock{
 			ID:       i,
 			Position: pos,
 		}
+
+		grid[pos.Y][pos.X].OccupantType = OccupantItem
+		grid[pos.Y][pos.X].OccupantID = int64(i)
 	}
 
 	return &GameState{
 		Turn:       1,
+		ActiveTeam: 1,
 		Grid:       grid,
 		Units:      units,
 		Bombs:      make(map[BombID]*Bomb),
@@ -115,6 +119,7 @@ func hasExactlyOneAndFirstIsKing(team []string) bool {
 
 func createUnits(
 	units map[UnitID]*Unit,
+	grid [][]Tile,
 	teams []string,
 	startingPositions [5]Coordinate,
 	teamID int,
@@ -140,6 +145,9 @@ func createUnits(
 			HP:           archetype.BaseHP,
 			Skills:       archetype.PresetSkills,
 		}
+
+		grid[startingPositions[i].Y][startingPositions[i].X].OccupantType = OccupantUnit
+		grid[startingPositions[i].Y][startingPositions[i].X].OccupantID = int64(id)
 	}
 	return nil
 }
@@ -159,7 +167,8 @@ func (gs *GameState) DeepCopy() *GameState {
 	}
 
 	clone := &GameState{
-		Turn: gs.Turn,
+		Turn:       gs.Turn,
+		ActiveTeam: gs.ActiveTeam,
 	}
 
 	if gs.Grid == nil {

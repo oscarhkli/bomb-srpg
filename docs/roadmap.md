@@ -21,14 +21,15 @@
 - [x] Starting turns
   - [x] Environment setup
   - [x] Sudden death
-- [ ] CLI terminal
-  - [ ] CLI Controller
-  - [ ] Start/Restart Game
+- [x] CLI terminal
+  - [x] CLI Controller
+  - [x] Start/Restart Game
   - [x] Display
-  - [ ] GameEvent
-  - [ ] Command
-  - [ ] Surrender
+  - [x] GameEvent
+  - [x] Command
+  - [x] Surrender
   - [ ] TurnCommand
+- [ ] Winning Condition
 
 ## Phase 2: Web Server & Transition from Terminal Driver
 - **Goal:** Drop the console interface and build a graphical browser client.

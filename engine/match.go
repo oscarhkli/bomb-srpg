@@ -22,6 +22,27 @@ func (m *Match) SubmitAction(gameEvent GameEvent) {
 	}
 }
 
+// Surrender ends the match by setting the winner and sending MatchEndedEvent.
+func (m *Match) Surrender(teamID int) []GameEvent {
+	if teamID == 1 {
+		m.WinnerTeamID = 2
+	} else {
+		m.WinnerTeamID = 1
+	}
+
+	// discard all the logs in rollback mode
+	// as opponent doesn't need to know what steps were taken lead to surrender
+	m.PlaybackLog = []GameEvent{}
+
+	// broadcast it
+	return []GameEvent{
+		MatchEndedEvent{
+			WinnerTeamID: m.WinnerTeamID,
+			IsDraw:       false,
+		},
+	}
+}
+
 // CommandMoveUnit executes a unit relocation after verifying game rule compliance.
 // It calculates the active range, updates the board matrix, and commits a UnitMovedEvent.
 // Returns an error if the pathing rules are violated or if the target cell is blocked.
@@ -45,6 +66,7 @@ func (m *Match) CommandMoveUnit(unitID UnitID, target Coordinate) error {
 	oldPos := unit.Position
 	m.WorkingState.ClearStageTile(oldPos)
 	m.WorkingState.UpdateStageOccupant(target, OccupantUnit, int64(unitID))
+	unit.Position = target
 
 	m.SubmitAction(UnitMovedEvent{
 		UnitID: unitID,
@@ -68,9 +90,8 @@ func (m *Match) validateActiveUnit(unitID UnitID) (*Unit, error) {
 		return nil, fmt.Errorf("tactical restriction: unit %d is dead and cannot declare actions", unitID)
 	}
 
-	currentTeamTurn := ((m.WorkingState.Turn - 1) & 1) + 1
-	if unit.Team != currentTeamTurn {
-		return nil, fmt.Errorf("turn restriction: unit %d belongs to Team %d but it's currently Team %d's turn", unitID, unit.Team, currentTeamTurn)
+	if unit.Team != m.WorkingState.ActiveTeam {
+		return nil, fmt.Errorf("turn restriction: unit %d belongs to Team %d but it's currently Team %d's turn", unitID, unit.Team, m.WorkingState.ActiveTeam)
 	}
 
 	if !m.WorkingState.IsWithinBounds(unit.Position) {
@@ -218,6 +239,7 @@ func (m *Match) ResolveTurn() []GameEvent {
 
 		case MatchInProgress:
 			m.WorkingState.Turn++
+			m.WorkingState.ActiveTeam = ((m.WorkingState.Turn - 1) & 1) + 1
 		}
 	}
 

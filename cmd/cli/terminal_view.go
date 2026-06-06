@@ -8,6 +8,12 @@ import (
 	"strings"
 )
 
+const (
+	Reset = "\033[0m"
+	Red   = "\033[31m"
+	Green = "\033[32m"
+)
+
 type TerminalView struct {
 	output io.Writer
 }
@@ -27,7 +33,9 @@ func (v *TerminalView) RenderBoard(gs *engine.GameState) error {
 		return errors.New("cannot render board: game grid matrix is empty or uninitialized")
 	}
 
-	fmt.Fprintf(v.output, "\n--- TURN %d ---\n", gs.Turn)
+	if err := v.RenderTurnHeader(gs.Turn, gs.ActiveTeam); err != nil {
+		return err
+	}
 
 	// 1. Print top X coordinate header
 	fmt.Fprint(v.output, "Y\\X  ") // Space for the left Y column padding
@@ -102,5 +110,31 @@ func (v *TerminalView) RenderGameConfig(cfg *engine.GameCfg) error {
 	fmt.Fprintf(v.output, "Sudden Death: %t\n", cfg.SuddenDeath)
 	fmt.Fprintln(v.output, "===========================")
 
+	return nil
+}
+
+func (v *TerminalView) RenderMessage(message string) error {
+	fmt.Fprintf(v.output, "%s", message)
+	return nil
+}
+
+func (v *TerminalView) RenderFeedback(success bool, message string) error {
+	if success {
+		fmt.Fprintf(v.output, "%s%s%s\n", Green, message, Reset)
+	} else {
+		fmt.Fprintf(v.output, "%s%s%s\n", Red, message, Reset)
+	}
+	return nil
+}
+
+func (v *TerminalView) RenderTurnHeader(turn, activeTeamID int) error {
+	fmt.Fprintf(v.output, "\n--- TURN %d PLAYER %d ---\n\n", turn, activeTeamID)
+	return nil
+}
+
+func (v *TerminalView) RenderGameEvents(events []engine.GameEvent) error {
+	for _, event := range events {
+		v.RenderMessage(fmt.Sprintf("%#v\n", event))
+	}
 	return nil
 }

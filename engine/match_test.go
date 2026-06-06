@@ -99,7 +99,48 @@ func TestMatch_SubmitAction_DisallowResetTurn(t *testing.T) {
 	}
 }
 
-func TestCommandMoveUnit(t *testing.T) {
+func TestMatch_Surrender(t *testing.T) {
+	tests := []struct {
+		name         string
+		teamID       int
+		winnerTeamID int
+	}{
+		{"Team 1 surrender", 1, 2},
+		{"Team 2 surrender", 2, 1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := newTestMatch(1, 2)
+			m.PlaybackLog = append(m.PlaybackLog, UnitDiedEvent{UnitID: 16})
+
+			events := m.Surrender(tt.teamID)
+
+			if len(events) != 1 {
+				t.Errorf("Expected 1 event for surrender, got %v", len(events))
+			}
+
+			var foundEndedEvent bool
+			for _, event := range events {
+				if ended, ok := event.(MatchEndedEvent); ok {
+					foundEndedEvent = true
+					if ended.WinnerTeamID != tt.winnerTeamID || ended.IsDraw {
+						t.Errorf("Malformed MatchEndedEvent! Got winner %d, draw %t", ended.WinnerTeamID, ended.IsDraw)
+					}
+				}
+			}
+			if !foundEndedEvent {
+				t.Error("Missing critical MatchEndedEvent token inside returned telemetry array stream")
+			}
+
+			if len(m.PlaybackLog) != 0 {
+				t.Errorf("Expectd clean slice array from PlaybackLog, got %d items", len(m.PlaybackLog))
+			}
+		})
+	}
+}
+
+func TestMatch_CommandMoveUnit(t *testing.T) {
 	// Define the schema for our table rows
 	type testCase struct {
 		name          string
@@ -147,6 +188,7 @@ func TestCommandMoveUnit(t *testing.T) {
 			setupState: func() *Match {
 				m := newTestMatch(2, 2)
 				m.WorkingState.Turn = 1 // Team 1's turn
+				m.WorkingState.ActiveTeam = 1
 				m.WorkingState.Units[validUnitID] = &Unit{
 					ID:       validUnitID,
 					HP:       1,
@@ -168,6 +210,7 @@ func TestCommandMoveUnit(t *testing.T) {
 			setupState: func() *Match {
 				m := newTestMatch(3, 3)
 				m.WorkingState.Turn = 1
+				m.WorkingState.ActiveTeam = 1
 
 				// Intentionally corrupt the position data
 				m.WorkingState.Units[validUnitID] = &Unit{
@@ -190,6 +233,7 @@ func TestCommandMoveUnit(t *testing.T) {
 			setupState: func() *Match {
 				m := newTestMatch(2, 2)
 				m.WorkingState.Turn = 1
+				m.WorkingState.ActiveTeam = 1
 				m.WorkingState.Units[validUnitID] = &Unit{
 					ID:       validUnitID,
 					HP:       1,
@@ -210,6 +254,7 @@ func TestCommandMoveUnit(t *testing.T) {
 			setupState: func() *Match {
 				m := newTestMatch(10, 10)
 				m.WorkingState.Turn = 1
+				m.WorkingState.ActiveTeam = 1
 				m.WorkingState.Units[validUnitID] = &Unit{
 					ID:       validUnitID,
 					HP:       1,
@@ -231,6 +276,7 @@ func TestCommandMoveUnit(t *testing.T) {
 			setupState: func() *Match {
 				m := newTestMatch(3, 3)
 				m.WorkingState.Turn = 1
+				m.WorkingState.ActiveTeam = 1
 				m.WorkingState.Units[validUnitID] = &Unit{
 					ID:       validUnitID,
 					HP:       1,
@@ -252,6 +298,11 @@ func TestCommandMoveUnit(t *testing.T) {
 				newCell := m.WorkingState.Grid[validTarget.Y][validTarget.X]
 				if newCell.OccupantID != int64(validUnitID) {
 					t.Errorf("expected unit %d at target, got %d", validUnitID, newCell.OccupantID)
+				}
+
+				newPos := m.WorkingState.Units[validUnitID].Position
+				if newPos != validTarget {
+					t.Errorf("expect unit %d pos at %#v, got %#v", validUnitID, validTarget, newPos)
 				}
 
 				if len(m.PlaybackLog) != 1 {
@@ -288,7 +339,7 @@ func TestCommandMoveUnit(t *testing.T) {
 	}
 }
 
-func TestCommandPlaceBomb(t *testing.T) {
+func TestMatch_CommandPlaceBomb(t *testing.T) {
 	// Define the schema for our table rows matching the style of TestCommandMoveUnit
 	type testCase struct {
 		name          string
@@ -337,6 +388,7 @@ func TestCommandPlaceBomb(t *testing.T) {
 			setupState: func() *Match {
 				m := newTestMatch(2, 2)
 				m.WorkingState.Turn = 1 // Team 1's turn
+				m.WorkingState.ActiveTeam = 1
 				m.WorkingState.Units[validUnitID] = &Unit{
 					ID:       validUnitID,
 					HP:       1,
@@ -355,6 +407,7 @@ func TestCommandPlaceBomb(t *testing.T) {
 			setupState: func() *Match {
 				m := newTestMatch(3, 3)
 				m.WorkingState.Turn = 1
+				m.WorkingState.ActiveTeam = 1
 				m.WorkingState.Units[validUnitID] = &Unit{
 					ID:       validUnitID,
 					HP:       1,
@@ -373,6 +426,7 @@ func TestCommandPlaceBomb(t *testing.T) {
 			setupState: func() *Match {
 				m := newTestMatch(2, 2)
 				m.WorkingState.Turn = 1
+				m.WorkingState.ActiveTeam = 1
 				m.WorkingState.Units[validUnitID] = &Unit{
 					ID:       validUnitID,
 					HP:       1,
@@ -392,6 +446,7 @@ func TestCommandPlaceBomb(t *testing.T) {
 			setupState: func() *Match {
 				m := newTestMatch(3, 3)
 				m.WorkingState.Turn = 1
+				m.WorkingState.ActiveTeam = 1
 				m.WorkingState.Units[validUnitID] = &Unit{
 					ID:           validUnitID,
 					HP:           1,
@@ -413,6 +468,7 @@ func TestCommandPlaceBomb(t *testing.T) {
 			setupState: func() *Match {
 				m := newTestMatch(10, 10)
 				m.WorkingState.Turn = 1
+				m.WorkingState.ActiveTeam = 1
 				m.WorkingState.Units[validUnitID] = &Unit{
 					ID:           validUnitID,
 					HP:           1,
@@ -429,12 +485,13 @@ func TestCommandPlaceBomb(t *testing.T) {
 			errContains: "bomb placement restriction: target coordinate is out of placement range",
 		},
 		{
-			name:   "Failure: Illegal target wanding",
+			name:   "Failure: Illegal target",
 			unitID: validUnitID,
 			target: validTarget,
 			setupState: func() *Match {
 				m := newTestMatch(3, 3)
 				m.WorkingState.Turn = 3
+				m.WorkingState.ActiveTeam = 1
 				m.WorkingState.TurnBombCounter = 0
 				m.WorkingState.Bombs = make(map[BombID]*Bomb)
 				m.WorkingState.Units[validUnitID] = &Unit{
@@ -461,6 +518,7 @@ func TestCommandPlaceBomb(t *testing.T) {
 			setupState: func() *Match {
 				m := newTestMatch(3, 3)
 				m.WorkingState.Turn = 3
+				m.WorkingState.ActiveTeam = 1
 				m.WorkingState.TurnBombCounter = 0
 				m.WorkingState.Bombs = make(map[BombID]*Bomb)
 				m.WorkingState.Units[validUnitID] = &Unit{
@@ -655,6 +713,7 @@ func TestMatch_StartTurn_NotTriggeringSuddenDeath(t *testing.T) {
 		m.GameCfg.SuddenDeath = true
 		m.TrueState.Turn = 100
 		m.WorkingState.Turn = 100
+		m.WorkingState.ActiveTeam = 2
 		u1 := NewUnitID(1, 0)
 		u2 := NewUnitID(2, 0)
 		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1}
@@ -755,7 +814,7 @@ func TestMatch_ResolveTurn_ExplosionAndBlast(t *testing.T) {
 		events := m.ResolveTurn()
 
 		if len(events) != 0 {
-			t.Errorf("Expected zero events for ticking fuse, got %v", len(events))
+			t.Errorf("Expected zero events for ticking bomb, got %v", len(events))
 		}
 		if m.WorkingState.Bombs[b1].Countdown != 2 {
 			t.Errorf("Expected Bomb %#X to reduce to 2, got %d", b1, m.WorkingState.Bombs[b1].Countdown)
@@ -944,6 +1003,7 @@ func TestMatch_ResolveTurn_TimelineSystemTransitions(t *testing.T) {
 		m := newTestMatch(16, 16)
 		m.TrueState.Turn = 1
 		m.WorkingState.Turn = 1
+		m.WorkingState.ActiveTeam = 1
 
 		u1 := NewUnitID(1, 0)
 		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1, Position: Coordinate{1, 1}}
@@ -981,6 +1041,7 @@ func TestMatch_ResolveTurn_TimelineSystemTransitions(t *testing.T) {
 		m := newTestMatch(16, 16)
 		m.TrueState.Turn = 1
 		m.WorkingState.Turn = 1
+		m.WorkingState.ActiveTeam = 1
 
 		u1 := NewUnitID(1, 0)
 		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1, Position: Coordinate{4, 5}}
@@ -1017,6 +1078,7 @@ func TestMatch_ResolveTurn_TimelineSystemTransitions(t *testing.T) {
 		m := newTestMatch(16, 16)
 		m.TrueState.Turn = 1
 		m.WorkingState.Turn = 1
+		m.WorkingState.ActiveTeam = 1
 
 		u1 := NewUnitID(1, 0)
 		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 2, Position: Coordinate{0, 0}}
