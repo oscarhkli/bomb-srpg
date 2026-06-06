@@ -22,6 +22,27 @@ func (m *Match) SubmitAction(gameEvent GameEvent) {
 	}
 }
 
+// Surrender ends the match by setting the winner and sending MatchEndedEvent.
+func (m *Match) Surrender(teamID int) []GameEvent {
+	if teamID == 1 {
+		m.WinnerTeamID = 2
+	} else {
+		m.WinnerTeamID = 1
+	}
+
+	// discard all the logs in rollback mode
+	// as opponent doesn't need to know what steps were taken lead to surrender
+	m.PlaybackLog = []GameEvent{}
+
+	// broadcast it
+	return []GameEvent{
+		MatchEndedEvent{
+			WinnerTeamID: m.WinnerTeamID,
+			IsDraw:       false,
+		},
+	}
+}
+
 // CommandMoveUnit executes a unit relocation after verifying game rule compliance.
 // It calculates the active range, updates the board matrix, and commits a UnitMovedEvent.
 // Returns an error if the pathing rules are violated or if the target cell is blocked.

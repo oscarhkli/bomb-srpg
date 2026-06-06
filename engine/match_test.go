@@ -99,7 +99,48 @@ func TestMatch_SubmitAction_DisallowResetTurn(t *testing.T) {
 	}
 }
 
-func TestCommandMoveUnit(t *testing.T) {
+func TestMatch_Surrender(t *testing.T) {
+	tests := []struct {
+		name         string
+		teamID       int
+		winnerTeamID int
+	}{
+		{"Team 1 surrender", 1, 2},
+		{"Team 2 surrender", 2, 1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := newTestMatch(1, 2)
+			m.PlaybackLog = append(m.PlaybackLog, UnitDiedEvent{UnitID: 16})
+
+			events := m.Surrender(tt.teamID)
+
+			if len(events) != 1 {
+				t.Errorf("Expected 1 event for surrender, got %v", len(events))
+			}
+
+			var foundEndedEvent bool
+			for _, event := range events {
+				if ended, ok := event.(MatchEndedEvent); ok {
+					foundEndedEvent = true
+					if ended.WinnerTeamID != tt.winnerTeamID || ended.IsDraw {
+						t.Errorf("Malformed MatchEndedEvent! Got winner %d, draw %t", ended.WinnerTeamID, ended.IsDraw)
+					}
+				}
+			}
+			if !foundEndedEvent {
+				t.Error("Missing critical MatchEndedEvent token inside returned telemetry array stream")
+			}
+
+			if len(m.PlaybackLog) != 0 {
+				t.Errorf("Expectd clean slice array from PlaybackLog, got %d items", len(m.PlaybackLog))
+			}
+		})
+	}
+}
+
+func TestMatch_CommandMoveUnit(t *testing.T) {
 	// Define the schema for our table rows
 	type testCase struct {
 		name          string
@@ -293,7 +334,7 @@ func TestCommandMoveUnit(t *testing.T) {
 	}
 }
 
-func TestCommandPlaceBomb(t *testing.T) {
+func TestMatch_CommandPlaceBomb(t *testing.T) {
 	// Define the schema for our table rows matching the style of TestCommandMoveUnit
 	type testCase struct {
 		name          string
@@ -768,7 +809,7 @@ func TestMatch_ResolveTurn_ExplosionAndBlast(t *testing.T) {
 		events := m.ResolveTurn()
 
 		if len(events) != 0 {
-			t.Errorf("Expected zero events for ticking fuse, got %v", len(events))
+			t.Errorf("Expected zero events for ticking bomb, got %v", len(events))
 		}
 		if m.WorkingState.Bombs[b1].Countdown != 2 {
 			t.Errorf("Expected Bomb %#X to reduce to 2, got %d", b1, m.WorkingState.Bombs[b1].Countdown)
