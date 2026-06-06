@@ -9,9 +9,12 @@ import (
 
 func main() {
 	gameCfg := engine.GameCfg{
-		StagePreset: "Plain",
-		P1Teams:     []string{"King", "Fighter"},
-		P2Teams:     []string{"King", "Thief"},
+		StagePreset:    "MAP01",
+		MaxTurns:       30,
+		AllowResetTurn: true,
+		SuddenDeath:    true,
+		P1Teams:        []string{"King", "Witch", "Thief", "Fighter", "Fighter"},
+		P2Teams:        []string{"King", "Witch", "Thief", "Fighter", "Fighter"},
 	}
 
 	match, err := engine.InitGame(gameCfg)

@@ -128,7 +128,7 @@ func (v *TerminalView) RenderFeedback(success bool, message string) error {
 }
 
 func (v *TerminalView) RenderTurnHeader(turn, activeTeamID int) error {
-	fmt.Fprintf(v.output, "\n--- TURN %d PLAYER %d ---\n", turn, activeTeamID)
+	fmt.Fprintf(v.output, "\n--- TURN %d PLAYER %d ---\n\n", turn, activeTeamID)
 	return nil
 }
 
