@@ -621,6 +621,67 @@ func newTestMatch(width, height int) *Match {
 	return m
 }
 
+type fakeUsupportedCommand struct {
+	UnitID UnitID
+}
+
+func (fakeUsupportedCommand) isTurnCommand() {}
+
+func TestMatch_ApplyTurnCommand(t *testing.T) {
+	uID := NewUnitID(1, 0)
+
+	t.Run("apply MoveCommand", func(t *testing.T) {
+		m := newTestMatch(2, 2)
+		m.WorkingState.Turn = 1
+		m.WorkingState.ActiveTeam = 1
+		m.WorkingState.Units[uID] = &Unit{ID: uID, Team: 1, HP: 1, Speed: 100, Position: Coordinate{0, 0}}
+		m.WorkingState.Grid[0][0] = Tile{Type: TerrainPlain, OccupantType: OccupantUnit, OccupantID: int64(uID)}
+
+		cmd := MoveCommand{uID, Coordinate{1, 0}}
+
+		err := m.ApplyTurnCommand(cmd)
+
+		if err != nil {
+			t.Errorf("ApplyCommand for MoveCommand failed unexpectedly: %v", err)
+		}
+
+	})
+
+	t.Run("apply PlaceBombCommand", func(t *testing.T) {
+		m := newTestMatch(2, 2)
+		m.WorkingState.Turn = 1
+		m.WorkingState.ActiveTeam = 1
+		m.WorkingState.Units[uID] = &Unit{ID: uID, Team: 1, HP: 1, BombMaxRange: 100, MaxBombCount: 100, Position: Coordinate{0, 0}}
+		m.WorkingState.Grid[0][0] = Tile{Type: TerrainPlain, OccupantType: OccupantUnit, OccupantID: int64(uID)}
+
+		cmd := PlaceBombCommand{uID, Coordinate{1, 0}}
+
+		err := m.ApplyTurnCommand(cmd)
+
+		if err != nil {
+			t.Errorf("ApplyCommand for PlaceBombCommand failed unexpectedly: %v", err)
+		}
+
+	})
+
+	t.Run("apply unsupported command", func(t *testing.T) {
+		m := newTestMatch(2, 2)
+		m.WorkingState.Turn = 1
+		m.WorkingState.ActiveTeam = 1
+		m.WorkingState.Units[uID] = &Unit{ID: uID, Team: 1, HP: 1, BombMaxRange: 100, MaxBombCount: 100, Position: Coordinate{0, 0}}
+		m.WorkingState.Grid[0][0] = Tile{Type: TerrainPlain, OccupantType: OccupantUnit, OccupantID: int64(uID)}
+
+		cmd := fakeUsupportedCommand{uID}
+
+		err := m.ApplyTurnCommand(cmd)
+
+		if err == nil || !strings.Contains(err.Error(), "unsupported command") {
+			t.Errorf("Expect ApplyCommand for UnsupportedCommand should fail, but got %#v", err)
+		}
+
+	})
+}
+
 func TestGameState_IsLandingLegal_OccupantBomb(t *testing.T) {
 	state := &GameState{
 		Grid: [][]Tile{
