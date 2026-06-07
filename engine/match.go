@@ -407,26 +407,85 @@ func (m *Match) handleDelayedBatchDamage(
 	// TODO: Item destruction in future phase
 }
 
+// evaluateVictoryConditions calculate the VictoryResult with the below truth table:
+//
+// # P1 King | P1 Non | P2 King | P2 Non | Expected Result
+//
+// ------------------------------------------------------
+//
+//	T    |   T    |    T    |   T    | MatchInProgress, 0
+//
+// ------------------------------------------------------
+//
+//	T    |   T    |    T    |   F    | MatchWin, 1 (P2 misses non-king)
+//	T    |   T    |    F    |   T    | MatchWin, 1 (P2 King dead)
+//	T    |   T    |    F    |   F    | MatchWin, 1 (P2 wiped out)
+//	T    |   F    |    F    |   F    | MatchWin, 1 (P1 lone king)
+//
+// ------------------------------------------------------
+//
+//	F    |   T    |    T    |   T    | MatchWin, 2 (P1 King dead)
+//	F    |   F    |    T    |   T    | MatchWin, 2 (P1 wiped out)
+//	F    |   F    |    T    |   F    | MatchWin, 2 (P2 lone King)
+//	T    |   F    |    T    |   T    | MatchWin, 2 (P1 misses non-king)
+//
+// ------------------------------------------------------
+//
+//	F    |   T    |    F    |   T    | MatchDraw, -1 (Both Kings dead)
+//	F    |   T    |    F    |   F    | MatchDraw, -1 (Both Kings dead)
+//	F    |   F    |    F    |   T    | MatchDraw, -1 (Both Kings dead)
+//	F    |   F    |    F    |   F    | MatchDraw, -1 (Everyone dead)
+//	T    |   F    |    T    |   F    | MatchDraw, -1 (Mutual lone Kings)*
 func (m *Match) evaluateVictoryConditions() (VictoryResult, int) {
-	livingTeams := make(map[int]bool)
+	p1King, p1NonKing := false, false
+	p2King, p2NonKing := false, false
+
 	for _, unit := range m.WorkingState.Units {
-		if unit.HP > 0 {
-			livingTeams[unit.Team] = true
+		if unit.HP <= 0 {
+			continue
+		}
+		if unit.Team == 1 {
+			if unit.Type.Name == "King" {
+				p1King = true
+			} else {
+				p1NonKing = true
+			}
+		} else {
+			if unit.Type.Name == "King" {
+				p2King = true
+			} else {
+				p2NonKing = true
+			}
 		}
 	}
 
-	switch len(livingTeams) {
-	case 0:
-		return MatchDraw, -1
+	// Standard goals
+	p1Goal := p1King && p1NonKing
+	p2Goal := p2King && p2NonKing
 
-	case 1:
-		winner := 0
-		for teamID := range livingTeams {
-			winner = teamID
-		}
-		return MatchWin, winner
+	// Opponent fully defeated conditions
+	p1Wiped := !p1King && !p1NonKing
+	p2Wiped := !p2King && !p2NonKing
 
-	default:
+	// 1. Both teams are still strong -> The fight continues
+	if p1Goal && p2Goal {
 		return MatchInProgress, 0
 	}
+
+	// 2. P1 wins if they meet their goal, OR if they have a King and P2 is wiped
+	if p1Goal || (p1King && p2Wiped) {
+		// Double check mutual wipe out edge case
+		if p2Goal || (p2King && p1Wiped) {
+			return MatchDraw, -1
+		}
+		return MatchWin, 1
+	}
+
+	// 3. P2 wins if they meet their goal, OR if they have a King and P1 is wiped
+	if p2Goal || (p2King && p1Wiped) {
+		return MatchWin, 2
+	}
+
+	// 4. Anything else is a Draw
+	return MatchDraw, -1
 }
