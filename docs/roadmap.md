@@ -28,8 +28,8 @@
   - [x] GameEvent
   - [x] Command
   - [x] Surrender
-  - [ ] TurnCommand
-- [ ] Winning Condition
+  - [x] TurnCommand
+- [x] Victory Condition
 
 ## Phase 2: Web Server & Transition from Terminal Driver
 - **Goal:** Drop the console interface and build a graphical browser client.

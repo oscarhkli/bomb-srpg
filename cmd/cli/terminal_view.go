@@ -9,9 +9,10 @@ import (
 )
 
 const (
-	Reset = "\033[0m"
-	Red   = "\033[31m"
-	Green = "\033[32m"
+	Reset  = "\033[0m"
+	Red    = "\033[31m"
+	Green  = "\033[32m"
+	Yellow = "\033[33m"
 )
 
 type TerminalView struct {
@@ -32,6 +33,16 @@ func (v *TerminalView) RenderBoard(gs *engine.GameState) error {
 	if len(gs.Grid) == 0 || len(gs.Grid[0]) == 0 {
 		return errors.New("cannot render board: game grid matrix is empty or uninitialized")
 	}
+
+	fmt.Fprintln(v.output, "============== Command Instruction ==============")
+	fmt.Fprintf(v.output, "End Turn          : %s/commit%s\n", Yellow, Reset)
+	fmt.Fprintf(v.output, "Reset Current Turn: %s/reset%s\n", Yellow, Reset)
+	fmt.Fprintf(v.output, "Surrender         : %s/surrender%s\n", Yellow, Reset)
+	fmt.Fprintln(v.output, "          ------- How to move -------")
+	fmt.Fprintf(v.output, "Move      : %smove <unit-ID> <target-X> <target-Y>%s\n", Yellow, Reset)
+	fmt.Fprintf(v.output, "Place Bomb: %sbomb <unit-ID> <target-X> <target-Y>%s\n", Yellow, Reset)
+	fmt.Fprintf(v.output, "Example   : %smove 16 4 7%s", Yellow, Reset)
+	fmt.Fprintln(v.output, "=================================================")
 
 	if err := v.RenderTurnHeader(gs.Turn, gs.ActiveTeam); err != nil {
 		return err

@@ -115,20 +115,28 @@ type GameState struct {
 	TurnCommands    []TurnCommand      // Commands issued by players for the current turn
 }
 
-type ActionType int
-
-const (
-	ActionMove ActionType = iota
-	ActionPlaceBomb
-	ActionCommitTurn
-)
-
-type TurnCommand struct {
-	Action         ActionType
-	ActorID        UnitID
-	TargetPosition Coordinate // For move and place bomb actions
+// TurnCommand is the unified interface for all GameState actions.
+type TurnCommand interface {
+	isTurnCommand()
 }
 
+// MoveCommand packages everything needed to walk across the board.
+type MoveCommand struct {
+	UnitID UnitID
+	Target Coordinate
+}
+
+func (MoveCommand) isTurnCommand() {}
+
+// PlaceBombCommand packages everything needed to deploy bomb.
+type PlaceBombCommand struct {
+	UnitID UnitID
+	Target Coordinate
+}
+
+func (PlaceBombCommand) isTurnCommand() {}
+
+// GameEvent is the unified interface for all PlaybackLogs actions for frontend rendering.
 type GameEvent interface {
 	isGameEvent()
 }

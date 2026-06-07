@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := test
-.PHONY: fmt vet test coverage
+.PHONY: fmt vet test coverage build run
 
 fmt:
 	go fmt ./...
@@ -13,3 +13,9 @@ test: vet
 coverage: test
 	go tool cover -html=coverage.txt
 
+build: vet
+	go build -o bin/srpg-cli cmd/srpg-cli.go
+
+run: build
+	./bin/srpg-cli
+	
