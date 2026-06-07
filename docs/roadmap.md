@@ -28,7 +28,7 @@
   - [x] GameEvent
   - [x] Command
   - [x] Surrender
-  - [ ] TurnCommand
+  - [x] TurnCommand
 - [x] Victory Condition
 
 ## Phase 2: Web Server & Transition from Terminal Driver
