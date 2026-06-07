@@ -43,6 +43,21 @@ func (m *Match) Surrender(teamID int) []GameEvent {
 	}
 }
 
+// ApplyTurnCommand accepts any packaged action and forwards it to the true match logic.
+func (m *Match) ApplyTurnCommand(cmd TurnCommand) error {
+	switch c := cmd.(type) {
+
+	case MoveCommand:
+		return m.CommandMoveUnit(c.UnitID, c.Target)
+
+	case PlaceBombCommand:
+		return m.CommandPlaceBomb(c.UnitID, c.Target)
+
+	default:
+		return fmt.Errorf("unsupported command variant type passed to engine")
+	}
+}
+
 // CommandMoveUnit executes a unit relocation after verifying game rule compliance.
 // It calculates the active range, updates the board matrix, and commits a UnitMovedEvent.
 // Returns an error if the pathing rules are violated or if the target cell is blocked.

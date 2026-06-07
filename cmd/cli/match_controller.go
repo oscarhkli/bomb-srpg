@@ -112,18 +112,21 @@ func (c *MatchController) routeGameAction(cmd string) {
 			return
 		}
 
-		unitID, x, y, err := c.parseActionCommand(token[1], token[2], token[3])
+		unitID, target, err := c.parseActionCommand(token[1], token[2], token[3])
 		if err != nil {
 			_ = c.View.RenderFeedback(false, "Argument Error: Unit index, X, and Y must be integers!")
 			return
 		}
 
-		err = c.Match.CommandMoveUnit(unitID, engine.Coordinate{X: x, Y: y})
+		err = c.Match.ApplyTurnCommand(engine.MoveCommand{
+			UnitID: unitID,
+			Target: target,
+		})
 		if err != nil {
 			_ = c.View.RenderFeedback(false, fmt.Sprintf("Invalid move: %v", err))
 			return
 		}
-		_ = c.View.RenderFeedback(true, fmt.Sprintf("Unit %d moved to (%d, %d)", unitID, x, y))
+		_ = c.View.RenderFeedback(true, fmt.Sprintf("Unit %d moved to (%#v)", unitID, target))
 
 	case "bomb":
 		if len(token) < 4 {
@@ -131,18 +134,21 @@ func (c *MatchController) routeGameAction(cmd string) {
 			return
 		}
 
-		unitID, x, y, err := c.parseActionCommand(token[1], token[2], token[3])
+		unitID, target, err := c.parseActionCommand(token[1], token[2], token[3])
 		if err != nil {
 			_ = c.View.RenderFeedback(false, "Argument Error: Unit index, X, and Y must be integers!")
 			return
 		}
 
-		err = c.Match.CommandPlaceBomb(unitID, engine.Coordinate{X: x, Y: y})
+		err = c.Match.ApplyTurnCommand(engine.PlaceBombCommand{
+			UnitID: unitID,
+			Target: target,
+		})
 		if err != nil {
 			_ = c.View.RenderFeedback(false, fmt.Sprintf("Invalid bomb placement: %v", err))
 			return
 		}
-		_ = c.View.RenderFeedback(true, fmt.Sprintf("Unit %d placed bomb at (%d, %d)", unitID, x, y))
+		_ = c.View.RenderFeedback(true, fmt.Sprintf("Unit %d placed bomb at (%#v)", unitID, target))
 
 	default:
 		_ = c.View.RenderFeedback(false, fmt.Sprintf("Unknown meta command: %s\n", cmd))
@@ -150,12 +156,12 @@ func (c *MatchController) routeGameAction(cmd string) {
 	}
 }
 
-func (c *MatchController) parseActionCommand(s1, s2, s3 string) (engine.UnitID, int, int, error) {
+func (c *MatchController) parseActionCommand(s1, s2, s3 string) (engine.UnitID, engine.Coordinate, error) {
 	id, err1 := strconv.ParseUint(s1, 10, 8)
 	x, err2 := strconv.Atoi(s2)
 	y, err3 := strconv.Atoi(s3)
 	if err1 != nil || err2 != nil || err3 != nil {
-		return 0xFF, -1, -1, errors.New("invalid integer syntax")
+		return 0, engine.Coordinate{}, errors.New("invalid integer syntax")
 	}
-	return engine.UnitID(id), x, y, nil
+	return engine.UnitID(id), engine.Coordinate{X: x, Y: y}, nil
 }
