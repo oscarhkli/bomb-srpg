@@ -728,18 +728,38 @@ func TestMatch_StartTurn_NotTriggeringSuddenDeath(t *testing.T) {
 }
 
 func TestMatch_StartTurn_SuddenDeath(t *testing.T) {
+	king, ok := GetArchetype("King")
+	if !ok {
+		t.Fatalf("Archetype King does not exist")
+	}
+
+	fighter, ok := GetArchetype("Fighter")
+	if !ok {
+		t.Fatalf("Archetype Fighter does not exist")
+	}
+
+	u1 := NewUnitID(1, 0)
+	u2 := NewUnitID(2, 0)
+	u3 := NewUnitID(1, 1)
+	u4 := NewUnitID(2, 1)
+
 	t.Run("stage has many available tiles", func(t *testing.T) {
-		m := newTestMatch(3, 3)
+		m := newTestMatch(4, 3)
 		m.GameCfg.SuddenDeath = true
 		m.TrueState.Turn = 101
-		u1 := NewUnitID(1, 0)
-		u2 := NewUnitID(2, 0)
-		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1, Position: Coordinate{0, 0}}
-		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1, Position: Coordinate{0, 1}}
+
+		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1, Position: Coordinate{0, 0}, Type: king}
+		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1, Position: Coordinate{0, 1}, Type: king}
+		m.WorkingState.Units[u3] = &Unit{ID: u3, Team: 1, HP: 1, Position: Coordinate{3, 0}, Type: fighter}
+		m.WorkingState.Units[u4] = &Unit{ID: u4, Team: 2, HP: 1, Position: Coordinate{3, 1}, Type: fighter}
 		m.WorkingState.Grid[0][0].OccupantType = OccupantUnit
 		m.WorkingState.Grid[0][0].OccupantID = int64(u1)
 		m.WorkingState.Grid[1][0].OccupantType = OccupantUnit
 		m.WorkingState.Grid[1][0].OccupantID = int64(u2)
+		m.WorkingState.Grid[0][3].OccupantType = OccupantUnit
+		m.WorkingState.Grid[0][3].OccupantID = int64(u4)
+		m.WorkingState.Grid[1][3].OccupantType = OccupantUnit
+		m.WorkingState.Grid[1][3].OccupantID = int64(u4)
 
 		m.StartNewTurn()
 
@@ -749,14 +769,14 @@ func TestMatch_StartTurn_SuddenDeath(t *testing.T) {
 	})
 
 	t.Run("stage has many 1 available tile", func(t *testing.T) {
-		m := newTestMatch(1, 7)
+		m := newTestMatch(1, 9)
 		m.GameCfg.SuddenDeath = true
 		m.TrueState.Turn = 101
-		u1 := NewUnitID(1, 0)
-		u2 := NewUnitID(2, 0)
 		bID := NewBombID(100, 1, u1)
-		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1, Position: Coordinate{0, 0}}
-		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1, Position: Coordinate{0, 1}}
+		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1, Position: Coordinate{0, 0}, Type: king}
+		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1, Position: Coordinate{0, 1}, Type: king}
+		m.WorkingState.Units[u3] = &Unit{ID: u3, Team: 1, HP: 1, Position: Coordinate{0, 7}, Type: fighter}
+		m.WorkingState.Units[u4] = &Unit{ID: u4, Team: 2, HP: 1, Position: Coordinate{0, 8}, Type: fighter}
 		m.WorkingState.Bombs[bID] = &Bomb{ID: bID, OwnerID: u2, Position: Coordinate{0, 3}}
 		m.WorkingState.Grid[0][0].OccupantType = OccupantUnit
 		m.WorkingState.Grid[0][0].OccupantID = int64(u1)
@@ -767,6 +787,10 @@ func TestMatch_StartTurn_SuddenDeath(t *testing.T) {
 		m.WorkingState.Grid[3][0].OccupantID = int64(bID)
 		m.WorkingState.Grid[4][0].OccupantType = OccupantSoftBlock
 		m.WorkingState.Grid[5][0].OccupantType = OccupantItem
+		m.WorkingState.Grid[7][0].OccupantType = OccupantUnit
+		m.WorkingState.Grid[7][0].OccupantID = int64(u4)
+		m.WorkingState.Grid[8][0].OccupantType = OccupantUnit
+		m.WorkingState.Grid[8][0].OccupantID = int64(u4)
 
 		m.StartNewTurn()
 
@@ -776,18 +800,22 @@ func TestMatch_StartTurn_SuddenDeath(t *testing.T) {
 	})
 
 	t.Run("stage has no available tile", func(t *testing.T) {
-		m := newTestMatch(1, 3)
+		m := newTestMatch(1, 5)
 		m.GameCfg.SuddenDeath = true
 		m.TrueState.Turn = 101
-		u1 := NewUnitID(1, 0)
-		u2 := NewUnitID(2, 0)
-		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1, Position: Coordinate{0, 0}}
-		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1, Position: Coordinate{0, 1}}
+		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1, Position: Coordinate{0, 0}, Type: king}
+		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1, Position: Coordinate{0, 1}, Type: king}
+		m.WorkingState.Units[u3] = &Unit{ID: u3, Team: 1, HP: 1, Position: Coordinate{0, 3}, Type: fighter}
+		m.WorkingState.Units[u4] = &Unit{ID: u4, Team: 2, HP: 1, Position: Coordinate{0, 4}, Type: fighter}
 		m.WorkingState.Grid[0][0].OccupantType = OccupantUnit
 		m.WorkingState.Grid[0][0].OccupantID = int64(u1)
 		m.WorkingState.Grid[1][0].OccupantType = OccupantUnit
 		m.WorkingState.Grid[1][0].OccupantID = int64(u2)
 		m.WorkingState.Grid[2][0].Type = TerrainBlock
+		m.WorkingState.Grid[3][0].OccupantType = OccupantUnit
+		m.WorkingState.Grid[3][0].OccupantID = int64(u4)
+		m.WorkingState.Grid[4][0].OccupantType = OccupantUnit
+		m.WorkingState.Grid[4][0].OccupantID = int64(u4)
 
 		m.StartNewTurn()
 
@@ -798,14 +826,28 @@ func TestMatch_StartTurn_SuddenDeath(t *testing.T) {
 }
 
 func TestMatch_ResolveTurn_ExplosionAndBlast(t *testing.T) {
+	king, ok := GetArchetype("King")
+	if !ok {
+		t.Fatalf("Archetype King does not exist")
+	}
+
+	fighter, ok := GetArchetype("Fighter")
+	if !ok {
+		t.Fatalf("Archetype Fighter does not exist")
+	}
+
 	t.Run("Natural countdown tick reduces for countdown bombs and does not detonate early", func(t *testing.T) {
 		m := newTestMatch(16, 16)
 		u1 := NewUnitID(1, 0)
 		u2 := NewUnitID(2, 0)
+		u3 := NewUnitID(1, 1)
+		u4 := NewUnitID(2, 1)
 		b1 := NewBombID(1, 1, u1)
 		b2 := NewBombID(1, 2, u2)
-		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1}
-		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1}
+		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1, Type: king}
+		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1, Type: king}
+		m.WorkingState.Units[u3] = &Unit{ID: u3, Team: 1, HP: 1, Type: fighter}
+		m.WorkingState.Units[u4] = &Unit{ID: u4, Team: 2, HP: 1, Type: fighter}
 		m.WorkingState.Bombs[b1] = &Bomb{ID: b1, Countdown: 3, Range: 2, Position: Coordinate{5, 5}}
 		m.WorkingState.Bombs[b2] = &Bomb{ID: b2, Countdown: -1, Range: 2, Position: Coordinate{15, 15}}
 		m.WorkingState.Grid[5][5] = Tile{OccupantType: OccupantBomb, OccupantID: int64(b1)}
@@ -977,12 +1019,28 @@ func TestMatch_ResolveTurn_CascadingChainReactions(t *testing.T) {
 }
 
 func TestMatch_ResolveTurn_TimelineSystemTransitions(t *testing.T) {
+	king, ok := GetArchetype("King")
+	if !ok {
+		t.Fatalf("Archetype King does not exist")
+	}
+
+	fighter, ok := GetArchetype("Fighter")
+	if !ok {
+		t.Fatalf("Archetype Fighter does not exist")
+	}
+
+	u1 := NewUnitID(1, 0)
+	u2 := NewUnitID(2, 0)
+	u3 := NewUnitID(1, 1)
+	u4 := NewUnitID(2, 1)
+
 	t.Run("Empty turn resolution executes smoothly with zero structural mutations", func(t *testing.T) {
 		m := newTestMatch(16, 16)
-		u1 := NewUnitID(1, 0)
-		u2 := NewUnitID(2, 0)
-		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1}
-		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1}
+
+		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1, Type: king}
+		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1, Type: king}
+		m.WorkingState.Units[u3] = &Unit{ID: u3, Team: 1, HP: 1, Type: fighter}
+		m.WorkingState.Units[u4] = &Unit{ID: u4, Team: 2, HP: 1, Type: fighter}
 
 		events := m.ResolveTurn()
 
@@ -999,91 +1057,16 @@ func TestMatch_ResolveTurn_TimelineSystemTransitions(t *testing.T) {
 		}
 	})
 
-	t.Run("Solid Victory is decreed when exactly one team has living units left standing", func(t *testing.T) {
-		m := newTestMatch(16, 16)
-		m.TrueState.Turn = 1
-		m.WorkingState.Turn = 1
-		m.WorkingState.ActiveTeam = 1
-
-		u1 := NewUnitID(1, 0)
-		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1, Position: Coordinate{1, 1}}
-		m.WorkingState.Grid[1][1] = Tile{Type: TerrainPlain, OccupantType: OccupantUnit, OccupantID: int64(u1)}
-
-		u2 := NewUnitID(2, 0)
-		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1, Position: Coordinate{5, 5}}
-		m.WorkingState.Grid[5][5] = Tile{Type: TerrainPlain, OccupantType: OccupantUnit, OccupantID: int64(u2)}
-
-		bID := NewBombID(1, 1, u1)
-		m.WorkingState.Bombs[bID] = &Bomb{ID: bID, Countdown: 1, Range: 2, Position: Coordinate{5, 4}}
-		m.WorkingState.Grid[4][5] = Tile{Type: TerrainPlain, OccupantType: OccupantBomb, OccupantID: int64(bID)}
-
-		events := m.ResolveTurn()
-
-		if m.WinnerTeamID != 1 {
-			t.Errorf("Victory Guard Failed! Expected WinnerTeamID = 1, got %d", m.WinnerTeamID)
-		}
-
-		var foundEndedEvent bool
-		for _, event := range events {
-			if ended, ok := event.(MatchEndedEvent); ok {
-				foundEndedEvent = true
-				if ended.WinnerTeamID != 1 || ended.IsDraw {
-					t.Errorf("Malformed MatchEndedEvent! Got winner %d, draw %t", ended.WinnerTeamID, ended.IsDraw)
-				}
-			}
-		}
-		if !foundEndedEvent {
-			t.Error("Missing critical MatchEndedEvent token inside returned telemetry array stream")
-		}
-	})
-
-	t.Run("Mutual destruction Draw condition is logged when a blast vaporises all players simultaneously", func(t *testing.T) {
-		m := newTestMatch(16, 16)
-		m.TrueState.Turn = 1
-		m.WorkingState.Turn = 1
-		m.WorkingState.ActiveTeam = 1
-
-		u1 := NewUnitID(1, 0)
-		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1, Position: Coordinate{4, 5}}
-		m.WorkingState.Grid[5][4] = Tile{Type: TerrainPlain, OccupantType: OccupantUnit, OccupantID: int64(u1)}
-
-		u2 := NewUnitID(2, 0)
-		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1, Position: Coordinate{6, 5}}
-		m.WorkingState.Grid[5][6] = Tile{Type: TerrainPlain, OccupantType: OccupantUnit, OccupantID: int64(u2)}
-
-		bID := NewBombID(1, 1, SystemUnitID)
-		m.WorkingState.Bombs[bID] = &Bomb{ID: bID, Countdown: 1, Range: 3, Position: Coordinate{5, 5}}
-		m.WorkingState.Grid[5][5] = Tile{Type: TerrainPlain, OccupantType: OccupantBomb, OccupantID: int64(bID)}
-
-		events := m.ResolveTurn()
-
-		if m.WinnerTeamID != -1 {
-			t.Errorf("Draw Guard Failed! Expected WinnerTeamID = -1, got %d", m.WinnerTeamID)
-		}
-
-		var foundDrawEvent bool
-		for _, event := range events {
-			if ended, ok := event.(MatchEndedEvent); ok {
-				if ended.IsDraw {
-					foundDrawEvent = true
-				}
-			}
-		}
-		if !foundDrawEvent {
-			t.Error("Missing critical Draw configuration flag inside MatchEndedEvent log packet")
-		}
-	})
-
 	t.Run("Successful turn resolution advances true match clock and deep copies sandbox workspace", func(t *testing.T) {
 		m := newTestMatch(16, 16)
 		m.TrueState.Turn = 1
 		m.WorkingState.Turn = 1
 		m.WorkingState.ActiveTeam = 1
 
-		u1 := NewUnitID(1, 0)
-		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 2, Position: Coordinate{0, 0}}
-		u2 := NewUnitID(2, 0)
-		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 2, Position: Coordinate{0, 1}}
+		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 2, Type: king}
+		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 2, Type: king}
+		m.WorkingState.Units[u3] = &Unit{ID: u3, Team: 1, HP: 2, Type: fighter}
+		m.WorkingState.Units[u4] = &Unit{ID: u4, Team: 2, HP: 2, Type: fighter}
 
 		m.WorkingState.Grid[0][0] = Tile{Type: TerrainPlain, OccupantType: OccupantUnit, OccupantID: int64(u1)}
 		m.WorkingState.Grid[1][0] = Tile{Type: TerrainPlain, OccupantType: OccupantUnit, OccupantID: int64(u2)}
@@ -1107,4 +1090,268 @@ func TestMatch_ResolveTurn_TimelineSystemTransitions(t *testing.T) {
 			t.Errorf("Sandbox rollback broke timeline integrity! WorkingState turn clock reset to %d, want 2", m.WorkingState.Turn)
 		}
 	})
+}
+
+func newTestMatchWithFullTeam(t *testing.T, p1KingAlive, p2KingAlive bool, p1Alive, p2Alive [4]bool) *Match {
+	m := newTestMatch(5, 2)
+	m.TrueState.Turn = 1
+	m.WorkingState.Turn = 1
+
+	m.TrueState.Turn = 1
+	m.WorkingState.Turn = 1
+	m.WorkingState.ActiveTeam = 1
+
+	king, ok := GetArchetype("King")
+	if !ok {
+		t.Fatalf("Archetype King does not exist")
+	}
+
+	fighter, ok := GetArchetype("Fighter")
+	if !ok {
+		t.Fatalf("Archetype Fighter does not exist")
+	}
+
+	p1KingUnitID := NewUnitID(1, 0)
+	p1KingHP := 1
+	if !p1KingAlive {
+		p1KingHP = 0
+	}
+	m.WorkingState.Units[p1KingUnitID] = &Unit{
+		ID:       p1KingUnitID,
+		Team:     1,
+		HP:       p1KingHP,
+		Type:     king,
+		Position: Coordinate{0, 0},
+	}
+	m.WorkingState.Grid[0][0] = Tile{Type: TerrainPlain, OccupantType: OccupantUnit, OccupantID: int64(p1KingUnitID)}
+
+	p2KingUnitID := NewUnitID(2, 0)
+	p2KingHP := 1
+	if !p2KingAlive {
+		p2KingHP = 0
+	}
+	m.WorkingState.Units[p2KingUnitID] = &Unit{
+		ID:       p2KingUnitID,
+		Team:     2,
+		HP:       p2KingHP,
+		Type:     king,
+		Position: Coordinate{0, 1},
+	}
+	m.WorkingState.Grid[1][0] = Tile{Type: TerrainPlain, OccupantType: OccupantUnit, OccupantID: int64(p2KingUnitID)}
+
+	for i, p := range p1Alive {
+		id := NewUnitID(1, i+1)
+		hp := 1
+		if !p {
+			hp = 0
+		}
+		m.WorkingState.Units[id] = &Unit{
+			ID:       id,
+			Team:     1,
+			HP:       hp,
+			Type:     fighter,
+			Position: Coordinate{i + 1, 0},
+		}
+		m.WorkingState.Grid[0][i+1] = Tile{Type: TerrainPlain, OccupantType: OccupantUnit, OccupantID: int64(id)}
+
+	}
+
+	for i, p := range p2Alive {
+		id := NewUnitID(2, i+1)
+		hp := 1
+		if !p {
+			hp = 0
+		}
+		m.WorkingState.Units[id] = &Unit{
+			ID:       id,
+			Team:     2,
+			HP:       hp,
+			Type:     fighter,
+			Position: Coordinate{i + 1, 1},
+		}
+		m.WorkingState.Grid[1][i+1] = Tile{Type: TerrainPlain, OccupantType: OccupantUnit, OccupantID: int64(id)}
+
+	}
+
+	m.TrueState = m.WorkingState.DeepCopy()
+
+	return m
+}
+
+func TestMatch_Resolve_VictoryCondition_Suite(t *testing.T) {
+	tests := []struct {
+		name                string
+		p1King              bool
+		p1NonKings          [4]bool
+		p2King              bool
+		p2NonKings          [4]bool
+		expectedResult      VictoryResult
+		expectedWinningTeam int
+	}{
+		{
+			name:                "Standard gameplay state",
+			p1King:              true,
+			p1NonKings:          [4]bool{true, true, false, true},
+			p2King:              true,
+			p2NonKings:          [4]bool{true, true, false, false},
+			expectedResult:      MatchInProgress,
+			expectedWinningTeam: 0,
+		},
+		// P1 Wins
+		{
+			name:                "P1 Wins: P2 misses non-king",
+			p1King:              true,
+			p1NonKings:          [4]bool{true, true, false, true},
+			p2King:              true,
+			p2NonKings:          [4]bool{false, false, false, false},
+			expectedResult:      MatchWin,
+			expectedWinningTeam: 1,
+		},
+		{
+			name:                "P1 Wins: P2 King dead",
+			p1King:              true,
+			p1NonKings:          [4]bool{true, true, false, true},
+			p2King:              false,
+			p2NonKings:          [4]bool{true, false, false, false},
+			expectedResult:      MatchWin,
+			expectedWinningTeam: 1,
+		},
+		{
+			name:                "P1 Wins: P2 wiped out",
+			p1King:              true,
+			p1NonKings:          [4]bool{true, true, false, true},
+			p2King:              false,
+			p2NonKings:          [4]bool{false, false, false, false},
+			expectedResult:      MatchWin,
+			expectedWinningTeam: 1,
+		},
+		{
+			name:                "P1 Wins: P1 lone king",
+			p1King:              true,
+			p1NonKings:          [4]bool{false, false, false, false},
+			p2King:              false,
+			p2NonKings:          [4]bool{false, false, false, false},
+			expectedResult:      MatchWin,
+			expectedWinningTeam: 1,
+		},
+		// P2 Wins
+		{
+			name:                "P2 Wins: P1 misses non-king",
+			p1King:              true,
+			p1NonKings:          [4]bool{false, false, false, false},
+			p2King:              true,
+			p2NonKings:          [4]bool{true, true, false, true},
+			expectedResult:      MatchWin,
+			expectedWinningTeam: 2,
+		},
+		{
+			name:                "P2 Wins: P1 King dead",
+			p1King:              false,
+			p1NonKings:          [4]bool{true, true, false, true},
+			p2King:              true,
+			p2NonKings:          [4]bool{true, false, false, false},
+			expectedResult:      MatchWin,
+			expectedWinningTeam: 2,
+		},
+		{
+			name:                "P2 Wins: P1 wiped out",
+			p1King:              false,
+			p1NonKings:          [4]bool{false, false, false, false},
+			p2King:              true,
+			p2NonKings:          [4]bool{true, true, false, true},
+			expectedResult:      MatchWin,
+			expectedWinningTeam: 2,
+		},
+		{
+			name:                "P2 Wins: P2 lone king",
+			p1King:              false,
+			p1NonKings:          [4]bool{false, false, false, false},
+			p2King:              true,
+			p2NonKings:          [4]bool{false, false, false, false},
+			expectedResult:      MatchWin,
+			expectedWinningTeam: 2,
+		},
+		// Draw Conditions
+		{
+			name:                "Draw: Both Kings dead",
+			p1King:              false,
+			p1NonKings:          [4]bool{false, true, false, false},
+			p2King:              false,
+			p2NonKings:          [4]bool{false, false, true, false},
+			expectedResult:      MatchDraw,
+			expectedWinningTeam: -1,
+		},
+		{
+			name:                "Draw: Both Kings dead, P2 wiped out",
+			p1King:              false,
+			p1NonKings:          [4]bool{false, true, false, false},
+			p2King:              false,
+			p2NonKings:          [4]bool{false, false, false, false},
+			expectedResult:      MatchDraw,
+			expectedWinningTeam: -1,
+		},
+		{
+			name:                "Draw: Both Kings dead, P1 wiped out",
+			p1King:              false,
+			p1NonKings:          [4]bool{false, false, false, false},
+			p2King:              false,
+			p2NonKings:          [4]bool{false, false, true, false},
+			expectedResult:      MatchDraw,
+			expectedWinningTeam: -1,
+		},
+		{
+			name:                "Draw: Everyone dead",
+			p1King:              false,
+			p1NonKings:          [4]bool{false, false, false, false},
+			p2King:              false,
+			p2NonKings:          [4]bool{false, false, false, false},
+			expectedResult:      MatchDraw,
+			expectedWinningTeam: -1,
+		},
+		{
+			name:                "Draw: Both Lone Kings dead",
+			p1King:              true,
+			p1NonKings:          [4]bool{false, false, false, false},
+			p2King:              true,
+			p2NonKings:          [4]bool{false, false, false, false},
+			expectedResult:      MatchDraw,
+			expectedWinningTeam: -1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := newTestMatchWithFullTeam(t, tt.p1King, tt.p2King, tt.p1NonKings, tt.p2NonKings)
+
+			events := m.ResolveTurn()
+
+			if m.WinnerTeamID != tt.expectedWinningTeam {
+				t.Errorf("Victory Guard Failed! Expected WinnerTeamID = %d, got %d", tt.expectedWinningTeam, m.WinnerTeamID)
+			}
+
+			var foundEndedEvent bool
+			for _, event := range events {
+				if ended, ok := event.(MatchEndedEvent); ok {
+					foundEndedEvent = true
+					if ended.WinnerTeamID != tt.expectedWinningTeam {
+						t.Errorf("Malformed MatchEndedEvent.WinnerTeam, got winner %d", ended.WinnerTeamID)
+					}
+
+					if (tt.expectedResult == MatchInProgress && !ended.IsDraw) || (tt.expectedResult == MatchWin && ended.IsDraw) {
+						t.Errorf("Malformed MatchEndedEvent.IsDraw for result %#v, got winner %d", tt.expectedResult, ended.WinnerTeamID)
+					}
+				}
+			}
+
+			if tt.expectedResult == MatchInProgress {
+				if foundEndedEvent {
+					t.Errorf("MatchEndedEvent should not be captured, but got one")
+				}
+				return // all the subsequent verifications aren't related to MatchInProgress
+			}
+			if !foundEndedEvent {
+				t.Error("Missing critical MatchEndedEvent token inside returned telemetry array stream")
+			}
+		})
+	}
 }
