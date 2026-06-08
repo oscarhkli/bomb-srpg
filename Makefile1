@@ -8,13 +8,13 @@ vet: fmt
 	go vet ./...
 
 test: vet
-	go test -cover -coverprofile=coverage.txt ./engine/... ./cmd/cli/... 
+	go test -cover -coverprofile=coverage.txt ./cli/... ./engine/...
 
 coverage: test
 	go tool cover -html=coverage.txt
 
 build: vet
-	go build -o bin/srpg-cli cmd/srpg-cli.go
+	go build -o bin/srpg-cli ./cmd/srpg-cli
 
 run: build
 	./bin/srpg-cli
