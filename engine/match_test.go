@@ -20,13 +20,14 @@ func TestMatch_ResetTurn(t *testing.T) {
 	m.WorkingState = m.TrueState.DeepCopy()
 
 	m.WorkingState.Units[unitID].HP = 2
+	m.WorkingState.Units[unitID].HasMoved = true
 
 	m.ResetTurn()
 
-	if m.WorkingState.Units[unitID].HP != 5 {
+	if m.WorkingState.Units[unitID].HP != 5 || m.WorkingState.Units[unitID].HasMoved {
 		t.Errorf("Rollback invariant broken: uncommitted unit action still exists in WorkingState after reset!")
 	}
-	if m.TrueState.Units[unitID].HP != 5 {
+	if m.TrueState.Units[unitID].HP != 5 || m.WorkingState.Units[unitID].HasMoved {
 		t.Errorf("CRITICAL POINTER LEAK: Sandbox action permanently corrupted your master TrueState checkpoint!")
 	}
 }
@@ -270,6 +271,28 @@ func TestMatch_CommandMoveUnit(t *testing.T) {
 			errContains: "movement restriction: target coordinate is out of moving range",
 		},
 		{
+			name:   "Failure: Unit has moved in the same turn",
+			unitID: validUnitID,
+			target: validTarget,
+			setupState: func() *Match {
+				m := newTestMatch(3, 3)
+				m.WorkingState.Turn = 1
+				m.WorkingState.ActiveTeam = 1
+				m.WorkingState.Units[validUnitID] = &Unit{
+					ID:       validUnitID,
+					HP:       1,
+					Team:     1,
+					Position: origin,
+					Speed:    3,
+					HasMoved: true,
+				}
+				m.WorkingState.Grid[origin.Y][origin.X] = Tile{OccupantType: OccupantUnit, OccupantID: int64(validUnitID)}
+				return m
+			},
+			wantErr:     true,
+			errContains: "single move restriction: unit has moved in this turn",
+		},
+		{
 			name:   "Success: Unit moves successfully",
 			unitID: validUnitID,
 			target: validTarget,
@@ -510,6 +533,33 @@ func TestMatch_CommandPlaceBomb(t *testing.T) {
 			},
 			wantErr:     true,
 			errContains: "bomb placement rejected: terrain restriction",
+		},
+		{
+			name:   "Failure: Unit has used skill in the turn",
+			unitID: validUnitID,
+			target: validTarget,
+			setupState: func() *Match {
+				m := newTestMatch(3, 3)
+				m.WorkingState.Turn = 3
+				m.WorkingState.ActiveTeam = 1
+				m.WorkingState.TurnBombCounter = 0
+				m.WorkingState.Bombs = make(map[BombID]*Bomb)
+				m.WorkingState.Units[validUnitID] = &Unit{
+					ID:           validUnitID,
+					HP:           1,
+					Team:         1,
+					Position:     origin,
+					BombPower:    3,
+					BombMaxRange: 3,
+					MaxBombCount: 2,
+					BombUsed:     0,
+					HasUsedSkill: true,
+				}
+				m.WorkingState.Grid[origin.Y][origin.X] = Tile{OccupantType: OccupantUnit, OccupantID: int64(validUnitID)}
+				return m
+			},
+			wantErr:     true,
+			errContains: "single move restriction",
 		},
 		{
 			name:   "Success: Bomb placed successfully",
@@ -1098,9 +1148,9 @@ func TestMatch_ResolveTurn_TimelineSystemTransitions(t *testing.T) {
 	t.Run("Empty turn resolution executes smoothly with zero structural mutations", func(t *testing.T) {
 		m := newTestMatch(16, 16)
 
-		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1, Type: king}
-		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1, Type: king}
-		m.WorkingState.Units[u3] = &Unit{ID: u3, Team: 1, HP: 1, Type: fighter}
+		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1, Type: king, HasMoved: true}
+		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1, Type: king, HasUsedSkill: true}
+		m.WorkingState.Units[u3] = &Unit{ID: u3, Team: 1, HP: 1, Type: fighter, HasMoved: true, HasUsedSkill: true}
 		m.WorkingState.Units[u4] = &Unit{ID: u4, Team: 2, HP: 1, Type: fighter}
 
 		events := m.ResolveTurn()
@@ -1110,7 +1160,13 @@ func TestMatch_ResolveTurn_TimelineSystemTransitions(t *testing.T) {
 		}
 
 		if m.WorkingState.Turn != 2 {
-			t.Errorf("Expected Turn will increment to 2, go %d", m.WorkingState.Turn)
+			t.Errorf("Expected Turn will increment to 2, got %d", m.WorkingState.Turn)
+		}
+
+		for uID, unit := range m.WorkingState.Units {
+			if unit.HasMoved || unit.HasUsedSkill {
+				t.Errorf("Expected Unit %#X HasMoved and HasUsed are reset, got HasMoved %v, HasUsedSkill %v", uID, unit.HasMoved, unit.HasUsedSkill)
+			}
 		}
 
 		if len(m.PlaybackLog) != 0 {

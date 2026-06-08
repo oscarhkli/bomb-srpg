@@ -12,9 +12,9 @@
 
 ## 2. Spatial Mapping & State Model Definitions
 
-- **Stage Dimensions:** Dynamic N x M grid layout (supporting ranges from 7x7 up to a maximum bound of 16x16).
-- **Storage Type:** Rows are allocated via dynamic Go slices (`[][]Tile`) to support custom asymmetrical maps without recompiling code.
-- **Coordinate Mapping:** Layout is indexed as `Grid[Y][X]`. The top-left corner of the map is designated as `(0,0)`.
+- **Stage Dimensions**: Dynamic N x M grid layout (supporting ranges from 7x7 up to a maximum bound of 16x16).
+- **Storage Type**: Rows are allocated via dynamic Go slices (`[][]Tile`) to support custom asymmetrical maps without recompiling code.
+- **Coordinate Mapping**: Layout is indexed as `Grid[Y][X]`. The top-left corner of the map is designated as `(0,0)`.
 * **Dynamic Boundary Rule**: Every check evaluates dynamically against active bounds: `0 <= X < len(grid)` and `0 <= Y < len(grid)`.
 - **Memory Normalization**: The Board Matrix tracks tile references via minimal structural fields (`OccupantType`, `OccupantID`). The GameState Engine maintains the master map directory of active entities. Moving an object updates only the cell metadata, leaving base entity metrics untouched.
 
@@ -30,20 +30,21 @@
 
 - **Transient Snapshot Pattern**: Instead of heavy OOP decorator patterns or permanent state mutations, movement capabilities are passed into pathfinding as a short-lived, discardable `MovementRule` context instruction slip generated on the fly using active character statistics.
 - **High-Performance Bitmask Matrix**: Entity pass-through permissions are packed into a highly optimized, 1-byte bitmask field (`PassFlags` uint8). This completely eliminates nested slice iteration loops inside the pathfinder, collapsing obstacle evaluation down to a bitwise operation.
-* **Separation of Concerns (Reachability vs. Legality)**:
-  * The pathfinder function (`FindReachableTiles`) has exactly one job: mapping spatial reachability and step distance tracking (`map[Coordinate]int`), treating the origin tile as step 0.
-  * Target landing restrictions (e.g., landing on an item tile or targeting allies) are business rules evaluated independently by respective **Action Handlers** *after* pathfinding returns.
-* **Unified Impact Absorption Crucible**: Straight-line calculation rays (character walking, bomb explosions) and corner-wrapping paths (sanity check). An explicit impact flag (`StopOnFirstNonUnitOccupant`) forces the ray to register a valid hit on a solid obstacle (SoftBlock, Bomb, Item) but instantly terminates the vector to shield cells behind it.
-* **Snapshot-Based Detonation**: All cascading bomb explosions within an intra-turn phase resolve at the exact same physical millisecond. To prevent ray-truncation anomalies, the engine queries a read-only 2D snapshot copy of the board captured at the start of the resolution pass (`cloneGridSnapshot()`). Destructible soft blocks flag their destruction inside delayed registries but remain solid, ray-blocking obstacles until the end of the pass to ensure perfect unit shielding.
-* **Intra-Turn Damage Capping**: Units caught in overlapping blast patterns or multiple cascading explosions lose a flat maximum of exactly 1 HP, matching the low-density 1-HP character pacing rules. Damage calculations utilize a local boolean presence set to record injuries rather than an accumulator, preventing health overflow. All entity modifications, soft wall dissolutions, and tile clear passes execute as a simultaneous batch flush at the very end of the loop.
+- **Separation of Concerns (Reachability vs. Legality)**:
+  - The pathfinder function (`FindReachableTiles`) has exactly one job: mapping spatial reachability and step distance tracking (`map[Coordinate]int`), treating the origin tile as step 0.
+  - Target landing restrictions (e.g., landing on an item tile or targeting allies) are business rules evaluated independently by respective **Action Handlers** *after* pathfinding returns.
+- **Unified Impact Absorption Crucible**: Straight-line calculation rays (character walking, bomb explosions) and corner-wrapping paths (sanity check). An explicit impact flag (`StopOnFirstNonUnitOccupant`) forces the ray to register a valid hit on a solid obstacle (SoftBlock, Bomb, Item) but instantly terminates the vector to shield cells behind it.
+- **Snapshot-Based Detonation**: All cascading bomb explosions within an intra-turn phase resolve at the exact same physical millisecond. To prevent ray-truncation anomalies, the engine queries a read-only 2D snapshot copy of the board captured at the start of the resolution pass (`cloneGridSnapshot()`). Destructible soft blocks flag their destruction inside delayed registries but remain solid, ray-blocking obstacles until the end of the pass to ensure perfect unit shielding.
+- **Intra-Turn Damage Capping**: Units caught in overlapping blast patterns or multiple cascading explosions lose a flat maximum of exactly 1 HP, matching the low-density 1-HP character pacing rules. Damage calculations utilize a local boolean presence set to record injuries rather than an accumulator, preventing health overflow. All entity modifications, soft wall dissolutions, and tile clear passes execute as a simultaneous batch flush at the very end of the loop.
 
 ## 5. Online Multiplayer Synchronisation & State Machine Loops
 
-- **Turn Secrecy Pattern:** Active turn planning is fully hidden from the opposing player to preserve the Turn Reset capability. Opponents see a passive waiting status during the planning phase.
-- **Unified Event Broadcast:** Upon turn commitment, the backend generates an identical chronological Action Queue array and distributes it to both clients.
-- **Frontend Queue Playback:** Clients process incoming batch payloads using a sequential async loop, ensuring both players watch animations unfold with perfect deterministic lockstep alignment.
-* **Turn Startup Sudden Death Checks**: State machine transition and boundary rules—such as checking if `TrueState.Turn >= Config.MaxTurn`—are evaluated at the very beginning of a new turn (`StartNewTurn()`). This ensures map alterations and automated sudden-death bomb injections are fully populated and rendered before a player can input commands. Setting `MaxTurn = 0` forces instant sudden death on Turn 1.
-* **Decoupled Analytical Queries**: Victory evaluations (`EvaluateVictoryConditions()`) are written as pure, read-only, stateless functions that return data structures without producing side effects. The top-level `ResolveTurn()` orchestrator handles updating properties and injecting the definitive termination token (`MatchEndedEvent`) into the public stream, allowing AI modules to securely query hypothetical sandboxes without corrupting telemetry arrays.
+- **Turn Secrecy Pattern**: Active turn planning is fully hidden from the opposing player to preserve the Turn Reset capability. Opponents see a passive waiting status during the planning phase.
+- **Unified Event Broadcast**: Upon turn commitment, the backend generates an identical chronological Action Queue array and distributes it to both clients.
+- **Frontend Queue Playback**: Clients process incoming batch payloads using a sequential async loop, ensuring both players watch animations unfold with perfect deterministic lockstep alignment.
+- **Turn Startup Sudden Death Checks**: State machine transition and boundary rules—such as checking if `TrueState.Turn >= Config.MaxTurn`—are evaluated at the very beginning of a new turn (`StartNewTurn()`). This ensures map alterations and automated sudden-death bomb injections are fully populated and rendered before a player can input commands. Setting `MaxTurn = 0` forces instant sudden death on Turn 1.
+- **Decoupled Analytical Queries**: Victory evaluations (`EvaluateVictoryConditions()`) are written as pure, read-only, stateless functions that return data structures without producing side effects. The top-level `ResolveTurn()` orchestrator handles updating properties and injecting the definitive termination token (`MatchEndedEvent`) into the public stream, allowing AI modules to securely query hypothetical sandboxes without corrupting telemetry arrays.
+- **Stateless Lounge-to-Game Manager**: Session lifetimes are managed via a `web.ServerStateManager`. The server starts in a "Lounge" state, dynamically allocates a match pointer (`engine.InitGame`) upon user action, and triggers a clean teardown (`ActiveMatch = nil`) upon match completion, returning to the Lounge.
 
 ## 6. Monolithic Architectural Separation & Presentation Boundaries
 
@@ -79,6 +80,7 @@
   - **TerminalView (Phase 1)**: Synchronously maps the 2D grid matrix into single-byte ASCII tokens (`█`, `B`, `U`) for raw terminal streaming.
   - **WebView (Phase 2)**: Directly serializes the active `GameState` struct into flat JSON arrays for HTTP response targets.
 - **Pointer-Driven Memory Persistence (`*engine.Match`)**: Controller pipelines execute actions exclusively via `*engine.Match` references. This guarantees user interactions mutate master allocation frames natively, eliminating the memory duplication overhead of dynamic matrix slices.
+- **Unified Service Entry Gate (`ApplyTurnCommand`)**: The engine exposes a single `ApplyTurnCommand` method. The MatchController (Phase 1) or HTTP handlers (Phase 2) construct concrete `TurnCommand` packets, allowing the engine to function as a stateless, decoupled command processor.
 
 ## 7. Network Sync, Transaction Pipeline & Idempotency Invariants
 
@@ -92,21 +94,64 @@
 ```text
 bomb-srpg
 ├── cmd/
-│   └── cli/                    <-- Phase 1: Interactive Terminal CLI Driver
-│       ├── main.go             <-- Initialises engine and drives the 1-time render
-│       ├── match_controller.go <-- Reads inputs and maps to engine actions
-│       ├── views.go            <-- Defines the read-only MatchView interface
-│       └── terminal_view.go    <-- Implements the ASCII map grid rendering logic
-├── srpg-cli.go                 <-- Phase 1 entry point
-├── srpg-cli.go                 <-- Phase 2 entry point
+│   ├── cli/                    <-- Phase 1: Interactive Terminal CLI Package
+│   │   ├── main.go             <-- Initialises engine and drives the 1-time render
+│   │   ├── match_controller.go <-- Reads inputs and maps to engine actions
+│   │   ├── views.go            <-- Defines the read-only MatchView interface
+│   │   └── terminal_view.go    <-- Implements the ASCII map grid rendering logic
+│   │
+│   └── web/                    <-- Phase 2: HTTP Web Server Package
+│       └── server_state.go     <-- Room Manager
+|
+├── srpg-cli.go                 <-- Phase 1 Terminal entry point (v0.1.0-cli)
+├── srpg-web.go                 <-- Phase 2 HTTP entry point
 ├── docs/                       <-- Design, roadmap and other docs
 ├── engine/                     <-- Pure Core Logic
-│   └── codecs.go               <-- Bitmask encoders, decoders for UnitID and BombID
-│   └── game.go                 <-- Game initializer
-│   └── match.go                <-- Match life cycle transactions
-│   └── models.go               <-- Pure blueprints
-│   └── pathfinding.go          <-- Stage navigation
-│   └── presets.go              <-- Static database
+│   ├── codecs.go               <-- Bitmask encoders, decoders for UnitID and BombID
+│   ├── game.go                 <-- Game initializer
+│   ├── match.go                <-- Match life cycle transactions
+│   ├── models.go               <-- Pure blueprints
+│   ├── pathfinding.go          <-- Stage navigation
+│   ├── presets.go              <-- Static database
 |   └── stage.go                <-- Centralized Stage verification and manipulation (IsInBound, ClearTile, UpdateTileOccupant, etc.)
-└── web/                        <-- Phase 2+: Frontend
+|│
+├── Makefile                    <-- Build/Test Automation
+└── web/public                  <-- Phase 2+: Phaser.js Frontend UI
 ```
+
+# Gameplay
+
+## UX Lifecycle and Screen States
+
+The game flow operates through a decoupled presentation layer managed entirely on the frontend via Phaser.js. The interface transitions through three distinct layout states:
+
+1. **The Title Screen (Front Page)**
+   - Displays game title logo (`Bomb Tactics`) and primary navigation routes.
+   - User choices: `Match Mode` (Local vs. Human), `Online Mode` (Phase 3), `Story Mode` (Future Phase).
+
+2. **The Match Lounge (Setup Screen)**
+   - Triggered by selecting `Match Mode`. 
+   - Provides interface controllers to adjust configuration parameters before a game starts:
+     - Map presets (Stages)
+     - Max Turn limitations
+     - Character Archetype choices for 2 Teams, etc.
+   - Action Button: Clicking `[Start Game]` validates choices, bundles the parameters into a `GameCfg` JSON structure, and sends a `POST /api/match/create` network request to the Go backend room manager.
+
+3. **The Active Gameplay Canvas**
+   - Phaser.js captures the initialized `WorkingState` JSON reply from the server and instantly renders the 2D grid matrix world.
+   - The user conducts their gameplay rounds step-by-step until an engine victory or surrender condition updates `WinnerTeamID != 0`.
+   - Upon match resolution, the UI resets and routes the player cleanly back to the Match Lounge configuration state.
+
+## In-Turn Action Economy Rules
+
+To preserve strategic depth and prevent infinite execution exploits within a single sandbox turn planning cycle, each individual `Unit` is strictly bounded by a rigid action economy:
+
+* **The Rule of 1-Move & 1-Bomb**: Within a single turn loop, an active character unit is permitted to execute a maximum of **one move action** and **one bomb placement action**.
+* **Order Independent**: The execution sequence is completely flexible. A unit may choose to:
+  - Move first, then drop a bomb.
+  - Drop a bomb first, then move away.
+  - Execute *only* a move action or *only* a bomb action.
+  - Do nothing.
+* **Sandbox Verification**: These status restrictions operate entirely within the engine's `WorkingState` scratchpad. 
+  - Executing a `/reset` system command completely restores a unit's action availability flags.
+  - Transitioning via an authoritative `/commit` command completely flushes and refreshes these action limits back to zero inside `StartNewTurn()` for the upcoming round.

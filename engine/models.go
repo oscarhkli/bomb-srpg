@@ -82,6 +82,8 @@ type Unit struct {
 	Team         int // 1 = P1, 2 = P2 / COM
 	HP           int // 1 = alive, 0 = dead, could be extended to more HP in later implementation
 	Skills       map[SkillType]bool
+	HasMoved     bool
+	HasUsedSkill bool // a unit can only place a bomb or use a skill in a turn, but not both
 }
 
 type Bomb struct {

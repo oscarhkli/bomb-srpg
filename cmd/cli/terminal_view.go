@@ -41,7 +41,7 @@ func (v *TerminalView) RenderBoard(gs *engine.GameState) error {
 	fmt.Fprintln(v.output, "          ------- How to move -------")
 	fmt.Fprintf(v.output, "Move      : %smove <unit-ID> <target-X> <target-Y>%s\n", Yellow, Reset)
 	fmt.Fprintf(v.output, "Place Bomb: %sbomb <unit-ID> <target-X> <target-Y>%s\n", Yellow, Reset)
-	fmt.Fprintf(v.output, "Example   : %smove 16 4 7%s", Yellow, Reset)
+	fmt.Fprintf(v.output, "Example   : %smove 16 4 7%s\n", Yellow, Reset)
 	fmt.Fprintln(v.output, "=================================================")
 
 	if err := v.RenderTurnHeader(gs.Turn, gs.ActiveTeam); err != nil {
