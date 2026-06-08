@@ -16,6 +16,11 @@ coverage: test
 build: vet
 	go build -o bin/srpg-cli ./cmd/srpg-cli
 
+build-server: vet
+	go build -o bin/srpg-web ./cmd/srpg-web
+
 run: build
 	./bin/srpg-cli
-	
+
+run-server: build-server
+	./bin/srpg-web

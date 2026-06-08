@@ -30,7 +30,7 @@
   - [x] Surrender
   - [x] TurnCommand
 - [x] Victory Condition
-- [ ] In-turn movement restriction
+- [x] In-turn movement restriction
 
 ## Phase 2: Web Server & Transition from Terminal Driver
 - **Goal:** Drop the console interface and build a graphical browser client.
@@ -38,9 +38,9 @@
 - **DoD:** Two local human players can play a full pass-and-play match on a single browser window using standard HTTP requests. Terminal runner is deprecated or isolated.
 
 ### TODO
-- [ ] JSON structure
-_ [ ] Lounge
 - [ ] Web Server & HTTP request migration
+- [ ] JSON structure
+_ [ ] Lounge/Room
 - [ ] Frontend display
 - [ ] Frontend navigation
 - [ ] Deployment
