@@ -67,6 +67,10 @@ func (m *Match) CommandMoveUnit(unitID UnitID, target Coordinate) error {
 		return err
 	}
 
+	if unit.HasMoved {
+		return fmt.Errorf("single move restriction: unit has moved in this turn")
+	}
+
 	tiles := m.WorkingState.FindReachableTiles(unit.Position, unit.NewMovementRule())
 
 	if _, ok := tiles[target]; !ok {
@@ -82,6 +86,7 @@ func (m *Match) CommandMoveUnit(unitID UnitID, target Coordinate) error {
 	m.WorkingState.ClearStageTile(oldPos)
 	m.WorkingState.UpdateStageOccupant(target, OccupantUnit, int64(unitID))
 	unit.Position = target
+	unit.HasMoved = true
 
 	m.SubmitAction(UnitMovedEvent{
 		UnitID: unitID,
@@ -132,6 +137,10 @@ func (m *Match) CommandPlaceBomb(unitID UnitID, target Coordinate) error {
 		return err
 	}
 
+	if unit.HasUsedSkill {
+		return fmt.Errorf("single move restriction: unit %d has placed bombs / used skill in this turn", unitID)
+	}
+
 	if unit.BombUsed >= unit.MaxBombCount {
 		return fmt.Errorf("unit restriction: unit %d has used up all his bombs", unitID)
 	}
@@ -147,6 +156,7 @@ func (m *Match) CommandPlaceBomb(unitID UnitID, target Coordinate) error {
 	}
 
 	m.placeBomb(unitID, target, unit.BombPower)
+	unit.HasUsedSkill = true
 
 	return nil
 }
@@ -236,7 +246,8 @@ func (m *Match) injectSuddenDeathHazards() error {
 // 3. Calculate Occupant Destruction (Units, SoftBlocks, Items)
 // 4. Victory audit guard: Check who has living units left on the board
 // 5. Advance Turn Counter (Turn++)
-// 6. Overwrite TrueState with clean DeepCopy
+// 6. Reset move & skills limits
+// 7. Overwrite TrueState with clean DeepCopy
 func (m *Match) ResolveTurn() []GameEvent {
 	m.resolveBombExplosionAndDamage()
 
@@ -255,6 +266,10 @@ func (m *Match) ResolveTurn() []GameEvent {
 		case MatchInProgress:
 			m.WorkingState.Turn++
 			m.WorkingState.ActiveTeam = ((m.WorkingState.Turn - 1) & 1) + 1
+			for _, unit := range m.WorkingState.Units {
+				unit.HasMoved = false
+				unit.HasUsedSkill = false
+			}
 		}
 	}
 
