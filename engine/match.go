@@ -77,7 +77,7 @@ func (m *Match) CommandMoveUnit(unitID UnitID, target Coordinate) error {
 		return fmt.Errorf("movement restriction: target coordinate is out of moving range")
 	}
 
-	// err will always be nil at the moment, not testable until the Skills implementation in Phase 3
+	// err will always be nil at the moment, not testable until the Skills implementation in Phase 4 
 	if err = m.WorkingState.IsLandingLegal(target, OccupantUnit); err != nil {
 		return fmt.Errorf("movement rejected: %w", err)
 	}

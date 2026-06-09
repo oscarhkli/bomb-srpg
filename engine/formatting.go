@@ -37,7 +37,7 @@ func (o OccupantType) String() string {
 }
 
 // String converts an SkillType integer value into a human-readable text string.
-// It's a placeholder for Phase 3+, may be changed into other from.
+// It's a placeholder for Phase 4+, may be changed into other from.
 func (s SkillType) String() string {
 	switch s {
 	case SkillCanFly:

@@ -66,7 +66,7 @@
 
           |
           +-----------------------+-----------------------+
-          | (Phase 1)             | (Phase 2)             | (Phase 3 Future)
+          | (Phase 1)             | (Phase 2)             | (Phase 4 Future)
           v                       v                       v
 +-------------------+   +-------------------+   +-------------------+
 
@@ -109,7 +109,7 @@ bomb-srpg
 ├── server/                     <-- Phase 2: HTTP Web server package
 │   ├── http_handlers.go        <-- REST HTTP interface boundary
 │   ├── server_manager.go       <-- Web server memory manager, state locks & housekeeper
-│   └── ws_hub.go               <-- Phase 3+ Future: WebSocket connection event pump
+│   └── ws_hub.go               <-- Phase 4: WebSocket connection event pump
 │
 ├── docs/                       <-- Design, roadmap and other docs
 ├── engine/                     <-- Pure core logic
@@ -122,7 +122,7 @@ bomb-srpg
 │   └── stage.go                <-- Centralized Stage verification and manipulation (IsInBound, ClearTile, UpdateTileOccupant, etc.)
 │
 ├── Makefile                    <-- Build/Test Automation
-└── web/public                  <-- Phase 2+: Phaser.js Frontend UI
+└── web/public                  <-- Phase 3: Phaser.js Frontend UI
 ```
 
 # Gameplay
@@ -133,7 +133,7 @@ The game flow operates through a decoupled presentation layer managed entirely o
 
 1. **The Title Screen (Front Page)**
    - Displays game title logo (`Bomb Tactics`) and primary navigation routes.
-   - User choices: `Match Mode` (Local vs. Human), `Online Mode` (Phase 3), `Story Mode` (Future Phase).
+   - User choices: `Match Mode` (Local vs. Human), `Online Mode` (Phase 4), `Story Mode` (Future Phase).
 
 2. **The Match Lounge (Setup Screen)**
    - Triggered by selecting `Match Mode`. 
