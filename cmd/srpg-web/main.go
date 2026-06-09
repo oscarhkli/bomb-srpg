@@ -28,6 +28,6 @@ func main() {
 	log.Println("Open http://localhost:8080 in your browser to view the Title Screen!")
 
 	if err := s.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		log.Fatalf("🚨 Server crashed: %v", err)
+		log.Fatalf("Server crashed: %v", err)
 	}
 }
