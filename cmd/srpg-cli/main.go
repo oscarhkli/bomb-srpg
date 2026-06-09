@@ -1,7 +1,7 @@
 package main
 
 import (
-	"bomb-srpg/cmd/cli"
+	"bomb-srpg/cli"
 	"bomb-srpg/engine"
 	"log"
 	"os"

@@ -30,22 +30,45 @@
   - [x] Surrender
   - [x] TurnCommand
 - [x] Victory Condition
-- [ ] In-turn movement restriction
+- [x] In-turn movement restriction
 
-## Phase 2: Web Server & Transition from Terminal Driver
+## Phase 2: Web Server & Headless API Implementation
+- **Goal:** Setup web server embedding the game engine so a match can be played from start to finish purely via HTTP requests.
+- **Scope:** Core engine is wrapped in a Go `net/http` server reading JSON payloads.
+- **DoD:** Two local human players can play a full pass-and-play match using standard HTTP requests.
+
+### TODO
+- [x] Init router Setup 
+- [ ] HTTP Handlers for Game Setup
+  - [x] List Archetypes
+  - [ ] New Match with user-defined Game Config
+- [ ] HTTP Handlers for Turn resolution and Match lifecycle
+  - [ ] Reset
+  - [ ] Commit
+  - [ ] Surrender
+- [ ] HTTP Handlers for TurnCommands
+  - [ ] Move
+  - [ ] PlaceBomb
+- [ ] Match Room
+ - [ ] Creation & Housekeep
+ - [ ] Navigation with Match
+- [ ] Deployment
+
+## Phase 3: Graphical Browser Client & UI Integration
 - **Goal:** Drop the console interface and build a graphical browser client.
-- **Scope:** Core engine is wrapped in a Go `net/http` server reading JSON payloads. The frontend renders the grid using zero-dependency Vanilla JavaScript and an HTML5 Canvas layer. Includes Optimistic UI client rendering.
+- **Scope:** The frontend renders the grid using Phaser.js and an HTML5 Canvas layer. Includes Optimistic UI client rendering.
 - **DoD:** Two local human players can play a full pass-and-play match on a single browser window using standard HTTP requests. Terminal runner is deprecated or isolated.
 
 ### TODO
-- [ ] JSON structure
-_ [ ] Lounge
-- [ ] Web Server & HTTP request migration
-- [ ] Frontend display
-- [ ] Frontend navigation
+- [ ] Phaser.js Engine & Asset Loading Boilerplate
+- [ ] Match Lounge
+- [ ] Board & Sprite Rendering from JSON State
+- [ ] Input Mapping (Converting Clicks to HTTP Commands)
+- [ ] Action Log Animation Playback
+- [ ] Local Terminal Code Deprecation/Isolation
 - [ ] Deployment
 
-## Phase 3a: Add WebSockets (Optional Branch A)
+## Phase 4a: Add WebSockets
 - **Goal:** Upgrade the networking layer to support live, real-time online multiplayer between separate machines.
 - **Scope:** Connection pool management in Go, game room/lobby routers, and client disconnect handling.
 - **DoD:** Two players on completely separate computers/browsers can join a unique game room via a URL and play a full match with real-time UI synchronization without manual page refreshes.
@@ -58,7 +81,7 @@ _ [ ] Lounge
   - [ ] Room admin
   - [ ] Interruption handling
 
-## Phase 3b: More Character Classes & Skills (Optional Branch B)
+## Phase 4b: More Character Classes & Skills
 - **Goal:** Expand game depth by transitioning from basic stats to a flexible, component-based unit and ability engine.
 - **Scope:** Implement advanced unit types (Archers with min/max range limits, Mages utilizing Area-of-Effect parameters, Flying units overriding structural obstructions).
 - **DoD:** New characters can be selected and use their unique skills inside the game, with both the web frontend rendering the visuals and the Go backend fully validating the custom actions.
@@ -67,7 +90,7 @@ _ [ ] Lounge
 - [ ] Skill, e.g., prolonging the count down
 - [ ] Advance path finding algorithm (e.g., float, jump, etc.)
 
-## Phase 3c: Terrain & Power-Up Items (Optional Branch C)
+## Phase 4c: Terrain & Power-Up Items
 - **Goal:** Expand game depth by adding reactive terrain effects and power-up items. The latter will dynamically alter the character's stats during turn validation.
 - **Scope:** Power-up spawn math, movement resolution interceptors, and dynamic terrain modifiers (mud slowing navigation, lava shortern bomb countdown, water extinguishing explosives).
 - **DoD:** A character can move across varied terrain with accurate movement point deductions, roll back gathered power-ups correctly on turn reset, and permanently collect buffs that modify backend stats upon commitment.
@@ -76,7 +99,7 @@ _ [ ] Lounge
 - [ ] Terrains: Lava, Water
 - [ ] Softblock with / without items
 
-## Phase 4: Add Computer Player with AI
+## Phase 5: Add Computer Player with AI
 - **Goal:** Introduce a single-player mode against an automated opponent.
 - **Scope:** Heuristic-based enemy unit logic running inside an asynchronous backend goroutine worker.
 - **DoD:** A player can play a match against a local AI opponent that automatically calculates and executes its movements when its turn segment activates.

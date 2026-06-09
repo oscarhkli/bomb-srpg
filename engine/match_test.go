@@ -201,7 +201,7 @@ func TestMatch_CommandMoveUnit(t *testing.T) {
 			wantErr:     true,
 			errContains: "turn restriction: unit 16 belongs to Team 2 but it's currently Team 1's turn",
 		},
-		// { This test is not available at the moment - not until the Skills implementation in Phase 3
+		// { This test is not available at the moment - not until the Skills implementation in Phase 4
 		// 	name:   "Failure: Unit passes through but cannot land on HardRock",
 		// },
 		{

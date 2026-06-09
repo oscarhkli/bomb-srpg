@@ -66,7 +66,7 @@
 
           |
           +-----------------------+-----------------------+
-          | (Phase 1)             | (Phase 2)             | (Phase 3 Future)
+          | (Phase 1)             | (Phase 2)             | (Phase 4 Future)
           v                       v                       v
 +-------------------+   +-------------------+   +-------------------+
 
@@ -79,6 +79,7 @@
 - **Abstract Rendering Contract (`MatchView`)**: Insulates input mechanics from layout layers via a stateless interface contract. Implementations satisfy compliance implicitly:
   - **TerminalView (Phase 1)**: Synchronously maps the 2D grid matrix into single-byte ASCII tokens (`█`, `B`, `U`) for raw terminal streaming.
   - **WebView (Phase 2)**: Directly serializes the active `GameState` struct into flat JSON arrays for HTTP response targets.
+- **Flat Package Web Architecture**: Unlike the highly segregated `/engine` domain package, the `/server` package utilizes a cohesive flat file structure. This structure prevents circular dependencies during protocol handling and organizes network translation files by their specific communication protocol layer.
 - **Pointer-Driven Memory Persistence (`*engine.Match`)**: Controller pipelines execute actions exclusively via `*engine.Match` references. This guarantees user interactions mutate master allocation frames natively, eliminating the memory duplication overhead of dynamic matrix slices.
 - **Unified Service Entry Gate (`ApplyTurnCommand`)**: The engine exposes a single `ApplyTurnCommand` method. The MatchController (Phase 1) or HTTP handlers (Phase 2) construct concrete `TurnCommand` packets, allowing the engine to function as a stateless, decoupled command processor.
 
@@ -93,30 +94,35 @@
 
 ```text
 bomb-srpg
+├── cli/                        <-- Phase 1: Interactive terminal CLI package
+│   ├── match_controller.go     <-- Reads inputs and maps to engine actions
+│   ├── views.go                <-- Defines the read-only MatchView interface
+│   └── terminal_view.go        <-- Implements the ASCII map grid rendering logic
+│
 ├── cmd/
-│   ├── cli/                    <-- Phase 1: Interactive Terminal CLI Package
-│   │   ├── main.go             <-- Initialises engine and drives the 1-time render
-│   │   ├── match_controller.go <-- Reads inputs and maps to engine actions
-│   │   ├── views.go            <-- Defines the read-only MatchView interface
-│   │   └── terminal_view.go    <-- Implements the ASCII map grid rendering logic
+│   ├── srpg-cli/               <-- Phase 1 Terminal entry point (v0.1.0-cli)
+│   │   └── main.go
 │   │
-│   └── web/                    <-- Phase 2: HTTP Web Server Package
-│       └── server_state.go     <-- Room Manager
-|
-├── srpg-cli.go                 <-- Phase 1 Terminal entry point (v0.1.0-cli)
-├── srpg-web.go                 <-- Phase 2 HTTP entry point
+│   └── srpg-web/               <-- Phase 2+ HTTP entry point
+│       └── main.go 
+│
+├── server/                     <-- Phase 2: HTTP Web server package
+│   ├── http_handlers.go        <-- REST HTTP interface boundary
+│   ├── server_manager.go       <-- Web server memory manager, state locks & housekeeper
+│   └── ws_hub.go               <-- Phase 4: WebSocket connection event pump
+│
 ├── docs/                       <-- Design, roadmap and other docs
-├── engine/                     <-- Pure Core Logic
+├── engine/                     <-- Pure core logic
 │   ├── codecs.go               <-- Bitmask encoders, decoders for UnitID and BombID
 │   ├── game.go                 <-- Game initializer
 │   ├── match.go                <-- Match life cycle transactions
 │   ├── models.go               <-- Pure blueprints
 │   ├── pathfinding.go          <-- Stage navigation
 │   ├── presets.go              <-- Static database
-|   └── stage.go                <-- Centralized Stage verification and manipulation (IsInBound, ClearTile, UpdateTileOccupant, etc.)
-|│
+│   └── stage.go                <-- Centralized Stage verification and manipulation (IsInBound, ClearTile, UpdateTileOccupant, etc.)
+│
 ├── Makefile                    <-- Build/Test Automation
-└── web/public                  <-- Phase 2+: Phaser.js Frontend UI
+└── web/public                  <-- Phase 3: Phaser.js Frontend UI
 ```
 
 # Gameplay
@@ -127,7 +133,7 @@ The game flow operates through a decoupled presentation layer managed entirely o
 
 1. **The Title Screen (Front Page)**
    - Displays game title logo (`Bomb Tactics`) and primary navigation routes.
-   - User choices: `Match Mode` (Local vs. Human), `Online Mode` (Phase 3), `Story Mode` (Future Phase).
+   - User choices: `Match Mode` (Local vs. Human), `Online Mode` (Phase 4), `Story Mode` (Future Phase).
 
 2. **The Match Lounge (Setup Screen)**
    - Triggered by selecting `Match Mode`. 
