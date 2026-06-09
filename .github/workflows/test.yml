@@ -24,7 +24,7 @@ jobs:
           go-version: "^1.26.3"
 
       - name: Run Tests with Coverage
-        run: go test -cover -coverprofile=coverage.txt ./engine/... ./cmd/cli/...
+        run: go test -cover -coverprofile=coverage.txt ./cli/... ./engine/... ./server/...
 
       - name: Archive code coverage results
         uses: actions/upload-artifact@v4
