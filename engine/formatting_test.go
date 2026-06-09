@@ -47,3 +47,23 @@ func TestOccupantTypeString(t *testing.T) {
 		})
 	}
 }
+
+func TestSkillTypeString(t *testing.T) {
+	tests := []struct {
+		name  string
+		skill SkillType
+		want  string
+	}{
+		{"Skill Fly", SkillCanFly, "Fly"},
+		{"Skill Jump", SkillCanJump, "Jump"},
+		{"Invalid Value", SkillType(0), "Unknown"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.skill.String(); got != tt.want {
+				t.Errorf("SkillType.String() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}

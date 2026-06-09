@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bomb-srpg/server"
 	"log"
 	"net/http"
 	"time"
@@ -8,11 +9,13 @@ import (
 
 func main() {
 	r := http.NewServeMux()
+	serverState := server.NewServerStateManager()
 
 	fs := http.FileServer(http.Dir("./web/public"))
 	r.Handle("GET /", fs)
 
 	// all other HTTP endpoints
+	r.HandleFunc("GET /api/archetypes", serverState.HandleGetAllArchetypes)
 
 	s := &http.Server{
 		Addr:         ":8080",

@@ -16,6 +16,7 @@ var archetypesRegistry = map[string]Archetype{
 		MaxBombCount: 2,
 		BaseHP:       1,
 		PresetSkills: map[SkillType]bool{},
+		IsSelectable: false,
 	},
 	"Fighter": {
 		Name:         "Fighter",
@@ -26,6 +27,7 @@ var archetypesRegistry = map[string]Archetype{
 		MaxBombCount: 3,
 		BaseHP:       1,
 		PresetSkills: map[SkillType]bool{},
+		IsSelectable: true,
 	},
 	"Witch": {
 		Name:         "Witch",
@@ -36,6 +38,7 @@ var archetypesRegistry = map[string]Archetype{
 		MaxBombCount: 2,
 		BaseHP:       1,
 		PresetSkills: map[SkillType]bool{},
+		IsSelectable: true,
 	},
 	"Thief": {
 		Name:         "Thief",
@@ -46,6 +49,7 @@ var archetypesRegistry = map[string]Archetype{
 		MaxBombCount: 2,
 		BaseHP:       1,
 		PresetSkills: map[SkillType]bool{},
+		IsSelectable: true,
 	},
 }
 
@@ -117,6 +121,17 @@ var stagePresetsRegistry = map[string]StagePreset{
 		P1StartingPositions: [5]Coordinate{{4, 8}, {3, 8}, {5, 8}, {2, 8}, {6, 8}},
 		P2StartingPositions: [5]Coordinate{{4, 0}, {5, 0}, {3, 0}, {6, 0}, {2, 0}},
 	},
+}
+
+// GetAllArchetypes gets all archestypes for game setup.
+func GetAllArchetypes() []Archetype {
+	results := []Archetype{}
+	for _, arch := range archetypesRegistry {
+		if arch.IsSelectable {
+			results = append(results, arch)
+		}
+	}
+	return results
 }
 
 // GetStagePreset mimics a read-only database query.

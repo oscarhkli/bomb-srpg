@@ -64,6 +64,7 @@ type Archetype struct {
 	MaxBombCount int
 	BaseHP       int
 	PresetSkills map[SkillType]bool
+	IsSelectable bool // Not every archetype is selected in game setup, e.g., boss, 1 team only has 1 king
 }
 
 type UnitID uint8 // will be used later on

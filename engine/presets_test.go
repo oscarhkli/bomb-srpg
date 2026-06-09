@@ -1,6 +1,8 @@
 package engine
 
 import (
+	"maps"
+	"slices"
 	"testing"
 )
 
@@ -86,6 +88,26 @@ func TestStatBoundaries(t *testing.T) {
 				t.Errorf("BaseHP for %s should be non-negative, got %d", name, archetype.BaseHP)
 			}
 		})
+	}
+}
+
+func TestGetAllArchetypes(t *testing.T) {
+	archeTypes := GetAllArchetypes()
+
+	missing := map[string]bool{
+		"Fighter": true,
+		"Witch":   true,
+		"Thief":   true,
+	}
+
+	for _, archeTypes := range archeTypes {
+		if missing[archeTypes.Name] {
+			delete(missing, archeTypes.Name)
+		}
+	}
+
+	if len(missing) > 0 {
+		t.Errorf("GetAllArchetypes misses Archetype %v", slices.Collect(maps.Keys(missing)))
 	}
 }
 
