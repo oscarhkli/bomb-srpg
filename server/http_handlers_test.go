@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"bomb-srpg/engine"
@@ -63,33 +64,30 @@ func TestHandleGetAllArchetypes(t *testing.T) {
 
 		http.HandlerFunc(s.HandleGetAllArchetypes).ServeHTTP(rr, req)
 
-		var rawPayload []map[string]any
-		if err := json.Unmarshal(rr.Body.Bytes(), &rawPayload); err != nil {
-			t.Fatalf("Failed to parse raw JSON body: %v", err)
-		}
-
-		if len(rawPayload) == 0 {
-			t.Skip("No archetypes found to validate")
-		}
-
-		targetObj := rawPayload[0]
-		expectedFields := []string{
-			"name",
-			"speed",
-			"bombMaxRange",
-			"skills",
-		}
-
-		if len(targetObj) != len(expectedFields) {
-			t.Errorf("Total number of fields exceeded, want %d, got %d", len(expectedFields), len(targetObj))
-		}
-
-		for _, field := range expectedFields {
-			if _, exists := targetObj[field]; !exists {
-				t.Errorf("Phaser Contract Broken: JavaScript code expects key '%s', but it was missing in the HTTP response payload.", field)
-			}
-		}
+		assertArchetypeContract(t, rr.Body.Bytes())
 	})
+}
+
+func assertArchetypeContract(t *testing.T, body []byte) {
+	var raw []map[string]any
+	if err := json.Unmarshal(body, &raw); err != nil {
+		t.Fatalf("Failed to parse JSON: %v", err)
+	}
+	if len(raw) == 0 {
+		t.Skip("No archetypes found to validate")
+	}
+	expectedFields := []string{"name", "speed", "bombMaxRange", "skills"}
+	targetObj := raw[0]
+
+	if len(targetObj) != len(expectedFields) {
+		t.Errorf("Total number of fields exceeded, want %d, got %d", len(expectedFields), len(targetObj))
+	}
+
+	for _, field := range expectedFields {
+		if _, exists := targetObj[field]; !exists {
+			t.Errorf("Phaser Contract Broken: JavaScript code expects key '%s', but it was missing in the HTTP response payload.", field)
+		}
+	}
 }
 
 func TestHandleCreateServerRoom(t *testing.T) {
@@ -105,8 +103,8 @@ func TestHandleCreateServerRoom(t *testing.T) {
 
 		http.HandlerFunc(s.HandleCreateNewMatchRoom).ServeHTTP(rr, req)
 
-		if status := rr.Code; status != http.StatusOK {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusOK)
+		if status := rr.Code; status != http.StatusCreated {
+			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusCreated)
 		}
 
 		expectedHeader := "application/json"
@@ -132,10 +130,10 @@ func TestHandleCreateServerRoom(t *testing.T) {
 
 		brokenWriter := &BrokenResponseWriter{}
 
-		http.HandlerFunc(s.HandleGetAllArchetypes).ServeHTTP(brokenWriter, req)
+		http.HandlerFunc(s.HandleCreateNewMatchRoom).ServeHTTP(brokenWriter, req)
 
-		if brokenWriter.Code != http.StatusOK {
-			t.Errorf("Expected initial header setup to attempt status 200, got %d", brokenWriter.Code)
+		if brokenWriter.Code != http.StatusCreated {
+			t.Errorf("Expected initial header setup to attempt status 201, got %d", brokenWriter.Code)
 		}
 	})
 
@@ -145,28 +143,57 @@ func TestHandleCreateServerRoom(t *testing.T) {
 
 		http.HandlerFunc(s.HandleCreateNewMatchRoom).ServeHTTP(rr, req)
 
-		var rawPayload map[string]any
-		if err := json.Unmarshal(rr.Body.Bytes(), &rawPayload); err != nil {
-			t.Fatalf("Failed to parse raw JSON body: %v", err)
-		}
+		assertMatchRoomContract(t, rr.Body.Bytes())
+	})
 
-		if len(rawPayload) == 0 {
-			t.Skip("No archetypes found to validate")
-		}
+	t.Run("Failure: CreateMatchRoom exhausted retries", func(t *testing.T) {
+		s := NewServerStateManager()
 
-		targetObj := rawPayload
-		expectedFields := []string{
-			"id",
+		roomIDs := []string{"ID001", "ID002", "ID003", "ID004", "ID005"}
+		for _, id := range roomIDs {
+			s.Rooms[id] = &MatchRoom{ID: id}
 		}
-
-		if len(targetObj) != len(expectedFields) {
-			t.Errorf("Total number of fields exceeded, want %d, got %d", len(expectedFields), len(targetObj))
-		}
-
-		for _, field := range expectedFields {
-			if _, exists := targetObj[field]; !exists {
-				t.Errorf("Phaser Contract Broken: JavaScript code expects key '%s', but it was missing in the HTTP response payload.", field)
+		callCount := 0
+		s.generateRoomID = func(int) string {
+			if callCount < len(roomIDs) {
+				id := roomIDs[callCount]
+				callCount++
+				return id
 			}
+			return "SHOULD_NOT_REACH"
+		}
+
+		req, _ := http.NewRequest("POST", "/api/match-rooms", nil)
+		rr := httptest.NewRecorder()
+
+		http.HandlerFunc(s.HandleCreateNewMatchRoom).ServeHTTP(rr, req)
+
+		if status := rr.Code; status != http.StatusInternalServerError {
+			t.Errorf("Expected 500, got %d", status)
+		}
+
+		body := rr.Body.String()
+		if !strings.Contains(body, "Failed to create new MatchRoom") {
+			t.Errorf("Expected error message in body, got: %s", body)
 		}
 	})
+}
+
+func assertMatchRoomContract(t *testing.T, body []byte) {
+	var raw map[string]any
+	if err := json.Unmarshal(body, &raw); err != nil {
+		t.Fatalf("Failed to parse JSON: %v", err)
+	}
+	expectedFields := []string{"id"}
+	targetObj := raw
+
+	if len(targetObj) != len(expectedFields) {
+		t.Errorf("Total number of fields exceeded, want %d, got %d", len(expectedFields), len(targetObj))
+	}
+
+	for _, field := range expectedFields {
+		if _, exists := targetObj[field]; !exists {
+			t.Errorf("Phaser Contract Broken: JavaScript code expects key '%s', but it was missing in the HTTP response payload.", field)
+		}
+	}
 }

@@ -26,6 +26,8 @@ type ServerStateManager struct {
 	generateRoomID func(int) string
 }
 
+// NewServerStateManager constructs a new ServerStateManager with an empty room map.
+// It uses the Crockford32 alphabet to generate collision-resistant room IDs.
 func NewServerStateManager() *ServerStateManager {
 	manager := &ServerStateManager{
 		Rooms:          make(map[string]*MatchRoom),
@@ -35,6 +37,8 @@ func NewServerStateManager() *ServerStateManager {
 	return manager
 }
 
+// CreateMatchRoom generates a unique room ID and registers an empty MatchRoom.
+// It retries up to 5 times on ID collision. Returns the room ID or an error if exhausted.
 func (s *ServerStateManager) CreateMatchRoom() (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
