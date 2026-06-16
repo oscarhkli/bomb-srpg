@@ -26,3 +26,7 @@ func MapToArchetypeResponse(a engine.Archetype) ArchetypeResponse {
 		PresetSkills: skills,
 	}
 }
+
+type CreateMatchRoomResponse struct {
+	ID string `json:"id"`
+}
