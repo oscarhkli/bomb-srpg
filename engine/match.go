@@ -54,7 +54,7 @@ func (m *Match) ApplyTurnCommand(cmd TurnCommand) error {
 		return m.CommandPlaceBomb(c.UnitID, c.Target)
 
 	default:
-		return fmt.Errorf("unsupported command variant type passed to engine")
+		return fmt.Errorf("unsupported command type %T", cmd)
 	}
 }
 
@@ -68,13 +68,13 @@ func (m *Match) CommandMoveUnit(unitID UnitID, target Coordinate) error {
 	}
 
 	if unit.HasMoved {
-		return fmt.Errorf("single move restriction: unit has moved in this turn")
+		return fmt.Errorf("unit %#x already moved this turn", unitID)
 	}
 
 	tiles := m.WorkingState.FindReachableTiles(unit.Position, unit.NewMovementRule())
 
 	if _, ok := tiles[target]; !ok {
-		return fmt.Errorf("movement restriction: target coordinate is out of moving range")
+		return fmt.Errorf("target out of move range")
 	}
 
 	// err will always be nil at the moment, not testable until the Skills implementation in Phase 4
@@ -97,33 +97,24 @@ func (m *Match) CommandMoveUnit(unitID UnitID, target Coordinate) error {
 	return nil
 }
 
-// validateActiveUnit performs systemic and structural sanity checks on a requested unit.
-// It sequentially validates presence, vitality, phase ownership, bounds, and grid desync.
-// Returns a pointer to the verified Unit, or a detailed error blocking action execution.
 func (m *Match) validateActiveUnit(unitID UnitID) (*Unit, error) {
 	unit, ok := m.WorkingState.Units[unitID]
 	if !ok {
-		return nil, fmt.Errorf("security violation: unit ID %d does not exist in active sandbox context", unitID)
+		return nil, fmt.Errorf("unit %#x does not exist", unitID)
 	}
-
 	if unit.HP <= 0 {
-		return nil, fmt.Errorf("tactical restriction: unit %d is dead and cannot declare actions", unitID)
+		return nil, fmt.Errorf("unit %#x is dead", unitID)
 	}
-
 	if unit.Team != m.WorkingState.ActiveTeam {
-		return nil, fmt.Errorf("turn restriction: unit %d belongs to Team %d but it's currently Team %d's turn", unitID, unit.Team, m.WorkingState.ActiveTeam)
+		return nil, fmt.Errorf("unit %#x not active team", unitID)
 	}
-
 	if !m.WorkingState.IsWithinBounds(unit.Position) {
-		return nil, fmt.Errorf("data corruption: unit %d current position %v is out of stage bounds", unitID, unit.Position)
+		return nil, fmt.Errorf("unit %#x out of bounds", unitID)
 	}
-
 	cell := m.WorkingState.Grid[unit.Position.Y][unit.Position.X]
 	if cell.OccupantType != OccupantUnit || cell.OccupantID != int64(unitID) {
-		return nil, fmt.Errorf("data desync: grid matrix at %v does not acknowledge unit %d as its occupant (found type: %v, id: %d)",
-			unit.Position, unitID, cell.OccupantType, cell.OccupantID)
+		return nil, fmt.Errorf("unit %#x desynced at %v", unitID, unit.Position)
 	}
-
 	return unit, nil
 }
 
@@ -138,17 +129,17 @@ func (m *Match) CommandPlaceBomb(unitID UnitID, target Coordinate) error {
 	}
 
 	if unit.HasUsedSkill {
-		return fmt.Errorf("single move restriction: unit %d has placed bombs / used skill in this turn", unitID)
+		return fmt.Errorf("unit %#x already used skill this turn", unitID)
 	}
 
 	if unit.BombUsed >= unit.MaxBombCount {
-		return fmt.Errorf("unit restriction: unit %d has used up all his bombs", unitID)
+		return fmt.Errorf("unit %#x out of bombs", unitID)
 	}
 
 	tiles := m.WorkingState.FindReachableTiles(unit.Position, unit.NewBombPlacementRule())
 
 	if _, ok := tiles[target]; !ok {
-		return fmt.Errorf("bomb placement restriction: target coordinate is out of placement range")
+		return fmt.Errorf("target out of bomb range")
 	}
 
 	if err = m.WorkingState.IsLandingLegal(target, OccupantBomb); err != nil {
@@ -186,19 +177,19 @@ func (m *Match) placeBomb(unitID UnitID, target Coordinate, bombPower int) {
 // In Phase 1 it's used by placing Bomb only, but in future it will be used for skills like jump.
 func (gs GameState) IsLandingLegal(target Coordinate, occupantType OccupantType) error {
 	if !gs.IsWithinBounds(target) {
-		return fmt.Errorf("boundary restriction: coordinate %v is out of stage dimensions", target)
+		return fmt.Errorf("coordinate %v out of bounds", target)
 	}
 
 	tile := gs.Grid[target.Y][target.X]
 
 	// Phase 1 only on TerrainPlain. In futur phase it should support TerrainLava as well
 	if tile.Type != TerrainPlain {
-		return fmt.Errorf("terrain restriction: can only land on plain tile but target is %v", tile.Type)
+		return fmt.Errorf("can only place on plain terrain, got %v", tile.Type)
 	}
 
 	// Cell Occupant Collisions
 	if tile.OccupantType != OccupantNone {
-		return fmt.Errorf("occupant restriction: target cell already contains entity type %v", tile.OccupantType)
+		return fmt.Errorf("cell occupied by %v", tile.OccupantType)
 	}
 
 	return nil

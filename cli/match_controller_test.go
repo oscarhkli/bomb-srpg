@@ -270,8 +270,8 @@ func TestMatchController_GameplayActions(t *testing.T) {
 				if view.FeedbackSuccess {
 					t.Error("Expected illegal bomb coordinates to return a failure status, but reported success")
 				}
-				if !strings.Contains(view.FeedbackMessage, "Invalid bomb placement: unit restriction") {
-					t.Errorf("Expected feedback warning parameters to mention 'Invalid bomb placement: unit restriction', got: %q", view.FeedbackMessage)
+				if !strings.Contains(view.FeedbackMessage, "unit 0x10 out of bombs") {
+					t.Errorf("Expected feedback warning parameters to mention 'unit 0x10 out of bombs', got: %q", view.FeedbackMessage)
 				}
 			},
 		},

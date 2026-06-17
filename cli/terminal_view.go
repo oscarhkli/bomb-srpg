@@ -79,7 +79,7 @@ func (v *TerminalView) RenderBoard(gs *engine.GameState) error {
 				case engine.OccupantBomb:
 					bomb, ok := gs.Bombs[engine.BombID(tile.OccupantID)]
 					if !ok {
-						return fmt.Errorf("cannot render board due to data corruption: Bomb %#X not found", tile.OccupantID)
+						return fmt.Errorf("bomb %#x not found", tile.OccupantID)
 					}
 					cellStr = fmt.Sprintf("B-%d", bomb.Countdown)
 				case engine.OccupantSoftBlock:

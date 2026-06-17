@@ -168,7 +168,7 @@ func TestMatch_CommandMoveUnit(t *testing.T) {
 				return newTestMatch(2, 2) // Empty map, no units
 			},
 			wantErr:     true,
-			errContains: "security violation: unit ID 51 does not exist",
+			errContains: "unit 0x33 does not exist",
 		},
 		{
 			name:   "Failure: Unit is dead",
@@ -180,7 +180,7 @@ func TestMatch_CommandMoveUnit(t *testing.T) {
 				return m
 			},
 			wantErr:     true,
-			errContains: "tactical restriction: unit 18 is dead",
+			errContains: "unit 0x12 is dead",
 		},
 		{
 			name:   "Failure: Wrong team turn",
@@ -199,7 +199,7 @@ func TestMatch_CommandMoveUnit(t *testing.T) {
 				return m
 			},
 			wantErr:     true,
-			errContains: "turn restriction: unit 16 belongs to Team 2 but it's currently Team 1's turn",
+			errContains: "unit 0x10 not active team",
 		},
 		// { This test is not available at the moment - not until the Skills implementation in Phase 4
 		// 	name:   "Failure: Unit passes through but cannot land on HardRock",
@@ -225,7 +225,7 @@ func TestMatch_CommandMoveUnit(t *testing.T) {
 				return m
 			},
 			wantErr:     true,
-			errContains: "data corruption: unit 16 current position",
+			errContains: "unit 0x10 out of bounds",
 		},
 		{
 			name:   "Failure: Grid data desync",
@@ -246,7 +246,7 @@ func TestMatch_CommandMoveUnit(t *testing.T) {
 				return m
 			},
 			wantErr:     true,
-			errContains: "data desync: grid matrix at",
+			errContains: "unit 0x10 desynced at",
 		},
 		{
 			name:   "Failure: Target out of moving range",
@@ -268,7 +268,7 @@ func TestMatch_CommandMoveUnit(t *testing.T) {
 				return m
 			},
 			wantErr:     true,
-			errContains: "movement restriction: target coordinate is out of moving range",
+			errContains: "target out of move range",
 		},
 		{
 			name:   "Failure: Unit has moved in the same turn",
@@ -290,7 +290,7 @@ func TestMatch_CommandMoveUnit(t *testing.T) {
 				return m
 			},
 			wantErr:     true,
-			errContains: "single move restriction: unit has moved in this turn",
+			errContains: "unit 0x10 already moved this turn",
 		},
 		{
 			name:   "Success: Unit moves successfully",
@@ -390,7 +390,7 @@ func TestMatch_CommandPlaceBomb(t *testing.T) {
 				return newTestMatch(2, 2) // Empty map, no units
 			},
 			wantErr:     true,
-			errContains: "security violation: unit ID 51 does not exist",
+			errContains: "unit 0x33 does not exist",
 		},
 		{
 			name:   "Failure: Unit is dead",
@@ -402,7 +402,7 @@ func TestMatch_CommandPlaceBomb(t *testing.T) {
 				return m
 			},
 			wantErr:     true,
-			errContains: "tactical restriction: unit 18 is dead",
+			errContains: "unit 0x12 is dead",
 		},
 		{
 			name:   "Failure: Wrong team turn",
@@ -421,7 +421,7 @@ func TestMatch_CommandPlaceBomb(t *testing.T) {
 				return m
 			},
 			wantErr:     true,
-			errContains: "turn restriction: unit 16 belongs to Team 2 but it's currently Team 1's turn",
+			errContains: "unit 0x10 not active team",
 		},
 		{
 			name:   "Failure: Data corruption - unit out of bounds",
@@ -440,7 +440,7 @@ func TestMatch_CommandPlaceBomb(t *testing.T) {
 				return m
 			},
 			wantErr:     true,
-			errContains: "data corruption: unit 16 current position",
+			errContains: "unit 0x10 out of bounds",
 		},
 		{
 			name:   "Failure: Grid data desync",
@@ -460,7 +460,7 @@ func TestMatch_CommandPlaceBomb(t *testing.T) {
 				return m
 			},
 			wantErr:     true,
-			errContains: "data desync: grid matrix at",
+			errContains: "unit 0x10 desynced at",
 		},
 		{
 			name:   "Failure: Unit has used up all bombs",
@@ -482,7 +482,7 @@ func TestMatch_CommandPlaceBomb(t *testing.T) {
 				return m
 			},
 			wantErr:     true,
-			errContains: "unit restriction: unit 16 has used up all his bombs",
+			errContains: "unit 0x10 out of bombs",
 		},
 		{
 			name:   "Failure: Target out of placement range",
@@ -505,7 +505,7 @@ func TestMatch_CommandPlaceBomb(t *testing.T) {
 				return m
 			},
 			wantErr:     true,
-			errContains: "bomb placement restriction: target coordinate is out of placement range",
+			errContains: "target out of bomb range",
 		},
 		{
 			name:   "Failure: Illegal target",
@@ -532,7 +532,7 @@ func TestMatch_CommandPlaceBomb(t *testing.T) {
 				return m
 			},
 			wantErr:     true,
-			errContains: "bomb placement rejected: terrain restriction",
+			errContains: "can only place on plain terrain",
 		},
 		{
 			name:   "Failure: Unit has used skill in the turn",
@@ -559,7 +559,7 @@ func TestMatch_CommandPlaceBomb(t *testing.T) {
 				return m
 			},
 			wantErr:     true,
-			errContains: "single move restriction",
+			errContains: "unit 0x10 already used skill this turn",
 		},
 		{
 			name:   "Success: Bomb placed successfully",
@@ -754,19 +754,19 @@ func TestGameState_IsLandingLegal_OccupantBomb(t *testing.T) {
 			name:          "Failure: Out of bound",
 			pos:           Coordinate{100, 0},
 			expectError:   true,
-			errorContains: "boundary restriction",
+			errorContains: "out of bounds",
 		},
 		{
 			name:          "Failure: Within bound, non-TerrainPlain",
 			pos:           Coordinate{2, 0},
 			expectError:   true,
-			errorContains: "terrain restriction",
+			errorContains: "can only place on plain terrain",
 		},
 		{
 			name:          "Failure: Within bound, TerrainPlain, on non-OccupantNone",
 			pos:           Coordinate{1, 0},
 			expectError:   true,
-			errorContains: "occupant restriction",
+			errorContains: "cell occupied by",
 		},
 	}
 
