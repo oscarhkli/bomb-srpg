@@ -31,9 +31,10 @@ go.work.sum
 # .idea/
 # .vscode/
 
-# Test coverage artifacts
-coverage.txt
-
 .DS_Store
 
 bin/
+
+# Agentic Tools
+AGENTS.md
+CLAUDE.md

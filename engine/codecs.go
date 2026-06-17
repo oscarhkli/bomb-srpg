@@ -22,19 +22,19 @@ const (
 	BombUnitIDMask  uint32 = 0xFF   // Isolates the 8 bits for unit ID after shifting
 )
 
-// NewUnitID combines variables cleanly into the standard layout
+// NewUnitID constructs a UnitID from team and player index using (TeamID << 4) | Index.
 func NewUnitID(teamID, counter int) UnitID {
 	return UnitID((uint8(teamID) << UnitTeamShift) | (uint8(counter) << UnitLocalShift))
 }
 
-// Decode breaks down the UintID into teamID and index
+// Decode extracts TeamID and PlayerIndex from a UnitID.
 func (id UnitID) Decode() (teamID int, index int) {
 	teamID = int((uint8(id) >> UnitTeamShift) & UnitTeamMask)
 	index = int(uint8(id) >> uint8(UnitLocalShift) & uint8(UnitLocalMask))
 	return
 }
 
-// NewBombID combines variables cleanly into the standard layout
+// NewBombID constructs a BombID from turn, counter, and owner UnitID using (UnitID << 24) | (Turn << 16) | Counter.
 func NewBombID(turn int, counter int, unitID UnitID) BombID {
 	return BombID(
 		(uint32(unitID) << BombUnitIDShift) |
@@ -43,7 +43,7 @@ func NewBombID(turn int, counter int, unitID UnitID) BombID {
 	)
 }
 
-// Decode breaks down the BombID efficiently into clear values in one line
+// Decode extracts Turn, Counter, and Owner UnitID from a BombID.
 func (id BombID) Decode() (turn int, counter int, ownerID UnitID) {
 	ownerID = UnitID((uint32(id) >> BombUnitIDShift) & BombUnitIDMask)
 	turn = int((uint32(id) >> BombTurnShift) & BombTurnMask)

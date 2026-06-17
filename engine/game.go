@@ -13,6 +13,8 @@ var terrainToken = map[byte]TerrainType{
 	'L': TerrainLava,
 }
 
+// InitGame validates the config, builds the initial GameState, and returns a ready-to-play Match.
+// It enforces: 1-5 units per team, King as first unit, valid stage preset, and grid dimensions.
 func InitGame(gameCfg GameCfg) (*Match, error) {
 	gameState, err := initGameState(gameCfg)
 	if err != nil {

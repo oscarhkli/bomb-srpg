@@ -2,12 +2,16 @@ package main
 
 import (
 	"bomb-srpg/server"
-	"log"
+	"log/slog"
 	"net/http"
+	"os"
 	"time"
 )
 
 func main() {
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	slog.SetDefault(logger)
+
 	r := http.NewServeMux()
 	serverState := server.NewServerStateManager()
 
@@ -16,6 +20,8 @@ func main() {
 
 	// all other HTTP endpoints
 	r.HandleFunc("GET /api/archetypes", serverState.HandleGetAllArchetypes)
+	r.HandleFunc("POST /api/match-rooms", serverState.HandleCreateMatchRoom)
+	r.HandleFunc("POST /api/match-rooms/{roomID}/match", serverState.HandleCreateMatch)
 
 	s := &http.Server{
 		Addr:         ":8080",
@@ -24,10 +30,10 @@ func main() {
 		WriteTimeout: 5 * time.Second,
 	}
 
-	log.Println("Bomb Tactics Server running on http://localhost:8080")
-	log.Println("Open http://localhost:8080 in your browser to view the Title Screen!")
+	slog.Info("Bomb Tactics Server running on http://localhost:8080")
+	slog.Info("Open http://localhost:8080 in your browser to view the Title Screen!")
 
 	if err := s.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		log.Fatalf("Server crashed: %v", err)
+		slog.Error("Server crashed", "error", err)
 	}
 }
