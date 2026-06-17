@@ -2,7 +2,9 @@ package server
 
 import (
 	"bomb-srpg/engine"
+	"errors"
 	"fmt"
+	"log/slog"
 	"math/rand/v2"
 	"sync"
 	"time"
@@ -11,6 +13,12 @@ import (
 const (
 	roomIDLength      = 5
 	crockfordAlphabet = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+)
+
+var (
+	ErrRoomNotFound  = errors.New("room not found")
+	ErrMatchExists   = errors.New("match already exists")
+	ErrInvalidConfig = errors.New("invalid game config")
 )
 
 // MatchRoom wraps the core engine match instance with server-layer network metadata.
@@ -56,6 +64,7 @@ func (s *ServerStateManager) CreateMatchRoom() (string, error) {
 	}
 
 	if !found {
+		slog.Warn("failed to generate room ID", "retries", maxRetry)
 		return "", fmt.Errorf("room unavailable: failed to generate a MatchRoom ID after %d times of retry", maxRetry)
 	}
 
@@ -65,6 +74,7 @@ func (s *ServerStateManager) CreateMatchRoom() (string, error) {
 		LastActivity: time.Now(),
 	}
 
+	slog.Info("match room created", "roomID", id)
 	return id, nil
 }
 
@@ -75,4 +85,31 @@ func generateRoomID(length int) string {
 	}
 
 	return string(code)
+}
+
+func (s *ServerStateManager) CreateMatch(roomID string, gameCfg engine.GameCfg) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	room, ok := s.Rooms[roomID]
+	if !ok {
+		slog.Warn("match room not found", "roomID", roomID)
+		return fmt.Errorf("%w: roomID=%s", ErrRoomNotFound, roomID)
+	}
+
+	if room.Match != nil {
+		slog.Warn("match already exists", "roomID", roomID)
+		return fmt.Errorf("%w: roomID=%s", ErrMatchExists, roomID)
+	}
+
+	match, err := engine.InitGame(gameCfg)
+
+	if err != nil {
+		slog.Error("invalid game config", "roomID", roomID, "error", err)
+		return fmt.Errorf("%w: gameCfg=%+v: %v", ErrInvalidConfig, gameCfg, err)
+	}
+
+	room.Match = match
+
+	return nil
 }

@@ -1,6 +1,9 @@
 package server
 
 import (
+	"bomb-srpg/engine"
+	"bytes"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -12,7 +15,8 @@ func TestHTTPRouting(t *testing.T) {
 	serverState := NewServerStateManager()
 
 	mux.HandleFunc("GET /api/archetypes", serverState.HandleGetAllArchetypes)
-	mux.HandleFunc("POST /api/match-rooms", serverState.HandleCreateNewMatchRoom)
+	mux.HandleFunc("POST /api/match-rooms", serverState.HandleCreateMatchRoom)
+	mux.HandleFunc("POST /api/match-rooms/{roomID}/match", serverState.HandleCreateMatch)
 
 	server := httptest.NewServer(mux)
 	defer server.Close()
@@ -34,6 +38,18 @@ func TestHTTPRouting(t *testing.T) {
 			method:     "POST",
 			path:       "/api/match-rooms",
 			wantStatus: http.StatusCreated,
+		},
+		{
+			name:       "POST /api/match-rooms/{roomID}/match",
+			method:     "POST",
+			path:       "/api/match-rooms/DUMMY/match", // Use a dummy roomID for routing test
+			wantStatus: http.StatusNotFound,            // Room doesn't exist yet
+		},
+		{
+			name:       "GET /api/match-rooms/{roomID}/match (405)",
+			method:     "GET",
+			path:       "/api/match-rooms/DUMMY/match",
+			wantStatus: http.StatusMethodNotAllowed,
 		},
 		{
 			name:       "POST /api/archetypes (405)",
@@ -67,11 +83,25 @@ func TestHTTPRouting(t *testing.T) {
 		},
 	}
 
+	gameCfgBody, _ := json.Marshal(engine.GameCfg{
+		StagePreset: "MAP01",
+		P1Teams:     []string{"King"},
+		P2Teams:     []string{"King"},
+		MaxTurns:    10,
+	})
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req, err := http.NewRequest(tt.method, server.URL+tt.path, nil)
+			var body io.Reader
+			if tt.name == "POST /api/match-rooms/{roomID}/match" {
+				body = bytes.NewReader(gameCfgBody)
+			}
+			req, err := http.NewRequest(tt.method, server.URL+tt.path, body)
 			if err != nil {
 				t.Fatalf("Failed to create request: %v", err)
+			}
+			if body != nil {
+				req.Header.Set("Content-Type", "application/json")
 			}
 
 			resp, err := http.DefaultClient.Do(req)

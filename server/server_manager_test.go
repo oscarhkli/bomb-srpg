@@ -1,6 +1,8 @@
 package server
 
 import (
+	"bomb-srpg/engine"
+	"errors"
 	"strings"
 	"testing"
 )
@@ -104,4 +106,111 @@ func isValidCrockfordCode(s string) bool {
 		}
 	}
 	return true
+}
+
+func TestServerStateManager_CreateMatch(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		s := NewServerStateManager()
+
+		roomID, err := s.CreateMatchRoom()
+		if err != nil {
+			t.Fatalf("CreateMatchRoom() returned error: %v", err)
+		}
+
+		gameCfg := engine.GameCfg{
+			StagePreset: "MAP01",
+			P1Teams:     []string{"King", "Fighter"},
+			P2Teams:     []string{"King", "Witch"},
+			MaxTurns:    10,
+		}
+
+		err = s.CreateMatch(roomID, gameCfg)
+		if err != nil {
+			t.Fatalf("CreateMatch() returned error: %v", err)
+		}
+
+		room, ok := s.Rooms[roomID]
+		if !ok {
+			t.Fatal("Room not found")
+		}
+		if room.Match == nil {
+			t.Fatal("Expected Match to be created, got nil")
+		}
+		if room.Match.GameCfg.StagePreset != "MAP01" {
+			t.Errorf("Expected StagePreset 'MAP01', got '%s'", room.Match.GameCfg.StagePreset)
+		}
+		if room.Match.GameCfg.MaxTurns != 10 {
+			t.Errorf("Expected MaxTurns 10, got %d", room.Match.GameCfg.MaxTurns)
+		}
+	})
+
+	t.Run("Room Not Found", func(t *testing.T) {
+		s := NewServerStateManager()
+
+		gameCfg := engine.GameCfg{
+			StagePreset: "MAP01",
+			P1Teams:     []string{"King", "Fighter"},
+			P2Teams:     []string{"King", "Witch"},
+			MaxTurns:    10,
+		}
+
+		err := s.CreateMatch("NONEXISTENT", gameCfg)
+		if err == nil {
+			t.Fatal("Expected error for non-existent room")
+		}
+		if !errors.Is(err, ErrRoomNotFound) {
+			t.Errorf("Expected ErrRoomNotFound, got: %v", err)
+		}
+	})
+
+	t.Run("Match Already Exists", func(t *testing.T) {
+		s := NewServerStateManager()
+
+		roomID, err := s.CreateMatchRoom()
+		if err != nil {
+			t.Fatalf("CreateMatchRoom() returned error: %v", err)
+		}
+
+		gameCfg := engine.GameCfg{
+			StagePreset: "MAP01",
+			P1Teams:     []string{"King", "Fighter"},
+			P2Teams:     []string{"King", "Witch"},
+			MaxTurns:    10,
+		}
+
+		err = s.CreateMatch(roomID, gameCfg)
+		if err != nil {
+			t.Fatalf("First CreateMatch() returned error: %v", err)
+		}
+
+		err = s.CreateMatch(roomID, gameCfg)
+		if err == nil {
+			t.Fatal("Expected error for existing match")
+		}
+		if !errors.Is(err, ErrMatchExists) {
+			t.Errorf("Expected ErrMatchExists, got: %v", err)
+		}
+	})
+
+	t.Run("Invalid Config", func(t *testing.T) {
+		s := NewServerStateManager()
+
+		roomID, err := s.CreateMatchRoom()
+		if err != nil {
+			t.Fatalf("CreateMatchRoom() returned error: %v", err)
+		}
+
+		gameCfg := engine.GameCfg{
+			StagePreset: "INVALID_STAGE",
+			MaxTurns:    10,
+		}
+
+		err = s.CreateMatch(roomID, gameCfg)
+		if err == nil {
+			t.Fatal("Expected error for invalid config")
+		}
+		if !errors.Is(err, ErrInvalidConfig) {
+			t.Errorf("Expected ErrInvalidConfig, got: %v", err)
+		}
+	})
 }

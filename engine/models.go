@@ -63,8 +63,8 @@ type StagePreset struct {
 type SkillType uint32
 
 const (
-	SkillCanJump SkillType = 1 << iota 
-	SkillCanFly                        
+	SkillCanJump SkillType = 1 << iota
+	SkillCanFly
 )
 
 // Archetype defines the base template for a unit class (King, Fighter, Witch, etc.).
@@ -116,15 +116,15 @@ type Bomb struct {
 
 // GameCfg holds all configuration for a match.
 type GameCfg struct {
-	StagePreset                 string   // Stage preset name (e.g., "MAP01")
-	P1Teams                     []string // Archetype names for Player 1 (1-5 units, first must be King)
-	P2Teams                     []string // Archetype names for Player 2 (1-5 units, first must be King)
-	MaxTurns                    int      // Turn limit; 0 = instant sudden death
-	AllowResetTurn              bool     // True = players can undo actions before committing
-	SuddenDeath                 bool     // True = spawn hazards after MaxTurns; False = draw at limit
-	GlobalSpeedOverride         int      // Test override for all unit speeds (0 = disabled)
-	GlobalBombCountdownOverride int      // Test override for bomb countdown (0 = disabled)
-	GlobalBombMaxRangeOverride  int      // Test override for bomb max range (0 = disabled)
+	StagePreset                 string   `json:"stagePreset"`    // Stage preset name (e.g., "MAP01")
+	P1Teams                     []string `json:"p1Teams"`        // Archetype names for Player 1 (1-5 units, first must be King)
+	P2Teams                     []string `json:"p2Teams"`        // Archetype names for Player 2 (1-5 units, first must be King)
+	MaxTurns                    int      `json:"maxTurns"`       // Turn limit; 0 = instant sudden death
+	AllowResetTurn              bool     `json:"allowResetTurn"` // True = players can undo actions before committing
+	SuddenDeath                 bool     `json:"SuddenDeath"`    // True = spawn hazards after MaxTurns; False = draw at limit
+	GlobalSpeedOverride         int      `json:"-"`              // Test override for all unit speeds (0 = disabled)
+	GlobalBombCountdownOverride int      `json:"-"`              // Test override for bomb countdown (0 = disabled)
+	GlobalBombMaxRangeOverride  int      `json:"-"`              // Test override for bomb max range (0 = disabled)
 }
 
 // GameState is the complete snapshot of a match at a point in time.

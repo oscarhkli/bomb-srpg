@@ -32,3 +32,13 @@ func MapToArchetypeResponse(a engine.Archetype) ArchetypeResponse {
 type CreateMatchRoomResponse struct {
 	ID string `json:"id"`
 }
+
+// CreateMatchRequest is the neccessary details from client to create a Match
+type CreateMatchRequest struct {
+	GameCfg engine.GameCfg `json:"gameCfg"`
+}
+
+// CreateMatchResponse is returned when a new match is created.
+type CreateMatchResponse struct {
+	Success bool `json:"success"`
+}
