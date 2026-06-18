@@ -9,19 +9,30 @@ import (
 	"net/http"
 )
 
+// CreateMatchRoomResponse is returned when a new match room is created.
+type CreateMatchRoomResponse struct {
+	ID string `json:"id"`
+}
+
+// CreateMatchResponse is returned when a new match is created.
+type CreateMatchResponse struct {
+	Success bool `json:"success"`
+}
+
+// CreateMatchRequest wraps GameCfg for backward compatibility with existing clients.
+type CreateMatchRequest struct {
+	GameCfg engine.GameCfg `json:"gameCfg"`
+}
+
 // HandleGetAllArchetypes returns all available unit archetypes for the client to display in the lobby.
 // It encodes the archetype definitions as JSON and writes them to the response.
 func (s *ServerStateManager) HandleGetAllArchetypes(w http.ResponseWriter, r *http.Request) {
 	archetypes := engine.GetAllArchetypes()
-	responsePayload := make([]ArchetypeResponse, len(archetypes))
-	for i, arch := range archetypes {
-		responsePayload[i] = MapToArchetypeResponse(arch)
-	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 
-	if err := json.NewEncoder(w).Encode(responsePayload); err != nil {
+	if err := json.NewEncoder(w).Encode(archetypes); err != nil {
 		slog.Error("encode archetypes failed", "error", err)
 		http.Error(w, "Failed to encode archetype definitions", http.StatusInternalServerError)
 		return
@@ -39,16 +50,13 @@ func (s *ServerStateManager) HandleCreateMatchRoom(w http.ResponseWriter, r *htt
 		return
 	}
 
-	responsePayload := CreateMatchRoomResponse{
-		ID: id,
-	}
-
 	location := fmt.Sprintf("/api/match-rooms/%s", id)
 	w.Header().Set("Location", location)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 
-	if err := json.NewEncoder(w).Encode(responsePayload); err != nil {
+	res := CreateMatchRoomResponse{ID: id}
+	if err := json.NewEncoder(w).Encode(res); err != nil {
 		slog.Error("encode match room response failed", "roomID", id, "error", err)
 		http.Error(w, "Failed to encode MatchRoom ID", http.StatusInternalServerError)
 		return
@@ -61,14 +69,14 @@ func (s *ServerStateManager) HandleCreateMatchRoom(w http.ResponseWriter, r *htt
 func (s *ServerStateManager) HandleCreateMatch(w http.ResponseWriter, r *http.Request) {
 	roomID := r.PathValue("roomID")
 
-	var gameCfg engine.GameCfg
-	if err := json.NewDecoder(r.Body).Decode(&gameCfg); err != nil {
+	var req CreateMatchRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		slog.Warn("invalid config format", "error", err)
 		http.Error(w, "Invalid configuration format", http.StatusBadRequest)
 		return
 	}
 
-	err := s.CreateMatch(roomID, gameCfg)
+	err := s.CreateMatch(roomID, req.GameCfg)
 
 	if err != nil {
 		switch {
@@ -91,10 +99,8 @@ func (s *ServerStateManager) HandleCreateMatch(w http.ResponseWriter, r *http.Re
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 
-	responsePayload := CreateMatchResponse{
-		Success: true,
-	}
-	if err := json.NewEncoder(w).Encode(responsePayload); err != nil {
+	res := CreateMatchResponse{Success: true}
+	if err := json.NewEncoder(w).Encode(res); err != nil {
 		slog.Error("encode match response failed", "roomID", roomID, "error", err)
 		http.Error(w, "Failed to encode success indicator", http.StatusInternalServerError)
 		return

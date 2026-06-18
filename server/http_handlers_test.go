@@ -31,7 +31,7 @@ func TestHandleGetAllArchetypes(t *testing.T) {
 			t.Errorf("Handler returned wrong content type: got %v want %v", contentType, expectedHeader)
 		}
 
-		var response []ArchetypeResponse
+		var response []engine.Archetype
 		if err := json.NewDecoder(rr.Body).Decode(&response); err != nil {
 			t.Fatalf("Failed to decode response JSON payload: %v", err)
 		}
@@ -217,7 +217,7 @@ func TestHandleCreateNewMatch(t *testing.T) {
 			P2Teams:     []string{"King", "Witch"},
 			MaxTurns:    10,
 		}
-		jsonBody, _ := json.Marshal(gameCfg)
+		jsonBody, _ := json.Marshal(CreateMatchRequest{GameCfg: gameCfg})
 		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match", strings.NewReader(string(jsonBody)))
 		if err != nil {
 			t.Fatalf("Failed to create request: %v", err)
@@ -289,7 +289,7 @@ func TestHandleCreateNewMatch(t *testing.T) {
 			P2Teams:     []string{"King", "Witch"},
 			MaxTurns:    10,
 		}
-		jsonBody, _ := json.Marshal(gameCfg)
+		jsonBody, _ := json.Marshal(CreateMatchRequest{GameCfg: gameCfg})
 		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match", strings.NewReader(string(jsonBody)))
 		if err != nil {
 			t.Fatalf("Failed to create request: %v", err)
@@ -374,7 +374,7 @@ func TestHandleCreateNewMatch(t *testing.T) {
 			P2Teams:     []string{"King", "Witch"},
 			MaxTurns:    10,
 		}
-		jsonBody, _ := json.Marshal(gameCfg)
+		jsonBody, _ := json.Marshal(CreateMatchRequest{GameCfg: gameCfg})
 		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match", strings.NewReader(string(jsonBody)))
 		if err != nil {
 			t.Fatalf("Failed to create request: %v", err)
@@ -402,7 +402,7 @@ func TestHandleCreateNewMatch(t *testing.T) {
 			P2Teams:     []string{"King", "Witch"},
 			MaxTurns:    10,
 		}
-		jsonBody, _ := json.Marshal(gameCfg)
+		jsonBody, _ := json.Marshal(CreateMatchRequest{GameCfg: gameCfg})
 		req, _ := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match", strings.NewReader(string(jsonBody)))
 		req.Header.Set("Content-Type", "application/json")
 
