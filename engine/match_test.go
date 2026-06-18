@@ -1209,12 +1209,67 @@ func TestMatch_ResolveTurn_TimelineSystemTransitions(t *testing.T) {
 	})
 }
 
+// AddUnit adds a unit to the match's WorkingState and syncs the grid.
+// Test-only helper.
+func (m *Match) AddUnit(team, idx int, arch Archetype, pos Coordinate, hp int) *Unit {
+	id := NewUnitID(team, idx)
+	u := &Unit{
+		ID:           id,
+		Type:         arch,
+		Position:     pos,
+		Speed:        arch.BaseSpeed,
+		BombMaxRange: arch.BombMaxRange,
+		BombMinRange: arch.BombMinRange,
+		BombPower:    arch.BombPower,
+		MaxBombCount: arch.MaxBombCount,
+		BombUsed:     0,
+		Team:         team,
+		HP:           hp,
+		Skills:       arch.PresetSkills,
+	}
+	m.WorkingState.Units[id] = u
+	m.WorkingState.Grid[pos.Y][pos.X] = Tile{
+		Type:         TerrainPlain,
+		OccupantType: OccupantUnit,
+		OccupantID:   int64(id),
+	}
+	return u
+}
+
+// AddBomb adds a bomb to the match's WorkingState and syncs the grid.
+// Test-only helper.
+func (m *Match) AddBomb(turn, counter int, owner UnitID, pos Coordinate, range_, cd int) *Bomb {
+	b := &Bomb{
+		ID:        NewBombID(turn, counter, owner),
+		OwnerID:   owner,
+		Position:  pos,
+		Range:     range_,
+		Countdown: cd,
+	}
+	m.WorkingState.Bombs[b.ID] = b
+	m.WorkingState.Grid[pos.Y][pos.X] = Tile{
+		Type:         TerrainPlain,
+		OccupantType: OccupantBomb,
+		OccupantID:   int64(b.ID),
+	}
+	return b
+}
+
+// AddSoftBlock adds a soft block to the match's WorkingState and syncs the grid.
+// Test-only helper.
+func (m *Match) AddSoftBlock(id int, pos Coordinate) *SoftBlock {
+	sb := &SoftBlock{ID: id, Position: pos}
+	m.WorkingState.SoftBlocks[id] = sb
+	m.WorkingState.Grid[pos.Y][pos.X] = Tile{
+		Type:         TerrainPlain,
+		OccupantType: OccupantSoftBlock,
+		OccupantID:   int64(id),
+	}
+	return sb
+}
+
 func newTestMatchWithFullTeam(t *testing.T, p1KingAlive, p2KingAlive bool, p1Alive, p2Alive [4]bool) *Match {
 	m := newTestMatch(5, 2)
-	m.TrueState.Turn = 1
-	m.WorkingState.Turn = 1
-
-	m.TrueState.Turn = 1
 	m.WorkingState.Turn = 1
 	m.WorkingState.ActiveTeam = 1
 
@@ -1228,66 +1283,32 @@ func newTestMatchWithFullTeam(t *testing.T, p1KingAlive, p2KingAlive bool, p1Ali
 		t.Fatalf("Archetype Fighter does not exist")
 	}
 
-	p1KingUnitID := NewUnitID(1, 0)
 	p1KingHP := 1
 	if !p1KingAlive {
 		p1KingHP = 0
 	}
-	m.WorkingState.Units[p1KingUnitID] = &Unit{
-		ID:       p1KingUnitID,
-		Team:     1,
-		HP:       p1KingHP,
-		Type:     king,
-		Position: Coordinate{0, 0},
-	}
-	m.WorkingState.Grid[0][0] = Tile{Type: TerrainPlain, OccupantType: OccupantUnit, OccupantID: int64(p1KingUnitID)}
+	m.AddUnit(1, 0, king, Coordinate{0, 0}, p1KingHP)
 
-	p2KingUnitID := NewUnitID(2, 0)
 	p2KingHP := 1
 	if !p2KingAlive {
 		p2KingHP = 0
 	}
-	m.WorkingState.Units[p2KingUnitID] = &Unit{
-		ID:       p2KingUnitID,
-		Team:     2,
-		HP:       p2KingHP,
-		Type:     king,
-		Position: Coordinate{0, 1},
-	}
-	m.WorkingState.Grid[1][0] = Tile{Type: TerrainPlain, OccupantType: OccupantUnit, OccupantID: int64(p2KingUnitID)}
+	m.AddUnit(2, 0, king, Coordinate{0, 1}, p2KingHP)
 
-	for i, p := range p1Alive {
-		id := NewUnitID(1, i+1)
+	for i, alive := range p1Alive {
 		hp := 1
-		if !p {
+		if !alive {
 			hp = 0
 		}
-		m.WorkingState.Units[id] = &Unit{
-			ID:       id,
-			Team:     1,
-			HP:       hp,
-			Type:     fighter,
-			Position: Coordinate{i + 1, 0},
-		}
-		m.WorkingState.Grid[0][i+1] = Tile{Type: TerrainPlain, OccupantType: OccupantUnit, OccupantID: int64(id)}
-
+		m.AddUnit(1, i+1, fighter, Coordinate{i + 1, 0}, hp)
 	}
 
-	for i, p := range p2Alive {
-		id := NewUnitID(2, i+1)
+	for i, alive := range p2Alive {
 		hp := 1
-		if !p {
+		if !alive {
 			hp = 0
 		}
-		m.WorkingState.Units[id] = &Unit{
-			ID:       id,
-			Team:     2,
-			HP:       hp,
-			Type:     fighter,
-			Position: Coordinate{i + 1, 1},
-		}
-		m.WorkingState.Grid[1][i+1] = Tile{Type: TerrainPlain, OccupantType: OccupantUnit, OccupantID: int64(id)}
-
+		m.AddUnit(2, i+1, fighter, Coordinate{i + 1, 1}, hp)
 	}
 
 	m.TrueState = m.WorkingState.DeepCopy()
