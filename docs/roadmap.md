@@ -41,7 +41,7 @@
 - [x] Init router Setup 
 - [ ] HTTP Handlers for Game Setup
   - [x] List Archetypes
-  - [ ] New Match with user-defined Game Config
+  - [x] New Match with user-defined Game Config
 - [ ] HTTP Handlers for Turn resolution and Match lifecycle
   - [ ] Reset
   - [ ] Commit
@@ -50,8 +50,9 @@
   - [ ] Move
   - [ ] PlaceBomb
 - [ ] Match Room
- - [ ] Creation & Housekeep
- - [ ] Navigation with Match
+ - [x] Creation
+ - [ ] Housekeep based on the last activity time
+ - [ ] Navigation with Match, Game cycle
 - [ ] Deployment
 
 ## Phase 3: Graphical Browser Client & UI Integration
