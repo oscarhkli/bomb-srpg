@@ -1,5 +1,7 @@
 package engine
 
+import "encoding/json"
+
 // TerrainType represents the base terrain of a tile.
 type TerrainType int
 
@@ -69,15 +71,30 @@ const (
 
 // Archetype defines the base template for a unit class (King, Fighter, Witch, etc.).
 type Archetype struct {
-	Name         string
-	BaseSpeed    int
-	BombMaxRange int
-	BombMinRange int
-	BombPower    int
-	MaxBombCount int
-	BaseHP       int
-	PresetSkills map[SkillType]bool
-	IsSelectable bool // False for forced units (e.g., King) or boss-only archetypes
+	Name         string             `json:"name"`
+	BaseSpeed    int                `json:"speed"`
+	BombMaxRange int                `json:"bombMaxRange"`
+	BombMinRange int                `json:"-"`
+	BombPower    int                `json:"-"`
+	MaxBombCount int                `json:"-"`
+	BaseHP       int                `json:"-"`
+	PresetSkills map[SkillType]bool `json:"-"`
+	IsSelectable bool               `json:"-"`
+}
+
+func (a Archetype) MarshalJSON() ([]byte, error) {
+	skills := []string{}
+	for s, ok := range a.PresetSkills {
+		if ok {
+			skills = append(skills, s.String())
+		}
+	}
+	return json.Marshal(struct {
+		Name         string   `json:"name"`
+		BaseSpeed    int      `json:"speed"`
+		BombMaxRange int      `json:"bombMaxRange"`
+		Skills       []string `json:"skills"`
+	}{a.Name, a.BaseSpeed, a.BombMaxRange, skills})
 }
 
 // UnitID encodes (TeamID << 4) | PlayerIndex. Max 15 teams, 15 units per team.
