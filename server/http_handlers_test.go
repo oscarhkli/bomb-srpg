@@ -449,6 +449,7 @@ type ClientUnit struct {
 	HasUsedSkill bool              `json:"hasUsedSkill"`
 }
 
+// ClientTile mimics the client's view of Tile in GetMatchState response
 type ClientTile struct {
 	Type         string `json:"type"`
 	OccupantType string `json:"occupantType"`

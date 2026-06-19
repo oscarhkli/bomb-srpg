@@ -109,6 +109,8 @@ func (s *ServerStateManager) HandleCreateMatch(w http.ResponseWriter, r *http.Re
 	slog.Info("match created", "roomID", roomID)
 }
 
+// GetMatchState get the WorkingState of the Match in a given MatchRoom.
+// It encodes the gameState definitions as JSON and writes them to the response.
 func (s *ServerStateManager) HandleGetMatchState(w http.ResponseWriter, r *http.Request) {
 	roomID := r.PathValue("roomID")
 
