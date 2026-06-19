@@ -36,25 +36,19 @@ func (m *Match) Surrender(teamID int) []GameEvent {
 
 	// broadcast it
 	return []GameEvent{
-		MatchEndedEvent{
-			WinnerTeamID: m.WinnerTeamID,
-			IsDraw:       false,
-		},
+		NewMatchEndedEvent(m.WinnerTeamID, false),
 	}
 }
 
 // ApplyTurnCommand accepts any packaged action and forwards it to the true match logic.
 func (m *Match) ApplyTurnCommand(cmd TurnCommand) error {
-	switch c := cmd.(type) {
-
-	case MoveCommand:
-		return m.CommandMoveUnit(c.UnitID, c.Target)
-
-	case PlaceBombCommand:
-		return m.CommandPlaceBomb(c.UnitID, c.Target)
-
+	switch cmd.Type {
+	case TurnCmdMove:
+		return m.CommandMoveUnit(cmd.UnitID, cmd.Target)
+	case TurnCmdPlaceBomb:
+		return m.CommandPlaceBomb(cmd.UnitID, cmd.Target)
 	default:
-		return fmt.Errorf("unsupported command type %T", cmd)
+		return fmt.Errorf("unsupported command type: %s", cmd.Type)
 	}
 }
 
@@ -88,11 +82,7 @@ func (m *Match) CommandMoveUnit(unitID UnitID, target Coordinate) error {
 	unit.Position = target
 	unit.HasMoved = true
 
-	m.SubmitAction(UnitMovedEvent{
-		UnitID: unitID,
-		From:   oldPos,
-		To:     target,
-	})
+	m.SubmitAction(NewUnitMovedEvent(unitID, oldPos, target))
 
 	return nil
 }
@@ -164,13 +154,7 @@ func (m *Match) placeBomb(unitID UnitID, target Coordinate, bombPower int) {
 	m.WorkingState.Bombs[bomb.ID] = bomb
 	m.WorkingState.UpdateStageOccupant(target, OccupantBomb, int64(bomb.ID))
 
-	m.SubmitAction(BombPlacedEvent{
-		UnitID:    unitID,
-		BombID:    bomb.ID,
-		Position:  target,
-		Range:     bomb.Range,
-		Countdown: bomb.Countdown,
-	})
+	m.SubmitAction(NewBombPlacedEvent(unitID, bomb.ID, target, bomb.Range, bomb.Countdown))
 }
 
 // IsLandingLegal checks if the target is legal to be landed by a certain occupantType.
@@ -248,11 +232,11 @@ func (m *Match) ResolveTurn() []GameEvent {
 		switch result {
 		case MatchDraw:
 			m.WinnerTeamID = -1
-			m.SubmitAction(MatchEndedEvent{WinnerTeamID: -1, IsDraw: true})
+			m.SubmitAction(NewMatchEndedEvent(-1, true))
 
 		case MatchWin:
 			m.WinnerTeamID = winner
-			m.SubmitAction(MatchEndedEvent{WinnerTeamID: winner, IsDraw: false})
+			m.SubmitAction(NewMatchEndedEvent(winner, false))
 
 		case MatchInProgress:
 			m.WorkingState.Turn++
@@ -369,10 +353,7 @@ func (m *Match) processChainDetonations(
 
 		m.WorkingState.ClearStageTile(currBomb.Position)
 		delete(m.WorkingState.Bombs, currBombID)
-		m.SubmitAction(BombExplodedEvent{
-			BombID:            currBombID,
-			AffectedPositions: affectedPos,
-		})
+		m.SubmitAction(NewBombExplodedEvent(currBombID, affectedPos))
 	}
 }
 
@@ -400,14 +381,11 @@ func (m *Match) handleDelayedBatchDamage(
 		}
 
 		unit.HP -= 1
-		m.SubmitAction(UnitDamagedEvent{
-			UnitID: unitID,
-			NewHP:  unit.HP,
-		})
+		m.SubmitAction(NewUnitDamagedEvent(unitID, unit.HP))
 
 		if unit.HP <= 0 {
 			m.WorkingState.ClearStageTile(unit.Position)
-			m.SubmitAction(UnitDiedEvent{UnitID: unitID})
+			m.SubmitAction(NewUnitDiedEvent(unitID))
 		}
 	}
 
@@ -419,10 +397,7 @@ func (m *Match) handleDelayedBatchDamage(
 
 		m.WorkingState.ClearStageTile(softBlock.Position)
 		delete(m.WorkingState.SoftBlocks, softBlockID)
-		m.SubmitAction(SoftBlockDestroyedEvent{
-			SoftBlockID: softBlockID,
-			Position:    softBlock.Position,
-		})
+		m.SubmitAction(NewSoftBlockDestroyedEvent(softBlockID, softBlock.Position))
 	}
 
 	// TODO: Item destruction in future phase

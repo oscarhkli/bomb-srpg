@@ -118,10 +118,7 @@ func (c *MatchController) routeGameAction(cmd string) {
 			return
 		}
 
-		err = c.Match.ApplyTurnCommand(engine.MoveCommand{
-			UnitID: unitID,
-			Target: target,
-		})
+		err = c.Match.ApplyTurnCommand(engine.NewMoveCommand(unitID, target))
 		if err != nil {
 			_ = c.View.RenderFeedback(false, fmt.Sprintf("Invalid move: %v", err))
 			return
@@ -140,10 +137,7 @@ func (c *MatchController) routeGameAction(cmd string) {
 			return
 		}
 
-		err = c.Match.ApplyTurnCommand(engine.PlaceBombCommand{
-			UnitID: unitID,
-			Target: target,
-		})
+		err = c.Match.ApplyTurnCommand(engine.NewPlaceBombCommand(unitID, target))
 		if err != nil {
 			_ = c.View.RenderFeedback(false, fmt.Sprintf("Invalid bomb placement: %v", err))
 			return
