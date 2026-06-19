@@ -108,3 +108,33 @@ func (s *ServerStateManager) HandleCreateMatch(w http.ResponseWriter, r *http.Re
 
 	slog.Info("match created", "roomID", roomID)
 }
+
+func (s *ServerStateManager) HandleGetMatchState(w http.ResponseWriter, r *http.Request) {
+	roomID := r.PathValue("roomID")
+
+	gameState, err := s.GetMatchState(roomID)
+
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrRoomNotFound):
+			slog.Warn("get match state match room not found", "roomID", roomID)
+			http.Error(w, "room not found", http.StatusNotFound)
+		case errors.Is(err, ErrMatchNotFound):
+			slog.Warn("get match state match not found", "roomID", roomID)
+			http.Error(w, "match not found", http.StatusNotFound)
+		default:
+			slog.Error("get match state internal error", "roomID", roomID, "error", err)
+			http.Error(w, "internal error", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	if err := json.NewEncoder(w).Encode(gameState); err != nil {
+		slog.Error("encode gameState failed", "error", err)
+		http.Error(w, "Failed to encode gameState definitions", http.StatusInternalServerError)
+		return
+	}
+}

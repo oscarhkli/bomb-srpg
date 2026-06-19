@@ -18,6 +18,7 @@ const (
 var (
 	ErrRoomNotFound  = errors.New("room not found")
 	ErrMatchExists   = errors.New("match already exists")
+	ErrMatchNotFound = errors.New("active match not exist")
 	ErrInvalidConfig = errors.New("invalid game config")
 )
 
@@ -112,4 +113,22 @@ func (s *ServerStateManager) CreateMatch(roomID string, gameCfg engine.GameCfg) 
 	room.Match = match
 
 	return nil
+}
+
+func (s *ServerStateManager) GetMatchState(roomID string) (*engine.GameState, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	room, ok := s.Rooms[roomID]
+	if !ok {
+		slog.Warn("match room not found", "roomID", roomID)
+		return nil, fmt.Errorf("%w: roomID=%s", ErrRoomNotFound, roomID)
+	}
+
+	if room.Match == nil {
+		slog.Warn("match not found", "roomID", roomID)
+		return nil, fmt.Errorf("%w: roomID=%s", ErrMatchNotFound, roomID)
+	}
+
+	return room.Match.WorkingState, nil
 }

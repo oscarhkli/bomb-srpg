@@ -22,6 +22,7 @@ func main() {
 	r.HandleFunc("GET /api/archetypes", serverState.HandleGetAllArchetypes)
 	r.HandleFunc("POST /api/match-rooms", serverState.HandleCreateMatchRoom)
 	r.HandleFunc("POST /api/match-rooms/{roomID}/match", serverState.HandleCreateMatch)
+	r.HandleFunc("GET /api/match-rooms/{roomID}/match/state", serverState.HandleGetMatchState)
 
 	s := &http.Server{
 		Addr:         ":8080",
