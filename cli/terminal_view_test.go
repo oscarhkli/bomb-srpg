@@ -234,15 +234,8 @@ func TestTerminalView_RenderGameEvents(t *testing.T) {
 		view := NewTerminalView(&fakeScreen)
 
 		events := []engine.GameEvent{
-			engine.UnitMovedEvent{
-				UnitID: 16,
-				From:   engine.Coordinate{X: 1, Y: 2},
-				To:     engine.Coordinate{X: 2, Y: 2},
-			},
-			engine.MatchEndedEvent{
-				WinnerTeamID: 1,
-				IsDraw:       false,
-			},
+			engine.NewUnitMovedEvent(16, engine.Coordinate{X: 1, Y: 2}, engine.Coordinate{X: 2, Y: 2}),
+			engine.NewMatchEndedEvent(1, false),
 		}
 
 		err := view.RenderGameEvents(events)
@@ -253,11 +246,11 @@ func TestTerminalView_RenderGameEvents(t *testing.T) {
 
 		result := fakeScreen.String()
 
-		if !strings.Contains(result, "UnitMovedEvent") {
-			t.Errorf("Expected output to contain UnitMovedEvent, got:\n%s", result)
+		if !strings.Contains(result, "unitMoved") {
+			t.Errorf("Expected output to contain unitMoved, got:\n%s", result)
 		}
-		if !strings.Contains(result, "MatchEndedEvent") {
-			t.Errorf("Expected output to contain MatchEndedEvent, got:\n%s", result)
+		if !strings.Contains(result, "matchEnded") {
+			t.Errorf("Expected output to contain matchEnded, got:\n%s", result)
 		}
 	})
 }

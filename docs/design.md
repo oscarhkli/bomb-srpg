@@ -77,7 +77,7 @@
   - **WebView (Phase 2)**: Directly serializes the active `GameState` struct into flat JSON arrays for HTTP response targets.
 - **Flat Package Web Architecture**: Unlike the highly segregated `/engine` domain package, the `/server` package utilizes a cohesive flat file structure. This structure prevents circular dependencies during protocol handling and organizes network translation files by their specific communication protocol layer.
 - **Pointer-Driven Memory Persistence (`*engine.Match`)**: Controller pipelines execute actions exclusively via `*engine.Match` references. This guarantees user interactions mutate master allocation frames natively, eliminating the memory duplication overhead of dynamic matrix slices.
-- **Unified Service Entry Gate (`ApplyTurnCommand`)**: The engine exposes a single `ApplyTurnCommand` method. The MatchController (Phase 1) or HTTP handlers (Phase 2) construct concrete `TurnCommand` packets, allowing the engine to function as a stateless, decoupled command processor.
+- **Unified Service Entry Gate (`ApplyTurnCommand`)**: The engine exposes a single `ApplyTurnCommand` method. The MatchController (Phase 1) or HTTP handlers (Phase 2) construct `TurnCommand` structs with a `Type` discriminator (`TurnCmdMove`, `TurnCmdPlaceBomb`), allowing the engine to function as a stateless, decoupled command processor.
 
 ## 7. Network Sync, Transaction Pipeline & Idempotency Invariants
 
@@ -114,19 +114,7 @@ The server does **not** auto-call `StartNewTurn()` on match creation. Client exp
 
 Surrender: `POST /surrender` (either team, any time).
 
-### 8.3 Endpoints
-
-| Method | Path | Handler | Engine Call |
-|--------|------|---------|-------------|
-| `GET` | `/match-rooms/{id}/match/state` | `HandleGetMatchState` | Read `WorkingState` |
-| `POST` | `/match-rooms/{id}/match/start-turn` | `HandleStartTurn` | `Match.StartNewTurn()` |
-| `POST` | `/match-rooms/{id}/match/commit` | `HandleCommitTurn` | `Match.ResolveTurn()` |
-| `POST` | `/match-rooms/{id}/match/reset` | `HandleResetTurn` | `Match.ResetTurn()` |
-| `POST` | `/match-rooms/{id}/match/surrender` | `HandleSurrender` | `Match.Surrender(teamID)` |
-| `POST` | `/match-rooms/{id}/match/move` | `HandleMoveUnit` | `ApplyTurnCommand(MoveCommand)` |
-| `POST` | `/match-rooms/{id}/match/bomb` | `HandlePlaceBomb` | `ApplyTurnCommand(PlaceBombCommand)` |
-
-### 8.4 Key Decisions
+### 8.3 Key Decisions
 
 - **State exposure**: `WorkingState` only (sandbox), never `TrueState`
 - **Surrender**: Either team, validated as 1 or 2
@@ -158,6 +146,8 @@ bomb-srpg
 ├── docs/                       <-- Design, roadmap and other docs
 ├── engine/                     <-- Pure core logic
 │   ├── codecs.go               <-- Bitmask encoders, decoders for UnitID and BombID
+│   ├── commands.go             <-- TurnCommand types & constructors
+│   ├── events.go               <-- GameEvent types & constructors
 │   ├── game.go                 <-- Game initializer
 │   ├── match.go                <-- Match life cycle transactions
 │   ├── models.go               <-- Pure blueprints
