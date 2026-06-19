@@ -18,14 +18,32 @@ const (
 	TerrainLava
 )
 
-// Coordinate represents a grid position using (X, Y) where (0,0) is top-left.
-type Coordinate struct {
-	X int `json:"x"`
-	Y int `json:"y"`
+// String converts a TerrainType integer value into a human-readable text string.
+func (t TerrainType) String() string {
+	switch t {
+	case TerrainPlain:
+		return "TerrainPlain"
+	case TerrainBlock:
+		return "TerrainBlock"
+	case TerrainTower:
+		return "TerrainTower"
+	case TerrainWater:
+		return "TerrainWater"
+	case TerrainLava:
+		return "TerrainLava"
+	default:
+		return "TerrainUnknown"
+	}
 }
 
 func (o TerrainType) MarshalJSON() ([]byte, error) {
 	return json.Marshal(o.String())
+}
+
+// Coordinate represents a grid position using (X, Y) where (0,0) is top-left.
+type Coordinate struct {
+	X int `json:"x"`
+	Y int `json:"y"`
 }
 
 // OccupantType represents what occupies a tile (if anything).
@@ -38,6 +56,24 @@ const (
 	OccupantSoftBlock                     // Destructible block
 	OccupantItem                          // Item pickup (hidden in soft block)
 )
+
+// String converts an OccupantType integer value into a human-readable text string.
+func (o OccupantType) String() string {
+	switch o {
+	case OccupantNone:
+		return "OccupantNone"
+	case OccupantUnit:
+		return "OccupantUnit"
+	case OccupantBomb:
+		return "OccupantBomb"
+	case OccupantSoftBlock:
+		return "OccupantSoftBlock"
+	case OccupantItem:
+		return "OccupantItem"
+	default:
+		return "OccupantUnknown"
+	}
+}
 
 func (o OccupantType) MarshalJSON() ([]byte, error) {
 	return json.Marshal(o.String())
@@ -76,6 +112,18 @@ const (
 	SkillCanJump SkillType = 1 << iota
 	SkillCanFly
 )
+
+// String converts an SkillType integer value into a human-readable text string.
+func (s SkillType) String() string {
+	switch s {
+	case SkillCanFly:
+		return "Fly"
+	case SkillCanJump:
+		return "Jump"
+	default:
+		return "Unknown"
+	}
+}
 
 // Archetype defines the base template for a unit class (King, Fighter, Witch, etc.).
 type Archetype struct {
