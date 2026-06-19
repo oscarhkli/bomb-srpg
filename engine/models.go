@@ -36,6 +36,7 @@ func (t TerrainType) String() string {
 	}
 }
 
+// MarshalJSON serializes TerrainType struct to JSON that client needs
 func (o TerrainType) MarshalJSON() ([]byte, error) {
 	return json.Marshal(o.String())
 }
@@ -75,6 +76,7 @@ func (o OccupantType) String() string {
 	}
 }
 
+// MarshalJSON serializes OccupantType struct to JSON that client needs
 func (o OccupantType) MarshalJSON() ([]byte, error) {
 	return json.Marshal(o.String())
 }
@@ -138,6 +140,7 @@ type Archetype struct {
 	IsSelectable bool               `json:"-"`
 }
 
+// MarshalJSON serializes Archetype struct to JSON that client needs
 func (a Archetype) MarshalJSON() ([]byte, error) {
 	skills := []string{}
 	for s, ok := range a.PresetSkills {
@@ -178,6 +181,7 @@ type Unit struct {
 	HasUsedSkill bool // True after placing bomb or using skill; resets each turn
 }
 
+// MarshalJSON serializes Unit struct to JSON that client needs
 func (u Unit) MarshalJSON() ([]byte, error) {
 	skills := []string{}
 	for s, ok := range u.Skills {
@@ -250,6 +254,7 @@ type GameState struct {
 	TurnCommands    []TurnCommand      // Pending commands for current turn
 }
 
+// MarshalJSON serializes GameState struct to JSON that client needs
 func (gs GameState) MarshalJSON() ([]byte, error) {
 	units := make([]*Unit, 0, len(gs.Units))
 	for _, u := range gs.Units {

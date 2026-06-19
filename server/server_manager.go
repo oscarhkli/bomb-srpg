@@ -88,6 +88,8 @@ func generateRoomID(length int) string {
 	return string(code)
 }
 
+// CreateMatch initialize the game in a given MatchRoom.
+// Returns an error if any setup rule is violated.
 func (s *ServerStateManager) CreateMatch(roomID string, gameCfg engine.GameCfg) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -115,6 +117,8 @@ func (s *ServerStateManager) CreateMatch(roomID string, gameCfg engine.GameCfg) 
 	return nil
 }
 
+// GetMatchState get the WorkingState of the Match in a given MatchRoom.
+// Returns the WorkingState or an error if any pre-check is violated.
 func (s *ServerStateManager) GetMatchState(roomID string) (*engine.GameState, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
