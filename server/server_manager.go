@@ -18,7 +18,7 @@ const (
 var (
 	ErrRoomNotFound  = errors.New("room not found")
 	ErrMatchExists   = errors.New("match already exists")
-	ErrMatchNotFound = errors.New("active match not exist")
+	ErrMatchNotFound = errors.New("match not found")
 	ErrInvalidConfig = errors.New("invalid game config")
 )
 
