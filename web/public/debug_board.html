@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Bomb Tactics - Debug Board</title>
+  <style>
+    body { font-family: monospace; background: #111; color: #ddd; padding: 10px; }
+    #board { white-space: pre; line-height: 1.15; }
+    input { padding: 4px 8px; }
+    button { padding: 4px 12px; cursor: pointer; }
+    .p1 { color: #4fc3f7; }
+    .p2 { color: #f06292; }
+    .bomb { color: #ffb74d; }
+    .sb { color: #a1887f; }
+    .blk { color: #666; }
+  </style>
+</head>
+<body>
+  <div>
+    Room: <input id="roomId" size="6" maxlength="5">
+    <button onclick="fetchState()">Fetch</button>
+    <label><input type="checkbox" id="auto"> Auto (5s)</label>
+    <span id="ts"></span>
+  </div>
+  <pre id="board">Enter room ID and click Fetch</pre>
+
+  <script>
+    const board = document.getElementById('board');
+    const ts = document.getElementById('ts');
+    let timer;
+
+    function fetchState() {
+      const input = document.getElementById('roomId');
+      const roomId = input.value.trim().toUpperCase();
+      if (!roomId) {
+        return;
+      }
+
+      fetch('/api/match-rooms/' + roomId + '/match/state')
+        .then(res => {
+          if (!res.ok) {
+            throw new Error(res.status);
+          }
+          return res.json();
+        })
+        .then(gs => {
+          render(gs);
+          ts.textContent = 'Turn ' + gs.turn + ' P' + gs.activeTeam + ' | ' + new Date().toISOString();
+        })
+        .catch(e => board.textContent = 'Error: ' + e.message);
+    }
+
+    function render(gs) {
+      if (!gs || !gs.grid) {
+        return;
+      }
+
+      const grid = gs.grid;
+      const units = gs.units || [];
+      const bombs = gs.bombs || [];
+      const turn = gs.turn;
+      const activeTeam = gs.activeTeam;
+
+      let out = 'Turn ' + turn + ' | Active P' + activeTeam + '\n\n';
+
+      out += 'Y\\X ';
+      for (let x = 0; x < grid[0].length; x++) {
+        out += x.toString().padStart(3) + ' ';
+      }
+      out += '\n   +' + '---+'.repeat(grid[0].length) + '\n';
+
+      const getCell = (t) => {
+        const cell = '   ';
+        const cls = '';
+        if (t.type === "TileBlock") {
+          return { cell, cls };
+        } 
+
+        const id = t.occupantId;
+        switch (t.occupantType) {
+          case "OccupantUnit": {
+            const u = units.find(u => u.id === id);
+            return {
+              cell: 'U' + (u ? u.id : '?'),
+              cls : (u && u.team === 1) ? 'p1' : 'p2'};
+            }
+          case "OccupantBomb": {
+            const b = bombs.find(b => b.id === id);
+            return {
+              cell: 'B-' + (b ? b.countdown : '?'),
+              cls: 'bomb'
+            };
+          }
+          case "OccupantSoftBlock": {
+            return {
+              cell: 'SBK',
+              cls: 'sb'
+            };
+          }
+        }
+        return { cell, cls };
+      };
+
+      for (let y = 0; y < grid.length; y++) {
+        out += y.toString().padStart(2) + ' |';
+        for (let x = 0; x < grid[y].length; x++) {
+          const { cell, cls } = getCell(grid[y][x]);
+          out += '<span class="' + cls + '">' + cell.padEnd(3) + '</span>|';
+        }
+        out += ' ' + y + '\n';
+        out += '   +' + '---+'.repeat(grid[0].length) + '\n';
+      }
+
+      out += '    ';
+      for (let x = 0; x < grid[0].length; x++) {
+        out += x.toString().padStart(3) + ' ';
+      }
+
+      out += '\n\nUnits:';
+      units.sort((a, b) => a.id - b.id).forEach(u => {
+        out += '\n ' + u.id + ': ' + u.type + ' HP' + u.hp + ' (' + u.position.x + ',' + u.position.y + ') T' + u.team + ' M' + (u.hasMoved ? '✓' : '✗') + ' S' + (u.hasUsedSkill ? '✓' : '✗');
+      });
+
+      if (bombs.length > 0) {
+        out += '\n\nBombs:';
+        bombs.sort((a, b) => a.id - b.id).forEach(b => {
+          out += '\n ' + b.id + ': O' + b.ownerId + ' (' + b.position.x + ',' + b.position.y + ') R' + b.range + ' CD' + b.countdown;
+        });
+      }
+
+      board.innerHTML = out;
+    }
+
+    document.getElementById('roomId').addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        fetchState();
+      }
+    });
+
+    document.getElementById('auto').addEventListener('change', function(e) {
+      clearInterval(timer);
+      if (e.target.checked) {
+        timer = setInterval(fetchState, 5000);
+      }
+    });
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomParam = urlParams.get('roomId');
+    if (roomParam) {
+      document.getElementById('roomId').value = roomParam.toUpperCase();
+      fetchState();
+    }
+  </script>
+</body>
+</html>

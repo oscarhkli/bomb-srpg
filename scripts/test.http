@@ -1,0 +1,29 @@
+@baseUrl = http://localhost:8080
+@roomId = {{createRoom.response.body.id}}
+
+
+### Get Archetypes
+GET http://localhost:8080/api/archetypes
+Content-Type: application/json
+
+### Create Room
+# @name createRoom
+POST {{baseUrl}}/api/match-rooms
+
+### Create Match
+POST {{baseUrl}}/api/match-rooms/{{roomId}}/match
+Content-Type: application/json
+
+{
+  "gameCfg": {
+    "stagePreset": "MAP01",
+    "p1Teams": ["King", "Fighter", "Fighter", "Witch", "Thief"],
+    "p2Teams": ["King", "Witch", "Fighter", "Thief", "Thief"],
+    "maxTurns": 30,
+    "allowResetTurn": true,
+    "suddenDeath": true
+  }
+}
+
+### Get State
+GET {{baseUrl}}/api/match-rooms/{{roomId}}/match/state

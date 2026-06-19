@@ -39,7 +39,7 @@
 
 ### TODO
 - [x] Init router Setup 
-- [ ] HTTP Handlers for Game Setup
+- [x] HTTP Handlers for Game Setup
   - [x] List Archetypes
   - [x] New Match with user-defined Game Config
 - [ ] HTTP Handlers for Turn resolution and Match lifecycle
@@ -49,9 +49,11 @@
 - [ ] HTTP Handlers for TurnCommands
   - [ ] Move
   - [ ] PlaceBomb
+  - [ ] GetAllowedTiles, which is different from GetReachableTiles
 - [ ] Match Room
  - [x] Creation
  - [ ] Housekeep based on the last activity time
+ - [x] Get Match State
  - [ ] Navigation with Match, Game cycle
 - [ ] Deployment
 
@@ -76,11 +78,14 @@
 
 ### TODO
 - [ ] WebSockets setup
-- [ ] Room
 - [ ] Multiplayer management
   - [ ] Join/leave room
-  - [ ] Room admin
+  - [ ] Join/leave match
+  - [ ] GameCfg + Team formation
   - [ ] Interruption handling
+- [ ] Room config mutability after creation
+- [ ] Per-room fine-grained locking
+- [ ] Player identity/auth (headers, tokens)
 
 ## Phase 4b: More Character Classes & Skills
 - **Goal:** Expand game depth by transitioning from basic stats to a flexible, component-based unit and ability engine.

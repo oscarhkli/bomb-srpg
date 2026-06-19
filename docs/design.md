@@ -42,6 +42,7 @@
 - **Turn Secrecy Pattern**: Active turn planning is fully hidden from the opposing player to preserve the Turn Reset capability. Opponents see a passive waiting status during the planning phase.
 - **Unified Event Broadcast**: Upon turn commitment, the backend generates an identical chronological Action Queue array and distributes it to both clients.
 - **Frontend Queue Playback**: Clients process incoming batch payloads using a sequential async loop, ensuring both players watch animations unfold with perfect deterministic lockstep alignment.
+- **Explicit Turn Start Flow**: The server does NOT auto-call `StartNewTurn()` on match creation. Instead, the client explicitly calls `POST /match/start-turn` to begin each turn (including Turn 1). This allows the UI to render the clean initial state, then animate sudden-death bomb drops when they occur on Turn 1 with `MaxTurns=0`.
 - **Turn Startup Sudden Death Checks**: State machine transition and boundary rules—such as checking if `TrueState.Turn >= Config.MaxTurn`—are evaluated at the very beginning of a new turn (`StartNewTurn()`). This ensures map alterations and automated sudden-death bomb injections are fully populated and rendered before a player can input commands. Setting `MaxTurn = 0` forces instant sudden death on Turn 1.
 - **Decoupled Analytical Queries**: Victory evaluations (`EvaluateVictoryConditions()`) are written as pure, read-only, stateless functions that return data structures without producing side effects. The top-level `ResolveTurn()` orchestrator handles updating properties and injecting the definitive termination token (`MatchEndedEvent`) into the public stream, allowing AI modules to securely query hypothetical sandboxes without corrupting telemetry arrays.
 - **Stateless Lounge-to-Game Manager**: Session lifetimes are managed via a `web.ServerStateManager`. The server starts in a "Lounge" state, dynamically allocates a match pointer (`engine.InitGame`) upon user action, and triggers a clean teardown (`ActiveMatch = nil`) upon match completion, returning to the Lounge.
@@ -50,26 +51,21 @@
 
 ```text
 +-------------------+      Uses Pointer (*)     +---------------------+
-
 |  MatchController  | ------------------------> |     engine.Match    |
 |   (UI Handler)    |                           | (Authoritative Core)|
 +-------------------+                           +---------------------+
-
           |
           | Calls Contract
           v
 +-------------------+
-
 |   <<interface>>   |
 |     MatchView     |
 +-------------------+
-
           |
           +-----------------------+-----------------------+
           | (Phase 1)             | (Phase 2)             | (Phase 4 Future)
           v                       v                       v
 +-------------------+   +-------------------+   +-------------------+
-
 |   TerminalView    |   |      WebView      |   |   WebSocketView   |
 |   (ASCII Text)    |   |  (JSON streaming) |   | (Live Event Pump) |
 +-------------------+   +-------------------+   +-------------------+
@@ -89,6 +85,54 @@
 - **Atomic Command Transaction Execution**: Turn commitment passes actions through a single atomic `POST /api/match/actions` transaction. The backend parses the payload packet, pushes it into the master engine loop, applies verification rules, and drops a consolidated state bundle containing the evaluation snapshot and resolution log vectors.
 - **Retained Playback Logs**: The sequence remains preserved throughout the turn resolution pass to drive localized client actions (raw terminal text traces in Phase 1; canvas animation frames and audio triggers in Phase 2). The array is wiped clean on the initialization boundary of a new turn sequence.
 - **Idempotency and Self-Healing Synchronization**: Network drops and state desynchronizations drop down to zero-overhead overwriting loops. Because the engine treats every network interaction as an absolute state delivery event, the client handles incoming engine payloads as immutable truth, instantly wiping and rewriting local memory allocations without complex rolling diff checks.
+
+## 8. Phase 2 HTTP API Design (REST)
+
+### 8.1 Architecture Boundary
+
+```
+Client (Phaser.js / CLI)          Server (net/http)           Engine (pure Go)
+────────────────────────────────────────────────────────────────────────────
+Controls flow                     Mediates                    Pure calc
+Renders/animates                  Validates requests          Rules, math
+User input                        Serializes JSON             No I/O
+                                  Manages rooms/matches       No time
+                                  Calls engine methods
+```
+
+### 8.2 Turn Lifecycle (Client-Driven)
+
+The server does **not** auto-call `StartNewTurn()` on match creation. Client explicitly starts each turn:
+
+1. `POST /match-rooms/{id}/match` → `CreateMatch` (full GameCfg), returns 201
+2. `GET /match-rooms/{id}/match/state` → clean Turn 1 state (no sudden death yet)
+3. `POST /match-rooms/{id}/match/start-turn` → `StartNewTurn()` injects sudden death if `MaxTurns=0`
+4. `GET /match/state` → state with bombs (animatable)
+5. Planning: `POST /move`, `POST /bomb`, `POST /reset` (sandbox)
+6. `POST /commit` → `ResolveTurn()`, returns events + next turn
+7. Loop: `GET /state` → `POST /start-turn` → ...
+
+Surrender: `POST /surrender` (either team, any time).
+
+### 8.3 Endpoints
+
+| Method | Path | Handler | Engine Call |
+|--------|------|---------|-------------|
+| `GET` | `/match-rooms/{id}/match/state` | `HandleGetMatchState` | Read `WorkingState` |
+| `POST` | `/match-rooms/{id}/match/start-turn` | `HandleStartTurn` | `Match.StartNewTurn()` |
+| `POST` | `/match-rooms/{id}/match/commit` | `HandleCommitTurn` | `Match.ResolveTurn()` |
+| `POST` | `/match-rooms/{id}/match/reset` | `HandleResetTurn` | `Match.ResetTurn()` |
+| `POST` | `/match-rooms/{id}/match/surrender` | `HandleSurrender` | `Match.Surrender(teamID)` |
+| `POST` | `/match-rooms/{id}/match/move` | `HandleMoveUnit` | `ApplyTurnCommand(MoveCommand)` |
+| `POST` | `/match-rooms/{id}/match/bomb` | `HandlePlaceBomb` | `ApplyTurnCommand(PlaceBombCommand)` |
+
+### 8.4 Key Decisions
+
+- **State exposure**: `WorkingState` only (sandbox), never `TrueState`
+- **Surrender**: Either team, validated as 1 or 2
+- **Locking**: Global `mu` (Phase 2), per-room deferred to Phase 4
+- **Stale cleanup**: 10min timeout, 30s interval, `LastActivity` updated on every request
+- **CreateMatch**: Full GameCfg required (Phase 2); partial/join deferred to Phase 4
 
 # File Structure (WIP)
 

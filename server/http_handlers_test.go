@@ -431,3 +431,301 @@ func assertCreateMatchContract(t *testing.T, body []byte) {
 		}
 	}
 }
+
+// ClientUnit mimics the client's view of Unit in GetMatchState response
+type ClientUnit struct {
+	ID           engine.UnitID     `json:"id"`
+	Type         string            `json:"type"`
+	Position     engine.Coordinate `json:"position"`
+	Speed        int               `json:"speed"`
+	BombMaxRange int               `json:"bombMaxRange"`
+	BombPower    int               `json:"bombPower"`
+	MaxBombCount int               `json:"maxBombCount"`
+	BombUsed     int               `json:"bombUsed"`
+	Team         int               `json:"team"`
+	HP           int               `json:"hp"`
+	Skills       []string          `json:"skills"`
+	HasMoved     bool              `json:"hasMoved"`
+	HasUsedSkill bool              `json:"hasUsedSkill"`
+}
+
+// ClientTile mimics the client's view of Tile in GetMatchState response
+type ClientTile struct {
+	Type         string `json:"type"`
+	OccupantType string `json:"occupantType"`
+	OccupantID   int64  `json:"occupantId"`
+}
+
+// ClientMatchStateResponse mimics the client's view of GetMatchState response
+type ClientMatchStateResponse struct {
+	Turn         int                  `json:"turn"`
+	ActiveTeam   int                  `json:"activeTeam"`
+	Grid         [][]ClientTile       `json:"grid"`
+	Units        []ClientUnit         `json:"units"`
+	Bombs        []*engine.Bomb       `json:"bombs"`
+	SoftBlocks   []*engine.SoftBlock  `json:"softBlocks"`
+	TurnCommands []engine.TurnCommand `json:"turnCommands"`
+}
+
+func TestHandleGetMatchState(t *testing.T) {
+	setupMux := func(s *ServerStateManager) *http.ServeMux {
+		mux := http.NewServeMux()
+		mux.HandleFunc("GET /api/match-rooms/{roomID}/match/state", s.HandleGetMatchState)
+		return mux
+	}
+
+	t.Run("Success: creates a new match in an existing room", func(t *testing.T) {
+		s := NewServerStateManager()
+		roomID, err := s.CreateMatchRoom()
+		if err != nil {
+			t.Fatalf("Failed to create room: %v", err)
+		}
+
+		gameCfg := engine.GameCfg{
+			StagePreset: "MAP03",
+			P1Teams:     []string{"King", "Fighter"},
+			P2Teams:     []string{"King", "Witch"},
+			MaxTurns:    10,
+		}
+		err = s.CreateMatch(roomID, gameCfg)
+		if err != nil {
+			t.Fatalf("Failed to create match: %v", err)
+		}
+
+		req, err := http.NewRequest("GET", "/api/match-rooms/"+roomID+"/match/state", nil)
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+
+		rr := httptest.NewRecorder()
+		setupMux(s).ServeHTTP(rr, req)
+
+		if status := rr.Code; status != http.StatusOK {
+			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusOK)
+		}
+
+		expectedHeader := "application/json"
+		if contentType := rr.Header().Get("Content-Type"); contentType != expectedHeader {
+			t.Errorf("Handler returned wrong content type: got %v want %v", contentType, expectedHeader)
+		}
+		t.Log(rr.Body)
+		var response ClientMatchStateResponse
+		if err := json.NewDecoder(rr.Body).Decode(&response); err != nil {
+			t.Fatalf("Failed to decode response JSON payload: %v", err)
+		}
+
+		if response.Turn != 1 {
+			t.Errorf("Expected turn 1, got %d", response.Turn)
+		}
+		if response.ActiveTeam != 1 {
+			t.Errorf("Expected activeTeam 1, got %d", response.ActiveTeam)
+		}
+		if len(response.Units) == 0 {
+			t.Error("Expected units to be populated")
+		}
+		for _, u := range response.Units {
+			if u.ID == 0 {
+				t.Error("Unit missing ID")
+			}
+			if u.Type == "" {
+				t.Error("Unit missing type")
+			}
+			if u.HP != 1 {
+				t.Errorf("Expected unit HP 1, got %d", u.HP)
+			}
+		}
+	})
+
+	t.Run("Failure: room not found", func(t *testing.T) {
+		s := NewServerStateManager()
+		req, err := http.NewRequest("GET", "/api/match-rooms/NONEXISTENT/match/state", nil)
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+
+		rr := httptest.NewRecorder()
+		setupMux(s).ServeHTTP(rr, req)
+
+		if status := rr.Code; status != http.StatusNotFound {
+			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusNotFound)
+		}
+		if !strings.Contains(rr.Body.String(), "room not found") {
+			t.Errorf("Expected error message 'room not found', got: %s", rr.Body.String())
+		}
+	})
+
+	t.Run("Failure: match not found", func(t *testing.T) {
+		s := NewServerStateManager()
+		roomID, err := s.CreateMatchRoom()
+		if err != nil {
+			t.Fatalf("Failed to create room: %v", err)
+		}
+
+		req, err := http.NewRequest("GET", "/api/match-rooms/"+roomID+"/match/state", nil)
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+
+		rr := httptest.NewRecorder()
+		setupMux(s).ServeHTTP(rr, req)
+
+		if status := rr.Code; status != http.StatusNotFound {
+			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusNotFound)
+		}
+		if !strings.Contains(rr.Body.String(), "match not found") {
+			t.Errorf("Expected error message 'match not found', got: %s", rr.Body.String())
+		}
+	})
+
+	t.Run("Failure: failed to Encode", func(t *testing.T) {
+		s := NewServerStateManager()
+		roomID, err := s.CreateMatchRoom()
+		if err != nil {
+			t.Fatalf("Failed to create room: %v", err)
+		}
+
+		gameCfg := engine.GameCfg{
+			StagePreset: "MAP01",
+			P1Teams:     []string{"King", "Fighter"},
+			P2Teams:     []string{"King", "Witch"},
+			MaxTurns:    10,
+		}
+		err = s.CreateMatch(roomID, gameCfg)
+		if err != nil {
+			t.Fatalf("Failed to create match: %v", err)
+		}
+
+		req, err := http.NewRequest("GET", "/api/match-rooms/"+roomID+"/match/state", nil)
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+
+		brokenWriter := &BrokenResponseWriter{}
+		setupMux(s).ServeHTTP(brokenWriter, req)
+
+		if brokenWriter.Code != http.StatusOK {
+			t.Errorf("Expected initial header setup to attempt status 200, got %d", brokenWriter.Code)
+		}
+	})
+
+	t.Run("Test Contract", func(t *testing.T) {
+		s := NewServerStateManager()
+		roomID, err := s.CreateMatchRoom()
+		if err != nil {
+			t.Fatalf("Failed to create room: %v", err)
+		}
+
+		gameCfg := engine.GameCfg{
+			StagePreset: "MAP03",
+			P1Teams:     []string{"King", "Fighter"},
+			P2Teams:     []string{"King", "Witch"},
+			MaxTurns:    10,
+		}
+		err = s.CreateMatch(roomID, gameCfg)
+		if err != nil {
+			t.Fatalf("Failed to create match: %v", err)
+		}
+
+		req, _ := http.NewRequest("GET", "/api/match-rooms/"+roomID+"/match/state", nil)
+		rr := httptest.NewRecorder()
+		setupMux(s).ServeHTTP(rr, req)
+
+		assertMatchStateContract(t, rr.Body.Bytes())
+	})
+}
+
+func assertMatchStateContract(t *testing.T, body []byte) {
+	var raw map[string]any
+	if err := json.Unmarshal(body, &raw); err != nil {
+		t.Fatalf("Failed to parse JSON: %v", err)
+	}
+	expectedFields := []string{"turn", "activeTeam", "grid", "units", "bombs", "softBlocks", "turnCommands"}
+	if len(raw) != len(expectedFields) {
+		t.Errorf("Field count mismatch: want %d, got %d", len(expectedFields), len(raw))
+	}
+	for _, field := range expectedFields {
+		if _, exists := raw[field]; !exists {
+			t.Errorf("Phaser Contract Broken: JavaScript code expects key '%s', but it was missing", field)
+		}
+	}
+
+	if gridRaw, ok := raw["grid"].([]any); ok && len(gridRaw) > 4 {
+		tests := []struct {
+			x, y       int
+			expType    string
+			expOccType string
+			expOccID   float64
+		}{
+			{0, 4, "TerrainPlain", "OccupantItem", 0},
+			{4, 8, "TerrainPlain", "OccupantUnit", 16},
+			{4, 0, "TerrainPlain", "OccupantUnit", 32},
+			{1, 1, "TerrainPlain", "OccupantNone", 0},
+		}
+		for _, tt := range tests {
+			if tt.y < len(gridRaw) {
+				row := gridRaw[tt.y].([]any)
+				if tt.x < len(row) {
+					tile := row[tt.x].(map[string]any)
+
+					for _, field := range []string{"type", "occupantType", "occupantId"} {
+						if _, exists := tile[field]; !exists {
+							t.Errorf("grid[%d][%d] missing key '%s'", tt.y, tt.x, field)
+						}
+					}
+					if tile["type"] != tt.expType {
+						t.Errorf("grid[%d][%d].type: want %q got %v", tt.y, tt.x, tt.expType, tile["type"])
+					}
+					if tile["occupantType"] != tt.expOccType {
+						t.Errorf("grid[%d][%d].occupantType: want %q got %v", tt.y, tt.x, tt.expOccType, tile["occupantType"])
+					}
+					if tile["occupantId"] != tt.expOccID {
+						t.Errorf("grid[%d][%d].occupantId: want %v got %v", tt.y, tt.x, tt.expOccID, tile["occupantId"])
+					}
+				}
+			}
+		}
+	}
+
+	if sbRaw, ok := raw["softBlocks"].([]any); ok && len(sbRaw) == 4 {
+		expectedCoords := map[int][2]int{
+			0: {0, 4},
+			1: {2, 4},
+			2: {6, 4},
+			3: {8, 4},
+		}
+		for _, sbAny := range sbRaw {
+			sb := sbAny.(map[string]any)
+			for _, field := range []string{"id", "position"} {
+				if _, exists := sb[field]; !exists {
+					t.Errorf("softBlock missing key '%s'", field)
+				}
+			}
+			id := int(sb["id"].(float64))
+			if coord, ok := sb["position"].(map[string]any); ok {
+				exp, ok := expectedCoords[id]
+				if !ok {
+					t.Errorf("softBlock unexpected id: %d", id)
+				} else {
+					if coord["x"] != float64(exp[0]) || coord["y"] != float64(exp[1]) {
+						t.Errorf("softBlock[%d].position: want (%d,%d) got (%v,%v)", id, exp[0], exp[1], coord["x"], coord["y"])
+					}
+				}
+			}
+		}
+	}
+
+	// TODO: test bombs when PlaceBomb is implemented
+
+	// TODO: test turnCommands when command handling is implemented
+
+	if unitsRaw, ok := raw["units"].([]any); ok && len(unitsRaw) > 0 {
+		if unit, ok := unitsRaw[0].(map[string]any); ok {
+			unitFields := []string{"id", "type", "position", "speed", "bombMaxRange", "bombPower", "maxBombCount", "bombUsed", "team", "hp", "skills", "hasMoved", "hasUsedSkill"}
+			for _, field := range unitFields {
+				if _, exists := unit[field]; !exists {
+					t.Errorf("Phaser Contract Broken: unit missing key '%s'", field)
+				}
+			}
+		}
+	}
+}

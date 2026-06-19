@@ -1,8 +1,8 @@
 package engine
 
-const BombDefaultCountDown int = 5
-const BombDefaultPower int = 2
-const SuddenDeathBombs int = 2
+const BombDefaultCountDown int = 5 // default countdown for Bomb
+const BombDefaultPower int = 2     // default power of Bomb
+const SuddenDeathBombs int = 2     // Sudden Death, maximum bombs to drop during Sudden Death
 
 // ArchetypeRegistry stores the base templates. We keep it unexported (lowercase 'a')
 // so code outside this package cannot alter the map items directly.

@@ -18,10 +18,33 @@ const (
 	TerrainLava
 )
 
+// String converts a TerrainType integer value into a human-readable text string.
+func (t TerrainType) String() string {
+	switch t {
+	case TerrainPlain:
+		return "TerrainPlain"
+	case TerrainBlock:
+		return "TerrainBlock"
+	case TerrainTower:
+		return "TerrainTower"
+	case TerrainWater:
+		return "TerrainWater"
+	case TerrainLava:
+		return "TerrainLava"
+	default:
+		return "TerrainUnknown"
+	}
+}
+
+// MarshalJSON serializes TerrainType struct to JSON that client needs
+func (o TerrainType) MarshalJSON() ([]byte, error) {
+	return json.Marshal(o.String())
+}
+
 // Coordinate represents a grid position using (X, Y) where (0,0) is top-left.
 type Coordinate struct {
-	X int
-	Y int
+	X int `json:"x"`
+	Y int `json:"y"`
 }
 
 // OccupantType represents what occupies a tile (if anything).
@@ -35,18 +58,41 @@ const (
 	OccupantItem                          // Item pickup (hidden in soft block)
 )
 
+// String converts an OccupantType integer value into a human-readable text string.
+func (o OccupantType) String() string {
+	switch o {
+	case OccupantNone:
+		return "OccupantNone"
+	case OccupantUnit:
+		return "OccupantUnit"
+	case OccupantBomb:
+		return "OccupantBomb"
+	case OccupantSoftBlock:
+		return "OccupantSoftBlock"
+	case OccupantItem:
+		return "OccupantItem"
+	default:
+		return "OccupantUnknown"
+	}
+}
+
+// MarshalJSON serializes OccupantType struct to JSON that client needs
+func (o OccupantType) MarshalJSON() ([]byte, error) {
+	return json.Marshal(o.String())
+}
+
 // Tile represents a single cell on the game board combining terrain and occupant.
 type Tile struct {
-	Type         TerrainType
-	OccupantType OccupantType
-	OccupantID   int64 // Cross-reference ID for the occupant (UnitID, BombID, or SoftBlockID)
+	Type         TerrainType  `json:"type"`
+	OccupantType OccupantType `json:"occupantType"`
+	OccupantID   int64        `json:"occupantId"` // Cross-reference ID for the occupant (UnitID, BombID, or SoftBlockID)
 }
 
 // SoftBlock represents a destructible block that may hide an item.
 type SoftBlock struct {
-	ID         int
-	Position   Coordinate
-	HiddenItem string // Reserved for future item system
+	ID         int        `json:"id"`
+	Position   Coordinate `json:"position"`
+	HiddenItem string     `json:"-"` // Reserved for future item system
 }
 
 // StagePreset defines a complete map layout including terrain, soft blocks, and starting positions.
@@ -69,6 +115,18 @@ const (
 	SkillCanFly
 )
 
+// String converts an SkillType integer value into a human-readable text string.
+func (s SkillType) String() string {
+	switch s {
+	case SkillCanFly:
+		return "Fly"
+	case SkillCanJump:
+		return "Jump"
+	default:
+		return "Unknown"
+	}
+}
+
 // Archetype defines the base template for a unit class (King, Fighter, Witch, etc.).
 type Archetype struct {
 	Name         string             `json:"name"`
@@ -82,6 +140,7 @@ type Archetype struct {
 	IsSelectable bool               `json:"-"`
 }
 
+// MarshalJSON serializes Archetype struct to JSON that client needs
 func (a Archetype) MarshalJSON() ([]byte, error) {
 	skills := []string{}
 	for s, ok := range a.PresetSkills {
@@ -122,13 +181,52 @@ type Unit struct {
 	HasUsedSkill bool // True after placing bomb or using skill; resets each turn
 }
 
+// MarshalJSON serializes Unit struct to JSON that client needs
+func (u Unit) MarshalJSON() ([]byte, error) {
+	skills := []string{}
+	for s, ok := range u.Skills {
+		if ok {
+			skills = append(skills, s.String())
+		}
+	}
+	return json.Marshal(struct {
+		ID           UnitID     `json:"id"`
+		Type         string     `json:"type"`
+		Position     Coordinate `json:"position"`
+		Speed        int        `json:"speed"`
+		BombMaxRange int        `json:"bombMaxRange"`
+		BombPower    int        `json:"bombPower"`
+		MaxBombCount int        `json:"maxBombCount"`
+		BombUsed     int        `json:"bombUsed"`
+		Team         int        `json:"team"`
+		HP           int        `json:"hp"`
+		Skills       []string   `json:"skills"`
+		HasMoved     bool       `json:"hasMoved"`
+		HasUsedSkill bool       `json:"hasUsedSkill"`
+	}{
+		u.ID,
+		u.Type.Name,
+		u.Position,
+		u.Speed,
+		u.BombMaxRange,
+		u.BombPower,
+		u.MaxBombCount,
+		u.BombUsed,
+		u.Team,
+		u.HP,
+		skills,
+		u.HasMoved,
+		u.HasUsedSkill,
+	})
+}
+
 // Bomb represents an active explosive on the board.
 type Bomb struct {
-	ID        BombID
-	OwnerID   UnitID // Unit that placed this bomb
-	Position  Coordinate
-	Range     int // Explosion radius in tiles
-	Countdown int // Turns remaining until detonation; <0 for non-countdown bombs
+	ID        BombID     `json:"id"`
+	OwnerID   UnitID     `json:"ownerId"` // Unit that placed this bomb
+	Position  Coordinate `json:"position"`
+	Range     int        `json:"range"`     // Explosion radius in tiles
+	Countdown int        `json:"countdown"` // Turns remaining until detonation; <0 for non-countdown bombs
 }
 
 // GameCfg holds all configuration for a match.
@@ -138,7 +236,7 @@ type GameCfg struct {
 	P2Teams                     []string `json:"p2Teams"`        // Archetype names for Player 2 (1-5 units, first must be King)
 	MaxTurns                    int      `json:"maxTurns"`       // Turn limit; 0 = instant sudden death
 	AllowResetTurn              bool     `json:"allowResetTurn"` // True = players can undo actions before committing
-	SuddenDeath                 bool     `json:"SuddenDeath"`    // True = spawn hazards after MaxTurns; False = draw at limit
+	SuddenDeath                 bool     `json:"suddenDeath"`    // True = spawn hazards after MaxTurns; False = draw at limit
 	GlobalSpeedOverride         int      `json:"-"`              // Test override for all unit speeds (0 = disabled)
 	GlobalBombCountdownOverride int      `json:"-"`              // Test override for bomb countdown (0 = disabled)
 	GlobalBombMaxRangeOverride  int      `json:"-"`              // Test override for bomb max range (0 = disabled)
@@ -156,6 +254,39 @@ type GameState struct {
 	TurnCommands    []TurnCommand      // Pending commands for current turn
 }
 
+// MarshalJSON serializes GameState struct to JSON that client needs
+func (gs GameState) MarshalJSON() ([]byte, error) {
+	units := make([]*Unit, 0, len(gs.Units))
+	for _, u := range gs.Units {
+		units = append(units, u)
+	}
+	bombs := make([]*Bomb, 0, len(gs.Bombs))
+	for _, b := range gs.Bombs {
+		bombs = append(bombs, b)
+	}
+	softBlocks := make([]*SoftBlock, 0, len(gs.SoftBlocks))
+	for _, sb := range gs.SoftBlocks {
+		softBlocks = append(softBlocks, sb)
+	}
+	return json.Marshal(struct {
+		Turn         int           `json:"turn"`
+		ActiveTeam   int           `json:"activeTeam"`
+		Grid         [][]Tile      `json:"grid"`
+		Units        []*Unit       `json:"units"`
+		Bombs        []*Bomb       `json:"bombs"`
+		SoftBlocks   []*SoftBlock  `json:"softBlocks"`
+		TurnCommands []TurnCommand `json:"turnCommands"`
+	}{
+		gs.Turn,
+		gs.ActiveTeam,
+		gs.Grid,
+		units,
+		bombs,
+		softBlocks,
+		gs.TurnCommands,
+	})
+}
+
 // TurnCommand is the unified interface for all player actions during a turn.
 type TurnCommand interface {
 	isTurnCommand()
@@ -163,16 +294,16 @@ type TurnCommand interface {
 
 // MoveCommand instructs a unit to move to a target coordinate.
 type MoveCommand struct {
-	UnitID UnitID
-	Target Coordinate
+	UnitID UnitID     `json:"unitId"`
+	Target Coordinate `json:"target"`
 }
 
 func (MoveCommand) isTurnCommand() {}
 
 // PlaceBombCommand instructs a unit to place a bomb at a target coordinate.
 type PlaceBombCommand struct {
-	UnitID UnitID
-	Target Coordinate
+	UnitID UnitID     `json:"unitId"`
+	Target Coordinate `json:"target"`
 }
 
 func (PlaceBombCommand) isTurnCommand() {}
@@ -184,67 +315,67 @@ type GameEvent interface {
 
 // UnitMovedEvent signals a unit relocated.
 type UnitMovedEvent struct {
-	UnitID UnitID
-	From   Coordinate
-	To     Coordinate
+	UnitID UnitID     `json:"unitId"`
+	From   Coordinate `json:"from"`
+	To     Coordinate `json:"to"`
 }
 
 func (UnitMovedEvent) isGameEvent() {}
 
 // UnitDamagedEvent signals a unit took damage.
 type UnitDamagedEvent struct {
-	UnitID UnitID
-	NewHP  int
+	UnitID UnitID `json:"unitId"`
+	NewHP  int    `json:"newHp"`
 }
 
 func (UnitDamagedEvent) isGameEvent() {}
 
 // UnitDiedEvent signals a unit was eliminated.
 type UnitDiedEvent struct {
-	UnitID UnitID
+	UnitID UnitID `json:"unitId"`
 }
 
 func (UnitDiedEvent) isGameEvent() {}
 
 // BombPlacedEvent signals a new bomb was deployed.
 type BombPlacedEvent struct {
-	UnitID    UnitID
-	BombID    BombID
-	Position  Coordinate
-	Range     int
-	Countdown int
+	UnitID    UnitID     `json:"unitId"`
+	BombID    BombID     `json:"bombId"`
+	Position  Coordinate `json:"position"`
+	Range     int        `json:"range"`
+	Countdown int        `json:"countdown"`
 }
 
 func (BombPlacedEvent) isGameEvent() {}
 
 // BombExplodedEvent signals a bomb detonated and lists affected tiles.
 type BombExplodedEvent struct {
-	BombID            BombID
-	AffectedPositions []Coordinate
+	BombID            BombID       `json:"bombId"`
+	AffectedPositions []Coordinate `json:"affectedPositions"`
 }
 
 func (BombExplodedEvent) isGameEvent() {}
 
 // SoftBlockDestroyedEvent signals a soft block was destroyed.
 type SoftBlockDestroyedEvent struct {
-	SoftBlockID int
-	Position    Coordinate
+	SoftBlockID int        `json:"softBlockId"`
+	Position    Coordinate `json:"position"`
 }
 
 func (SoftBlockDestroyedEvent) isGameEvent() {}
 
 // ItemDestroyedEvent signals an item was destroyed (future phase).
 type ItemDestroyedEvent struct {
-	ItemID   int
-	Position Coordinate
+	ItemID   int        `json:"itemId"`
+	Position Coordinate `json:"position"`
 }
 
 func (ItemDestroyedEvent) isGameEvent() {}
 
 // MatchEndedEvent signals the match concluded.
 type MatchEndedEvent struct {
-	WinnerTeamID int // 1, 2, or -1 for draw
-	IsDraw       bool
+	WinnerTeamID int  `json:"winnerTeamId"`
+	IsDraw       bool `json:"isDraw"`
 }
 
 func (MatchEndedEvent) isGameEvent() {}

@@ -214,3 +214,68 @@ func TestServerStateManager_CreateMatch(t *testing.T) {
 		}
 	})
 }
+
+func TestServerStateManager_GetMatchState(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		s := NewServerStateManager()
+
+		roomID, err := s.CreateMatchRoom()
+		if err != nil {
+			t.Fatalf("CreateMatchRoom() returned error: %v", err)
+		}
+
+		gameCfg := engine.GameCfg{
+			StagePreset: "MAP01",
+			P1Teams:     []string{"King", "Fighter"},
+			P2Teams:     []string{"King", "Witch"},
+			MaxTurns:    10,
+		}
+
+		err = s.CreateMatch(roomID, gameCfg)
+		if err != nil {
+			t.Fatalf("CreateMatch() returned error: %v", err)
+		}
+
+		gs, err := s.GetMatchState(roomID)
+		if err != nil {
+			t.Fatalf("GetMatchState() returned error %v", err)
+		}
+
+		room, ok := s.Rooms[roomID]
+		if !ok {
+			t.Fatal("Room not found")
+		}
+		if gs != room.Match.WorkingState {
+			t.Errorf("Expected matchState pointer %p, got %p", room.Match.WorkingState, gs)
+		}
+	})
+
+	t.Run("Room Not Found", func(t *testing.T) {
+		s := NewServerStateManager()
+
+		_, err := s.GetMatchState("NONEXISTENT")
+		if err == nil {
+			t.Fatal("Expected error for non-existent room")
+		}
+		if !errors.Is(err, ErrRoomNotFound) {
+			t.Errorf("Expected ErrRoomNotFound, got: %v", err)
+		}
+	})
+
+	t.Run("Match Not Found", func(t *testing.T) {
+		s := NewServerStateManager()
+
+		roomID, err := s.CreateMatchRoom()
+		if err != nil {
+			t.Fatalf("CreateMatchRoom() returned error: %v", err)
+		}
+
+		_, err = s.GetMatchState(roomID)
+		if err == nil {
+			t.Fatal("Expected error for non-existent match")
+		}
+		if !errors.Is(err, ErrMatchNotFound) {
+			t.Errorf("Expected ErrMatchNotFound, got: %v", err)
+		}
+	})
+}
