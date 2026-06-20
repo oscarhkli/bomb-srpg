@@ -16,10 +16,11 @@ const (
 )
 
 var (
-	ErrRoomNotFound  = errors.New("room not found")
-	ErrMatchExists   = errors.New("match already exists")
-	ErrMatchNotFound = errors.New("match not found")
-	ErrInvalidConfig = errors.New("invalid game config")
+	ErrRoomNotFound   = errors.New("room not found")
+	ErrMatchExists    = errors.New("match already exists")
+	ErrMatchNotFound  = errors.New("match not found")
+	ErrInvalidConfig  = errors.New("invalid game config")
+	ErrInvalidTurnCmd = errors.New("invalid turn command")
 )
 
 // MatchRoom wraps the core engine match instance with server-layer network metadata.
@@ -117,7 +118,7 @@ func (s *ServerStateManager) CreateMatch(roomID string, gameCfg engine.GameCfg) 
 	return nil
 }
 
-// GetMatchState get the WorkingState of the Match in a given MatchRoom.
+// GetMatchState gets the WorkingState of the Match in a given MatchRoom.
 // Returns the WorkingState or an error if any pre-check is violated.
 func (s *ServerStateManager) GetMatchState(roomID string) (*engine.GameState, error) {
 	s.mu.RLock()
@@ -132,6 +133,33 @@ func (s *ServerStateManager) GetMatchState(roomID string) (*engine.GameState, er
 	if room.Match == nil {
 		slog.Warn("match not found", "roomID", roomID)
 		return nil, fmt.Errorf("%w: roomID=%s", ErrMatchNotFound, roomID)
+	}
+
+	return room.Match.WorkingState, nil
+}
+
+// SubmitTurnCommand delivers TurnCommand to engine to move a Unit or place a bomb in a given MatchRoom.
+// Returns the latest WorkingState or an error if any pre-check is violated
+func (s *ServerStateManager) SubmitTurnCommand(roomID string, cmd engine.TurnCommand) (*engine.GameState, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	room, ok := s.Rooms[roomID]
+	if !ok {
+		slog.Warn("match room not found", "roomID", roomID)
+		return nil, fmt.Errorf("%w: roomID=%s", ErrRoomNotFound, roomID)
+	}
+
+	if room.Match == nil {
+		slog.Warn("match not found", "roomID", roomID)
+		return nil, fmt.Errorf("%w: roomID=%s", ErrMatchNotFound, roomID)
+	}
+
+	err := room.Match.ApplyTurnCommand(cmd)
+
+	if err != nil {
+		slog.Error("invalid turn command", "roomID", roomID, "turnCmdType", cmd.Type, "error", err)
+		return nil, fmt.Errorf("%w: turnCommand=%+v: %v", ErrInvalidTurnCmd, cmd, err)
 	}
 
 	return room.Match.WorkingState, nil

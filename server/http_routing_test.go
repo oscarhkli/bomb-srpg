@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -18,6 +19,7 @@ func TestHTTPRouting(t *testing.T) {
 	mux.HandleFunc("POST /api/match-rooms", serverState.HandleCreateMatchRoom)
 	mux.HandleFunc("POST /api/match-rooms/{roomID}/match", serverState.HandleCreateMatch)
 	mux.HandleFunc("GET /api/match-rooms/{roomID}/match/state", serverState.HandleGetMatchState)
+	mux.HandleFunc("POST /api/match-rooms/{roomID}/match/turn-commands", serverState.HandleSubmitTurnCommand)
 
 	server := httptest.NewServer(mux)
 	defer server.Close()
@@ -106,6 +108,18 @@ func TestHTTPRouting(t *testing.T) {
 			path:       "/api/match-rooms/DUMMY/match/state",
 			wantStatus: http.StatusMethodNotAllowed,
 		},
+		{
+			name:       "POST /api/match-rooms/{roomID}/match/turn-commands (404 - no room)",
+			method:     "POST",
+			path:       "/api/match-rooms/DUMMY/match/turn-commands",
+			wantStatus: http.StatusNotFound,
+		},
+		{
+			name:       "GET /api/match-rooms/{roomID}/match/turn-commands (405)",
+			method:     "GET",
+			path:       "/api/match-rooms/DUMMY/match/turn-commands",
+			wantStatus: http.StatusMethodNotAllowed,
+		},
 	}
 
 	gameCfgBody, _ := json.Marshal(engine.GameCfg{
@@ -115,12 +129,17 @@ func TestHTTPRouting(t *testing.T) {
 		MaxTurns:    10,
 	})
 
+	turnCmdBody, _ := json.Marshal(engine.NewMoveCommand(engine.NewUnitID(1, 0), engine.Coordinate{X: 4, Y: 7}))
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var body io.Reader
 			if tt.name == "POST /api/match-rooms/{roomID}/match" {
 				body = bytes.NewReader(gameCfgBody)
+			} else if strings.HasPrefix(tt.name, "POST /api/match-rooms/{roomID}/match/turn-commands") {
+				body = bytes.NewBuffer(turnCmdBody)
 			}
+
 			req, err := http.NewRequest(tt.method, server.URL+tt.path, body)
 			if err != nil {
 				t.Fatalf("Failed to create request: %v", err)

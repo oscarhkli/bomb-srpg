@@ -109,12 +109,12 @@ func (s *ServerStateManager) HandleCreateMatch(w http.ResponseWriter, r *http.Re
 	slog.Info("match created", "roomID", roomID)
 }
 
-// GetMatchState get the WorkingState of the Match in a given MatchRoom.
+// GetMatchState gets the WorkingState of the Match in a given MatchRoom.
 // It encodes the gameState definitions as JSON and writes them to the response.
 func (s *ServerStateManager) HandleGetMatchState(w http.ResponseWriter, r *http.Request) {
 	roomID := r.PathValue("roomID")
 
-	gameState, err := s.GetMatchState(roomID)
+	gs, err := s.GetMatchState(roomID)
 
 	if err != nil {
 		switch {
@@ -134,7 +134,48 @@ func (s *ServerStateManager) HandleGetMatchState(w http.ResponseWriter, r *http.
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 
-	if err := json.NewEncoder(w).Encode(gameState); err != nil {
+	if err := json.NewEncoder(w).Encode(gs); err != nil {
+		slog.Error("encode gameState failed", "error", err)
+		http.Error(w, "Failed to encode gameState definitions", http.StatusInternalServerError)
+		return
+	}
+}
+
+// HandleSubmitTurnCommand delivers TurnCommand to engine to move a Unit or place a bomb in a given MatchRoom.
+// It encodes the definitions as JSON and writes them to the response.
+func (s *ServerStateManager) HandleSubmitTurnCommand(w http.ResponseWriter, r *http.Request) {
+	roomID := r.PathValue("roomID")
+
+	var req engine.TurnCommand
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		slog.Warn("invalid turnCommand format", "error", err)
+		http.Error(w, "Invalid turnCommand format", http.StatusBadRequest)
+		return
+	}
+
+	gs, err := s.SubmitTurnCommand(roomID, req)
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrRoomNotFound):
+			slog.Warn("submit turn command match room not found", "roomID", roomID)
+			http.Error(w, "room not found", http.StatusNotFound)
+		case errors.Is(err, ErrMatchNotFound):
+			slog.Warn("submit turn command match not found", "roomID", roomID)
+			http.Error(w, "match not found", http.StatusNotFound)
+		case errors.Is(err, ErrInvalidTurnCmd):
+			slog.Warn("submit turn command invalid turn command", "roomID", roomID)
+			http.Error(w, "invalid turn command", http.StatusConflict)
+		default:
+			slog.Error("get match state internal error", "roomID", roomID, "error", err)
+			http.Error(w, "internal error", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	if err := json.NewEncoder(w).Encode(gs); err != nil {
 		slog.Error("encode gameState failed", "error", err)
 		http.Error(w, "Failed to encode gameState definitions", http.StatusInternalServerError)
 		return

@@ -279,3 +279,130 @@ func TestServerStateManager_GetMatchState(t *testing.T) {
 		}
 	})
 }
+
+func TestServerStateManager_SubmitTurnCommand(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		s := NewServerStateManager()
+
+		roomID, err := s.CreateMatchRoom()
+		if err != nil {
+			t.Fatalf("CreateMatchRoom() returned error: %v", err)
+		}
+
+		gameCfg := engine.GameCfg{
+			StagePreset: "MAP01",
+			P1Teams:     []string{"King", "Fighter"},
+			P2Teams:     []string{"King", "Witch"},
+			MaxTurns:    10,
+		}
+
+		err = s.CreateMatch(roomID, gameCfg)
+		if err != nil {
+			t.Fatalf("CreateMatch() returned error: %v", err)
+		}
+
+		uID := engine.NewUnitID(1, 0)
+		newPos := engine.Coordinate{X: 4, Y: 7}
+		cmd := engine.NewMoveCommand(uID, newPos)
+
+		gs, err := s.SubmitTurnCommand(roomID, cmd)
+		if err != nil {
+			t.Fatalf("SubmitTurnCommand() returned error: %v", err)
+		}
+
+		room, ok := s.Rooms[roomID]
+		if !ok {
+			t.Fatal("Room not found")
+		}
+		if gotPos := room.Match.WorkingState.Units[uID].Position; gotPos != newPos {
+			t.Errorf("Expected Unit %#X new position %#v, got %#v", uID, newPos, gotPos)
+		}
+		if gs != room.Match.WorkingState {
+			t.Errorf("Expected matchState pointer %p, got %p", room.Match.WorkingState, gs)
+		}
+	})
+
+	t.Run("Invalid TurnCommand", func(t *testing.T) {
+		s := NewServerStateManager()
+
+		roomID, err := s.CreateMatchRoom()
+		if err != nil {
+			t.Fatalf("CreateMatchRoom() returned error: %v", err)
+		}
+
+		gameCfg := engine.GameCfg{
+			StagePreset: "MAP01",
+			P1Teams:     []string{"King", "Fighter"},
+			P2Teams:     []string{"King", "Witch"},
+			MaxTurns:    10,
+		}
+
+		err = s.CreateMatch(roomID, gameCfg)
+		if err != nil {
+			t.Fatalf("CreateMatch() returned error: %v", err)
+		}
+
+		uID := engine.NewUnitID(1, 0)
+		newPos := engine.Coordinate{X: 4, Y: 7777}
+		cmd := engine.NewMoveCommand(uID, newPos)
+
+		gs, err := s.SubmitTurnCommand(roomID, cmd)
+		if err == nil {
+			t.Fatal("Expected error for invalid TurnCommand")
+		}
+		if !errors.Is(err, ErrInvalidTurnCmd) {
+			t.Errorf("Expected ErrInvalidTurnCmd, got: %v", err)
+		}
+
+		room, ok := s.Rooms[roomID]
+		if !ok {
+			t.Fatal("Room not found")
+		}
+		if gotPos := room.Match.WorkingState.Units[uID].Position; gotPos == newPos {
+			t.Errorf("Expected Unit %#X didn't move", uID)
+		}
+		if gs != nil {
+			t.Errorf("Expected matchState to be nil, got %p", gs)
+		}
+	})
+
+	t.Run("Room Not Found", func(t *testing.T) {
+		s := NewServerStateManager()
+
+		uID := engine.NewUnitID(1, 0)
+		newPos := engine.Coordinate{X: 4, Y: 7777}
+		cmd := engine.NewMoveCommand(uID, newPos)
+
+		gs, err := s.SubmitTurnCommand("NONEXISTENT", cmd)
+		if err == nil {
+			t.Fatal("Expected error for non-existent room")
+		}
+		if !errors.Is(err, ErrRoomNotFound) {
+			t.Errorf("Expected ErrRoomNotFound, got: %v", err)
+		}
+		if gs != nil {
+			t.Errorf("Expected matchState to be nil, got %p", gs)
+		}
+	})
+
+	t.Run("Match Not Found", func(t *testing.T) {
+		s := NewServerStateManager()
+
+		roomID, err := s.CreateMatchRoom()
+		if err != nil {
+			t.Fatalf("CreateMatchRoom() returned error: %v", err)
+		}
+
+		uID := engine.NewUnitID(1, 0)
+		newPos := engine.Coordinate{X: 4, Y: 7777}
+		cmd := engine.NewMoveCommand(uID, newPos)
+		gs, err := s.SubmitTurnCommand(roomID, cmd)
+
+		if !errors.Is(err, ErrMatchNotFound) {
+			t.Errorf("Expected ErrMatchNotFound, got: %v", err)
+		}
+		if gs != nil {
+			t.Errorf("Expected matchState to be nil, got %p", gs)
+		}
+	})
+}
