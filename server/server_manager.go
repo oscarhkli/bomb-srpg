@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math/rand/v2"
+	"net/http"
 	"sync"
 	"time"
 )
@@ -22,6 +23,43 @@ var (
 	ErrInvalidConfig  = errors.New("invalid game config")
 	ErrInvalidTurnCmd = errors.New("invalid turn command")
 )
+
+// mapError converts an error to an HTTP status code and message.
+func mapError(err error) (int, string) {
+	switch {
+	case errors.Is(err, ErrRoomNotFound), errors.Is(err, ErrMatchNotFound):
+		return http.StatusNotFound, err.Error()
+	case errors.Is(err, ErrMatchExists):
+		return http.StatusConflict, err.Error()
+	case errors.Is(err, ErrInvalidConfig):
+		return http.StatusBadRequest, err.Error()
+	case errors.Is(err, ErrInvalidTurnCmd):
+		return http.StatusConflict, err.Error()
+	case errors.Is(err, engine.ErrInvalidStagePreset),
+		errors.Is(err, engine.ErrInvalidTeamSize),
+		errors.Is(err, engine.ErrMissingKing),
+		errors.Is(err, engine.ErrInvalidStageLayout),
+		errors.Is(err, engine.ErrInvalidTerrain),
+		errors.Is(err, engine.ErrUnknownArchetype):
+		return http.StatusBadRequest, err.Error()
+	case errors.Is(err, engine.ErrUnitNotFound),
+		errors.Is(err, engine.ErrUnitDead),
+		errors.Is(err, engine.ErrNotActiveTeam),
+		errors.Is(err, engine.ErrAlreadyMoved),
+		errors.Is(err, engine.ErrAlreadyUsedSkill),
+		errors.Is(err, engine.ErrOutOfMoveRange),
+		errors.Is(err, engine.ErrOutOfBombRange),
+		errors.Is(err, engine.ErrCellOccupied),
+		errors.Is(err, engine.ErrOutOfBombs),
+		errors.Is(err, engine.ErrUnsupportedCommand),
+		errors.Is(err, engine.ErrInvalidLanding),
+		errors.Is(err, engine.ErrDesynced),
+		errors.Is(err, engine.ErrOutOfBounds):
+		return http.StatusConflict, err.Error()
+	default:
+		return http.StatusInternalServerError, "internal error"
+	}
+}
 
 // MatchRoom wraps the core engine match instance with server-layer network metadata.
 type MatchRoom struct {

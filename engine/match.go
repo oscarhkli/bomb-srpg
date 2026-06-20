@@ -48,7 +48,7 @@ func (m *Match) ApplyTurnCommand(cmd TurnCommand) error {
 	case TurnCmdPlaceBomb:
 		return m.CommandPlaceBomb(cmd.UnitID, cmd.Target)
 	default:
-		return fmt.Errorf("unsupported command type: %s", cmd.Type)
+		return fmt.Errorf("%w: %s", ErrUnsupportedCommand, cmd.Type)
 	}
 }
 
@@ -62,18 +62,18 @@ func (m *Match) CommandMoveUnit(unitID UnitID, target Coordinate) error {
 	}
 
 	if unit.HasMoved {
-		return fmt.Errorf("unit %#x already moved this turn", unitID)
+		return fmt.Errorf("%w: unit %#x already moved this turn", ErrAlreadyMoved, unitID)
 	}
 
 	tiles := m.WorkingState.FindReachableTiles(unit.Position, unit.NewMovementRule())
 
 	if _, ok := tiles[target]; !ok {
-		return fmt.Errorf("target out of move range")
+		return ErrOutOfMoveRange
 	}
 
 	// err will always be nil at the moment, not testable until the Skills implementation in Phase 4
 	if err = m.WorkingState.IsLandingLegal(target, OccupantUnit); err != nil {
-		return fmt.Errorf("movement rejected: %w", err)
+		return fmt.Errorf("%w: %w", ErrInvalidLanding, err)
 	}
 
 	oldPos := unit.Position
@@ -90,20 +90,20 @@ func (m *Match) CommandMoveUnit(unitID UnitID, target Coordinate) error {
 func (m *Match) validateActiveUnit(unitID UnitID) (*Unit, error) {
 	unit, ok := m.WorkingState.Units[unitID]
 	if !ok {
-		return nil, fmt.Errorf("unit %#x does not exist", unitID)
+		return nil, fmt.Errorf("%w: unit %#x does not exist", ErrUnitNotFound, unitID)
 	}
 	if unit.HP <= 0 {
-		return nil, fmt.Errorf("unit %#x is dead", unitID)
+		return nil, fmt.Errorf("%w: unit %#x is dead", ErrUnitDead, unitID)
 	}
 	if unit.Team != m.WorkingState.ActiveTeam {
-		return nil, fmt.Errorf("unit %#x not active team", unitID)
+		return nil, fmt.Errorf("%w: unit %#x not active team", ErrNotActiveTeam, unitID)
 	}
 	if !m.WorkingState.IsWithinBounds(unit.Position) {
-		return nil, fmt.Errorf("unit %#x out of bounds", unitID)
+		return nil, fmt.Errorf("%w: unit %#x out of bounds", ErrOutOfBounds, unitID)
 	}
 	cell := m.WorkingState.Grid[unit.Position.Y][unit.Position.X]
 	if cell.OccupantType != OccupantUnit || cell.OccupantID != int64(unitID) {
-		return nil, fmt.Errorf("unit %#x desynced at %v", unitID, unit.Position)
+		return nil, fmt.Errorf("%w: unit %#x desynced at %v", ErrDesynced, unitID, unit.Position)
 	}
 	return unit, nil
 }
@@ -119,21 +119,21 @@ func (m *Match) CommandPlaceBomb(unitID UnitID, target Coordinate) error {
 	}
 
 	if unit.HasUsedSkill {
-		return fmt.Errorf("unit %#x already used skill this turn", unitID)
+		return fmt.Errorf("%w: unit %#x already used skill this turn", ErrAlreadyUsedSkill, unitID)
 	}
 
 	if unit.BombUsed >= unit.MaxBombCount {
-		return fmt.Errorf("unit %#x out of bombs", unitID)
+		return fmt.Errorf("%w: unit %#x out of bombs", ErrOutOfBombs, unitID)
 	}
 
 	tiles := m.WorkingState.FindReachableTiles(unit.Position, unit.NewBombPlacementRule())
 
 	if _, ok := tiles[target]; !ok {
-		return fmt.Errorf("target out of bomb range")
+		return ErrOutOfBombRange
 	}
 
 	if err = m.WorkingState.IsLandingLegal(target, OccupantBomb); err != nil {
-		return fmt.Errorf("bomb placement rejected: %w", err)
+		return fmt.Errorf("%w: %w", ErrInvalidLanding, err)
 	}
 
 	m.placeBomb(unitID, target, unit.BombPower)
@@ -161,19 +161,19 @@ func (m *Match) placeBomb(unitID UnitID, target Coordinate, bombPower int) {
 // In Phase 1 it's used by placing Bomb only, but in future it will be used for skills like jump.
 func (gs GameState) IsLandingLegal(target Coordinate, occupantType OccupantType) error {
 	if !gs.IsWithinBounds(target) {
-		return fmt.Errorf("coordinate %v out of bounds", target)
+		return fmt.Errorf("%w: coordinate %v out of bounds", ErrOutOfBounds, target)
 	}
 
 	tile := gs.Grid[target.Y][target.X]
 
 	// Phase 1 only on TerrainPlain. In futur phase it should support TerrainLava as well
 	if tile.Type != TerrainPlain {
-		return fmt.Errorf("can only place on plain terrain, got %v", tile.Type)
+		return fmt.Errorf("%w: can only place on plain terrain, got %v", ErrInvalidLanding, tile.Type)
 	}
 
 	// Cell Occupant Collisions
 	if tile.OccupantType != OccupantNone {
-		return fmt.Errorf("cell occupied by %v", tile.OccupantType)
+		return fmt.Errorf("%w: cell occupied by %v", ErrCellOccupied, tile.OccupantType)
 	}
 
 	return nil

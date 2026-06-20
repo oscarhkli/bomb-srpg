@@ -331,8 +331,8 @@ func TestHandleCreateNewMatch(t *testing.T) {
 		if status := rr.Code; status != http.StatusBadRequest {
 			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusBadRequest)
 		}
-		if !strings.Contains(rr.Body.String(), "invalid config") {
-			t.Errorf("Expected error message 'invalid config', got: %s", rr.Body.String())
+		if !strings.Contains(rr.Body.String(), "invalid game config") {
+			t.Errorf("Expected error message 'invalid game config', got: %s", rr.Body.String())
 		}
 	})
 

@@ -32,31 +32,31 @@ func InitGame(gameCfg GameCfg) (*Match, error) {
 func initGameState(gameCfg GameCfg) (*GameState, error) {
 	stagePreset, exists := GetStagePreset(gameCfg.StagePreset)
 	if !exists {
-		return nil, fmt.Errorf("stage preset '%s' not found", gameCfg.StagePreset)
+		return nil, fmt.Errorf("%w: stage preset '%s' not found", ErrInvalidStagePreset, gameCfg.StagePreset)
 	}
 
 	if len(gameCfg.P1Teams) < 1 || len(gameCfg.P1Teams) > 5 {
-		return nil, fmt.Errorf("Player 1 must have between 1 and 5 units, got %d", len(gameCfg.P1Teams))
+		return nil, fmt.Errorf("%w: Player 1 must have between 1 and 5 units, got %d", ErrInvalidTeamSize, len(gameCfg.P1Teams))
 	}
 	if len(gameCfg.P2Teams) < 1 || len(gameCfg.P2Teams) > 5 {
-		return nil, fmt.Errorf("Player 2 must have between 1 and 5 units, got %d", len(gameCfg.P2Teams))
+		return nil, fmt.Errorf("%w: Player 2 must have between 1 and 5 units, got %d", ErrInvalidTeamSize, len(gameCfg.P2Teams))
 	}
 
 	// Only 1 king each team allowed, and must be the first unit if present
 	if !hasExactlyOneAndFirstIsKing(gameCfg.P1Teams) {
-		return nil, fmt.Errorf("Player 1 must have exactly one King as the first unit")
+		return nil, fmt.Errorf("%w: Player 1 must have exactly one King as the first unit", ErrMissingKing)
 	}
 	if !hasExactlyOneAndFirstIsKing(gameCfg.P2Teams) {
-		return nil, fmt.Errorf("Player 2 must have exactly one King as the first unit")
+		return nil, fmt.Errorf("%w: Player 2 must have exactly one King as the first unit", ErrMissingKing)
 	}
 
 	// verify stage layout dimensions match the specified width and height
 	if len(stagePreset.LayoutGrid) != stagePreset.Height {
-		return nil, fmt.Errorf("stage preset layout grid row count %d does not match specified height %d", len(stagePreset.LayoutGrid), stagePreset.Height)
+		return nil, fmt.Errorf("%w: stage preset layout grid row count %d does not match specified height %d", ErrInvalidStageLayout, len(stagePreset.LayoutGrid), stagePreset.Height)
 	}
 	for y, row := range stagePreset.LayoutGrid {
 		if len(row) != stagePreset.Width {
-			return nil, fmt.Errorf("stage preset layout grid row %d column count %d does not match specified width %d", y, len(row), stagePreset.Width)
+			return nil, fmt.Errorf("%w: stage preset layout grid row %d column count %d does not match specified width %d", ErrInvalidStageLayout, y, len(row), stagePreset.Width)
 		}
 	}
 
@@ -66,7 +66,7 @@ func initGameState(gameCfg GameCfg) (*GameState, error) {
 		for x, char := range row {
 			terrain, exists := terrainToken[byte(char)]
 			if !exists {
-				return nil, fmt.Errorf("invalid terrain character '%c' at (%d, %d)", char, x, y)
+				return nil, fmt.Errorf("%w: invalid terrain character '%c' at (%d, %d)", ErrInvalidTerrain, char, x, y)
 			}
 			grid[y][x] = Tile{
 				Type: terrain,
@@ -130,7 +130,7 @@ func createUnits(
 	for i, archetypeName := range teams {
 		archetype, exists := GetArchetype(archetypeName)
 		if !exists {
-			return fmt.Errorf("archetype '%s' for Player %d not found", archetypeName, teamID)
+			return fmt.Errorf("%w: archetype '%s' for Player %d not found", ErrUnknownArchetype, archetypeName, teamID)
 		}
 		id := NewUnitID(teamID, i) // Player 1 units have IDs starting from 8, Player 2 units have IDs starting from 16
 		units[id] = &Unit{

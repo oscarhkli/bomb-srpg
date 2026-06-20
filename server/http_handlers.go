@@ -3,7 +3,6 @@ package server
 import (
 	"bomb-srpg/engine"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -79,20 +78,9 @@ func (s *ServerStateManager) HandleCreateMatch(w http.ResponseWriter, r *http.Re
 	err := s.CreateMatch(roomID, req.GameCfg)
 
 	if err != nil {
-		switch {
-		case errors.Is(err, ErrRoomNotFound):
-			slog.Warn("create match room not found", "roomID", roomID)
-			http.Error(w, "room not found", http.StatusNotFound)
-		case errors.Is(err, ErrMatchExists):
-			slog.Warn("create match exists", "roomID", roomID)
-			http.Error(w, "match already exists", http.StatusConflict)
-		case errors.Is(err, ErrInvalidConfig):
-			slog.Warn("create match invalid config", "roomID", roomID, "error", err)
-			http.Error(w, "invalid config", http.StatusBadRequest)
-		default:
-			slog.Error("create match internal error", "roomID", roomID, "error", err)
-			http.Error(w, "internal error", http.StatusInternalServerError)
-		}
+		code, msg := mapError(err)
+		slog.Warn("create match failed", "roomID", roomID, "error", err)
+		http.Error(w, msg, code)
 		return
 	}
 
@@ -117,17 +105,9 @@ func (s *ServerStateManager) HandleGetMatchState(w http.ResponseWriter, r *http.
 	gs, err := s.GetMatchState(roomID)
 
 	if err != nil {
-		switch {
-		case errors.Is(err, ErrRoomNotFound):
-			slog.Warn("get match state match room not found", "roomID", roomID)
-			http.Error(w, "room not found", http.StatusNotFound)
-		case errors.Is(err, ErrMatchNotFound):
-			slog.Warn("get match state match not found", "roomID", roomID)
-			http.Error(w, "match not found", http.StatusNotFound)
-		default:
-			slog.Error("get match state internal error", "roomID", roomID, "error", err)
-			http.Error(w, "internal error", http.StatusInternalServerError)
-		}
+		code, msg := mapError(err)
+		slog.Warn("get match state failed", "roomID", roomID, "error", err)
+		http.Error(w, msg, code)
 		return
 	}
 
@@ -155,20 +135,9 @@ func (s *ServerStateManager) HandleSubmitTurnCommand(w http.ResponseWriter, r *h
 
 	gs, err := s.SubmitTurnCommand(roomID, req)
 	if err != nil {
-		switch {
-		case errors.Is(err, ErrRoomNotFound):
-			slog.Warn("submit turn command match room not found", "roomID", roomID)
-			http.Error(w, "room not found", http.StatusNotFound)
-		case errors.Is(err, ErrMatchNotFound):
-			slog.Warn("submit turn command match not found", "roomID", roomID)
-			http.Error(w, "match not found", http.StatusNotFound)
-		case errors.Is(err, ErrInvalidTurnCmd):
-			slog.Warn("submit turn command invalid turn command", "roomID", roomID)
-			http.Error(w, "invalid turn command", http.StatusConflict)
-		default:
-			slog.Error("get match state internal error", "roomID", roomID, "error", err)
-			http.Error(w, "internal error", http.StatusInternalServerError)
-		}
+		code, msg := mapError(err)
+		slog.Warn("submit turn command failed", "roomID", roomID, "error", err)
+		http.Error(w, msg, code)
 		return
 	}
 
