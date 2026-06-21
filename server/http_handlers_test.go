@@ -9,646 +9,60 @@ import (
 	"testing"
 )
 
-func TestHandleGetAllArchetypes(t *testing.T) {
-	s := NewServerStateManager()
-
-	t.Run("Success: called engine.GetAllArchetypes", func(t *testing.T) {
-		req, err := http.NewRequest("GET", "/api/archetypes", nil)
-		if err != nil {
-			t.Fatalf("Failed to create request: %v", err)
-		}
-
-		rr := httptest.NewRecorder()
-
-		http.HandlerFunc(s.HandleGetAllArchetypes).ServeHTTP(rr, req)
-
-		if status := rr.Code; status != http.StatusOK {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusOK)
-		}
-
-		expectedHeader := "application/json"
-		if contentType := rr.Header().Get("Content-Type"); contentType != expectedHeader {
-			t.Errorf("Handler returned wrong content type: got %v want %v", contentType, expectedHeader)
-		}
-
-		var response []engine.Archetype
-		if err := json.NewDecoder(rr.Body).Decode(&response); err != nil {
-			t.Fatalf("Failed to decode response JSON payload: %v", err)
-		}
-
-		expectedCount := len(engine.GetAllArchetypes())
-		if len(response) != expectedCount {
-			t.Errorf("Handler returned unexpected number of archetypes: got %d want %d", len(response), expectedCount)
-		}
-	})
-
-	t.Run("Failure: failed to Encode", func(t *testing.T) {
-		req, err := http.NewRequest("GET", "/api/archetypes", nil)
-		if err != nil {
-			t.Fatalf("Failed to create request: %v", err)
-		}
-
-		brokenWriter := &BrokenResponseWriter{}
-
-		http.HandlerFunc(s.HandleGetAllArchetypes).ServeHTTP(brokenWriter, req)
-
-		if brokenWriter.Code != http.StatusOK {
-			t.Errorf("Expected initial header setup to attempt status 200, got %d", brokenWriter.Code)
-		}
-	})
-
-	t.Run("Test Contract", func(t *testing.T) {
-		req, _ := http.NewRequest("GET", "/api/archetypes", nil)
-		rr := httptest.NewRecorder()
-
-		http.HandlerFunc(s.HandleGetAllArchetypes).ServeHTTP(rr, req)
-
-		assertArchetypeContract(t, rr.Body.Bytes())
-	})
+func testMux(pattern string, h http.HandlerFunc) *http.ServeMux {
+	mux := http.NewServeMux()
+	mux.HandleFunc(pattern, h)
+	return mux
 }
 
-func assertArchetypeContract(t *testing.T, body []byte) {
-	var raw []map[string]any
-	if err := json.Unmarshal(body, &raw); err != nil {
-		t.Fatalf("Failed to parse JSON: %v", err)
+func assertObjectContract(t *testing.T, body []byte, expectedFields []string, nestedChecks func(t *testing.T, raw map[string]any)) {
+	t.Helper()
+	var rawMap map[string]any
+	if err := json.Unmarshal(body, &rawMap); err != nil {
+		t.Fatalf("Failed to parse JSON object: %v", err)
 	}
-	if len(raw) == 0 {
-		t.Skip("No archetypes found to validate")
-	}
-	expectedFields := []string{"name", "speed", "bombMaxRange", "skills"}
-	targetObj := raw[0]
-
-	if len(targetObj) != len(expectedFields) {
-		t.Errorf("Total number of fields exceeded, want %d, got %d", len(expectedFields), len(targetObj))
-	}
-
-	for _, field := range expectedFields {
-		if _, exists := targetObj[field]; !exists {
-			t.Errorf("Phaser Contract Broken: JavaScript code expects key '%s', but it was missing in the HTTP response payload.", field)
+	if len(expectedFields) > 0 {
+		if len(rawMap) != len(expectedFields) {
+			t.Errorf("Field count mismatch: want %d, got %d", len(expectedFields), len(rawMap))
 		}
-	}
-}
-
-func TestHandleCreateServerRoom(t *testing.T) {
-	s := NewServerStateManager()
-
-	t.Run("Success: called server.CreateMatchRoom", func(t *testing.T) {
-		req, err := http.NewRequest("POST", "/api/match-rooms", nil)
-		if err != nil {
-			t.Fatalf("Failed to create request: %v", err)
-		}
-
-		rr := httptest.NewRecorder()
-
-		http.HandlerFunc(s.HandleCreateMatchRoom).ServeHTTP(rr, req)
-
-		if status := rr.Code; status != http.StatusCreated {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusCreated)
-		}
-
-		expectedHeader := "application/json"
-		if contentType := rr.Header().Get("Content-Type"); contentType != expectedHeader {
-			t.Errorf("Handler returned wrong content type: got %v want %v", contentType, expectedHeader)
-		}
-
-		var response CreateMatchRoomResponse
-		if err := json.NewDecoder(rr.Body).Decode(&response); err != nil {
-			t.Fatalf("Failed to decode response JSON payload: %v", err)
-		}
-
-		if len(response.ID) != 5 {
-			t.Errorf("Handler returned unexpected Match Room ID: got %v want length of 5", response.ID)
-		}
-	})
-
-	t.Run("Failure: failed to Encode", func(t *testing.T) {
-		req, err := http.NewRequest("POST", "/api/match-rooms", nil)
-		if err != nil {
-			t.Fatalf("Failed to create request: %v", err)
-		}
-
-		brokenWriter := &BrokenResponseWriter{}
-
-		http.HandlerFunc(s.HandleCreateMatchRoom).ServeHTTP(brokenWriter, req)
-
-		if brokenWriter.Code != http.StatusCreated {
-			t.Errorf("Expected initial header setup to attempt status 201, got %d", brokenWriter.Code)
-		}
-	})
-
-	t.Run("Test Contract", func(t *testing.T) {
-		req, _ := http.NewRequest("POST", "/api/match-rooms", nil)
-		rr := httptest.NewRecorder()
-
-		http.HandlerFunc(s.HandleCreateMatchRoom).ServeHTTP(rr, req)
-
-		assertMatchRoomContract(t, rr.Body.Bytes())
-	})
-
-	t.Run("Failure: CreateMatchRoom exhausted retries", func(t *testing.T) {
-		s := NewServerStateManager()
-
-		roomIDs := []string{"ID001", "ID002", "ID003", "ID004", "ID005"}
-		for _, id := range roomIDs {
-			s.Rooms[id] = &MatchRoom{ID: id}
-		}
-		callCount := 0
-		s.generateRoomID = func(int) string {
-			if callCount < len(roomIDs) {
-				id := roomIDs[callCount]
-				callCount++
-				return id
-			}
-			return "SHOULD_NOT_REACH"
-		}
-
-		req, _ := http.NewRequest("POST", "/api/match-rooms", nil)
-		rr := httptest.NewRecorder()
-
-		http.HandlerFunc(s.HandleCreateMatchRoom).ServeHTTP(rr, req)
-
-		if status := rr.Code; status != http.StatusInternalServerError {
-			t.Errorf("Expected 500, got %d", status)
-		}
-
-		body := rr.Body.String()
-		if !strings.Contains(body, "Failed to create new MatchRoom") {
-			t.Errorf("Expected error message in body, got: %s", body)
-		}
-	})
-}
-
-func assertMatchRoomContract(t *testing.T, body []byte) {
-	var raw map[string]any
-	if err := json.Unmarshal(body, &raw); err != nil {
-		t.Fatalf("Failed to parse JSON: %v", err)
-	}
-	expectedFields := []string{"id"}
-	targetObj := raw
-
-	if len(targetObj) != len(expectedFields) {
-		t.Errorf("Total number of fields exceeded, want %d, got %d", len(expectedFields), len(targetObj))
-	}
-
-	for _, field := range expectedFields {
-		if _, exists := targetObj[field]; !exists {
-			t.Errorf("Phaser Contract Broken: JavaScript code expects key '%s', but it was missing in the HTTP response payload.", field)
-		}
-	}
-}
-
-func TestHandleCreateNewMatch(t *testing.T) {
-	setupMux := func(s *ServerStateManager) *http.ServeMux {
-		mux := http.NewServeMux()
-		mux.HandleFunc("POST /api/match-rooms/{roomID}/match", s.HandleCreateMatch)
-		return mux
-	}
-
-	t.Run("Success: creates a new match in an existing room", func(t *testing.T) {
-		s := NewServerStateManager()
-		roomID, err := s.CreateMatchRoom()
-		if err != nil {
-			t.Fatalf("Failed to create room: %v", err)
-		}
-
-		gameCfg := engine.GameCfg{
-			StagePreset: "MAP01",
-			P1Teams:     []string{"King", "Fighter"},
-			P2Teams:     []string{"King", "Witch"},
-			MaxTurns:    10,
-		}
-		jsonBody, _ := json.Marshal(CreateMatchRequest{GameCfg: gameCfg})
-		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match", strings.NewReader(string(jsonBody)))
-		if err != nil {
-			t.Fatalf("Failed to create request: %v", err)
-		}
-		req.Header.Set("Content-Type", "application/json")
-
-		rr := httptest.NewRecorder()
-		setupMux(s).ServeHTTP(rr, req)
-
-		if status := rr.Code; status != http.StatusCreated {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusCreated)
-		}
-		if contentType := rr.Header().Get("Content-Type"); contentType != "application/json" {
-			t.Errorf("Handler returned wrong content type: got %v want %v", contentType, "application/json")
-		}
-
-		var response CreateMatchResponse
-		if err := json.NewDecoder(rr.Body).Decode(&response); err != nil {
-			t.Fatalf("Failed to decode response JSON payload: %v", err)
-		}
-		if !response.Success {
-			t.Error("Expected success=true in response, got false")
-		}
-
-		// Verify match was actually created in the server state manager
-		room, ok := s.Rooms[roomID]
-		if !ok || room.Match == nil {
-			t.Error("Match was not created in the server state manager")
-		}
-	})
-
-	t.Run("Failure: room not found", func(t *testing.T) {
-		s := NewServerStateManager()
-		gameCfg := engine.GameCfg{
-			StagePreset: "MAP01",
-			P1Teams:     []string{"King", "Fighter"},
-			P2Teams:     []string{"King", "Witch"},
-			MaxTurns:    10,
-		}
-		jsonBody, _ := json.Marshal(gameCfg)
-		req, err := http.NewRequest("POST", "/api/match-rooms/NONEXISTENT/match", strings.NewReader(string(jsonBody)))
-		if err != nil {
-			t.Fatalf("Failed to create request: %v", err)
-		}
-		req.Header.Set("Content-Type", "application/json")
-
-		rr := httptest.NewRecorder()
-		setupMux(s).ServeHTTP(rr, req)
-
-		if status := rr.Code; status != http.StatusNotFound {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusNotFound)
-		}
-		if !strings.Contains(rr.Body.String(), "room not found") {
-			t.Errorf("Expected error message 'room not found', got: %s", rr.Body.String())
-		}
-	})
-
-	t.Run("Failure: match already exists", func(t *testing.T) {
-		s := NewServerStateManager()
-		roomID, err := s.CreateMatchRoom()
-		if err != nil {
-			t.Fatalf("Failed to create room: %v", err)
-		}
-		s.Rooms[roomID].Match = &engine.Match{}
-
-		gameCfg := engine.GameCfg{
-			StagePreset: "MAP01",
-			P1Teams:     []string{"King", "Fighter"},
-			P2Teams:     []string{"King", "Witch"},
-			MaxTurns:    10,
-		}
-		jsonBody, _ := json.Marshal(CreateMatchRequest{GameCfg: gameCfg})
-		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match", strings.NewReader(string(jsonBody)))
-		if err != nil {
-			t.Fatalf("Failed to create request: %v", err)
-		}
-		req.Header.Set("Content-Type", "application/json")
-
-		rr := httptest.NewRecorder()
-		setupMux(s).ServeHTTP(rr, req)
-
-		if status := rr.Code; status != http.StatusConflict {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusConflict)
-		}
-		if !strings.Contains(rr.Body.String(), "match already exists") {
-			t.Errorf("Expected error message 'match already exists', got: %s", rr.Body.String())
-		}
-	})
-
-	t.Run("Failure: invalid game config", func(t *testing.T) {
-		s := NewServerStateManager()
-		roomID, err := s.CreateMatchRoom()
-		if err != nil {
-			t.Fatalf("Failed to create room: %v", err)
-		}
-
-		gameCfg := engine.GameCfg{
-			StagePreset: "INVALID_STAGE", // Invalid stage ID
-			MaxTurns:    10,
-		}
-		jsonBody, _ := json.Marshal(CreateMatchRequest{GameCfg: gameCfg})
-		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match", strings.NewReader(string(jsonBody)))
-		if err != nil {
-			t.Fatalf("Failed to create request: %v", err)
-		}
-		req.Header.Set("Content-Type", "application/json")
-
-		rr := httptest.NewRecorder()
-		setupMux(s).ServeHTTP(rr, req)
-
-		if status := rr.Code; status != http.StatusBadRequest {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusBadRequest)
-		}
-		if !strings.Contains(rr.Body.String(), "invalid game config") {
-			t.Errorf("Expected error message 'invalid game config', got: %s", rr.Body.String())
-		}
-	})
-
-	t.Run("Failure: invalid JSON format", func(t *testing.T) {
-		s := NewServerStateManager()
-		roomID, err := s.CreateMatchRoom()
-		if err != nil {
-			t.Fatalf("Failed to create room: %v", err)
-		}
-
-		// Malformed JSON body
-		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match", strings.NewReader("{invalid json"))
-		if err != nil {
-			t.Fatalf("Failed to create request: %v", err)
-		}
-		req.Header.Set("Content-Type", "application/json")
-
-		rr := httptest.NewRecorder()
-		setupMux(s).ServeHTTP(rr, req)
-
-		if status := rr.Code; status != http.StatusBadRequest {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusBadRequest)
-		}
-		if !strings.Contains(rr.Body.String(), "Invalid configuration format") {
-			t.Errorf("Expected error message 'Invalid configuration format', got: %s", rr.Body.String())
-		}
-	})
-
-	t.Run("Failure: failed to Encode response", func(t *testing.T) {
-		s := NewServerStateManager()
-		roomID, err := s.CreateMatchRoom()
-		if err != nil {
-			t.Fatalf("Failed to create room: %v", err)
-		}
-
-		gameCfg := engine.GameCfg{
-			StagePreset: "MAP01",
-			P1Teams:     []string{"King", "Fighter"},
-			P2Teams:     []string{"King", "Witch"},
-			MaxTurns:    10,
-		}
-		jsonBody, _ := json.Marshal(CreateMatchRequest{GameCfg: gameCfg})
-		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match", strings.NewReader(string(jsonBody)))
-		if err != nil {
-			t.Fatalf("Failed to create request: %v", err)
-		}
-		req.Header.Set("Content-Type", "application/json")
-
-		brokenWriter := &BrokenResponseWriter{}
-		setupMux(s).ServeHTTP(brokenWriter, req)
-
-		// Expect 201 because the match creation succeeded before encoding failed
-		if brokenWriter.Code != http.StatusCreated {
-			t.Errorf("Expected initial header setup to attempt status 201, got %d", brokenWriter.Code)
-		}
-	})
-
-	t.Run("Test Contract", func(t *testing.T) {
-		s := NewServerStateManager()
-		roomID, err := s.CreateMatchRoom()
-		if err != nil {
-			t.Fatalf("Failed to create room: %v", err)
-		}
-		gameCfg := engine.GameCfg{
-			StagePreset: "MAP01",
-			P1Teams:     []string{"King", "Fighter"},
-			P2Teams:     []string{"King", "Witch"},
-			MaxTurns:    10,
-		}
-		jsonBody, _ := json.Marshal(CreateMatchRequest{GameCfg: gameCfg})
-		req, _ := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match", strings.NewReader(string(jsonBody)))
-		req.Header.Set("Content-Type", "application/json")
-
-		rr := httptest.NewRecorder()
-		setupMux(s).ServeHTTP(rr, req)
-
-		assertCreateMatchContract(t, rr.Body.Bytes())
-	})
-}
-
-func assertCreateMatchContract(t *testing.T, body []byte) {
-	var raw map[string]any
-	if err := json.Unmarshal(body, &raw); err != nil {
-		t.Fatalf("Failed to parse JSON: %v", err)
-	}
-	expectedFields := []string{"success"}
-	targetObj := raw
-
-	if len(targetObj) != len(expectedFields) {
-		t.Errorf("Total number of fields exceeded, want %d, got %d", len(expectedFields), len(targetObj))
-	}
-
-	for _, field := range expectedFields {
-		if _, exists := targetObj[field]; !exists {
-			t.Errorf("Phaser Contract Broken: JavaScript code expects key '%s', but it was missing in the HTTP response payload.", field)
-		}
-	}
-}
-
-// ClientUnit mimics the client's view of Unit in GetMatchState response
-type ClientUnit struct {
-	ID           engine.UnitID     `json:"id"`
-	Type         string            `json:"type"`
-	Position     engine.Coordinate `json:"position"`
-	Speed        int               `json:"speed"`
-	BombMaxRange int               `json:"bombMaxRange"`
-	BombPower    int               `json:"bombPower"`
-	MaxBombCount int               `json:"maxBombCount"`
-	BombUsed     int               `json:"bombUsed"`
-	Team         int               `json:"team"`
-	HP           int               `json:"hp"`
-	Skills       []string          `json:"skills"`
-	HasMoved     bool              `json:"hasMoved"`
-	HasUsedSkill bool              `json:"hasUsedSkill"`
-}
-
-// ClientTile mimics the client's view of Tile in GetMatchState response
-type ClientTile struct {
-	Type         string `json:"type"`
-	OccupantType string `json:"occupantType"`
-	OccupantID   int64  `json:"occupantId"`
-}
-
-// ClientMatchStateResponse mimics the client's view of GetMatchState response
-type ClientMatchStateResponse struct {
-	Turn         int                  `json:"turn"`
-	ActiveTeam   int                  `json:"activeTeam"`
-	Grid         [][]ClientTile       `json:"grid"`
-	Units        []ClientUnit         `json:"units"`
-	Bombs        []*engine.Bomb       `json:"bombs"`
-	SoftBlocks   []*engine.SoftBlock  `json:"softBlocks"`
-	TurnCommands []engine.TurnCommand `json:"turnCommands"`
-}
-
-func TestHandleGetMatchState(t *testing.T) {
-	setupMux := func(s *ServerStateManager) *http.ServeMux {
-		mux := http.NewServeMux()
-		mux.HandleFunc("GET /api/match-rooms/{roomID}/match/state", s.HandleGetMatchState)
-		return mux
-	}
-
-	t.Run("Success: creates a new match in an existing room", func(t *testing.T) {
-		s := NewServerStateManager()
-		roomID, err := s.CreateMatchRoom()
-		if err != nil {
-			t.Fatalf("Failed to create room: %v", err)
-		}
-
-		gameCfg := engine.GameCfg{
-			StagePreset: "MAP03",
-			P1Teams:     []string{"King", "Fighter"},
-			P2Teams:     []string{"King", "Witch"},
-			MaxTurns:    10,
-		}
-		err = s.CreateMatch(roomID, gameCfg)
-		if err != nil {
-			t.Fatalf("Failed to create match: %v", err)
-		}
-
-		req, err := http.NewRequest("GET", "/api/match-rooms/"+roomID+"/match/state", nil)
-		if err != nil {
-			t.Fatalf("Failed to create request: %v", err)
-		}
-
-		rr := httptest.NewRecorder()
-		setupMux(s).ServeHTTP(rr, req)
-
-		if status := rr.Code; status != http.StatusOK {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusOK)
-		}
-
-		expectedHeader := "application/json"
-		if contentType := rr.Header().Get("Content-Type"); contentType != expectedHeader {
-			t.Errorf("Handler returned wrong content type: got %v want %v", contentType, expectedHeader)
-		}
-		t.Log(rr.Body)
-		var response ClientMatchStateResponse
-		if err := json.NewDecoder(rr.Body).Decode(&response); err != nil {
-			t.Fatalf("Failed to decode response JSON payload: %v", err)
-		}
-
-		if response.Turn != 1 {
-			t.Errorf("Expected turn 1, got %d", response.Turn)
-		}
-		if response.ActiveTeam != 1 {
-			t.Errorf("Expected activeTeam 1, got %d", response.ActiveTeam)
-		}
-		if len(response.Units) == 0 {
-			t.Error("Expected units to be populated")
-		}
-		for _, u := range response.Units {
-			if u.ID == 0 {
-				t.Error("Unit missing ID")
-			}
-			if u.Type == "" {
-				t.Error("Unit missing type")
-			}
-			if u.HP != 1 {
-				t.Errorf("Expected unit HP 1, got %d", u.HP)
+		for _, field := range expectedFields {
+			if _, exists := rawMap[field]; !exists {
+				t.Errorf("Phaser Contract Broken: JavaScript code expects key '%s', but it was missing", field)
 			}
 		}
-	})
-
-	t.Run("Failure: room not found", func(t *testing.T) {
-		s := NewServerStateManager()
-		req, err := http.NewRequest("GET", "/api/match-rooms/NONEXISTENT/match/state", nil)
-		if err != nil {
-			t.Fatalf("Failed to create request: %v", err)
-		}
-
-		rr := httptest.NewRecorder()
-		setupMux(s).ServeHTTP(rr, req)
-
-		if status := rr.Code; status != http.StatusNotFound {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusNotFound)
-		}
-		if !strings.Contains(rr.Body.String(), "room not found") {
-			t.Errorf("Expected error message 'room not found', got: %s", rr.Body.String())
-		}
-	})
-
-	t.Run("Failure: match not found", func(t *testing.T) {
-		s := NewServerStateManager()
-		roomID, err := s.CreateMatchRoom()
-		if err != nil {
-			t.Fatalf("Failed to create room: %v", err)
-		}
-
-		req, err := http.NewRequest("GET", "/api/match-rooms/"+roomID+"/match/state", nil)
-		if err != nil {
-			t.Fatalf("Failed to create request: %v", err)
-		}
-
-		rr := httptest.NewRecorder()
-		setupMux(s).ServeHTTP(rr, req)
-
-		if status := rr.Code; status != http.StatusNotFound {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusNotFound)
-		}
-		if !strings.Contains(rr.Body.String(), "match not found") {
-			t.Errorf("Expected error message 'match not found', got: %s", rr.Body.String())
-		}
-	})
-
-	t.Run("Failure: failed to Encode", func(t *testing.T) {
-		s := NewServerStateManager()
-		roomID, err := s.CreateMatchRoom()
-		if err != nil {
-			t.Fatalf("Failed to create room: %v", err)
-		}
-
-		gameCfg := engine.GameCfg{
-			StagePreset: "MAP01",
-			P1Teams:     []string{"King", "Fighter"},
-			P2Teams:     []string{"King", "Witch"},
-			MaxTurns:    10,
-		}
-		err = s.CreateMatch(roomID, gameCfg)
-		if err != nil {
-			t.Fatalf("Failed to create match: %v", err)
-		}
-
-		req, err := http.NewRequest("GET", "/api/match-rooms/"+roomID+"/match/state", nil)
-		if err != nil {
-			t.Fatalf("Failed to create request: %v", err)
-		}
-
-		brokenWriter := &BrokenResponseWriter{}
-		setupMux(s).ServeHTTP(brokenWriter, req)
-
-		if brokenWriter.Code != http.StatusOK {
-			t.Errorf("Expected initial header setup to attempt status 200, got %d", brokenWriter.Code)
-		}
-	})
-
-	t.Run("Test Contract", func(t *testing.T) {
-		s := NewServerStateManager()
-		roomID, err := s.CreateMatchRoom()
-		if err != nil {
-			t.Fatalf("Failed to create room: %v", err)
-		}
-
-		gameCfg := engine.GameCfg{
-			StagePreset: "MAP03",
-			P1Teams:     []string{"King", "Fighter"},
-			P2Teams:     []string{"King", "Witch"},
-			MaxTurns:    10,
-		}
-		err = s.CreateMatch(roomID, gameCfg)
-		if err != nil {
-			t.Fatalf("Failed to create match: %v", err)
-		}
-
-		req, _ := http.NewRequest("GET", "/api/match-rooms/"+roomID+"/match/state", nil)
-		rr := httptest.NewRecorder()
-		setupMux(s).ServeHTTP(rr, req)
-
-		assertMatchStateContract(t, rr.Body.Bytes())
-	})
+	}
+	if nestedChecks != nil {
+		nestedChecks(t, rawMap)
+	}
 }
 
-func assertMatchStateContract(t *testing.T, body []byte) {
-	var raw map[string]any
-	if err := json.Unmarshal(body, &raw); err != nil {
-		t.Fatalf("Failed to parse JSON: %v", err)
+func assertArrayContract(t *testing.T, body []byte, expectedFields []string, itemChecks func(t *testing.T, item map[string]any)) {
+	t.Helper()
+	var rawArr []map[string]any
+	if err := json.Unmarshal(body, &rawArr); err != nil {
+		t.Fatalf("Failed to parse JSON array: %v", err)
 	}
-	expectedFields := []string{"turn", "activeTeam", "grid", "units", "bombs", "softBlocks", "turnCommands"}
-	if len(raw) != len(expectedFields) {
-		t.Errorf("Field count mismatch: want %d, got %d", len(expectedFields), len(raw))
+	if len(rawArr) == 0 {
+		t.Fatalf("Expected non-empty array response")
 	}
-	for _, field := range expectedFields {
-		if _, exists := raw[field]; !exists {
-			t.Errorf("Phaser Contract Broken: JavaScript code expects key '%s', but it was missing", field)
+	if len(expectedFields) > 0 {
+		targetObj := rawArr[0]
+		if len(targetObj) != len(expectedFields) {
+			t.Errorf("Total number of fields exceeded, want %d, got %d", len(expectedFields), len(targetObj))
+		}
+		for _, field := range expectedFields {
+			if _, exists := targetObj[field]; !exists {
+				t.Errorf("Phaser Contract Broken: JavaScript code expects key '%s', but it was missing", field)
+			}
+		}
+		if itemChecks != nil {
+			itemChecks(t, targetObj)
 		}
 	}
+}
 
+func assertMatchStateNested(t *testing.T, raw map[string]any) {
+	t.Helper()
 	if gridRaw, ok := raw["grid"].([]any); ok && len(gridRaw) > 0 {
 		if row, ok := gridRaw[0].([]any); ok && len(row) > 0 {
 			if tile, ok := row[0].(map[string]any); ok {
@@ -719,13 +133,559 @@ func assertMatchStateContract(t *testing.T, body []byte) {
 	}
 }
 
-func TestHandleSubmitTurnCommand(t *testing.T) {
-	setupMux := func(s *ServerStateManager) *http.ServeMux {
-		mux := http.NewServeMux()
-		mux.HandleFunc("POST /api/match-rooms/{roomID}/match/turn-commands", s.HandleSubmitTurnCommand)
-		return mux
+func testEncodeFailure(t *testing.T, handler http.Handler, setup func() *http.Request, expectedStatus int) {
+	t.Helper()
+	req := setup()
+	brokenWriter := &BrokenResponseWriter{}
+	handler.ServeHTTP(brokenWriter, req)
+	if brokenWriter.Code != expectedStatus {
+		t.Errorf("Expected initial header setup to attempt status %d, got %d", expectedStatus, brokenWriter.Code)
 	}
+}
 
+func TestHandleGetAllArchetypes(t *testing.T) {
+	s := NewServerStateManager()
+
+	t.Run("Success: called engine.GetAllArchetypes", func(t *testing.T) {
+		req, err := http.NewRequest("GET", "/api/archetypes", nil)
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+
+		rr := httptest.NewRecorder()
+
+		http.HandlerFunc(s.HandleGetAllArchetypes).ServeHTTP(rr, req)
+
+		if status := rr.Code; status != http.StatusOK {
+			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusOK)
+		}
+
+		expectedHeader := "application/json"
+		if contentType := rr.Header().Get("Content-Type"); contentType != expectedHeader {
+			t.Errorf("Handler returned wrong content type: got %v want %v", contentType, expectedHeader)
+		}
+
+		var response []engine.Archetype
+		if err := json.NewDecoder(rr.Body).Decode(&response); err != nil {
+			t.Fatalf("Failed to decode response JSON payload: %v", err)
+		}
+
+		expectedCount := len(engine.GetAllArchetypes())
+		if len(response) != expectedCount {
+			t.Errorf("Handler returned unexpected number of archetypes: got %d want %d", len(response), expectedCount)
+		}
+	})
+
+	t.Run("Failure: failed to Encode", func(t *testing.T) {
+		testEncodeFailure(t, http.HandlerFunc(s.HandleGetAllArchetypes),
+			func() *http.Request {
+				req, _ := http.NewRequest("GET", "/api/archetypes", nil)
+				return req
+			}, http.StatusOK)
+	})
+
+	t.Run("Test Contract", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/api/archetypes", nil)
+		rr := httptest.NewRecorder()
+
+		http.HandlerFunc(s.HandleGetAllArchetypes).ServeHTTP(rr, req)
+
+		assertArrayContract(t, rr.Body.Bytes(), []string{"name", "speed", "bombMaxRange", "skills"},
+			func(t *testing.T, item map[string]any) {
+				t.Helper()
+				for _, field := range []string{"name", "speed", "bombMaxRange", "skills"} {
+					if _, exists := item[field]; !exists {
+						t.Errorf("Phaser Contract Broken: archetype missing key '%s'", field)
+					}
+				}
+			})
+	})
+}
+
+func TestHandleCreateMatchRoom(t *testing.T) {
+	s := NewServerStateManager()
+
+	t.Run("Success: called server.CreateMatchRoom", func(t *testing.T) {
+		req, err := http.NewRequest("POST", "/api/match-rooms", nil)
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+
+		rr := httptest.NewRecorder()
+
+		http.HandlerFunc(s.HandleCreateMatchRoom).ServeHTTP(rr, req)
+
+		if status := rr.Code; status != http.StatusCreated {
+			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusCreated)
+		}
+
+		expectedHeader := "application/json"
+		if contentType := rr.Header().Get("Content-Type"); contentType != expectedHeader {
+			t.Errorf("Handler returned wrong content type: got %v want %v", contentType, expectedHeader)
+		}
+
+		var response CreateMatchRoomResponse
+		if err := json.NewDecoder(rr.Body).Decode(&response); err != nil {
+			t.Fatalf("Failed to decode response JSON payload: %v", err)
+		}
+
+		if len(response.ID) != 5 {
+			t.Errorf("Handler returned unexpected Match Room ID: got %v want length of 5", response.ID)
+		}
+	})
+
+	t.Run("Failure: failed to Encode", func(t *testing.T) {
+		testEncodeFailure(t, http.HandlerFunc(s.HandleCreateMatchRoom),
+			func() *http.Request {
+				req, _ := http.NewRequest("POST", "/api/match-rooms", nil)
+				return req
+			}, http.StatusCreated)
+	})
+
+	t.Run("Test Contract", func(t *testing.T) {
+		req, _ := http.NewRequest("POST", "/api/match-rooms", nil)
+		rr := httptest.NewRecorder()
+
+		http.HandlerFunc(s.HandleCreateMatchRoom).ServeHTTP(rr, req)
+
+		assertObjectContract(t, rr.Body.Bytes(), []string{"id"}, nil)
+	})
+
+	t.Run("Failure: CreateMatchRoom exhausted retries", func(t *testing.T) {
+		s := NewServerStateManager()
+
+		roomIDs := []string{"ID001", "ID002", "ID003", "ID004", "ID005"}
+		for _, id := range roomIDs {
+			s.Rooms[id] = &MatchRoom{ID: id}
+		}
+		callCount := 0
+		s.generateRoomID = func(int) string {
+			if callCount < len(roomIDs) {
+				id := roomIDs[callCount]
+				callCount++
+				return id
+			}
+			return "SHOULD_NOT_REACH"
+		}
+
+		req, _ := http.NewRequest("POST", "/api/match-rooms", nil)
+		rr := httptest.NewRecorder()
+
+		http.HandlerFunc(s.HandleCreateMatchRoom).ServeHTTP(rr, req)
+
+		if status := rr.Code; status != http.StatusInternalServerError {
+			t.Errorf("Expected 500, got %d", status)
+		}
+
+		body := rr.Body.String()
+		if !strings.Contains(body, "Failed to create new MatchRoom") {
+			t.Errorf("Expected error message in body, got: %s", body)
+		}
+	})
+}
+
+func TestHandleCreateNewMatch(t *testing.T) {
+	t.Run("Success: creates a new match in an existing room", func(t *testing.T) {
+		s := NewServerStateManager()
+		roomID, err := s.CreateMatchRoom()
+		if err != nil {
+			t.Fatalf("Failed to create room: %v", err)
+		}
+
+		gameCfg := engine.GameCfg{
+			StagePreset: "MAP01",
+			P1Teams:     []string{"King", "Fighter"},
+			P2Teams:     []string{"King", "Witch"},
+			MaxTurns:    10,
+		}
+		jsonBody, _ := json.Marshal(CreateMatchRequest{GameCfg: gameCfg})
+		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match", strings.NewReader(string(jsonBody)))
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+
+		rr := httptest.NewRecorder()
+		testMux("POST /api/match-rooms/{roomID}/match", s.HandleCreateMatch).ServeHTTP(rr, req)
+
+		if status := rr.Code; status != http.StatusCreated {
+			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusCreated)
+		}
+		if contentType := rr.Header().Get("Content-Type"); contentType != "application/json" {
+			t.Errorf("Handler returned wrong content type: got %v want %v", contentType, "application/json")
+		}
+
+		var response CreateMatchResponse
+		if err := json.NewDecoder(rr.Body).Decode(&response); err != nil {
+			t.Fatalf("Failed to decode response JSON payload: %v", err)
+		}
+		if !response.Success {
+			t.Error("Expected success=true in response, got false")
+		}
+
+		// Verify match was actually created in the server state manager
+		room, ok := s.Rooms[roomID]
+		if !ok || room.Match == nil {
+			t.Error("Match was not created in the server state manager")
+		}
+	})
+
+	t.Run("Failure: room not found", func(t *testing.T) {
+		s := NewServerStateManager()
+		gameCfg := engine.GameCfg{
+			StagePreset: "MAP01",
+			P1Teams:     []string{"King", "Fighter"},
+			P2Teams:     []string{"King", "Witch"},
+			MaxTurns:    10,
+		}
+		jsonBody, _ := json.Marshal(gameCfg)
+		req, err := http.NewRequest("POST", "/api/match-rooms/NONEXISTENT/match", strings.NewReader(string(jsonBody)))
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+
+		rr := httptest.NewRecorder()
+		testMux("POST /api/match-rooms/{roomID}/match", s.HandleCreateMatch).ServeHTTP(rr, req)
+
+		if status := rr.Code; status != http.StatusNotFound {
+			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusNotFound)
+		}
+		if !strings.Contains(rr.Body.String(), "room not found") {
+			t.Errorf("Expected error message 'room not found', got: %s", rr.Body.String())
+		}
+	})
+
+	t.Run("Failure: match already exists", func(t *testing.T) {
+		s := NewServerStateManager()
+		roomID, err := s.CreateMatchRoom()
+		if err != nil {
+			t.Fatalf("Failed to create room: %v", err)
+		}
+		s.Rooms[roomID].Match = &engine.Match{}
+
+		gameCfg := engine.GameCfg{
+			StagePreset: "MAP01",
+			P1Teams:     []string{"King", "Fighter"},
+			P2Teams:     []string{"King", "Witch"},
+			MaxTurns:    10,
+		}
+		jsonBody, _ := json.Marshal(CreateMatchRequest{GameCfg: gameCfg})
+		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match", strings.NewReader(string(jsonBody)))
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+
+		rr := httptest.NewRecorder()
+		testMux("POST /api/match-rooms/{roomID}/match", s.HandleCreateMatch).ServeHTTP(rr, req)
+
+		if status := rr.Code; status != http.StatusConflict {
+			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusConflict)
+		}
+		if !strings.Contains(rr.Body.String(), "match already exists") {
+			t.Errorf("Expected error message 'match already exists', got: %s", rr.Body.String())
+		}
+	})
+
+	t.Run("Failure: invalid game config", func(t *testing.T) {
+		s := NewServerStateManager()
+		roomID, err := s.CreateMatchRoom()
+		if err != nil {
+			t.Fatalf("Failed to create room: %v", err)
+		}
+
+		gameCfg := engine.GameCfg{
+			StagePreset: "INVALID_STAGE", // Invalid stage ID
+			MaxTurns:    10,
+		}
+		jsonBody, _ := json.Marshal(CreateMatchRequest{GameCfg: gameCfg})
+		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match", strings.NewReader(string(jsonBody)))
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+
+		rr := httptest.NewRecorder()
+		testMux("POST /api/match-rooms/{roomID}/match", s.HandleCreateMatch).ServeHTTP(rr, req)
+
+		if status := rr.Code; status != http.StatusBadRequest {
+			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusBadRequest)
+		}
+		if !strings.Contains(rr.Body.String(), "invalid game config") {
+			t.Errorf("Expected error message 'invalid game config', got: %s", rr.Body.String())
+		}
+	})
+
+	t.Run("Failure: invalid JSON format", func(t *testing.T) {
+		s := NewServerStateManager()
+		roomID, err := s.CreateMatchRoom()
+		if err != nil {
+			t.Fatalf("Failed to create room: %v", err)
+		}
+
+		// Malformed JSON body
+		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match", strings.NewReader("{invalid json"))
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+
+		rr := httptest.NewRecorder()
+		testMux("POST /api/match-rooms/{roomID}/match", s.HandleCreateMatch).ServeHTTP(rr, req)
+
+		if status := rr.Code; status != http.StatusBadRequest {
+			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusBadRequest)
+		}
+		if !strings.Contains(rr.Body.String(), "Invalid configuration format") {
+			t.Errorf("Expected error message 'Invalid configuration format', got: %s", rr.Body.String())
+		}
+	})
+
+	t.Run("Failure: failed to Encode response", func(t *testing.T) {
+		s := NewServerStateManager()
+		roomID, err := s.CreateMatchRoom()
+		if err != nil {
+			t.Fatalf("Failed to create room: %v", err)
+		}
+
+		gameCfg := engine.GameCfg{
+			StagePreset: "MAP01",
+			P1Teams:     []string{"King", "Fighter"},
+			P2Teams:     []string{"King", "Witch"},
+			MaxTurns:    10,
+		}
+		jsonBody, _ := json.Marshal(CreateMatchRequest{GameCfg: gameCfg})
+		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match", strings.NewReader(string(jsonBody)))
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+
+		testEncodeFailure(t, testMux("POST /api/match-rooms/{roomID}/match", s.HandleCreateMatch),
+			func() *http.Request {
+				req, _ := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match", strings.NewReader(string(jsonBody)))
+				req.Header.Set("Content-Type", "application/json")
+				return req
+			}, http.StatusCreated)
+	})
+
+	t.Run("Test Contract", func(t *testing.T) {
+		s := NewServerStateManager()
+		roomID, err := s.CreateMatchRoom()
+		if err != nil {
+			t.Fatalf("Failed to create room: %v", err)
+		}
+		gameCfg := engine.GameCfg{
+			StagePreset: "MAP01",
+			P1Teams:     []string{"King", "Fighter"},
+			P2Teams:     []string{"King", "Witch"},
+			MaxTurns:    10,
+		}
+		jsonBody, _ := json.Marshal(CreateMatchRequest{GameCfg: gameCfg})
+		req, _ := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match", strings.NewReader(string(jsonBody)))
+		req.Header.Set("Content-Type", "application/json")
+
+		rr := httptest.NewRecorder()
+		testMux("POST /api/match-rooms/{roomID}/match", s.HandleCreateMatch).ServeHTTP(rr, req)
+
+		assertObjectContract(t, rr.Body.Bytes(), []string{"success"}, nil)
+	})
+}
+
+// ClientUnit mimics the client's view of Unit in GetMatchState response
+type ClientUnit struct {
+	ID           engine.UnitID     `json:"id"`
+	Type         string            `json:"type"`
+	Position     engine.Coordinate `json:"position"`
+	Speed        int               `json:"speed"`
+	BombMaxRange int               `json:"bombMaxRange"`
+	BombPower    int               `json:"bombPower"`
+	MaxBombCount int               `json:"maxBombCount"`
+	BombUsed     int               `json:"bombUsed"`
+	Team         int               `json:"team"`
+	HP           int               `json:"hp"`
+	Skills       []string          `json:"skills"`
+	HasMoved     bool              `json:"hasMoved"`
+	HasUsedSkill bool              `json:"hasUsedSkill"`
+}
+
+// ClientTile mimics the client's view of Tile in GetMatchState response
+type ClientTile struct {
+	Type         string `json:"type"`
+	OccupantType string `json:"occupantType"`
+	OccupantID   int64  `json:"occupantId"`
+}
+
+// ClientMatchStateResponse mimics the client's view of GetMatchState response
+type ClientMatchStateResponse struct {
+	Turn         int                  `json:"turn"`
+	ActiveTeam   int                  `json:"activeTeam"`
+	Grid         [][]ClientTile       `json:"grid"`
+	Units        []ClientUnit         `json:"units"`
+	Bombs        []*engine.Bomb       `json:"bombs"`
+	SoftBlocks   []*engine.SoftBlock  `json:"softBlocks"`
+	TurnCommands []engine.TurnCommand `json:"turnCommands"`
+}
+
+func TestHandleGetMatchState(t *testing.T) {
+	t.Run("Success: creates a new match in an existing room", func(t *testing.T) {
+		s := NewServerStateManager()
+		roomID, err := s.CreateMatchRoom()
+		if err != nil {
+			t.Fatalf("Failed to create room: %v", err)
+		}
+
+		gameCfg := engine.GameCfg{
+			StagePreset: "MAP03",
+			P1Teams:     []string{"King", "Fighter"},
+			P2Teams:     []string{"King", "Witch"},
+			MaxTurns:    10,
+		}
+		err = s.CreateMatch(roomID, gameCfg)
+		if err != nil {
+			t.Fatalf("Failed to create match: %v", err)
+		}
+
+		req, err := http.NewRequest("GET", "/api/match-rooms/"+roomID+"/match/state", nil)
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+
+		rr := httptest.NewRecorder()
+		testMux("GET /api/match-rooms/{roomID}/match/state", s.HandleGetMatchState).ServeHTTP(rr, req)
+
+		if status := rr.Code; status != http.StatusOK {
+			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusOK)
+		}
+
+		expectedHeader := "application/json"
+		if contentType := rr.Header().Get("Content-Type"); contentType != expectedHeader {
+			t.Errorf("Handler returned wrong content type: got %v want %v", contentType, expectedHeader)
+		}
+
+		var response ClientMatchStateResponse
+		if err := json.NewDecoder(rr.Body).Decode(&response); err != nil {
+			t.Fatalf("Failed to decode response JSON payload: %v", err)
+		}
+
+		if response.Turn != 1 {
+			t.Errorf("Expected turn 1, got %d", response.Turn)
+		}
+		if response.ActiveTeam != 1 {
+			t.Errorf("Expected activeTeam 1, got %d", response.ActiveTeam)
+		}
+		if len(response.Units) == 0 {
+			t.Error("Expected units to be populated")
+		}
+		for _, u := range response.Units {
+			if u.ID == 0 {
+				t.Error("Unit missing ID")
+			}
+			if u.Type == "" {
+				t.Error("Unit missing type")
+			}
+			if u.HP != 1 {
+				t.Errorf("Expected unit HP 1, got %d", u.HP)
+			}
+		}
+	})
+
+	t.Run("Failure: room not found", func(t *testing.T) {
+		s := NewServerStateManager()
+		req, err := http.NewRequest("GET", "/api/match-rooms/NONEXISTENT/match/state", nil)
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+
+		rr := httptest.NewRecorder()
+		testMux("GET /api/match-rooms/{roomID}/match/state", s.HandleGetMatchState).ServeHTTP(rr, req)
+
+		if status := rr.Code; status != http.StatusNotFound {
+			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusNotFound)
+		}
+		if !strings.Contains(rr.Body.String(), "room not found") {
+			t.Errorf("Expected error message 'room not found', got: %s", rr.Body.String())
+		}
+	})
+
+	t.Run("Failure: match not found", func(t *testing.T) {
+		s := NewServerStateManager()
+		roomID, err := s.CreateMatchRoom()
+		if err != nil {
+			t.Fatalf("Failed to create room: %v", err)
+		}
+
+		req, err := http.NewRequest("GET", "/api/match-rooms/"+roomID+"/match/state", nil)
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+
+		rr := httptest.NewRecorder()
+		testMux("GET /api/match-rooms/{roomID}/match/state", s.HandleGetMatchState).ServeHTTP(rr, req)
+
+		if status := rr.Code; status != http.StatusNotFound {
+			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusNotFound)
+		}
+		if !strings.Contains(rr.Body.String(), "match not found") {
+			t.Errorf("Expected error message 'match not found', got: %s", rr.Body.String())
+		}
+	})
+
+	t.Run("Failure: failed to Encode", func(t *testing.T) {
+		s := NewServerStateManager()
+		roomID, err := s.CreateMatchRoom()
+		if err != nil {
+			t.Fatalf("Failed to create room: %v", err)
+		}
+
+		gameCfg := engine.GameCfg{
+			StagePreset: "MAP01",
+			P1Teams:     []string{"King", "Fighter"},
+			P2Teams:     []string{"King", "Witch"},
+			MaxTurns:    10,
+		}
+		err = s.CreateMatch(roomID, gameCfg)
+		if err != nil {
+			t.Fatalf("Failed to create match: %v", err)
+		}
+
+		testEncodeFailure(t, testMux("GET /api/match-rooms/{roomID}/match/state", s.HandleGetMatchState),
+			func() *http.Request {
+				req, _ := http.NewRequest("GET", "/api/match-rooms/"+roomID+"/match/state", nil)
+				return req
+			}, http.StatusOK)
+	})
+
+	t.Run("Test Contract", func(t *testing.T) {
+		s := NewServerStateManager()
+		roomID, err := s.CreateMatchRoom()
+		if err != nil {
+			t.Fatalf("Failed to create room: %v", err)
+		}
+
+		gameCfg := engine.GameCfg{
+			StagePreset: "MAP03",
+			P1Teams:     []string{"King", "Fighter"},
+			P2Teams:     []string{"King", "Witch"},
+			MaxTurns:    10,
+		}
+		err = s.CreateMatch(roomID, gameCfg)
+		if err != nil {
+			t.Fatalf("Failed to create match: %v", err)
+		}
+
+		req, _ := http.NewRequest("GET", "/api/match-rooms/"+roomID+"/match/state", nil)
+		rr := httptest.NewRecorder()
+		testMux("GET /api/match-rooms/{roomID}/match/state", s.HandleGetMatchState).ServeHTTP(rr, req)
+
+		assertObjectContract(t, rr.Body.Bytes(),
+			[]string{"turn", "activeTeam", "grid", "units", "bombs", "softBlocks", "turnCommands"},
+			assertMatchStateNested)
+	})
+}
+
+func TestHandleSubmitTurnCommand(t *testing.T) {
 	createTestRoomWithMatch := func(t *testing.T) (string, *ServerStateManager) {
 		s := NewServerStateManager()
 		roomID, err := s.CreateMatchRoom()
@@ -761,7 +721,7 @@ func TestHandleSubmitTurnCommand(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 
 		rr := httptest.NewRecorder()
-		setupMux(s).ServeHTTP(rr, req)
+		testMux("POST /api/match-rooms/{roomID}/match/turn-commands", s.HandleSubmitTurnCommand).ServeHTTP(rr, req)
 
 		if status := rr.Code; status != http.StatusOK {
 			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusOK)
@@ -801,7 +761,7 @@ func TestHandleSubmitTurnCommand(t *testing.T) {
 		}
 
 		rr := httptest.NewRecorder()
-		setupMux(s).ServeHTTP(rr, req)
+		testMux("POST /api/match-rooms/{roomID}/match/turn-commands", s.HandleSubmitTurnCommand).ServeHTTP(rr, req)
 
 		if status := rr.Code; status != http.StatusConflict {
 			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusConflict)
@@ -822,7 +782,7 @@ func TestHandleSubmitTurnCommand(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 
 		rr := httptest.NewRecorder()
-		setupMux(s).ServeHTTP(rr, req)
+		testMux("POST /api/match-rooms/{roomID}/match/turn-commands", s.HandleSubmitTurnCommand).ServeHTTP(rr, req)
 
 		if status := rr.Code; status != http.StatusBadRequest {
 			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusBadRequest)
@@ -845,7 +805,7 @@ func TestHandleSubmitTurnCommand(t *testing.T) {
 		}
 
 		rr := httptest.NewRecorder()
-		setupMux(s).ServeHTTP(rr, req)
+		testMux("POST /api/match-rooms/{roomID}/match/turn-commands", s.HandleSubmitTurnCommand).ServeHTTP(rr, req)
 
 		if status := rr.Code; status != http.StatusNotFound {
 			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusNotFound)
@@ -869,7 +829,7 @@ func TestHandleSubmitTurnCommand(t *testing.T) {
 		}
 
 		rr := httptest.NewRecorder()
-		setupMux(s).ServeHTTP(rr, req)
+		testMux("POST /api/match-rooms/{roomID}/match/turn-commands", s.HandleSubmitTurnCommand).ServeHTTP(rr, req)
 
 		if status := rr.Code; status != http.StatusNotFound {
 			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusNotFound)
@@ -884,17 +844,13 @@ func TestHandleSubmitTurnCommand(t *testing.T) {
 		uID := engine.NewUnitID(1, 0)
 		newPos := engine.Coordinate{X: 4, Y: 7}
 		jsonBody, _ := json.Marshal(engine.NewMoveCommand(uID, newPos))
-		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/turn-commands", strings.NewReader(string(jsonBody)))
-		if err != nil {
-			t.Fatalf("Failed to create request: %v", err)
-		}
 
-		brokenWriter := &BrokenResponseWriter{}
-		setupMux(s).ServeHTTP(brokenWriter, req)
-
-		if brokenWriter.Code != http.StatusOK {
-			t.Errorf("Expected initial header setup to attempt status 200, got %d", brokenWriter.Code)
-		}
+		testEncodeFailure(t, testMux("POST /api/match-rooms/{roomID}/match/turn-commands", s.HandleSubmitTurnCommand),
+			func() *http.Request {
+				req, _ := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/turn-commands", strings.NewReader(string(jsonBody)))
+				req.Header.Set("Content-Type", "application/json")
+				return req
+			}, http.StatusOK)
 	})
 
 	t.Run("Test Contract", func(t *testing.T) {
@@ -908,9 +864,10 @@ func TestHandleSubmitTurnCommand(t *testing.T) {
 		}
 
 		rr := httptest.NewRecorder()
-		setupMux(s).ServeHTTP(rr, req)
+		testMux("POST /api/match-rooms/{roomID}/match/turn-commands", s.HandleSubmitTurnCommand).ServeHTTP(rr, req)
 
-		assertMatchStateContract(t, rr.Body.Bytes())
+		assertObjectContract(t, rr.Body.Bytes(),
+			[]string{"turn", "activeTeam", "grid", "units", "bombs", "softBlocks", "turnCommands"},
+			assertMatchStateNested)
 	})
-
 }
