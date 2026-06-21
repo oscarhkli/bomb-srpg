@@ -27,7 +27,7 @@ func assertObjectContract(t *testing.T, body []byte, expectedFields []string, ne
 		}
 		for _, field := range expectedFields {
 			if _, exists := rawMap[field]; !exists {
-				t.Errorf("Phaser Contract Broken: JavaScript code expects key '%s', but it was missing", field)
+				t.Errorf("Contract Broken: client code expects key '%s', but it was missing", field)
 			}
 		}
 	}
@@ -52,7 +52,7 @@ func assertArrayContract(t *testing.T, body []byte, expectedFields []string, ite
 		}
 		for _, field := range expectedFields {
 			if _, exists := targetObj[field]; !exists {
-				t.Errorf("Phaser Contract Broken: JavaScript code expects key '%s', but it was missing", field)
+				t.Errorf("Contract Broken: client code expects key '%s', but it was missing", field)
 			}
 		}
 		if itemChecks != nil {
@@ -97,7 +97,7 @@ func assertMatchStateNested(t *testing.T, raw map[string]any) {
 			unitFields := []string{"id", "type", "position", "speed", "bombMaxRange", "bombPower", "maxBombCount", "bombUsed", "team", "hp", "skills", "hasMoved", "hasUsedSkill"}
 			for _, field := range unitFields {
 				if _, exists := unit[field]; !exists {
-					t.Errorf("Phaser Contract Broken: unit missing key '%s'", field)
+					t.Errorf("Contract Broken: unit missing key '%s'", field)
 				}
 			}
 			if pos, ok := unit["position"].(map[string]any); ok {
@@ -115,7 +115,7 @@ func assertMatchStateNested(t *testing.T, raw map[string]any) {
 			bombFields := []string{"id", "ownerUnitID", "position", "range", "placedTurn", "countdown"}
 			for _, field := range bombFields {
 				if _, exists := bomb[field]; !exists {
-					t.Errorf("Phaser Contract Broken: bomb missing key '%s'", field)
+					t.Errorf("Contract Broken: bomb missing key '%s'", field)
 				}
 			}
 		}
@@ -126,7 +126,7 @@ func assertMatchStateNested(t *testing.T, raw map[string]any) {
 			tcFields := []string{"type", "unitID"}
 			for _, field := range tcFields {
 				if _, exists := tc[field]; !exists {
-					t.Errorf("Phaser Contract Broken: turnCommand missing key '%s'", field)
+					t.Errorf("Contract Broken: turnCommand missing key '%s'", field)
 				}
 			}
 		}
@@ -195,7 +195,7 @@ func TestHandleGetAllArchetypes(t *testing.T) {
 				t.Helper()
 				for _, field := range []string{"name", "speed", "bombMaxRange", "skills"} {
 					if _, exists := item[field]; !exists {
-						t.Errorf("Phaser Contract Broken: archetype missing key '%s'", field)
+						t.Errorf("Contract Broken: archetype missing key '%s'", field)
 					}
 				}
 			})
