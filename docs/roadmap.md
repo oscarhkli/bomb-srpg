@@ -43,19 +43,20 @@
   - [x] List Archetypes
   - [x] New Match with user-defined Game Config
 - [ ] HTTP Handlers for Turn resolution and Match lifecycle
+  - [ ] Start Turn
   - [ ] Reset
   - [ ] Commit
   - [ ] Surrender
+  - [ ] VictoryResult (may move to Phase 3)
 - [ ] HTTP Handlers for TurnCommands
-  - [ ] Move
-  - [ ] PlaceBomb
-  - [ ] GetAllowedTiles, which is different from GetReachableTiles
+  - [x] Move
+  - [x] PlaceBomb
+  - [ ] GetAllowedTiles, which is different from GetReachableTiles (may move to Phase 3)
 - [ ] Match Room
  - [x] Creation
  - [ ] Housekeep based on the last activity time
  - [x] Get Match State
- - [ ] Navigation with Match, Game cycle
-- [ ] Deployment
+ - [ ] Navigation with Match, Game cycle (may move to Phase 3)
 
 ## Phase 3: Graphical Browser Client & UI Integration
 - **Goal:** Drop the console interface and build a graphical browser client.
@@ -68,7 +69,7 @@
 - [ ] Board & Sprite Rendering from JSON State
 - [ ] Input Mapping (Converting Clicks to HTTP Commands)
 - [ ] Action Log Animation Playback
-- [ ] Local Terminal Code Deprecation/Isolation
+- [ ] Interaction with Server
 - [ ] Deployment
 
 ## Phase 4a: Add WebSockets

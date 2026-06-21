@@ -147,6 +147,7 @@ bomb-srpg
 ├── engine/                     <-- Pure core logic
 │   ├── codecs.go               <-- Bitmask encoders, decoders for UnitID and BombID
 │   ├── commands.go             <-- TurnCommand types & constructors
+│   ├── errors.go               <-- Error types deduced by engine
 │   ├── events.go               <-- GameEvent types & constructors
 │   ├── game.go                 <-- Game initializer
 │   ├── match.go                <-- Match life cycle transactions

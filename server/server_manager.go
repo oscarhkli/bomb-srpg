@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math/rand/v2"
+	"net/http"
 	"sync"
 	"time"
 )
@@ -16,11 +17,49 @@ const (
 )
 
 var (
-	ErrRoomNotFound  = errors.New("room not found")
-	ErrMatchExists   = errors.New("match already exists")
-	ErrMatchNotFound = errors.New("match not found")
-	ErrInvalidConfig = errors.New("invalid game config")
+	ErrRoomNotFound   = errors.New("room not found")
+	ErrMatchExists    = errors.New("match already exists")
+	ErrMatchNotFound  = errors.New("match not found")
+	ErrInvalidConfig  = errors.New("invalid game config")
+	ErrInvalidTurnCmd = errors.New("invalid turn command")
 )
+
+// mapError converts an error to an HTTP status code and message.
+func mapError(err error) (int, string) {
+	switch {
+	case errors.Is(err, ErrRoomNotFound), errors.Is(err, ErrMatchNotFound):
+		return http.StatusNotFound, err.Error()
+	case errors.Is(err, ErrMatchExists):
+		return http.StatusConflict, err.Error()
+	case errors.Is(err, ErrInvalidConfig):
+		return http.StatusBadRequest, err.Error()
+	case errors.Is(err, ErrInvalidTurnCmd):
+		return http.StatusConflict, err.Error()
+	case errors.Is(err, engine.ErrInvalidStagePreset),
+		errors.Is(err, engine.ErrInvalidTeamSize),
+		errors.Is(err, engine.ErrMissingKing),
+		errors.Is(err, engine.ErrInvalidStageLayout),
+		errors.Is(err, engine.ErrInvalidTerrain),
+		errors.Is(err, engine.ErrUnknownArchetype):
+		return http.StatusBadRequest, err.Error()
+	case errors.Is(err, engine.ErrUnitNotFound),
+		errors.Is(err, engine.ErrUnitDead),
+		errors.Is(err, engine.ErrNotActiveTeam),
+		errors.Is(err, engine.ErrAlreadyMoved),
+		errors.Is(err, engine.ErrAlreadyUsedSkill),
+		errors.Is(err, engine.ErrOutOfMoveRange),
+		errors.Is(err, engine.ErrOutOfBombRange),
+		errors.Is(err, engine.ErrCellOccupied),
+		errors.Is(err, engine.ErrOutOfBombs),
+		errors.Is(err, engine.ErrUnsupportedCommand),
+		errors.Is(err, engine.ErrInvalidLanding),
+		errors.Is(err, engine.ErrDesynced),
+		errors.Is(err, engine.ErrOutOfBounds):
+		return http.StatusConflict, err.Error()
+	default:
+		return http.StatusInternalServerError, "internal error"
+	}
+}
 
 // MatchRoom wraps the core engine match instance with server-layer network metadata.
 type MatchRoom struct {
@@ -117,7 +156,7 @@ func (s *ServerStateManager) CreateMatch(roomID string, gameCfg engine.GameCfg) 
 	return nil
 }
 
-// GetMatchState get the WorkingState of the Match in a given MatchRoom.
+// GetMatchState gets the WorkingState of the Match in a given MatchRoom.
 // Returns the WorkingState or an error if any pre-check is violated.
 func (s *ServerStateManager) GetMatchState(roomID string) (*engine.GameState, error) {
 	s.mu.RLock()
@@ -132,6 +171,33 @@ func (s *ServerStateManager) GetMatchState(roomID string) (*engine.GameState, er
 	if room.Match == nil {
 		slog.Warn("match not found", "roomID", roomID)
 		return nil, fmt.Errorf("%w: roomID=%s", ErrMatchNotFound, roomID)
+	}
+
+	return room.Match.WorkingState, nil
+}
+
+// SubmitTurnCommand delivers TurnCommand to engine to move a Unit or place a bomb in a given MatchRoom.
+// Returns the latest WorkingState or an error if any pre-check is violated
+func (s *ServerStateManager) SubmitTurnCommand(roomID string, cmd engine.TurnCommand) (*engine.GameState, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	room, ok := s.Rooms[roomID]
+	if !ok {
+		slog.Warn("match room not found", "roomID", roomID)
+		return nil, fmt.Errorf("%w: roomID=%s", ErrRoomNotFound, roomID)
+	}
+
+	if room.Match == nil {
+		slog.Warn("match not found", "roomID", roomID)
+		return nil, fmt.Errorf("%w: roomID=%s", ErrMatchNotFound, roomID)
+	}
+
+	err := room.Match.ApplyTurnCommand(cmd)
+
+	if err != nil {
+		slog.Error("invalid turn command", "roomID", roomID, "turnCmdType", cmd.Type, "error", err)
+		return nil, fmt.Errorf("%w: turnCommand=%+v: %v", ErrInvalidTurnCmd, cmd, err)
 	}
 
 	return room.Match.WorkingState, nil

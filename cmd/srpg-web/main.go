@@ -23,6 +23,7 @@ func main() {
 	r.HandleFunc("POST /api/match-rooms", serverState.HandleCreateMatchRoom)
 	r.HandleFunc("POST /api/match-rooms/{roomID}/match", serverState.HandleCreateMatch)
 	r.HandleFunc("GET /api/match-rooms/{roomID}/match/state", serverState.HandleGetMatchState)
+	r.HandleFunc("POST /api/match-rooms/{roomID}/match/turn-commands", serverState.HandleSubmitTurnCommand)
 
 	s := &http.Server{
 		Addr:         ":8080",

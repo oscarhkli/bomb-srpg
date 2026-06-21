@@ -3,7 +3,6 @@ package server
 import (
 	"bomb-srpg/engine"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -79,20 +78,9 @@ func (s *ServerStateManager) HandleCreateMatch(w http.ResponseWriter, r *http.Re
 	err := s.CreateMatch(roomID, req.GameCfg)
 
 	if err != nil {
-		switch {
-		case errors.Is(err, ErrRoomNotFound):
-			slog.Warn("create match room not found", "roomID", roomID)
-			http.Error(w, "room not found", http.StatusNotFound)
-		case errors.Is(err, ErrMatchExists):
-			slog.Warn("create match exists", "roomID", roomID)
-			http.Error(w, "match already exists", http.StatusConflict)
-		case errors.Is(err, ErrInvalidConfig):
-			slog.Warn("create match invalid config", "roomID", roomID, "error", err)
-			http.Error(w, "invalid config", http.StatusBadRequest)
-		default:
-			slog.Error("create match internal error", "roomID", roomID, "error", err)
-			http.Error(w, "internal error", http.StatusInternalServerError)
-		}
+		code, msg := mapError(err)
+		slog.Warn("create match failed", "roomID", roomID, "error", err)
+		http.Error(w, msg, code)
 		return
 	}
 
@@ -109,32 +97,54 @@ func (s *ServerStateManager) HandleCreateMatch(w http.ResponseWriter, r *http.Re
 	slog.Info("match created", "roomID", roomID)
 }
 
-// GetMatchState get the WorkingState of the Match in a given MatchRoom.
+// GetMatchState gets the WorkingState of the Match in a given MatchRoom.
 // It encodes the gameState definitions as JSON and writes them to the response.
 func (s *ServerStateManager) HandleGetMatchState(w http.ResponseWriter, r *http.Request) {
 	roomID := r.PathValue("roomID")
 
-	gameState, err := s.GetMatchState(roomID)
+	gs, err := s.GetMatchState(roomID)
 
 	if err != nil {
-		switch {
-		case errors.Is(err, ErrRoomNotFound):
-			slog.Warn("get match state match room not found", "roomID", roomID)
-			http.Error(w, "room not found", http.StatusNotFound)
-		case errors.Is(err, ErrMatchNotFound):
-			slog.Warn("get match state match not found", "roomID", roomID)
-			http.Error(w, "match not found", http.StatusNotFound)
-		default:
-			slog.Error("get match state internal error", "roomID", roomID, "error", err)
-			http.Error(w, "internal error", http.StatusInternalServerError)
-		}
+		code, msg := mapError(err)
+		slog.Warn("get match state failed", "roomID", roomID, "error", err)
+		http.Error(w, msg, code)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 
-	if err := json.NewEncoder(w).Encode(gameState); err != nil {
+	if err := json.NewEncoder(w).Encode(gs); err != nil {
+		slog.Error("encode gameState failed", "error", err)
+		http.Error(w, "Failed to encode gameState definitions", http.StatusInternalServerError)
+		return
+	}
+}
+
+// HandleSubmitTurnCommand delivers TurnCommand to engine to move a Unit or place a bomb in a given MatchRoom.
+// It encodes the definitions as JSON and writes them to the response.
+func (s *ServerStateManager) HandleSubmitTurnCommand(w http.ResponseWriter, r *http.Request) {
+	roomID := r.PathValue("roomID")
+
+	var req engine.TurnCommand
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		slog.Warn("invalid turnCommand format", "error", err)
+		http.Error(w, "Invalid turnCommand format", http.StatusBadRequest)
+		return
+	}
+
+	gs, err := s.SubmitTurnCommand(roomID, req)
+	if err != nil {
+		code, msg := mapError(err)
+		slog.Warn("submit turn command failed", "roomID", roomID, "error", err)
+		http.Error(w, msg, code)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	if err := json.NewEncoder(w).Encode(gs); err != nil {
 		slog.Error("encode gameState failed", "error", err)
 		http.Error(w, "Failed to encode gameState definitions", http.StatusInternalServerError)
 		return

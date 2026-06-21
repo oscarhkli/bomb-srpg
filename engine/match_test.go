@@ -1252,6 +1252,8 @@ func (m *Match) AddSoftBlock(id int, pos Coordinate) *SoftBlock {
 }
 
 func newTestMatchWithFullTeam(t *testing.T, p1KingAlive, p2KingAlive bool, p1Alive, p2Alive [4]bool) *Match {
+	t.Helper()
+
 	m := newTestMatch(5, 2)
 	m.WorkingState.Turn = 1
 	m.WorkingState.ActiveTeam = 1

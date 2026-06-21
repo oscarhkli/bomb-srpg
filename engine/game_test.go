@@ -471,7 +471,7 @@ func TestInitGame_ErrorConditions(t *testing.T) {
 		t.Fatalf("Expected game initialization to fail due to invalid config, but it succeeded")
 	}
 
-	expectedErrorMessage := "stage preset 'NonExistentStage' not found"
+	expectedErrorMessage := "invalid stage preset: stage preset 'NonExistentStage' not found"
 	if err.Error() != expectedErrorMessage {
 		t.Errorf("Expected error message '%s', got '%s'", expectedErrorMessage, err.Error())
 	}
