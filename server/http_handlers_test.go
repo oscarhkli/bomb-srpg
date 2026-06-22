@@ -521,7 +521,7 @@ type ClientMatchStateResponse struct {
 }
 
 func TestHandleGetMatchState(t *testing.T) {
-	t.Run("Success: creates a new match in an existing room", func(t *testing.T) {
+	t.Run("Success: get match state in an existing room", func(t *testing.T) {
 		s := NewServerStateManager()
 		roomID, err := s.CreateMatchRoom()
 		if err != nil {
@@ -1245,6 +1245,26 @@ func TestHandleSurrender(t *testing.T) {
 		}
 	})
 
+	t.Run("Failure: invalid JSON format", func(t *testing.T) {
+		roomID, s := createTestRoomWithMatch(t)
+
+		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/surrender", strings.NewReader("{invalid json}"))
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+
+		rr := httptest.NewRecorder()
+		testMux("POST /api/match-rooms/{roomID}/match/surrender", s.HandleSurrender).ServeHTTP(rr, req)
+
+		if status := rr.Code; status != http.StatusBadRequest {
+			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusBadRequest)
+		}
+		if !strings.Contains(rr.Body.String(), "Invalid surrenderRequest format") {
+			t.Errorf("Expected error message 'Invalid surrenderRequest format', got: %s", rr.Body.String())
+		}
+	})
+
 	t.Run("Failure: room not found", func(t *testing.T) {
 		s := NewServerStateManager()
 
@@ -1313,5 +1333,144 @@ func TestHandleSurrender(t *testing.T) {
 		testMux("POST /api/match-rooms/{roomID}/match/surrender", s.HandleSurrender).ServeHTTP(rr, req)
 		t.Log(rr.Body)
 		assertArrayContract(t, rr.Body.Bytes(), []string{"type", "winnerTeamId"}, nil)
+	})
+}
+
+func TestHandleGetMatchConfig(t *testing.T) {
+	t.Run("Success: get the gameConfig in an existing room", func(t *testing.T) {
+		s := NewServerStateManager()
+		roomID, err := s.CreateMatchRoom()
+		if err != nil {
+			t.Fatalf("Failed to create room: %v", err)
+		}
+
+		gameCfg := engine.GameCfg{
+			StagePreset: "MAP03",
+			P1Teams:     []string{"King", "Fighter"},
+			P2Teams:     []string{"King", "Witch"},
+			MaxTurns:    10,
+		}
+		err = s.CreateMatch(roomID, gameCfg)
+		if err != nil {
+			t.Fatalf("Failed to create match: %v", err)
+		}
+
+		req, err := http.NewRequest("GET", "/api/match-rooms/"+roomID+"/match/config", nil)
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+
+		rr := httptest.NewRecorder()
+		testMux("GET /api/match-rooms/{roomID}/match/config", s.HandleGetMatchConfig).ServeHTTP(rr, req)
+
+		if status := rr.Code; status != http.StatusOK {
+			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusOK)
+		}
+
+		expectedHeader := "application/json"
+		if contentType := rr.Header().Get("Content-Type"); contentType != expectedHeader {
+			t.Errorf("Handler returned wrong content type: got %v want %v", contentType, expectedHeader)
+		}
+
+		var response engine.GameCfg
+		if err := json.NewDecoder(rr.Body).Decode(&response); err != nil {
+			t.Fatalf("Failed to decode response JSON payload: %v", err)
+		}
+
+		if response.StagePreset != gameCfg.StagePreset {
+			t.Errorf("Expected stagePreset %v, got %v", validGameCfg().StagePreset, gameCfg.StagePreset)
+		}
+	})
+
+	t.Run("Failure: room not found", func(t *testing.T) {
+		s := NewServerStateManager()
+		req, err := http.NewRequest("GET", "/api/match-rooms/NONEXISTENT/match/config", nil)
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+
+		rr := httptest.NewRecorder()
+		testMux("GET /api/match-rooms/{roomID}/match/config", s.HandleGetMatchConfig).ServeHTTP(rr, req)
+
+		if status := rr.Code; status != http.StatusNotFound {
+			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusNotFound)
+		}
+		if !strings.Contains(rr.Body.String(), "room not found") {
+			t.Errorf("Expected error message 'room not found', got: %s", rr.Body.String())
+		}
+	})
+
+	t.Run("Failure: match not found", func(t *testing.T) {
+		s := NewServerStateManager()
+		roomID, err := s.CreateMatchRoom()
+		if err != nil {
+			t.Fatalf("Failed to create room: %v", err)
+		}
+
+		req, err := http.NewRequest("GET", "/api/match-rooms/"+roomID+"/match/config", nil)
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+
+		rr := httptest.NewRecorder()
+		testMux("GET /api/match-rooms/{roomID}/match/config", s.HandleGetMatchConfig).ServeHTTP(rr, req)
+
+		if status := rr.Code; status != http.StatusNotFound {
+			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusNotFound)
+		}
+		if !strings.Contains(rr.Body.String(), "match not found") {
+			t.Errorf("Expected error message 'match not found', got: %s", rr.Body.String())
+		}
+	})
+
+	t.Run("Failure: failed to Encode", func(t *testing.T) {
+		s := NewServerStateManager()
+		roomID, err := s.CreateMatchRoom()
+		if err != nil {
+			t.Fatalf("Failed to create room: %v", err)
+		}
+
+		gameCfg := engine.GameCfg{
+			StagePreset: "MAP01",
+			P1Teams:     []string{"King", "Fighter"},
+			P2Teams:     []string{"King", "Witch"},
+			MaxTurns:    10,
+		}
+		err = s.CreateMatch(roomID, gameCfg)
+		if err != nil {
+			t.Fatalf("Failed to create match: %v", err)
+		}
+
+		testEncodeFailure(t, testMux("GET /api/match-rooms/{roomID}/match/config", s.HandleGetMatchConfig),
+			func() *http.Request {
+				req, _ := http.NewRequest("GET", "/api/match-rooms/"+roomID+"/match/config", nil)
+				return req
+			}, http.StatusOK)
+	})
+
+	t.Run("Test Contract", func(t *testing.T) {
+		s := NewServerStateManager()
+		roomID, err := s.CreateMatchRoom()
+		if err != nil {
+			t.Fatalf("Failed to create room: %v", err)
+		}
+
+		gameCfg := engine.GameCfg{
+			StagePreset: "MAP03",
+			P1Teams:     []string{"King", "Fighter"},
+			P2Teams:     []string{"King", "Witch"},
+			MaxTurns:    10,
+		}
+		err = s.CreateMatch(roomID, gameCfg)
+		if err != nil {
+			t.Fatalf("Failed to create match: %v", err)
+		}
+
+		req, _ := http.NewRequest("GET", "/api/match-rooms/"+roomID+"/match/config", nil)
+		rr := httptest.NewRecorder()
+		testMux("GET /api/match-rooms/{roomID}/match/config", s.HandleGetMatchConfig).ServeHTTP(rr, req)
+
+		assertObjectContract(t, rr.Body.Bytes(),
+			[]string{"stagePreset", "p1Teams", "p2Teams", "maxTurns", "allowResetTurn", "suddenDeath"}, nil)
 	})
 }

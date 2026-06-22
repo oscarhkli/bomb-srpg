@@ -775,3 +775,63 @@ func TestServerStateManager_Surrender(t *testing.T) {
 		})
 	}
 }
+
+func TestServerStateManager_GetMatchConfig(t *testing.T) {
+	tests := []struct {
+		name     string
+		setup    func(t *testing.T) (string, *ServerStateManager)
+		wantErr  error
+		validate func(t *testing.T, gameCfg *engine.GameCfg, s *ServerStateManager, roomID string)
+	}{
+		{
+			name: "Success",
+			setup: func(t *testing.T) (string, *ServerStateManager) {
+				s := NewServerStateManager()
+				roomID, _ := s.CreateMatchRoom()
+				s.CreateMatch(roomID, validGameCfg())
+				return roomID, s
+			},
+			wantErr: nil,
+			validate: func(t *testing.T, gameCfg *engine.GameCfg, s *ServerStateManager, roomID string) {
+				room, ok := s.Rooms[roomID]
+				if !ok {
+					t.Fatal("Room not found")
+				}
+				if gameCfg != &room.Match.GameCfg {
+					t.Errorf("Expected matchState pointer %p, got %p", &room.Match.GameCfg, gameCfg)
+				}
+			},
+		},
+		{
+			name: "Room Not Found",
+			setup: func(t *testing.T) (string, *ServerStateManager) {
+				return "NONEXISTENT", NewServerStateManager()
+			},
+			wantErr:  ErrRoomNotFound,
+			validate: func(t *testing.T, gameCfg *engine.GameCfg, s *ServerStateManager, roomID string) {},
+		},
+		{
+			name: "Match Not Found",
+			setup: func(t *testing.T) (string, *ServerStateManager) {
+				s := NewServerStateManager()
+				roomID, _ := s.CreateMatchRoom()
+				return roomID, s
+			},
+			wantErr:  ErrMatchNotFound,
+			validate: func(t *testing.T, gameCfg *engine.GameCfg, s *ServerStateManager, roomID string) {},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			roomID, s := tt.setup(t)
+			gameCfg, err := s.GetMatchConfig(roomID)
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("GetMatchConfig() error = %v, want %v", err, tt.wantErr)
+			}
+			if tt.validate != nil {
+				tt.validate(t, gameCfg, s, roomID)
+			}
+		})
+	}
+}

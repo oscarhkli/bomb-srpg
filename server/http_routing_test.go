@@ -24,6 +24,7 @@ func TestHTTPRouting(t *testing.T) {
 	mux.HandleFunc("POST /api/match-rooms/{roomID}/match/reset-turn", serverState.HandleResetTurn)
 	mux.HandleFunc("POST /api/match-rooms/{roomID}/match/resolve-turn", serverState.HandleResolveTurn)
 	mux.HandleFunc("POST /api/match-rooms/{roomID}/match/surrender", serverState.HandleSurrender)
+	mux.HandleFunc("GET /api/match-rooms/{roomID}/match/config", serverState.HandleGetMatchConfig)
 
 	server := httptest.NewServer(mux)
 	defer server.Close()
@@ -218,6 +219,30 @@ func TestHTTPRouting(t *testing.T) {
 			name:       "DELETE /api/match-rooms/{roomID}/match/surrender (405)",
 			method:     "DELETE",
 			path:       "/api/match-rooms/DUMMY/match/surrender",
+			wantStatus: http.StatusMethodNotAllowed,
+		},
+		{
+			name:       "GET /api/match-rooms/{roomID}/match/config (404 - no room)",
+			method:     "GET",
+			path:       "/api/match-rooms/DUMMY/match/config",
+			wantStatus: http.StatusNotFound,
+		},
+		{
+			name:       "POST /api/match-rooms/{roomID}/match/config (405)",
+			method:     "POST",
+			path:       "/api/match-rooms/DUMMY/match/config",
+			wantStatus: http.StatusMethodNotAllowed,
+		},
+		{
+			name:       "PUT /api/match-rooms/{roomID}/match/config (405)",
+			method:     "PUT",
+			path:       "/api/match-rooms/DUMMY/match/config",
+			wantStatus: http.StatusMethodNotAllowed,
+		},
+		{
+			name:       "DELETE /api/match-rooms/{roomID}/match/config (405)",
+			method:     "DELETE",
+			path:       "/api/match-rooms/DUMMY/match/config",
 			wantStatus: http.StatusMethodNotAllowed,
 		},
 	}

@@ -230,7 +230,7 @@ func (s *ServerStateManager) HandleSurrender(w http.ResponseWriter, r *http.Requ
 	var req SurrenderRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		slog.Warn("invalid surrender request format", "error", err)
-		http.Error(w, "Invalid surrender request format", http.StatusBadRequest)
+		http.Error(w, "Invalid surrenderRequest format", http.StatusBadRequest)
 		return
 	}
 
@@ -254,11 +254,27 @@ func (s *ServerStateManager) HandleSurrender(w http.ResponseWriter, r *http.Requ
 
 // HandleGetMatchConfig gets the GameCfg of the current Match in a given MatchRoom
 func (s *ServerStateManager) HandleGetMatchConfig(w http.ResponseWriter, r *http.Request) {
-	//roomID := r.PathValue("roomID")
-	http.Error(w, "not yet implemented", http.StatusNotImplemented)
+	roomID := r.PathValue("roomID")
+	gameCfg, err := s.GetMatchConfig(roomID)
+	if err != nil {
+		code, msg := mapError(err)
+		slog.Warn("res turn failed", "roomID", roomID, "error", err)
+		http.Error(w, msg, code)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	if err := json.NewEncoder(w).Encode(gameCfg); err != nil {
+		slog.Error("encode gameConfig failed", "error", err)
+		http.Error(w, "Failed to encode gameConfig", http.StatusInternalServerError)
+		return
+	}
 }
 
 // HandleGetMatchVictoryResult gets the VictoryResult of the current Match in a given MatchRoom
+// TODO: Phase 3 frontend will determine what to provide
 func (s *ServerStateManager) HandleGetMatchVictoryResult(w http.ResponseWriter, r *http.Request) {
 	//roomID := r.PathValue("roomID")
 	http.Error(w, "not yet implemented", http.StatusNotImplemented)
