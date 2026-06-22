@@ -150,3 +150,53 @@ func (s *ServerStateManager) HandleSubmitTurnCommand(w http.ResponseWriter, r *h
 		return
 	}
 }
+
+func (s *ServerStateManager) HandleStartTurn(w http.ResponseWriter, r *http.Request) {
+	roomID := r.PathValue("roomID")
+	gs, err := s.StartTurn(roomID)
+	if err != nil {
+		code, msg := mapError(err)
+		slog.Warn("start turn failed", "roomID", roomID, "error", err)
+		http.Error(w, msg, code)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	if err := json.NewEncoder(w).Encode(gs); err != nil {
+		slog.Error("encode gameState failed", "error", err)
+		http.Error(w, "Failed to encode gameState definitions", http.StatusInternalServerError)
+		return
+	}
+}
+
+func (s *ServerStateManager) HandleCommitTurn(w http.ResponseWriter, r *http.Request) {
+	//roomID := r.PathValue("roomID")
+	http.Error(w, "not yet implemented", http.StatusNotImplemented)
+}
+
+func (s *ServerStateManager) HandleResetTurn(w http.ResponseWriter, r *http.Request) {
+	//roomID := r.PathValue("roomID")
+	http.Error(w, "not yet implemented", http.StatusNotImplemented)
+}
+
+func (s *ServerStateManager) HandleSurrender(w http.ResponseWriter, r *http.Request) {
+	//roomID := r.PathValue("roomID")
+	http.Error(w, "not yet implemented", http.StatusNotImplemented)
+}
+
+func (s *ServerStateManager) HandleGetMatchConfig(w http.ResponseWriter, r *http.Request) {
+	//roomID := r.PathValue("roomID")
+	http.Error(w, "not yet implemented", http.StatusNotImplemented)
+}
+
+func (s *ServerStateManager) HandleGetMatchVictoryResult(w http.ResponseWriter, r *http.Request) {
+	//roomID := r.PathValue("roomID")
+	http.Error(w, "not yet implemented", http.StatusNotImplemented)
+}
+
+func (s *ServerStateManager) HandleGetAllowedTiles(w http.ResponseWriter, r *http.Request) {
+	//roomID := r.PathValue("roomID")
+	http.Error(w, "not yet implemented", http.StatusNotImplemented)
+}

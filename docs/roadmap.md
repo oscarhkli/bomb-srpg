@@ -43,7 +43,7 @@
   - [x] List Archetypes
   - [x] New Match with user-defined Game Config
 - [ ] HTTP Handlers for Turn resolution and Match lifecycle
-  - [ ] Start Turn
+  - [x] Start Turn
   - [ ] Reset
   - [ ] Commit
   - [ ] Surrender
@@ -56,7 +56,9 @@
  - [x] Creation
  - [ ] Housekeep based on the last activity time
  - [x] Get Match State
- - [ ] Navigation with Match, Game cycle (may move to Phase 3)
+ - [ ] Navigation with Match, Game cycle
+  - [ ] End Match
+  - [ ] Rematch
 
 ## Phase 3: Graphical Browser Client & UI Integration
 - **Goal:** Drop the console interface and build a graphical browser client.

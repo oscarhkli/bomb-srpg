@@ -685,28 +685,31 @@ func TestHandleGetMatchState(t *testing.T) {
 	})
 }
 
-func TestHandleSubmitTurnCommand(t *testing.T) {
-	createTestRoomWithMatch := func(t *testing.T) (string, *ServerStateManager) {
-		s := NewServerStateManager()
-		roomID, err := s.CreateMatchRoom()
-		if err != nil {
-			t.Fatalf("Failed to create room: %v", err)
-		}
+func createTestRoomWithMatch(t *testing.T) (string, *ServerStateManager) {
+	t.Helper()
 
-		gameCfg := engine.GameCfg{
-			StagePreset: "MAP01",
-			P1Teams:     []string{"King", "Fighter"},
-			P2Teams:     []string{"King", "Witch"},
-			MaxTurns:    10,
-		}
-		err = s.CreateMatch(roomID, gameCfg)
-		if err != nil {
-			t.Fatalf("Failed to create match: %v", err)
-		}
-
-		return roomID, s
+	s := NewServerStateManager()
+	roomID, err := s.CreateMatchRoom()
+	if err != nil {
+		t.Fatalf("Failed to create room: %v", err)
 	}
 
+	gameCfg := engine.GameCfg{
+		StagePreset: "MAP01",
+		P1Teams:     []string{"King", "Fighter"},
+		P2Teams:     []string{"King", "Witch"},
+		MaxTurns:    10,
+		SuddenDeath: true,
+	}
+	err = s.CreateMatch(roomID, gameCfg)
+	if err != nil {
+		t.Fatalf("Failed to create match: %v", err)
+	}
+
+	return roomID, s
+}
+
+func TestHandleSubmitTurnCommand(t *testing.T) {
 	t.Run("Success: submit a valid TurnCommand in an existing room", func(t *testing.T) {
 		roomID, s := createTestRoomWithMatch(t)
 
@@ -865,6 +868,106 @@ func TestHandleSubmitTurnCommand(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 		testMux("POST /api/match-rooms/{roomID}/match/turn-commands", s.HandleSubmitTurnCommand).ServeHTTP(rr, req)
+
+		assertObjectContract(t, rr.Body.Bytes(),
+			[]string{"turn", "activeTeam", "grid", "units", "bombs", "softBlocks", "turnCommands"},
+			assertMatchStateNested)
+	})
+}
+
+func TestHandleStartTurn(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		roomID, s := createTestRoomWithMatch(t)
+		s.Rooms[roomID].Match.TrueState.Turn = 1000
+		s.Rooms[roomID].Match.WorkingState.Turn = 1000
+
+		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/start-turn", nil)
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+
+		rr := httptest.NewRecorder()
+		testMux("POST /api/match-rooms/{roomID}/match/start-turn", s.HandleStartTurn).ServeHTTP(rr, req)
+
+		if status := rr.Code; status != http.StatusOK {
+			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusOK)
+		}
+
+		expectedHeader := "application/json"
+		if contentType := rr.Header().Get("Content-Type"); contentType != expectedHeader {
+			t.Errorf("Handler returned wrong content type: got %v want %v", contentType, expectedHeader)
+		}
+
+		var response ClientMatchStateResponse
+		if err := json.NewDecoder(rr.Body).Decode(&response); err != nil {
+			t.Fatalf("Failed to decode response JSON payload: %v", err)
+		}
+
+		if got, want := len(s.Rooms[roomID].Match.WorkingState.Bombs), 2; got != want {
+			t.Errorf("Expected SuddenDeath triggered and drop %d bombs, got %d", want, got)
+		}
+	})
+
+	t.Run("Failure: room not found", func(t *testing.T) {
+		s := NewServerStateManager()
+
+		req, err := http.NewRequest("POST", "/api/match-rooms/NONEXISTENT/match/start-turn", nil)
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+
+		rr := httptest.NewRecorder()
+		testMux("POST /api/match-rooms/{roomID}/match/start-turn", s.HandleStartTurn).ServeHTTP(rr, req)
+
+		if status := rr.Code; status != http.StatusNotFound {
+			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusNotFound)
+		}
+		if !strings.Contains(rr.Body.String(), "room not found") {
+			t.Errorf("Expected error message 'room not found', got: %s", rr.Body.String())
+		}
+	})
+
+	t.Run("Failure: match not found", func(t *testing.T) {
+		roomID, s := createTestRoomWithMatch(t)
+		s.Rooms[roomID].Match = nil
+
+		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/start-turn", nil)
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+
+		rr := httptest.NewRecorder()
+		testMux("POST /api/match-rooms/{roomID}/match/start-turn", s.HandleStartTurn).ServeHTTP(rr, req)
+
+		if status := rr.Code; status != http.StatusNotFound {
+			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusNotFound)
+		}
+		if !strings.Contains(rr.Body.String(), "match not found") {
+			t.Errorf("Expected error message 'match not found', got: %s", rr.Body.String())
+		}
+	})
+
+	t.Run("Failure: failed to Encode", func(t *testing.T) {
+		roomID, s := createTestRoomWithMatch(t)
+
+		testEncodeFailure(t, testMux("POST /api/match-rooms/{roomID}/match/start-turn", s.HandleStartTurn),
+			func() *http.Request {
+				req, _ := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/start-turn", nil)
+				req.Header.Set("Content-Type", "application/json")
+				return req
+			}, http.StatusOK)
+	})
+
+	t.Run("Test Contract", func(t *testing.T) {
+		roomID, s := createTestRoomWithMatch(t)
+		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/start-turn", nil)
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+
+		rr := httptest.NewRecorder()
+		testMux("POST /api/match-rooms/{roomID}/match/start-turn", s.HandleStartTurn).ServeHTTP(rr, req)
 
 		assertObjectContract(t, rr.Body.Bytes(),
 			[]string{"turn", "activeTeam", "grid", "units", "bombs", "softBlocks", "turnCommands"},

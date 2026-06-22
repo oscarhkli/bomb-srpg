@@ -18,6 +18,7 @@ const (
 
 var (
 	ErrRoomNotFound   = errors.New("room not found")
+	ErrMatchEnded     = errors.New("match already ended")
 	ErrMatchExists    = errors.New("match already exists")
 	ErrMatchNotFound  = errors.New("match not found")
 	ErrInvalidConfig  = errors.New("invalid game config")
@@ -54,7 +55,8 @@ func mapError(err error) (int, string) {
 		errors.Is(err, engine.ErrUnsupportedCommand),
 		errors.Is(err, engine.ErrInvalidLanding),
 		errors.Is(err, engine.ErrDesynced),
-		errors.Is(err, engine.ErrOutOfBounds):
+		errors.Is(err, engine.ErrOutOfBounds),
+		errors.Is(err, ErrMatchEnded):
 		return http.StatusConflict, err.Error()
 	default:
 		return http.StatusInternalServerError, "internal error"
@@ -156,12 +158,7 @@ func (s *ServerStateManager) CreateMatch(roomID string, gameCfg engine.GameCfg) 
 	return nil
 }
 
-// GetMatchState gets the WorkingState of the Match in a given MatchRoom.
-// Returns the WorkingState or an error if any pre-check is violated.
-func (s *ServerStateManager) GetMatchState(roomID string) (*engine.GameState, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
+func (s *ServerStateManager) roomReadyForMatch(roomID string) (*MatchRoom, error) {
 	room, ok := s.Rooms[roomID]
 	if !ok {
 		slog.Warn("match room not found", "roomID", roomID)
@@ -171,6 +168,20 @@ func (s *ServerStateManager) GetMatchState(roomID string) (*engine.GameState, er
 	if room.Match == nil {
 		slog.Warn("match not found", "roomID", roomID)
 		return nil, fmt.Errorf("%w: roomID=%s", ErrMatchNotFound, roomID)
+	}
+
+	return room, nil
+}
+
+// GetMatchState gets the WorkingState of the Match in a given MatchRoom.
+// Returns the WorkingState or an error if any pre-check is violated.
+func (s *ServerStateManager) GetMatchState(roomID string) (*engine.GameState, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	room, err := s.roomReadyForMatch(roomID)
+	if err != nil {
+		return nil, err
 	}
 
 	return room.Match.WorkingState, nil
@@ -182,22 +193,33 @@ func (s *ServerStateManager) SubmitTurnCommand(roomID string, cmd engine.TurnCom
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	room, ok := s.Rooms[roomID]
-	if !ok {
-		slog.Warn("match room not found", "roomID", roomID)
-		return nil, fmt.Errorf("%w: roomID=%s", ErrRoomNotFound, roomID)
+	room, err := s.roomReadyForMatch(roomID)
+	if err != nil {
+		return nil, err
 	}
 
-	if room.Match == nil {
-		slog.Warn("match not found", "roomID", roomID)
-		return nil, fmt.Errorf("%w: roomID=%s", ErrMatchNotFound, roomID)
-	}
-
-	err := room.Match.ApplyTurnCommand(cmd)
-
+	err = room.Match.ApplyTurnCommand(cmd)
 	if err != nil {
 		slog.Error("invalid turn command", "roomID", roomID, "turnCmdType", cmd.Type, "error", err)
 		return nil, fmt.Errorf("%w: turnCommand=%+v: %v", ErrInvalidTurnCmd, cmd, err)
+	}
+
+	return room.Match.WorkingState, nil
+}
+
+func (s *ServerStateManager) StartTurn(roomID string) (*engine.GameState, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	room, err := s.roomReadyForMatch(roomID)
+	if err != nil {
+		return nil, err
+	}
+
+	room.Match.StartNewTurn()
+
+	if room.Match.WinnerTeamID != 0 {
+		return nil, fmt.Errorf("%w: match already ended", ErrMatchEnded)
 	}
 
 	return room.Match.WorkingState, nil

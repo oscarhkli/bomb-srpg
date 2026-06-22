@@ -128,6 +128,7 @@ func validGameCfg() engine.GameCfg {
 		P1Teams:     []string{"King", "Fighter"},
 		P2Teams:     []string{"King", "Witch"},
 		MaxTurns:    10,
+		SuddenDeath: true,
 	}
 }
 
@@ -435,6 +436,93 @@ func TestServerStateManager_SubmitTurnCommand(t *testing.T) {
 			}
 			if tt.validate != nil {
 				tt.validate(t, gs, s, roomID, cmd)
+			}
+		})
+	}
+}
+
+func TestServerStateManager_StartTurn(t *testing.T) {
+	tests := []struct {
+		name     string
+		setup    func(t *testing.T) (string, *ServerStateManager)
+		wantErr  error
+		validate func(t *testing.T, gs *engine.GameState, s *ServerStateManager, roomID string)
+	}{
+		{
+			name: "Success",
+			setup: func(t *testing.T) (string, *ServerStateManager) {
+				roomID, s := createTestRoom(t)
+				s.Rooms[roomID].Match.TrueState.Turn = 1000
+				s.Rooms[roomID].Match.WorkingState.Turn = 1000
+				return roomID, s
+			},
+			wantErr: nil,
+			validate: func(t *testing.T, gs *engine.GameState, s *ServerStateManager, roomID string) {
+				room, ok := s.Rooms[roomID]
+				if !ok {
+					t.Fatal("Room not found")
+				}
+
+				if got, want := len(room.Match.WorkingState.Bombs), 2; got != want {
+					t.Errorf("Expected SuddenDeath triggered and drop %d bombs, got %d", want, got)
+				}
+				if gs != room.Match.WorkingState {
+					t.Errorf("Expected matchState pointer %p, got %p", room.Match.WorkingState, gs)
+				}
+			},
+		},
+		{
+			name: "Match already ended",
+			setup: func(t *testing.T) (string, *ServerStateManager) {
+				roomID, s := createTestRoom(t)
+				s.Rooms[roomID].Match.WinnerTeamID = 1
+				return roomID, s
+			},
+			wantErr: ErrMatchEnded,
+			validate: func(t *testing.T, gs *engine.GameState, s *ServerStateManager, roomID string) {
+				if gs != nil {
+					t.Errorf("Expected matchState to be nil, got %p", gs)
+				}
+			},
+		},
+		{
+			name: "Room Not Found",
+			setup: func(t *testing.T) (string, *ServerStateManager) {
+				s := NewServerStateManager()
+				return "NONEXISTENT", s
+			},
+			wantErr: ErrRoomNotFound,
+			validate: func(t *testing.T, gs *engine.GameState, s *ServerStateManager, roomID string) {
+				if gs != nil {
+					t.Errorf("Expected matchState to be nil, got %p", gs)
+				}
+			},
+		},
+		{
+			name: "Match Not Found",
+			setup: func(t *testing.T) (string, *ServerStateManager) {
+				s := NewServerStateManager()
+				roomID, _ := s.CreateMatchRoom()
+				return roomID, s
+			},
+			wantErr: ErrMatchNotFound,
+			validate: func(t *testing.T, gs *engine.GameState, s *ServerStateManager, roomID string) {
+				if gs != nil {
+					t.Errorf("Expected matchState to be nil, got %p", gs)
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			roomID, s := tt.setup(t)
+			gs, err := s.StartTurn(roomID)
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("StartTurn() error = %v, want %v", err, tt.wantErr)
+			}
+			if tt.validate != nil {
+				tt.validate(t, gs, s, roomID)
 			}
 		})
 	}
