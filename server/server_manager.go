@@ -216,7 +216,7 @@ func (s *ServerStateManager) StartTurn(roomID string) (*engine.GameState, error)
 		return nil, err
 	}
 
-	room.Match.StartNewTurn()
+	room.Match.StartTurn()
 
 	if room.Match.WinnerTeamID != 0 {
 		return nil, fmt.Errorf("%w: match already ended", ErrMatchEnded)
