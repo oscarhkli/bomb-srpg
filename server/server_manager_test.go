@@ -527,3 +527,75 @@ func TestServerStateManager_StartTurn(t *testing.T) {
 		})
 	}
 }
+
+func TestServerStateManager_ResetTurn(t *testing.T) {
+	tests := []struct {
+		name     string
+		setup    func(t *testing.T) (string, *ServerStateManager)
+		wantErr  error
+		validate func(t *testing.T, gs *engine.GameState, s *ServerStateManager, roomID string)
+	}{
+		{
+			name: "Success",
+			setup: func(t *testing.T) (string, *ServerStateManager) {
+				roomID, s := createTestRoom(t)
+				s.Rooms[roomID].Match.WorkingState.Units[16].HasMoved = true
+				return roomID, s
+			},
+			wantErr: nil,
+			validate: func(t *testing.T, gs *engine.GameState, s *ServerStateManager, roomID string) {
+				room, ok := s.Rooms[roomID]
+				if !ok {
+					t.Fatal("Room not found")
+				}
+
+				if got, want := room.Match.WorkingState.Units[16].HasMoved, false; got != want {
+					t.Errorf("Expected Unit %#X HasMoved reset to %v, got %v", 16, want, got)
+				}
+				if gs != room.Match.WorkingState {
+					t.Errorf("Expected matchState pointer %p, got %p", room.Match.WorkingState, gs)
+				}
+			},
+		},
+		{
+			name: "Room Not Found",
+			setup: func(t *testing.T) (string, *ServerStateManager) {
+				s := NewServerStateManager()
+				return "NONEXISTENT", s
+			},
+			wantErr: ErrRoomNotFound,
+			validate: func(t *testing.T, gs *engine.GameState, s *ServerStateManager, roomID string) {
+				if gs != nil {
+					t.Errorf("Expected matchState to be nil, got %p", gs)
+				}
+			},
+		},
+		{
+			name: "Match Not Found",
+			setup: func(t *testing.T) (string, *ServerStateManager) {
+				s := NewServerStateManager()
+				roomID, _ := s.CreateMatchRoom()
+				return roomID, s
+			},
+			wantErr: ErrMatchNotFound,
+			validate: func(t *testing.T, gs *engine.GameState, s *ServerStateManager, roomID string) {
+				if gs != nil {
+					t.Errorf("Expected matchState to be nil, got %p", gs)
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			roomID, s := tt.setup(t)
+			gs, err := s.ResetTurn(roomID)
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("ResetTurn() error = %v, want %v", err, tt.wantErr)
+			}
+			if tt.validate != nil {
+				tt.validate(t, gs, s, roomID)
+			}
+		})
+	}
+}

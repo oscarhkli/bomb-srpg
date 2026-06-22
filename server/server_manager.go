@@ -207,6 +207,8 @@ func (s *ServerStateManager) SubmitTurnCommand(roomID string, cmd engine.TurnCom
 	return room.Match.WorkingState, nil
 }
 
+// StartTurn sends StartTurn signal engine to start a new turn in a given MatchRoom.
+// Returns the latest WorkingState or an error if any pre-check is violated
 func (s *ServerStateManager) StartTurn(roomID string) (*engine.GameState, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -221,6 +223,22 @@ func (s *ServerStateManager) StartTurn(roomID string) (*engine.GameState, error)
 	if room.Match.WinnerTeamID != 0 {
 		return nil, fmt.Errorf("%w: match already ended", ErrMatchEnded)
 	}
+
+	return room.Match.WorkingState, nil
+}
+
+// ResetTurn sends ResetTurn signal to engine to drop the current WorkingState and reset to TrueState in a given MatchRoom.
+// Returns the latest WorkingState or an error if any pre-check is violated
+func (s *ServerStateManager) ResetTurn(roomID string) (*engine.GameState, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	room, err := s.roomReadyForMatch(roomID)
+	if err != nil {
+		return nil, err
+	}
+
+	room.Match.ResetTurn()
 
 	return room.Match.WorkingState, nil
 }

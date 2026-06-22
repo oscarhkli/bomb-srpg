@@ -44,7 +44,7 @@
   - [x] New Match with user-defined Game Config
 - [ ] HTTP Handlers for Turn resolution and Match lifecycle
   - [x] Start Turn
-  - [ ] Reset
+  - [x] Reset
   - [ ] Commit
   - [ ] Surrender
   - [ ] VictoryResult (may move to Phase 3)
