@@ -242,3 +242,17 @@ func (s *ServerStateManager) ResetTurn(roomID string) (*engine.GameState, error)
 
 	return room.Match.WorkingState, nil
 }
+
+// ResetTurn sends ResolveTurn signal to engine to calculate the impacts of the Player's action in a given MatchRoom.
+// Returns the gameEvents or an error if any pre-check is violated
+func (s *ServerStateManager) ResolveTurn(roomID string) ([]engine.GameEvent, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	room, err := s.roomReadyForMatch(roomID)
+	if err != nil {
+		return nil, err
+	}
+
+	return room.Match.ResolveTurn(), nil
+}

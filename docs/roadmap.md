@@ -45,7 +45,7 @@
 - [ ] HTTP Handlers for Turn resolution and Match lifecycle
   - [x] Start Turn
   - [x] Reset
-  - [ ] Commit
+  - [x] Commit
   - [ ] Surrender
   - [ ] VictoryResult (may move to Phase 3)
 - [ ] HTTP Handlers for TurnCommands
