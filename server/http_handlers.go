@@ -23,6 +23,11 @@ type CreateMatchRequest struct {
 	GameCfg engine.GameCfg `json:"gameCfg"`
 }
 
+// SurrenderRequest wraps TeamID for backward compatibility with existing clients.
+type SurrenderRequest struct {
+	TeamID int `json:"teamId"`
+}
+
 // HandleGetAllArchetypes returns all available unit archetypes for the client to display in the lobby.
 // It encodes the archetype definitions as JSON and writes them to the response.
 func (s *ServerStateManager) HandleGetAllArchetypes(w http.ResponseWriter, r *http.Request) {
@@ -218,10 +223,33 @@ func (s *ServerStateManager) HandleResolveTurn(w http.ResponseWriter, r *http.Re
 }
 
 // HandleSurrender sends Surrender signal to engine to egnd the current Match in a given MatchRoom.
-// It encodes the VictoryResult as JSON and writes them to the response.
+// It encodes the gameEvents as JSON and writes them to the response.
 func (s *ServerStateManager) HandleSurrender(w http.ResponseWriter, r *http.Request) {
-	//roomID := r.PathValue("roomID")
-	http.Error(w, "not yet implemented", http.StatusNotImplemented)
+	roomID := r.PathValue("roomID")
+
+	var req SurrenderRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		slog.Warn("invalid surrender request format", "error", err)
+		http.Error(w, "Invalid surrender request format", http.StatusBadRequest)
+		return
+	}
+
+	gameEvents, err := s.Surrender(roomID, req.TeamID)
+	if err != nil {
+		code, msg := mapError(err)
+		slog.Warn("res turn failed", "roomID", roomID, "error", err)
+		http.Error(w, msg, code)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	if err := json.NewEncoder(w).Encode(gameEvents); err != nil {
+		slog.Error("encode gameState failed", "error", err)
+		http.Error(w, "Failed to encode gameEvents", http.StatusInternalServerError)
+		return
+	}
 }
 
 // HandleGetMatchConfig gets the GameCfg of the current Match in a given MatchRoom

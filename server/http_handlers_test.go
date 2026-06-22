@@ -1184,3 +1184,134 @@ func TestHandleResolveTurn(t *testing.T) {
 			})
 	})
 }
+
+func TestHandleSurrender(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		roomID, s := createTestRoomWithMatch(t)
+
+		jsonBody, _ := json.Marshal(SurrenderRequest{TeamID: 1})
+		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/surrender", strings.NewReader(string(jsonBody)))
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+
+		rr := httptest.NewRecorder()
+		testMux("POST /api/match-rooms/{roomID}/match/surrender", s.HandleSurrender).ServeHTTP(rr, req)
+
+		if status := rr.Code; status != http.StatusOK {
+			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusOK)
+		}
+
+		expectedHeader := "application/json"
+		if contentType := rr.Header().Get("Content-Type"); contentType != expectedHeader {
+			t.Errorf("Handler returned wrong content type: got %v want %v", contentType, expectedHeader)
+		}
+
+		var response []engine.GameEvent
+		if err := json.NewDecoder(rr.Body).Decode(&response); err != nil {
+			t.Fatalf("Failed to decode response JSON payload: %v", err)
+		}
+
+		if got, want := response, 1; len(got) != want {
+			t.Errorf("Expected %d gameEvents returned, got %#v", want, got)
+		}
+		if got, want := response[0].WinnerTeamID, 2; got != want {
+			t.Errorf("Expected gameEvent WinnerTeamID = %v, got %v", want, got)
+		}
+		if got, want := s.Rooms[roomID].Match.WinnerTeamID, 2; got != want {
+			t.Errorf("Expected match winner = %v, got %v", want, got)
+		}
+	})
+
+	t.Run("Failure: invalid SurrenderRequest", func(t *testing.T) {
+		roomID, s := createTestRoomWithMatch(t)
+
+		jsonBody, _ := json.Marshal(SurrenderRequest{TeamID: 3})
+		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/surrender", strings.NewReader(string(jsonBody)))
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+
+		rr := httptest.NewRecorder()
+		testMux("POST /api/match-rooms/{roomID}/match/surrender", s.HandleSurrender).ServeHTTP(rr, req)
+
+		if status := rr.Code; status != http.StatusBadRequest {
+			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusBadRequest)
+		}
+		if !strings.Contains(rr.Body.String(), "invalid game config") {
+			t.Errorf("Expected error message 'invalid game config', got: %s", rr.Body.String())
+		}
+	})
+
+	t.Run("Failure: room not found", func(t *testing.T) {
+		s := NewServerStateManager()
+
+		jsonBody, _ := json.Marshal(SurrenderRequest{TeamID: 1})
+		req, err := http.NewRequest("POST", "/api/match-rooms/NONEXISTENT/match/surrender", strings.NewReader(string(jsonBody)))
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+
+		rr := httptest.NewRecorder()
+		testMux("POST /api/match-rooms/{roomID}/match/surrender", s.HandleSurrender).ServeHTTP(rr, req)
+
+		if status := rr.Code; status != http.StatusNotFound {
+			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusNotFound)
+		}
+		if !strings.Contains(rr.Body.String(), "room not found") {
+			t.Errorf("Expected error message 'room not found', got: %s", rr.Body.String())
+		}
+	})
+
+	t.Run("Failure: match not found", func(t *testing.T) {
+		roomID, s := createTestRoomWithMatch(t)
+		s.Rooms[roomID].Match = nil
+
+		jsonBody, _ := json.Marshal(SurrenderRequest{TeamID: 1})
+		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/surrender", strings.NewReader(string(jsonBody)))
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+
+		rr := httptest.NewRecorder()
+		testMux("POST /api/match-rooms/{roomID}/match/surrender", s.HandleSurrender).ServeHTTP(rr, req)
+
+		if status := rr.Code; status != http.StatusNotFound {
+			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusNotFound)
+		}
+		if !strings.Contains(rr.Body.String(), "match not found") {
+			t.Errorf("Expected error message 'match not found', got: %s", rr.Body.String())
+		}
+	})
+
+	t.Run("Failure: failed to Encode", func(t *testing.T) {
+		roomID, s := createTestRoomWithMatch(t)
+
+		testEncodeFailure(t, testMux("POST /api/match-rooms/{roomID}/match/surrender", s.HandleSurrender),
+			func() *http.Request {
+				jsonBody, _ := json.Marshal(SurrenderRequest{TeamID: 1})
+				req, _ := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/surrender", strings.NewReader(string(jsonBody)))
+				req.Header.Set("Content-Type", "application/json")
+				return req
+			}, http.StatusOK)
+	})
+
+	t.Run("Test Contract", func(t *testing.T) {
+		roomID, s := createTestRoomWithMatch(t)
+		uID := engine.NewUnitID(1, 0)
+		s.SubmitTurnCommand(roomID, engine.NewPlaceBombCommand(uID, engine.Coordinate{X: 4, Y: 7}))
+
+		jsonBody, _ := json.Marshal(SurrenderRequest{TeamID: 1})
+		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/surrender", strings.NewReader(string(jsonBody)))
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+
+		rr := httptest.NewRecorder()
+		testMux("POST /api/match-rooms/{roomID}/match/surrender", s.HandleSurrender).ServeHTTP(rr, req)
+		t.Log(rr.Body)
+		assertArrayContract(t, rr.Body.Bytes(), []string{"type", "winnerTeamId"}, nil)
+	})
+}

@@ -256,3 +256,21 @@ func (s *ServerStateManager) ResolveTurn(roomID string) ([]engine.GameEvent, err
 
 	return room.Match.ResolveTurn(), nil
 }
+
+// ResetTurn sends Surrender signal to engine to egnd the current Match in a given MatchRoom.
+// Returns the gameEvents or an error if any pre-check is violated
+func (s *ServerStateManager) Surrender(roomID string, teamID int) ([]engine.GameEvent, error) {
+	if teamID != 1 && teamID != 2 {
+		return nil, fmt.Errorf("%w: team must be 1 or 2", ErrInvalidConfig)
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	room, err := s.roomReadyForMatch(roomID)
+	if err != nil {
+		return nil, err
+	}
+
+	return room.Match.Surrender(teamID), nil
+}

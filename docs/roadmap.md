@@ -46,7 +46,7 @@
   - [x] Start Turn
   - [x] Reset
   - [x] Commit
-  - [ ] Surrender
+  - [x] Surrender
   - [ ] VictoryResult (may move to Phase 3)
 - [ ] HTTP Handlers for TurnCommands
   - [x] Move
