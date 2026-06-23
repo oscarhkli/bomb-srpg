@@ -51,11 +51,11 @@
   - [x] Move
   - [x] PlaceBomb
   - [x] GetAllowedTiles, which is different from GetReachableTiles (may move to Phase 3)
-- [ ] Match Room
+- [x] Match Room
   - [x] Creation
-  - [ ] Housekeep based on the last activity time
+  - [x] Housekeep based on the last activity time
   - [x] Get Match State
-  - [ ] End Match
+- [ ] Authorization token
 
 ## Phase 3: Graphical Browser Client & UI Integration
 - **Goal:** Drop the console interface and build a graphical browser client.

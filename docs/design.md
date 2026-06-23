@@ -125,14 +125,7 @@ Surrender: `POST /surrender` (either team, any time).
 - **Locking**: Global `mu` (Phase 2), per-room deferred to Phase 4
 - **Stale cleanup**: 10min timeout, 30s interval, `LastActivity` updated on every request
 - **CreateMatch**: Full GameCfg required (Phase 2); partial/join deferred to Phase 4
-
-### 8.4 Player Authorization (Anonymous Tokens)
-
-- **Problem**: Room IDs (5-char Crockford32) and UnitIDs (deterministic Team << 4 \| Index) are guessable. Any client with a room ID can impersonate any player.
-- **Solution**: Per-team cryptographically random tokens generated and stored in a new Match, returned once in `CreateMatchResponse`. 
-- **Validation**: Mutating endpoints require `Authorization: Bearer <token>` header. Token validated against `UnitID`'s team (turn-commands) or `ActiveTeam` (start-turn, reset-turn, resolve-turn) or request `TeamID` (surrender). Read-only endpoints remain public.
-- **Implementation**: `server_manager.go` adds `validatePlayerToken()`; `http_handlers.go` adds `requirePlayerToken()` middleware. Engine unchanged — `validateActiveUnit` already enforces team ownership.
-- **Phase 4 Compatibility**: Same header supports both anonymous tokens (this phase) and JWT (Phase 4). Server tries token lookup first, falls back to JWT validation; both resolve to `TeamID`.
+- **Player authorization with anonymous tokens**: Room IDs and UnitIDs are guessable. Any client with a room ID can impersonate any player. The solution is to adopt per-team cryptographically random tokens generated and stored in a new Match, returned once in `CreateMatchResponse`. Token will be validated in mutation endpoints. No restriction to read-only enpoints at the moment.
 
 # File Structure (WIP)
 
