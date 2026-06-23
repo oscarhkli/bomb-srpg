@@ -321,6 +321,13 @@ func TestHandleCreateNewMatch(t *testing.T) {
 		if !ok || room.Match == nil {
 			t.Error("Match was not created in the server state manager")
 		}
+
+		if len(response.PlayerTokens) != 2 || response.PlayerTokens[0] == "" || response.PlayerTokens[1] == "" || response.PlayerTokens[0] == response.PlayerTokens[1] {
+			t.Errorf("Expected 2 unique non-empty PlayerToken, got %v", response.PlayerTokens)
+		}
+		if response.PlayerTokens != room.PlayerTokens {
+			t.Errorf("Expected response and MatchRoom share the same PlayerTokens, response %v vs MatchRoom %v", response.PlayerTokens, room.PlayerTokens)
+		}
 	})
 
 	t.Run("Failure: room not found", func(t *testing.T) {
@@ -482,7 +489,7 @@ func TestHandleCreateNewMatch(t *testing.T) {
 		rr := httptest.NewRecorder()
 		testMux("POST /api/match-rooms/{roomID}/match", s.HandleCreateMatch).ServeHTTP(rr, req)
 
-		assertObjectContract(t, rr.Body.Bytes(), []string{"success"}, nil)
+		assertObjectContract(t, rr.Body.Bytes(), []string{"success", "playerTokens"}, nil)
 	})
 }
 
@@ -535,7 +542,7 @@ func TestHandleGetMatchState(t *testing.T) {
 			P2Teams:     []string{"King", "Witch"},
 			MaxTurns:    10,
 		}
-		err = s.CreateMatch(roomID, gameCfg)
+		_, err = s.CreateMatch(roomID, gameCfg)
 		if err != nil {
 			t.Fatalf("Failed to create match: %v", err)
 		}
@@ -638,7 +645,7 @@ func TestHandleGetMatchState(t *testing.T) {
 			P2Teams:     []string{"King", "Witch"},
 			MaxTurns:    10,
 		}
-		err = s.CreateMatch(roomID, gameCfg)
+		_, err = s.CreateMatch(roomID, gameCfg)
 		if err != nil {
 			t.Fatalf("Failed to create match: %v", err)
 		}
@@ -663,7 +670,7 @@ func TestHandleGetMatchState(t *testing.T) {
 			P2Teams:     []string{"King", "Witch"},
 			MaxTurns:    10,
 		}
-		err = s.CreateMatch(roomID, gameCfg)
+		_, err = s.CreateMatch(roomID, gameCfg)
 		if err != nil {
 			t.Fatalf("Failed to create match: %v", err)
 		}
@@ -678,7 +685,7 @@ func TestHandleGetMatchState(t *testing.T) {
 	})
 }
 
-func createTestRoomWithMatch(t *testing.T) (string, *ServerStateManager) {
+func createTestRoomWithMatch(t *testing.T) (string, [2]string, *ServerStateManager) {
 	t.Helper()
 
 	s := NewServerStateManager()
@@ -694,17 +701,17 @@ func createTestRoomWithMatch(t *testing.T) (string, *ServerStateManager) {
 		MaxTurns:    10,
 		SuddenDeath: true,
 	}
-	err = s.CreateMatch(roomID, gameCfg)
+	playerTokens, err := s.CreateMatch(roomID, gameCfg)
 	if err != nil {
 		t.Fatalf("Failed to create match: %v", err)
 	}
 
-	return roomID, s
+	return roomID, playerTokens, s
 }
 
 func TestHandleSubmitTurnCommand(t *testing.T) {
 	t.Run("Success: submit a valid TurnCommand in an existing room", func(t *testing.T) {
-		roomID, s := createTestRoomWithMatch(t)
+		roomID, _, s := createTestRoomWithMatch(t)
 
 		uID := engine.NewUnitID(1, 0)
 		newPos := engine.Coordinate{X: 4, Y: 7}
@@ -745,7 +752,7 @@ func TestHandleSubmitTurnCommand(t *testing.T) {
 	})
 
 	t.Run("Failure: invalid TurnCommand", func(t *testing.T) {
-		roomID, s := createTestRoomWithMatch(t)
+		roomID, _, s := createTestRoomWithMatch(t)
 
 		uID := engine.NewUnitID(1, 0)
 		newPos := engine.Coordinate{X: 4, Y: 777}
@@ -768,7 +775,7 @@ func TestHandleSubmitTurnCommand(t *testing.T) {
 	})
 
 	t.Run("Failure: invalid JSON format", func(t *testing.T) {
-		roomID, s := createTestRoomWithMatch(t)
+		roomID, _, s := createTestRoomWithMatch(t)
 
 		// Malformed JSON body
 		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/turn-commands", strings.NewReader("{invalid json"))
@@ -812,7 +819,7 @@ func TestHandleSubmitTurnCommand(t *testing.T) {
 	})
 
 	t.Run("Failure: match not found", func(t *testing.T) {
-		roomID, s := createTestRoomWithMatch(t)
+		roomID, _, s := createTestRoomWithMatch(t)
 		s.Rooms[roomID].Match = nil
 
 		uID := engine.NewUnitID(1, 0)
@@ -836,7 +843,7 @@ func TestHandleSubmitTurnCommand(t *testing.T) {
 	})
 
 	t.Run("Failure: failed to Encode", func(t *testing.T) {
-		roomID, s := createTestRoomWithMatch(t)
+		roomID, _, s := createTestRoomWithMatch(t)
 		uID := engine.NewUnitID(1, 0)
 		newPos := engine.Coordinate{X: 4, Y: 7}
 		jsonBody, _ := json.Marshal(engine.NewMoveCommand(uID, newPos))
@@ -850,7 +857,7 @@ func TestHandleSubmitTurnCommand(t *testing.T) {
 	})
 
 	t.Run("Test Contract", func(t *testing.T) {
-		roomID, s := createTestRoomWithMatch(t)
+		roomID, _, s := createTestRoomWithMatch(t)
 		uID := engine.NewUnitID(1, 0)
 		newPos := engine.Coordinate{X: 4, Y: 7}
 		jsonBody, _ := json.Marshal(engine.NewMoveCommand(uID, newPos))
@@ -870,7 +877,7 @@ func TestHandleSubmitTurnCommand(t *testing.T) {
 
 func TestHandleStartTurn(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
-		roomID, s := createTestRoomWithMatch(t)
+		roomID, _, s := createTestRoomWithMatch(t)
 		s.Rooms[roomID].Match.TrueState.Turn = 1000
 		s.Rooms[roomID].Match.WorkingState.Turn = 1000
 
@@ -922,7 +929,7 @@ func TestHandleStartTurn(t *testing.T) {
 	})
 
 	t.Run("Failure: match not found", func(t *testing.T) {
-		roomID, s := createTestRoomWithMatch(t)
+		roomID, _, s := createTestRoomWithMatch(t)
 		s.Rooms[roomID].Match = nil
 
 		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/start-turn", nil)
@@ -942,7 +949,7 @@ func TestHandleStartTurn(t *testing.T) {
 	})
 
 	t.Run("Failure: failed to Encode", func(t *testing.T) {
-		roomID, s := createTestRoomWithMatch(t)
+		roomID, _, s := createTestRoomWithMatch(t)
 
 		testEncodeFailure(t, testMux("POST /api/match-rooms/{roomID}/match/start-turn", s.HandleStartTurn),
 			func() *http.Request {
@@ -953,7 +960,7 @@ func TestHandleStartTurn(t *testing.T) {
 	})
 
 	t.Run("Test Contract", func(t *testing.T) {
-		roomID, s := createTestRoomWithMatch(t)
+		roomID, _, s := createTestRoomWithMatch(t)
 		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/start-turn", nil)
 		if err != nil {
 			t.Fatalf("Failed to create request: %v", err)
@@ -970,7 +977,7 @@ func TestHandleStartTurn(t *testing.T) {
 
 func TestHandleResetTurn(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
-		roomID, s := createTestRoomWithMatch(t)
+		roomID, _, s := createTestRoomWithMatch(t)
 		uID := engine.NewUnitID(1, 0)
 		s.Rooms[roomID].Match.WorkingState.Units[uID].HasMoved = true
 
@@ -1022,7 +1029,7 @@ func TestHandleResetTurn(t *testing.T) {
 	})
 
 	t.Run("Failure: match not found", func(t *testing.T) {
-		roomID, s := createTestRoomWithMatch(t)
+		roomID, _, s := createTestRoomWithMatch(t)
 		s.Rooms[roomID].Match = nil
 
 		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/reset-turn", nil)
@@ -1042,7 +1049,7 @@ func TestHandleResetTurn(t *testing.T) {
 	})
 
 	t.Run("Failure: failed to Encode", func(t *testing.T) {
-		roomID, s := createTestRoomWithMatch(t)
+		roomID, _, s := createTestRoomWithMatch(t)
 
 		testEncodeFailure(t, testMux("POST /api/match-rooms/{roomID}/match/reset-turn", s.HandleResetTurn),
 			func() *http.Request {
@@ -1053,7 +1060,7 @@ func TestHandleResetTurn(t *testing.T) {
 	})
 
 	t.Run("Test Contract", func(t *testing.T) {
-		roomID, s := createTestRoomWithMatch(t)
+		roomID, _, s := createTestRoomWithMatch(t)
 		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/reset-turn", nil)
 		if err != nil {
 			t.Fatalf("Failed to create request: %v", err)
@@ -1070,7 +1077,7 @@ func TestHandleResetTurn(t *testing.T) {
 
 func TestHandleResolveTurn(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
-		roomID, s := createTestRoomWithMatch(t)
+		roomID, _, s := createTestRoomWithMatch(t)
 		uID := engine.NewUnitID(1, 0)
 		s.SubmitTurnCommand(roomID, engine.NewPlaceBombCommand(uID, engine.Coordinate{X: 4, Y: 7}))
 		s.Rooms[roomID].Match.WorkingState.Bombs[engine.NewBombID(1, 1, uID)].Countdown = 1 // force the bomb to explode in the next ResolveTurn
@@ -1129,7 +1136,7 @@ func TestHandleResolveTurn(t *testing.T) {
 	})
 
 	t.Run("Failure: match not found", func(t *testing.T) {
-		roomID, s := createTestRoomWithMatch(t)
+		roomID, _, s := createTestRoomWithMatch(t)
 		s.Rooms[roomID].Match = nil
 
 		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/resolve-turn", nil)
@@ -1149,7 +1156,7 @@ func TestHandleResolveTurn(t *testing.T) {
 	})
 
 	t.Run("Failure: failed to Encode", func(t *testing.T) {
-		roomID, s := createTestRoomWithMatch(t)
+		roomID, _, s := createTestRoomWithMatch(t)
 
 		testEncodeFailure(t, testMux("POST /api/match-rooms/{roomID}/match/resolve-turn", s.HandleResolveTurn),
 			func() *http.Request {
@@ -1160,7 +1167,7 @@ func TestHandleResolveTurn(t *testing.T) {
 	})
 
 	t.Run("Test Contract", func(t *testing.T) {
-		roomID, s := createTestRoomWithMatch(t)
+		roomID, _, s := createTestRoomWithMatch(t)
 		uID := engine.NewUnitID(1, 0)
 		s.SubmitTurnCommand(roomID, engine.NewPlaceBombCommand(uID, engine.Coordinate{X: 4, Y: 7}))
 
@@ -1171,7 +1178,7 @@ func TestHandleResolveTurn(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 		testMux("POST /api/match-rooms/{roomID}/match/resolve-turn", s.HandleResolveTurn).ServeHTTP(rr, req)
-		t.Log(rr.Body)
+
 		assertArrayContract(t, rr.Body.Bytes(),
 			[]string{"type", "unitId", "bombId", "position", "range", "countdown"},
 			func(t *testing.T, item map[string]any) {
@@ -1188,7 +1195,7 @@ func TestHandleResolveTurn(t *testing.T) {
 
 func TestHandleSurrender(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
-		roomID, s := createTestRoomWithMatch(t)
+		roomID, _, s := createTestRoomWithMatch(t)
 
 		jsonBody, _ := json.Marshal(SurrenderRequest{TeamID: 1})
 		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/surrender", strings.NewReader(string(jsonBody)))
@@ -1226,7 +1233,7 @@ func TestHandleSurrender(t *testing.T) {
 	})
 
 	t.Run("Failure: invalid SurrenderRequest", func(t *testing.T) {
-		roomID, s := createTestRoomWithMatch(t)
+		roomID, _, s := createTestRoomWithMatch(t)
 
 		jsonBody, _ := json.Marshal(SurrenderRequest{TeamID: 3})
 		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/surrender", strings.NewReader(string(jsonBody)))
@@ -1247,7 +1254,7 @@ func TestHandleSurrender(t *testing.T) {
 	})
 
 	t.Run("Failure: invalid JSON format", func(t *testing.T) {
-		roomID, s := createTestRoomWithMatch(t)
+		roomID, _, s := createTestRoomWithMatch(t)
 
 		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/surrender", strings.NewReader("{invalid json}"))
 		if err != nil {
@@ -1287,7 +1294,7 @@ func TestHandleSurrender(t *testing.T) {
 	})
 
 	t.Run("Failure: match not found", func(t *testing.T) {
-		roomID, s := createTestRoomWithMatch(t)
+		roomID, _, s := createTestRoomWithMatch(t)
 		s.Rooms[roomID].Match = nil
 
 		jsonBody, _ := json.Marshal(SurrenderRequest{TeamID: 1})
@@ -1308,7 +1315,7 @@ func TestHandleSurrender(t *testing.T) {
 	})
 
 	t.Run("Failure: failed to Encode", func(t *testing.T) {
-		roomID, s := createTestRoomWithMatch(t)
+		roomID, _, s := createTestRoomWithMatch(t)
 
 		testEncodeFailure(t, testMux("POST /api/match-rooms/{roomID}/match/surrender", s.HandleSurrender),
 			func() *http.Request {
@@ -1320,7 +1327,7 @@ func TestHandleSurrender(t *testing.T) {
 	})
 
 	t.Run("Test Contract", func(t *testing.T) {
-		roomID, s := createTestRoomWithMatch(t)
+		roomID, _, s := createTestRoomWithMatch(t)
 		uID := engine.NewUnitID(1, 0)
 		s.SubmitTurnCommand(roomID, engine.NewPlaceBombCommand(uID, engine.Coordinate{X: 4, Y: 7}))
 
@@ -1332,7 +1339,7 @@ func TestHandleSurrender(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 		testMux("POST /api/match-rooms/{roomID}/match/surrender", s.HandleSurrender).ServeHTTP(rr, req)
-		t.Log(rr.Body)
+
 		assertArrayContract(t, rr.Body.Bytes(), []string{"type", "winnerTeamId"}, nil)
 	})
 }
@@ -1351,7 +1358,7 @@ func TestHandleGetMatchConfig(t *testing.T) {
 			P2Teams:     []string{"King", "Witch"},
 			MaxTurns:    10,
 		}
-		err = s.CreateMatch(roomID, gameCfg)
+		_, err = s.CreateMatch(roomID, gameCfg)
 		if err != nil {
 			t.Fatalf("Failed to create match: %v", err)
 		}
@@ -1437,7 +1444,7 @@ func TestHandleGetMatchConfig(t *testing.T) {
 			P2Teams:     []string{"King", "Witch"},
 			MaxTurns:    10,
 		}
-		err = s.CreateMatch(roomID, gameCfg)
+		_, err = s.CreateMatch(roomID, gameCfg)
 		if err != nil {
 			t.Fatalf("Failed to create match: %v", err)
 		}
@@ -1462,7 +1469,7 @@ func TestHandleGetMatchConfig(t *testing.T) {
 			P2Teams:     []string{"King", "Witch"},
 			MaxTurns:    10,
 		}
-		err = s.CreateMatch(roomID, gameCfg)
+		_, err = s.CreateMatch(roomID, gameCfg)
 		if err != nil {
 			t.Fatalf("Failed to create match: %v", err)
 		}
@@ -1490,7 +1497,7 @@ func TestHandleGetAllowedTiles(t *testing.T) {
 			P2Teams:     []string{"King", "Witch"},
 			MaxTurns:    10,
 		}
-		err = s.CreateMatch(roomID, gameCfg)
+		_, err = s.CreateMatch(roomID, gameCfg)
 		if err != nil {
 			t.Fatalf("Failed to create match: %v", err)
 		}
@@ -1546,7 +1553,7 @@ func TestHandleGetAllowedTiles(t *testing.T) {
 			P2Teams:     []string{"King", "Witch"},
 			MaxTurns:    10,
 		}
-		err = s.CreateMatch(roomID, gameCfg)
+		_, err = s.CreateMatch(roomID, gameCfg)
 		if err != nil {
 			t.Fatalf("Failed to create match: %v", err)
 		}
@@ -1580,7 +1587,7 @@ func TestHandleGetAllowedTiles(t *testing.T) {
 			P2Teams:     []string{"King", "Witch"},
 			MaxTurns:    10,
 		}
-		err = s.CreateMatch(roomID, gameCfg)
+		_, err = s.CreateMatch(roomID, gameCfg)
 		if err != nil {
 			t.Fatalf("Failed to create match: %v", err)
 		}
@@ -1655,7 +1662,7 @@ func TestHandleGetAllowedTiles(t *testing.T) {
 			P2Teams:     []string{"King", "Witch"},
 			MaxTurns:    10,
 		}
-		err = s.CreateMatch(roomID, gameCfg)
+		_, err = s.CreateMatch(roomID, gameCfg)
 		if err != nil {
 			t.Fatalf("Failed to create match: %v", err)
 		}
@@ -1680,7 +1687,7 @@ func TestHandleGetAllowedTiles(t *testing.T) {
 			P2Teams:     []string{"King", "Witch"},
 			MaxTurns:    10,
 		}
-		err = s.CreateMatch(roomID, gameCfg)
+		_, err = s.CreateMatch(roomID, gameCfg)
 		if err != nil {
 			t.Fatalf("Failed to create match: %v", err)
 		}

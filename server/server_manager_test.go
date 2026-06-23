@@ -373,12 +373,20 @@ func TestServerStateManager_CreateMatch(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			roomID, s := tt.setup(t)
-			err := s.CreateMatch(roomID, tt.gameCfg)
+			playerTokens, err := s.CreateMatch(roomID, tt.gameCfg)
 			if !errors.Is(err, tt.wantErr) {
 				t.Fatalf("CreateMatch() error = %v, want %v", err, tt.wantErr)
 			}
 			if tt.validate != nil {
 				tt.validate(t, s, roomID)
+			}
+			if err == nil {
+				if len(playerTokens) != 2 || playerTokens[0] == "" || playerTokens[1] == "" || playerTokens[0] == playerTokens[1] {
+					t.Errorf("Expected 2 unique non-empty PlayerToken, got %v", playerTokens)
+				}
+				if playerTokens != s.Rooms[roomID].PlayerTokens {
+					t.Errorf("Expected response and MatchRoom share the same PlayerTokens, response %v vs MatchRoom %v", playerTokens, s.Rooms[roomID].PlayerTokens)
+				}
 			}
 		})
 	}

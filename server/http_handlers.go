@@ -16,7 +16,8 @@ type CreateMatchRoomResponse struct {
 
 // CreateMatchResponse is returned when a new match is created.
 type CreateMatchResponse struct {
-	Success bool `json:"success"`
+	Success      bool      `json:"success"`
+	PlayerTokens [2]string `json:"playerTokens"`
 }
 
 // CreateMatchRequest wraps GameCfg for backward compatibility with existing clients.
@@ -81,7 +82,7 @@ func (s *ServerStateManager) HandleCreateMatch(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	err := s.CreateMatch(roomID, req.GameCfg)
+	tokens, err := s.CreateMatch(roomID, req.GameCfg)
 
 	if err != nil {
 		code, msg := mapError(err)
@@ -93,7 +94,7 @@ func (s *ServerStateManager) HandleCreateMatch(w http.ResponseWriter, r *http.Re
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 
-	res := CreateMatchResponse{Success: true}
+	res := CreateMatchResponse{Success: true, PlayerTokens: tokens}
 	if err := json.NewEncoder(w).Encode(res); err != nil {
 		slog.Error("encode match response failed", "roomID", roomID, "error", err)
 		http.Error(w, "Failed to encode success indicator", http.StatusInternalServerError)

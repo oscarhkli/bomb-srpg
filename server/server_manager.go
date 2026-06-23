@@ -3,6 +3,8 @@ package server
 import (
 	"bomb-srpg/engine"
 	"context"
+	cryptorand "crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log"
@@ -74,6 +76,7 @@ type MatchRoom struct {
 	ID           string
 	Match        *engine.Match
 	LastActivity time.Time
+	PlayerTokens [2]string // [0]=Team1, [1]=Team2
 }
 
 type ServerStateManager struct {
@@ -134,34 +137,54 @@ func generateRoomID(length int) string {
 	return string(code)
 }
 
+func generatePlayerToken() (string, error) {
+	b := make([]byte, 16)
+	if _, err := cryptorand.Read(b); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b), nil
+}
+
 // CreateMatch initialize the game in a given MatchRoom.
 // Returns an error if any setup rule is violated.
-func (s *ServerStateManager) CreateMatch(roomID string, gameCfg engine.GameCfg) error {
+func (s *ServerStateManager) CreateMatch(roomID string, gameCfg engine.GameCfg) ([2]string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	room, ok := s.Rooms[roomID]
 	if !ok {
 		slog.Warn("match room not found", "roomID", roomID)
-		return fmt.Errorf("%w: roomID=%s", ErrRoomNotFound, roomID)
+		return [2]string{}, fmt.Errorf("%w: roomID=%s", ErrRoomNotFound, roomID)
 	}
 
 	if room.Match != nil {
 		slog.Warn("match already exists", "roomID", roomID)
-		return fmt.Errorf("%w: roomID=%s", ErrMatchExists, roomID)
+		return [2]string{}, fmt.Errorf("%w: roomID=%s", ErrMatchExists, roomID)
 	}
 
 	match, err := engine.InitGame(gameCfg)
 
 	if err != nil {
 		slog.Error("invalid game config", "roomID", roomID, "error", err)
-		return fmt.Errorf("%w: gameCfg=%+v: %v", ErrInvalidConfig, gameCfg, err)
+		return [2]string{}, fmt.Errorf("%w: gameCfg=%+v: %v", ErrInvalidConfig, gameCfg, err)
+	}
+
+	var tokens [2]string
+	for i := range 2 {
+		token, err := generatePlayerToken()
+		if err != nil {
+			slog.Warn("failed to generate player token", "roomID", roomID, "player", i)
+			return [2]string{}, fmt.Errorf("failed to generate playerToken for Player %d in MatchRoom %v", i, roomID)
+		}
+
+		tokens[i] = token
 	}
 
 	room.Match = match
+	room.PlayerTokens = tokens
 	room.LastActivity = time.Now()
 
-	return nil
+	return tokens, nil
 }
 
 func (s *ServerStateManager) roomReadyForMatch(roomID string) (*MatchRoom, error) {
