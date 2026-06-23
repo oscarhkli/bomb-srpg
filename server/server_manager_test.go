@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestServerStateManager_CreateMatchRoom(t *testing.T) {
@@ -121,6 +122,111 @@ func isValidCrockfordCode(s string) bool {
 		}
 	}
 	return true
+}
+
+func TestServerStateManager_LastActivityUpdated(t *testing.T) {
+	tests := []struct {
+		name   string
+		setup  func(t *testing.T) (string, *ServerStateManager)
+		action func(t *testing.T, s *ServerStateManager, roomID string)
+	}{
+		{
+			name: "CreateMatch updates LastActivity",
+			setup: func(t *testing.T) (string, *ServerStateManager) {
+				s := NewServerStateManager()
+				roomID, _ := s.CreateMatchRoom()
+				return roomID, s
+			},
+			action: func(t *testing.T, s *ServerStateManager, roomID string) {
+				s.CreateMatch(roomID, validGameCfg())
+			},
+		},
+		{
+			name: "SubmitTurnCommand updates LastActivity",
+			setup: func(t *testing.T) (string, *ServerStateManager) {
+				roomID, s := createTestRoom(t)
+				return roomID, s
+			},
+			action: func(t *testing.T, s *ServerStateManager, roomID string) {
+				uID := engine.NewUnitID(1, 0)
+				s.SubmitTurnCommand(roomID, engine.NewMoveCommand(uID, engine.Coordinate{X: 4, Y: 7}))
+			},
+		},
+		{
+			name: "StartTurn updates LastActivity",
+			setup: func(t *testing.T) (string, *ServerStateManager) {
+				roomID, s := createTestRoom(t)
+				return roomID, s
+			},
+			action: func(t *testing.T, s *ServerStateManager, roomID string) {
+				s.StartTurn(roomID)
+			},
+		},
+		{
+			name: "ResetTurn updates LastActivity",
+			setup: func(t *testing.T) (string, *ServerStateManager) {
+				roomID, s := createTestRoom(t)
+				return roomID, s
+			},
+			action: func(t *testing.T, s *ServerStateManager, roomID string) {
+				s.ResetTurn(roomID)
+			},
+		},
+		{
+			name: "ResolveTurn updates LastActivity",
+			setup: func(t *testing.T) (string, *ServerStateManager) {
+				roomID, s := createTestRoom(t)
+				s.SubmitTurnCommand(roomID, engine.NewPlaceBombCommand(16, engine.Coordinate{X: 4, Y: 7}))
+				return roomID, s
+			},
+			action: func(t *testing.T, s *ServerStateManager, roomID string) {
+				s.ResolveTurn(roomID)
+			},
+		},
+		{
+			name: "Surrender updates LastActivity",
+			setup: func(t *testing.T) (string, *ServerStateManager) {
+				roomID, s := createTestRoom(t)
+				return roomID, s
+			},
+			action: func(t *testing.T, s *ServerStateManager, roomID string) {
+				s.Surrender(roomID, 1)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			roomID, s := tt.setup(t)
+			before := time.Now()
+			time.Sleep(10 * time.Millisecond)
+			tt.action(t, s, roomID)
+
+			s.mu.RLock()
+			defer s.mu.RUnlock()
+			room := s.Rooms[roomID]
+			if room.LastActivity.Before(before) || room.LastActivity.Equal(before) {
+				t.Errorf("LastActivity not updated: before=%v, after=%v", before, room.LastActivity)
+			}
+		})
+	}
+}
+
+func TestServerStateManager_ReadOnlyMethodsDoNotUpdateLastActivity(t *testing.T) {
+	roomID, s := createTestRoom(t)
+	before := time.Now()
+	time.Sleep(10 * time.Millisecond)
+
+	s.GetMatchState(roomID)
+	s.GetMatchConfig(roomID)
+	s.GetAllowedTiles(roomID, engine.NewUnitID(1, 0), engine.TurnCmdPlaceBomb)
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	room := s.Rooms[roomID]
+	if !room.LastActivity.Equal(before) && !room.LastActivity.Before(before) {
+		t.Errorf("LastActivity should not be updated by read-only methods: before=%v, after=%v", before, room.LastActivity)
+	}
 }
 
 func validGameCfg() engine.GameCfg {

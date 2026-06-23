@@ -157,6 +157,7 @@ func (s *ServerStateManager) CreateMatch(roomID string, gameCfg engine.GameCfg) 
 	}
 
 	room.Match = match
+	room.LastActivity = time.Now()
 
 	return nil
 }
@@ -207,6 +208,7 @@ func (s *ServerStateManager) SubmitTurnCommand(roomID string, cmd engine.TurnCom
 		return nil, fmt.Errorf("%w: turnCommand=%+v: %v", ErrInvalidTurnCmd, cmd, err)
 	}
 
+	room.LastActivity = time.Now()
 	return room.Match.WorkingState, nil
 }
 
@@ -227,6 +229,7 @@ func (s *ServerStateManager) StartTurn(roomID string) (*engine.GameState, error)
 		return nil, fmt.Errorf("%w: match already ended", ErrMatchEnded)
 	}
 
+	room.LastActivity = time.Now()
 	return room.Match.WorkingState, nil
 }
 
@@ -243,6 +246,7 @@ func (s *ServerStateManager) ResetTurn(roomID string) (*engine.GameState, error)
 
 	room.Match.ResetTurn()
 
+	room.LastActivity = time.Now()
 	return room.Match.WorkingState, nil
 }
 
@@ -257,7 +261,9 @@ func (s *ServerStateManager) ResolveTurn(roomID string) ([]engine.GameEvent, err
 		return nil, err
 	}
 
-	return room.Match.ResolveTurn(), nil
+	events := room.Match.ResolveTurn()
+	room.LastActivity = time.Now()
+	return events, nil
 }
 
 // ResetTurn sends Surrender signal to engine to end the current Match in a given MatchRoom.
@@ -275,7 +281,9 @@ func (s *ServerStateManager) Surrender(roomID string, teamID int) ([]engine.Game
 		return nil, err
 	}
 
-	return room.Match.Surrender(teamID), nil
+	events := room.Match.Surrender(teamID)
+	room.LastActivity = time.Now()
+	return events, nil
 }
 
 // GetMatchConfig gets the GameConfig of the current Match in a given MatchRoom.
