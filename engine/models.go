@@ -129,15 +129,15 @@ func (s SkillType) String() string {
 
 // Archetype defines the base template for a unit class (King, Fighter, Witch, etc.).
 type Archetype struct {
-	Name         string             `json:"name"`
-	BaseSpeed    int                `json:"speed"`
-	BombMaxRange int                `json:"bombMaxRange"`
-	BombMinRange int                `json:"-"`
-	BombPower    int                `json:"-"`
-	MaxBombCount int                `json:"-"`
-	BaseHP       int                `json:"-"`
-	PresetSkills map[SkillType]bool `json:"-"`
-	IsSelectable bool               `json:"-"`
+	Name         string
+	BaseSpeed    int
+	BombMaxRange int
+	BombMinRange int
+	BombPower    int
+	MaxBombCount int
+	BaseHP       int
+	PresetSkills map[SkillType]bool
+	IsSelectable bool
 }
 
 // MarshalJSON serializes Archetype struct to JSON that client needs

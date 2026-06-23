@@ -26,7 +26,7 @@ func (c *MatchController) StartInputLoop() {
 
 	for {
 		// Always render the latest situation
-		c.Match.StartNewTurn()
+		c.Match.StartTurn()
 
 		if err := c.View.RenderBoard(c.Match.WorkingState); err != nil {
 			log.Fatalf("Critical Interface Failure: %v", err)

@@ -42,21 +42,20 @@
 - [x] HTTP Handlers for Game Setup
   - [x] List Archetypes
   - [x] New Match with user-defined Game Config
-- [ ] HTTP Handlers for Turn resolution and Match lifecycle
-  - [ ] Start Turn
-  - [ ] Reset
-  - [ ] Commit
-  - [ ] Surrender
-  - [ ] VictoryResult (may move to Phase 3)
-- [ ] HTTP Handlers for TurnCommands
+- [x] HTTP Handlers for Turn resolution and Match lifecycle
+  - [x] Start Turn
+  - [x] Reset
+  - [x] Commit
+  - [x] Surrender
+- [x] HTTP Handlers for TurnCommands
   - [x] Move
   - [x] PlaceBomb
-  - [ ] GetAllowedTiles, which is different from GetReachableTiles (may move to Phase 3)
+  - [x] GetAllowedTiles, which is different from GetReachableTiles (may move to Phase 3)
 - [ ] Match Room
- - [x] Creation
- - [ ] Housekeep based on the last activity time
- - [x] Get Match State
- - [ ] Navigation with Match, Game cycle (may move to Phase 3)
+  - [x] Creation
+  - [ ] Housekeep based on the last activity time
+  - [x] Get Match State
+  - [ ] End Match
 
 ## Phase 3: Graphical Browser Client & UI Integration
 - **Goal:** Drop the console interface and build a graphical browser client.
@@ -70,6 +69,9 @@
 - [ ] Input Mapping (Converting Clicks to HTTP Commands)
 - [ ] Action Log Animation Playback
 - [ ] Interaction with Server
+- [ ] VictoryResult
+  - [ ] Rematch
+- [ ] Per-room fine-grained locking
 - [ ] Deployment
 
 ## Phase 4a: Add WebSockets
@@ -85,7 +87,6 @@
   - [ ] GameCfg + Team formation
   - [ ] Interruption handling
 - [ ] Room config mutability after creation
-- [ ] Per-room fine-grained locking
 - [ ] Player identity/auth (headers, tokens)
 
 ## Phase 4b: More Character Classes & Skills

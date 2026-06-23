@@ -24,6 +24,13 @@ func main() {
 	r.HandleFunc("POST /api/match-rooms/{roomID}/match", serverState.HandleCreateMatch)
 	r.HandleFunc("GET /api/match-rooms/{roomID}/match/state", serverState.HandleGetMatchState)
 	r.HandleFunc("POST /api/match-rooms/{roomID}/match/turn-commands", serverState.HandleSubmitTurnCommand)
+	r.HandleFunc("POST /api/match-rooms/{roomID}/match/start-turn", serverState.HandleStartTurn)
+	r.HandleFunc("POST /api/match-rooms/{roomID}/match/reset", serverState.HandleResetTurn)
+	r.HandleFunc("POST /api/match-rooms/{roomID}/match/resolve", serverState.HandleResolveTurn)
+	r.HandleFunc("POST /api/match-rooms/{roomID}/match/surrender", serverState.HandleSurrender)
+	r.HandleFunc("GET /api/match-rooms/{roomID}/match/config", serverState.HandleGetMatchConfig)
+	r.HandleFunc("GET /api/match-rooms/{roomID}/match/victory", serverState.HandleGetMatchVictoryResult)
+	r.HandleFunc("GET /api/match-rooms/{roomID}/match/allowed-tiles", serverState.HandleGetAllowedTiles)
 
 	s := &http.Server{
 		Addr:         ":8080",

@@ -20,6 +20,12 @@ func TestHTTPRouting(t *testing.T) {
 	mux.HandleFunc("POST /api/match-rooms/{roomID}/match", serverState.HandleCreateMatch)
 	mux.HandleFunc("GET /api/match-rooms/{roomID}/match/state", serverState.HandleGetMatchState)
 	mux.HandleFunc("POST /api/match-rooms/{roomID}/match/turn-commands", serverState.HandleSubmitTurnCommand)
+	mux.HandleFunc("POST /api/match-rooms/{roomID}/match/start-turn", serverState.HandleStartTurn)
+	mux.HandleFunc("POST /api/match-rooms/{roomID}/match/reset-turn", serverState.HandleResetTurn)
+	mux.HandleFunc("POST /api/match-rooms/{roomID}/match/resolve-turn", serverState.HandleResolveTurn)
+	mux.HandleFunc("POST /api/match-rooms/{roomID}/match/surrender", serverState.HandleSurrender)
+	mux.HandleFunc("GET /api/match-rooms/{roomID}/match/config", serverState.HandleGetMatchConfig)
+	mux.HandleFunc("GET /api/match-rooms/{roomID}/match/allowed-tiles", serverState.HandleGetAllowedTiles)
 
 	server := httptest.NewServer(mux)
 	defer server.Close()
@@ -120,6 +126,150 @@ func TestHTTPRouting(t *testing.T) {
 			path:       "/api/match-rooms/DUMMY/match/turn-commands",
 			wantStatus: http.StatusMethodNotAllowed,
 		},
+		{
+			name:       "POST /api/match-rooms/{roomID}/match/start-turn (404 - no room)",
+			method:     "POST",
+			path:       "/api/match-rooms/DUMMY/match/start-turn",
+			wantStatus: http.StatusNotFound,
+		},
+		{
+			name:       "GET /api/match-rooms/{roomID}/match/start-turn (405)",
+			method:     "GET",
+			path:       "/api/match-rooms/DUMMY/match/start-turn",
+			wantStatus: http.StatusMethodNotAllowed,
+		},
+		{
+			name:       "PUT /api/match-rooms/{roomID}/match/start-turn (405)",
+			method:     "PUT",
+			path:       "/api/match-rooms/DUMMY/match/start-turn",
+			wantStatus: http.StatusMethodNotAllowed,
+		},
+		{
+			name:       "DELETE /api/match-rooms/{roomID}/match/start-turn (405)",
+			method:     "DELETE",
+			path:       "/api/match-rooms/DUMMY/match/start-turn",
+			wantStatus: http.StatusMethodNotAllowed,
+		},
+		{
+			name:       "POST /api/match-rooms/{roomID}/match/reset-turn (404 - no room)",
+			method:     "POST",
+			path:       "/api/match-rooms/DUMMY/match/reset-turn",
+			wantStatus: http.StatusNotFound,
+		},
+		{
+			name:       "GET /api/match-rooms/{roomID}/match/reset-turn (405)",
+			method:     "GET",
+			path:       "/api/match-rooms/DUMMY/match/reset-turn",
+			wantStatus: http.StatusMethodNotAllowed,
+		},
+		{
+			name:       "PUT /api/match-rooms/{roomID}/match/reset-turn (405)",
+			method:     "PUT",
+			path:       "/api/match-rooms/DUMMY/match/reset-turn",
+			wantStatus: http.StatusMethodNotAllowed,
+		},
+		{
+			name:       "DELETE /api/match-rooms/{roomID}/match/reset-turn (405)",
+			method:     "DELETE",
+			path:       "/api/match-rooms/DUMMY/match/reset-turn",
+			wantStatus: http.StatusMethodNotAllowed,
+		},
+		{
+			name:       "POST /api/match-rooms/{roomID}/match/resolve-turn (404 - no room)",
+			method:     "POST",
+			path:       "/api/match-rooms/DUMMY/match/resolve-turn",
+			wantStatus: http.StatusNotFound,
+		},
+		{
+			name:       "GET /api/match-rooms/{roomID}/match/resolve-turn (405)",
+			method:     "GET",
+			path:       "/api/match-rooms/DUMMY/match/resolve-turn",
+			wantStatus: http.StatusMethodNotAllowed,
+		},
+		{
+			name:       "PUT /api/match-rooms/{roomID}/match/resolve-turn (405)",
+			method:     "PUT",
+			path:       "/api/match-rooms/DUMMY/match/resolve-turn",
+			wantStatus: http.StatusMethodNotAllowed,
+		},
+		{
+			name:       "DELETE /api/match-rooms/{roomID}/match/resolve-turn (405)",
+			method:     "DELETE",
+			path:       "/api/match-rooms/DUMMY/match/resolve-turn",
+			wantStatus: http.StatusMethodNotAllowed,
+		},
+		{
+			name:       "POST /api/match-rooms/{roomID}/match/surrender (404 - no room)",
+			method:     "POST",
+			path:       "/api/match-rooms/DUMMY/match/surrender",
+			wantStatus: http.StatusNotFound,
+		},
+		{
+			name:       "GET /api/match-rooms/{roomID}/match/surrender (405)",
+			method:     "GET",
+			path:       "/api/match-rooms/DUMMY/match/surrender",
+			wantStatus: http.StatusMethodNotAllowed,
+		},
+		{
+			name:       "PUT /api/match-rooms/{roomID}/match/surrender (405)",
+			method:     "PUT",
+			path:       "/api/match-rooms/DUMMY/match/surrender",
+			wantStatus: http.StatusMethodNotAllowed,
+		},
+		{
+			name:       "DELETE /api/match-rooms/{roomID}/match/surrender (405)",
+			method:     "DELETE",
+			path:       "/api/match-rooms/DUMMY/match/surrender",
+			wantStatus: http.StatusMethodNotAllowed,
+		},
+		{
+			name:       "GET /api/match-rooms/{roomID}/match/config (404 - no room)",
+			method:     "GET",
+			path:       "/api/match-rooms/DUMMY/match/config",
+			wantStatus: http.StatusNotFound,
+		},
+		{
+			name:       "POST /api/match-rooms/{roomID}/match/config (405)",
+			method:     "POST",
+			path:       "/api/match-rooms/DUMMY/match/config",
+			wantStatus: http.StatusMethodNotAllowed,
+		},
+		{
+			name:       "PUT /api/match-rooms/{roomID}/match/config (405)",
+			method:     "PUT",
+			path:       "/api/match-rooms/DUMMY/match/config",
+			wantStatus: http.StatusMethodNotAllowed,
+		},
+		{
+			name:       "DELETE /api/match-rooms/{roomID}/match/config (405)",
+			method:     "DELETE",
+			path:       "/api/match-rooms/DUMMY/match/config",
+			wantStatus: http.StatusMethodNotAllowed,
+		},
+		{
+			name:       "GET /api/match-rooms/{roomID}/match/allowed-tiles (404 - no room)",
+			method:     "GET",
+			path:       "/api/match-rooms/DUMMY/match/allowed-tiles?unitId=16&turnCmdType=placeBomb",
+			wantStatus: http.StatusNotFound,
+		},
+		{
+			name:       "POST /api/match-rooms/{roomID}/match/allowed-tiles (405)",
+			method:     "POST",
+			path:       "/api/match-rooms/DUMMY/match/allowed-tiles",
+			wantStatus: http.StatusMethodNotAllowed,
+		},
+		{
+			name:       "PUT /api/match-rooms/{roomID}/match/allowed-tiles (405)",
+			method:     "PUT",
+			path:       "/api/match-rooms/DUMMY/match/allowed-tiles",
+			wantStatus: http.StatusMethodNotAllowed,
+		},
+		{
+			name:       "DELETE /api/match-rooms/{roomID}/match/allowed-tiles (405)",
+			method:     "DELETE",
+			path:       "/api/match-rooms/DUMMY/match/allowed-tiles",
+			wantStatus: http.StatusMethodNotAllowed,
+		},
 	}
 
 	gameCfgBody, _ := json.Marshal(engine.GameCfg{
@@ -131,6 +281,8 @@ func TestHTTPRouting(t *testing.T) {
 
 	turnCmdBody, _ := json.Marshal(engine.NewMoveCommand(engine.NewUnitID(1, 0), engine.Coordinate{X: 4, Y: 7}))
 
+	surrenderReqBody, _ := json.Marshal(SurrenderRequest{TeamID: 1})
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var body io.Reader
@@ -138,6 +290,8 @@ func TestHTTPRouting(t *testing.T) {
 				body = bytes.NewReader(gameCfgBody)
 			} else if strings.HasPrefix(tt.name, "POST /api/match-rooms/{roomID}/match/turn-commands") {
 				body = bytes.NewBuffer(turnCmdBody)
+			} else if strings.HasPrefix(tt.name, "POST /api/match-rooms/{roomID}/match/surrender") {
+				body = bytes.NewBuffer(surrenderReqBody)
 			}
 
 			req, err := http.NewRequest(tt.method, server.URL+tt.path, body)

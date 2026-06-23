@@ -3,11 +3,13 @@
 ## 1. Architectural Principles
 
 - **Authoritative Server / Zero Trust**: The backend (`engine`) acts as the single source of truth. Incoming user command payloads are treated as unverified requests. The engine recalculates all pathfinding and rules independently before mutating memory.
-  * *Zero-Trust Parameters*: Property deductions—such as initial bomb countdowns based on terrain or player skills—are processed authoritatively on the server boundary. Client payloads cannot dictate property states.
+  - _Zero-Trust Parameters_: Property deductions—such as initial bomb countdowns based on terrain or player skills—are processed authoritatively on the server boundary. Client payloads cannot dictate property states.
 - **State Sandboxing Pattern**: At the start of a turn, the engine clones the definitive `GameState` into a temporary `WorkingState` sandbox. All mid-turn actions (moving, placing bombs, picking up power-ups) alter this sandbox layer.
-  * A `/reset` or `ResetTurn()` command discards the sandbox and re-clones the definitive checkpoint (`m.TrueState`), wiping any uncommitted player actions.
-  * A `/commit` or `ResolveTurn()` command executes batch-resolution loops against the sandbox, advances the timeline, and permanently promotes the sandboxed state to the master history via a deep-copy clone.
+  - A `/reset` or `ResetTurn()` command discards the sandbox and re-clones the definitive checkpoint (`m.TrueState`), wiping any uncommitted player actions.
+  - A `/commit` or `ResolveTurn()` command executes batch-resolution loops against the sandbox, advances the timeline, and permanently promotes the sandboxed state to the master history via a deep-copy clone.
+
 * **Batch Resolution**: All damage calculations, terrain updates, bomb explosions, and chain reactions are deferred until a turn is committed. The resolution engine runs synchronously and returns a chronological `Animation Event Queue` string/binary array payload to the client.
+
 - **Synchronous Execution Bound**: Given the low-density metrics (16x16 maximum matrix, <= 10 active characters), all grid lookups, BFS pathfinding, and explosion cascade evaluations are run synchronously to avoid multi-threaded race conditions.
 
 ## 2. Spatial Mapping & State Model Definitions
@@ -15,16 +17,18 @@
 - **Stage Dimensions**: Dynamic N x M grid layout (supporting ranges from 7x7 up to a maximum bound of 16x16).
 - **Storage Type**: Rows are allocated via dynamic Go slices (`[][]Tile`) to support custom asymmetrical maps without recompiling code.
 - **Coordinate Mapping**: Layout is indexed as `Grid[Y][X]`. The top-left corner of the map is designated as `(0,0)`.
+
 * **Dynamic Boundary Rule**: Every check evaluates dynamically against active bounds: `0 <= X < len(grid)` and `0 <= Y < len(grid)`.
+
 - **Memory Normalization**: The Board Matrix tracks tile references via minimal structural fields (`OccupantType`, `OccupantID`). The GameState Engine maintains the master map directory of active entities. Moving an object updates only the cell metadata, leaving base entity metrics untouched.
 
 ## 3. Strongly Typed Identity Contracts & Bitmask Configurations
 
-* **Compile-Time Contract Safety**: To guarantee type safety and eliminate argument-swapping bugs, core entity lookups are wrapped in custom, power-of-2 byte-aligned semantic primitives.
-* **UnitID (uint8)**: Split internally into two equal 4-bit nibbles via `(TeamID << 4) | PlayerIndex`. This accommodates up to 15 unique teams and 15 players per team, mapping perfectly onto a single hexadecimal byte for clear log readability (e.g., `0x23` means Team 2, Player 3).
-* **BombID (uint32)**: Packed to represent absolute timeline metadata using clear byte boundaries: `(UnitID << 24) | (CurrentTurn << 16) | BombCounterShift`.
-* **TurnBombCounter Invariant**: A state-bound tracking sequence index that advances on the active sandbox frame. Because it is bound directly to the sandbox container, it resets on a turn-reset request, preventing ID collisions or frontend asset desynchronization.
-* **SystemUnitID Contract**: The identifier `UnitID(0)` (Team 0, Player 0) is explicitly reserved as the authoritative environmental actor. It is utilized to log and process automated environmental events, such as sudden-death hazards, without creating phantom player models.
+- **Compile-Time Contract Safety**: To guarantee type safety and eliminate argument-swapping bugs, core entity lookups are wrapped in custom, power-of-2 byte-aligned semantic primitives.
+- **UnitID (uint8)**: Split internally into two equal 4-bit nibbles via `(TeamID << 4) | PlayerIndex`. This accommodates up to 15 unique teams and 15 players per team, mapping perfectly onto a single hexadecimal byte for clear log readability (e.g., `0x23` means Team 2, Player 3).
+- **BombID (uint32)**: Packed to represent absolute timeline metadata using clear byte boundaries: `(UnitID << 24) | (CurrentTurn << 16) | BombCounterShift`.
+- **TurnBombCounter Invariant**: A state-bound tracking sequence index that advances on the active sandbox frame. Because it is bound directly to the sandbox container, it resets on a turn-reset request, preventing ID collisions or frontend asset desynchronization.
+- **SystemUnitID Contract**: The identifier `UnitID(0)` (Team 0, Player 0) is explicitly reserved as the authoritative environmental actor. It is utilized to log and process automated environmental events, such as sudden-death hazards, without creating phantom player models.
 
 ## 4. Pathfinding, Trajectory Vectors & Collision Engine
 
@@ -32,7 +36,7 @@
 - **High-Performance Bitmask Matrix**: Entity pass-through permissions are packed into a highly optimized, 1-byte bitmask field (`PassFlags` uint8). This completely eliminates nested slice iteration loops inside the pathfinder, collapsing obstacle evaluation down to a bitwise operation.
 - **Separation of Concerns (Reachability vs. Legality)**:
   - The pathfinder function (`FindReachableTiles`) has exactly one job: mapping spatial reachability and step distance tracking (`map[Coordinate]int`), treating the origin tile as step 0.
-  - Target landing restrictions (e.g., landing on an item tile or targeting allies) are business rules evaluated independently by respective **Action Handlers** *after* pathfinding returns.
+  - Target landing restrictions (e.g., landing on an item tile or targeting allies) are business rules evaluated independently by respective **Action Handlers** _after_ pathfinding returns.
 - **Unified Impact Absorption Crucible**: Straight-line calculation rays (character walking, bomb explosions) and corner-wrapping paths (sanity check). An explicit impact flag (`StopOnFirstNonUnitOccupant`) forces the ray to register a valid hit on a solid obstacle (SoftBlock, Bomb, Item) but instantly terminates the vector to shield cells behind it.
 - **Snapshot-Based Detonation**: All cascading bomb explosions within an intra-turn phase resolve at the exact same physical millisecond. To prevent ray-truncation anomalies, the engine queries a read-only 2D snapshot copy of the board captured at the start of the resolution pass (`cloneGridSnapshot()`). Destructible soft blocks flag their destruction inside delayed registries but remain solid, ray-blocking obstacles until the end of the pass to ensure perfect unit shielding.
 - **Intra-Turn Damage Capping**: Units caught in overlapping blast patterns or multiple cascading explosions lose a flat maximum of exactly 1 HP, matching the low-density 1-HP character pacing rules. Damage calculations utilize a local boolean presence set to record injuries rather than an accumulator, preventing health overflow. All entity modifications, soft wall dissolutions, and tile clear passes execute as a simultaneous batch flush at the very end of the loop.
@@ -42,8 +46,8 @@
 - **Turn Secrecy Pattern**: Active turn planning is fully hidden from the opposing player to preserve the Turn Reset capability. Opponents see a passive waiting status during the planning phase.
 - **Unified Event Broadcast**: Upon turn commitment, the backend generates an identical chronological Action Queue array and distributes it to both clients.
 - **Frontend Queue Playback**: Clients process incoming batch payloads using a sequential async loop, ensuring both players watch animations unfold with perfect deterministic lockstep alignment.
-- **Explicit Turn Start Flow**: The server does NOT auto-call `StartNewTurn()` on match creation. Instead, the client explicitly calls `POST /match/start-turn` to begin each turn (including Turn 1). This allows the UI to render the clean initial state, then animate sudden-death bomb drops when they occur on Turn 1 with `MaxTurns=0`.
-- **Turn Startup Sudden Death Checks**: State machine transition and boundary rules—such as checking if `TrueState.Turn >= Config.MaxTurn`—are evaluated at the very beginning of a new turn (`StartNewTurn()`). This ensures map alterations and automated sudden-death bomb injections are fully populated and rendered before a player can input commands. Setting `MaxTurn = 0` forces instant sudden death on Turn 1.
+- **Explicit Turn Start Flow**: The server does NOT auto-call `StartTurn()` on match creation. Instead, the client explicitly calls `POST /match/start-turn` to begin each turn (including Turn 1). This allows the UI to render the clean initial state, then animate sudden-death bomb drops when they occur on Turn 1 with `MaxTurns=0`.
+- **Turn Startup Sudden Death Checks**: State machine transition and boundary rules—such as checking if `TrueState.Turn >= Config.MaxTurn`—are evaluated at the very beginning of a new turn (`StartTurn()`). This ensures map alterations and automated sudden-death bomb injections are fully populated and rendered before a player can input commands. Setting `MaxTurn = 0` forces instant sudden death on Turn 1.
 - **Decoupled Analytical Queries**: Victory evaluations (`EvaluateVictoryConditions()`) are written as pure, read-only, stateless functions that return data structures without producing side effects. The top-level `ResolveTurn()` orchestrator handles updating properties and injecting the definitive termination token (`MatchEndedEvent`) into the public stream, allowing AI modules to securely query hypothetical sandboxes without corrupting telemetry arrays.
 - **Stateless Lounge-to-Game Manager**: Session lifetimes are managed via a `web.ServerStateManager`. The server starts in a "Lounge" state, dynamically allocates a match pointer (`engine.InitGame`) upon user action, and triggers a clean teardown (`ActiveMatch = nil`) upon match completion, returning to the Lounge.
 
@@ -102,11 +106,11 @@ User input                        Serializes JSON             No I/O
 
 ### 8.2 Turn Lifecycle (Client-Driven)
 
-The server does **not** auto-call `StartNewTurn()` on match creation. Client explicitly starts each turn:
+The server does **not** auto-call `StartTurn()` on match creation. Client explicitly starts each turn:
 
 1. `POST /match-rooms/{id}/match` → `CreateMatch` (full GameCfg), returns 201
 2. `GET /match-rooms/{id}/match/state` → clean Turn 1 state (no sudden death yet)
-3. `POST /match-rooms/{id}/match/start-turn` → `StartNewTurn()` injects sudden death if `MaxTurns=0`
+3. `POST /match-rooms/{id}/match/start-turn` → `StartTurn()` injects sudden death if `MaxTurns=0`
 4. `GET /match/state` → state with bombs (animatable)
 5. Planning: `POST /move`, `POST /bomb`, `POST /reset` (sandbox)
 6. `POST /commit` → `ResolveTurn()`, returns events + next turn
@@ -136,7 +140,7 @@ bomb-srpg
 │   │   └── main.go
 │   │
 │   └── srpg-web/               <-- Phase 2+ HTTP entry point
-│       └── main.go 
+│       └── main.go
 │
 ├── server/                     <-- Phase 2: HTTP Web server package
 │   ├── http_handlers.go        <-- REST HTTP interface boundary
@@ -171,7 +175,7 @@ The game flow operates through a decoupled presentation layer managed entirely o
    - User choices: `Match Mode` (Local vs. Human), `Online Mode` (Phase 4), `Story Mode` (Future Phase).
 
 2. **The Match Lounge (Setup Screen)**
-   - Triggered by selecting `Match Mode`. 
+   - Triggered by selecting `Match Mode`.
    - Provides interface controllers to adjust configuration parameters before a game starts:
      - Map presets (Stages)
      - Max Turn limitations
@@ -187,12 +191,12 @@ The game flow operates through a decoupled presentation layer managed entirely o
 
 To preserve strategic depth and prevent infinite execution exploits within a single sandbox turn planning cycle, each individual `Unit` is strictly bounded by a rigid action economy:
 
-* **The Rule of 1-Move & 1-Bomb**: Within a single turn loop, an active character unit is permitted to execute a maximum of **one move action** and **one bomb placement action**.
-* **Order Independent**: The execution sequence is completely flexible. A unit may choose to:
+- **The Rule of 1-Move & 1-Bomb**: Within a single turn loop, an active character unit is permitted to execute a maximum of **one move action** and **one bomb placement action**.
+- **Order Independent**: The execution sequence is completely flexible. A unit may choose to:
   - Move first, then drop a bomb.
   - Drop a bomb first, then move away.
-  - Execute *only* a move action or *only* a bomb action.
+  - Execute _only_ a move action or _only_ a bomb action.
   - Do nothing.
-* **Sandbox Verification**: These status restrictions operate entirely within the engine's `WorkingState` scratchpad. 
+- **Sandbox Verification**: These status restrictions operate entirely within the engine's `WorkingState` scratchpad.
   - Executing a `/reset` system command completely restores a unit's action availability flags.
-  - Transitioning via an authoritative `/commit` command completely flushes and refreshes these action limits back to zero inside `StartNewTurn()` for the upcoming round.
+  - Transitioning via an authoritative `/commit` command completely flushes and refreshes these action limits back to zero inside `StartTurn()` for the upcoming round.

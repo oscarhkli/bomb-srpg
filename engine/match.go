@@ -179,8 +179,8 @@ func (gs GameState) IsLandingLegal(target Coordinate, occupantType OccupantType)
 	return nil
 }
 
-// StartNewTurn sets up the environmental boundaries for the upcoming round.
-func (m *Match) StartNewTurn() {
+// StartTurn sets up the environmental boundaries for the upcoming round.
+func (m *Match) StartTurn() {
 	victoryResult, _ := m.evaluateVictoryConditions()
 	if victoryResult != MatchInProgress {
 		return // Match has reached a conclusion; abort round initialization
