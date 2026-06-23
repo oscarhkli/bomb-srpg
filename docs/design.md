@@ -112,7 +112,7 @@ The server does **not** auto-call `StartTurn()` on match creation. Client explic
 2. `GET /match-rooms/{id}/match/state` → clean Turn 1 state (no sudden death yet)
 3. `POST /match-rooms/{id}/match/start-turn` → `StartTurn()` injects sudden death if `MaxTurns=0`
 4. `GET /match/state` → state with bombs (animatable)
-5. Planning: `POST /turn-command`, `POST /reset` (sandbox)
+5. Planning: `POST /turn-commands`, `POST /reset` (sandbox)
 6. `POST /resolve` → `ResolveTurn()`, returns events + next turn
 7. Loop: `GET /state` → `POST /start-turn` → ...
 
