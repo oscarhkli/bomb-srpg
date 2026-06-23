@@ -112,8 +112,8 @@ The server does **not** auto-call `StartTurn()` on match creation. Client explic
 2. `GET /match-rooms/{id}/match/state` → clean Turn 1 state (no sudden death yet)
 3. `POST /match-rooms/{id}/match/start-turn` → `StartTurn()` injects sudden death if `MaxTurns=0`
 4. `GET /match/state` → state with bombs (animatable)
-5. Planning: `POST /move`, `POST /bomb`, `POST /reset` (sandbox)
-6. `POST /commit` → `ResolveTurn()`, returns events + next turn
+5. Planning: `POST /turn-command`, `POST /reset` (sandbox)
+6. `POST /resolve` → `ResolveTurn()`, returns events + next turn
 7. Loop: `GET /state` → `POST /start-turn` → ...
 
 Surrender: `POST /surrender` (either team, any time).
@@ -125,6 +125,14 @@ Surrender: `POST /surrender` (either team, any time).
 - **Locking**: Global `mu` (Phase 2), per-room deferred to Phase 4
 - **Stale cleanup**: 10min timeout, 30s interval, `LastActivity` updated on every request
 - **CreateMatch**: Full GameCfg required (Phase 2); partial/join deferred to Phase 4
+
+### 8.4 Player Authorization (Anonymous Tokens)
+
+- **Problem**: Room IDs (5-char Crockford32) and UnitIDs (deterministic Team << 4 \| Index) are guessable. Any client with a room ID can impersonate any player.
+- **Solution**: Per-team cryptographically random tokens generated and stored in a new Match, returned once in `CreateMatchResponse`. 
+- **Validation**: Mutating endpoints require `Authorization: Bearer <token>` header. Token validated against `UnitID`'s team (turn-commands) or `ActiveTeam` (start-turn, reset-turn, resolve-turn) or request `TeamID` (surrender). Read-only endpoints remain public.
+- **Implementation**: `server_manager.go` adds `validatePlayerToken()`; `http_handlers.go` adds `requirePlayerToken()` middleware. Engine unchanged — `validateActiveUnit` already enforces team ownership.
+- **Phase 4 Compatibility**: Same header supports both anonymous tokens (this phase) and JWT (Phase 4). Server tries token lookup first, falls back to JWT validation; both resolve to `TeamID`.
 
 # File Structure (WIP)
 

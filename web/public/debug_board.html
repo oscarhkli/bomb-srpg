@@ -19,7 +19,7 @@
   <div>
     Room: <input id="roomId" size="6" maxlength="5">
     <button onclick="fetchState()">Fetch</button>
-    <label><input type="checkbox" id="auto"> Auto (5s)</label>
+    <label><input type="checkbox" id="auto"> Auto (1s)</label>
     <span id="ts"></span>
   </div>
   <pre id="board">Enter room ID and click Fetch</pre>
@@ -140,7 +140,7 @@
     document.getElementById('auto').addEventListener('change', function(e) {
       clearInterval(timer);
       if (e.target.checked) {
-        timer = setInterval(fetchState, 5000);
+        timer = setInterval(fetchState, 1000);
       }
     });
 

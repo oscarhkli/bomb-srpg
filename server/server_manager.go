@@ -2,6 +2,7 @@ package server
 
 import (
 	"bomb-srpg/engine"
+	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -15,8 +16,10 @@ import (
 )
 
 const (
-	roomIDLength      = 5
-	crockfordAlphabet = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+	roomIDLength          = 5
+	crockfordAlphabet     = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+	RoomInactivityTimeout = 5 * time.Minute
+	CleanupInterval       = 1 * time.Minute
 )
 
 var (
@@ -119,7 +122,6 @@ func (s *ServerStateManager) CreateMatchRoom() (string, error) {
 		LastActivity: time.Now(),
 	}
 
-	slog.Info("match room created", "roomID", id)
 	return id, nil
 }
 
@@ -317,4 +319,35 @@ func (s *ServerStateManager) GetAllowedTiles(roomID string, unitID engine.UnitID
 	}
 
 	return slices.Collect(maps.Keys(allowedTiles)), nil
+}
+
+// StartCleanupLoop runs background cleanup until ctx is cancelled.
+func (s *ServerStateManager) StartCleanupLoop(ctx context.Context, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	go func() {
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				s.cleanupInactiveRooms()
+			}
+		}
+	}()
+}
+
+// cleanupInactiveRooms removes rooms inactive > RoomInactivityTimeout OR already ended.
+func (s *ServerStateManager) cleanupInactiveRooms() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now := time.Now()
+	for id, room := range s.Rooms {
+		inactive := now.Sub(room.LastActivity) > RoomInactivityTimeout
+		ended := room.Match != nil && room.Match.WinnerTeamID != 0
+		if inactive || ended {
+			delete(s.Rooms, id)
+			slog.Info("removed room", "roomID", id, "inactive", inactive, "ended", ended)
+		}
+	}
 }
