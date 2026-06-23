@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"errors"
 	"maps"
 	"testing"
 )
@@ -372,5 +373,153 @@ func TestUnit_NewBombPlacementRule(t *testing.T) {
 	if br.PassPermissions&^requiredFlags != 0 {
 		t.Errorf("Boundary leak: Bomb placement rule was granted unauthorized privileges (Bitmask: %b)",
 			br.PassPermissions)
+	}
+}
+
+func TestGameState_FindAllowedTiles(t *testing.T) {
+	occupants := [][]OccupantType{
+		{OccupantSoftBlock, OccupantNone, OccupantUnit, OccupantUnit, OccupantNone},
+		{OccupantNone, OccupantUnit, OccupantNone, OccupantUnit, OccupantBomb},
+		{OccupantUnit, OccupantUnit, OccupantNone, OccupantUnit, OccupantNone},
+	}
+	grid := make([][]Tile, len(occupants))
+	for y, row := range occupants {
+		grid[y] = make([]Tile, len(row))
+		for x, occupant := range row {
+			grid[y][x] = Tile{
+				Type:         TerrainPlain,
+				OccupantType: occupant,
+			}
+		}
+	}
+	state := &GameState{
+		Grid: grid,
+	}
+	startPos := Coordinate{2, 0}
+
+	rule := MovementRule{
+		MaxSteps:        2,
+		Pattern:         PatternCardinal,
+		PassPermissions: PassUnits | PassSoftBlocks | PassHardBlocks | PassItems | PassBombs,
+	}
+
+	result := state.FindAllowedTiles(startPos, rule, OccupantBomb)
+
+	expected := map[Coordinate]int{
+		{1, 0}: 1, {4, 0}: 2,
+		{2, 1}: 1,
+		{2, 2}: 2,
+	}
+	if !maps.Equal(result, expected) {
+		extra, missing, mismatched := diffMaps(expected, result)
+
+		t.Errorf("FAIL: FindAllowedTiles\n"+
+			"  Missing tiles (expected but got none):   %v\n"+
+			"  Extra tiles (got but didn't expect):     %v\n"+
+			"  Mismatched step counts (coord: exp!=got): %v",
+			missing, extra, mismatched)
+	}
+}
+
+func TestGameState_FindAllowedTilesForCommand(t *testing.T) {
+	occupants := [][]OccupantType{
+		{OccupantSoftBlock, OccupantNone, OccupantUnit, OccupantUnit, OccupantNone},
+		{OccupantNone, OccupantUnit, OccupantNone, OccupantUnit, OccupantBomb},
+		{OccupantUnit, OccupantUnit, OccupantNone, OccupantUnit, OccupantNone},
+	}
+	grid := make([][]Tile, len(occupants))
+	for y, row := range occupants {
+		grid[y] = make([]Tile, len(row))
+		for x, occupant := range row {
+			grid[y][x] = Tile{
+				Type:         TerrainPlain,
+				OccupantType: occupant,
+			}
+		}
+	}
+	state := &GameState{
+		Grid:  grid,
+		Units: make(map[UnitID]*Unit),
+	}
+	u1 := NewUnitID(1, 0)
+	state.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1, Speed: 1, BombMaxRange: 2, Position: Coordinate{2, 0}}
+	state.Grid[0][2] = Tile{Type: TerrainPlain, OccupantType: OccupantUnit, OccupantID: int64(u1)}
+
+	u2 := NewUnitID(1, 2)
+	state.Units[u2] = &Unit{ID: u2, Team: 1, HP: 1, Speed: 1, BombMaxRange: 2, Position: Coordinate{3, 0}}
+	state.Grid[0][3] = Tile{Type: TerrainPlain, OccupantType: OccupantUnit, OccupantID: int64(u1)}
+
+	u3 := NewUnitID(1, 3)
+	state.Units[u3] = &Unit{ID: u3, Team: 1, HP: 0, Speed: 1, BombMaxRange: 2, Position: Coordinate{-1, -1}}
+
+	tests := []struct {
+		name        string
+		unitID      UnitID
+		turnCmdType TurnCmdType
+		wantErr     error
+		want        map[Coordinate]int
+	}{
+		{
+			name:        "Success: alive unit move",
+			unitID:      u1,
+			turnCmdType: TurnCmdMove,
+			wantErr:     nil,
+			want: map[Coordinate]int{
+				{1, 0}: 1,
+				{2, 1}: 1,
+			},
+		},
+		{
+			name:        "Success: alive unit place bomb",
+			unitID:      u1,
+			turnCmdType: TurnCmdPlaceBomb,
+			wantErr:     nil,
+			want: map[Coordinate]int{
+				{1, 0}: 1, {4, 0}: 2,
+				{2, 1}: 1,
+				{2, 2}: 2,
+			},
+		},
+		{
+			name:        "Failure: dead unit place bomb",
+			unitID:      u3,
+			turnCmdType: TurnCmdPlaceBomb,
+			wantErr:     ErrUnitDead,
+			want:        map[Coordinate]int{},
+		},
+		{
+			name:        "Failure: unit not found",
+			unitID:      123,
+			turnCmdType: TurnCmdPlaceBomb,
+			wantErr:     ErrUnitNotFound,
+			want:        map[Coordinate]int{},
+		},
+		{
+			name:        "Failure: unsupported command",
+			unitID:      u1,
+			turnCmdType: "unsupported",
+			wantErr:     ErrUnsupportedCommand,
+			want:        map[Coordinate]int{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := state.FindAllowedTilesForCommand(tt.unitID, tt.turnCmdType)
+
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("FindAllowedTilesForCommand() error = %v, want %v", err, tt.wantErr)
+			}
+
+			if !maps.Equal(result, tt.want) {
+				extra, missing, mismatched := diffMaps(tt.want, result)
+
+				t.Errorf("FAIL: %s\n"+
+					"  Missing tiles (expected but got none):   %v\n"+
+					"  Extra tiles (got but didn't expect):     %v\n"+
+					"  Mismatched step counts (coord: exp!=got): %v",
+					tt.name, missing, extra, mismatched)
+			}
+		})
 	}
 }

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 )
 
 // CreateMatchRoomResponse is returned when a new match room is created.
@@ -282,6 +283,35 @@ func (s *ServerStateManager) HandleGetMatchVictoryResult(w http.ResponseWriter, 
 
 // HandlesGetAllowedTiles gets the hints for Player to identify which tiles are available according to the TurnCmdAction
 func (s *ServerStateManager) HandleGetAllowedTiles(w http.ResponseWriter, r *http.Request) {
-	//roomID := r.PathValue("roomID")
-	http.Error(w, "not yet implemented", http.StatusNotImplemented)
+	roomID := r.PathValue("roomID")
+	unitIDStr := r.URL.Query().Get("unitId")
+	turnCmdType := r.URL.Query().Get("turnCmdType")
+
+	if unitIDStr == "" || turnCmdType == "" {
+		http.Error(w, "missing required query parameters: unitId and turnCmdType are required", http.StatusBadRequest)
+		return
+	}
+
+	unitID, err := strconv.ParseUint(unitIDStr, 10, 8)
+	if err != nil {
+		http.Error(w, "Invalid unitId parameter", http.StatusBadRequest)
+		return
+	}
+
+	allowed, err := s.GetAllowedTiles(roomID, engine.UnitID(unitID), engine.TurnCmdType(turnCmdType))
+	if err != nil {
+		code, msg := mapError(err)
+		slog.Warn("res turn failed", "roomID", roomID, "error", err)
+		http.Error(w, msg, code)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	if err := json.NewEncoder(w).Encode(allowed); err != nil {
+		slog.Error("encode gameConfig failed", "error", err)
+		http.Error(w, "Failed to encode gameConfig", http.StatusInternalServerError)
+		return
+	}
 }

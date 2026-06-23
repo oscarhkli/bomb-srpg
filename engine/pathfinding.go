@@ -1,5 +1,7 @@
 package engine
 
+import "fmt"
+
 // FindReachableTiles runs standard pathfinding using the live, active game grid state.
 func (gs *GameState) FindReachableTiles(start Coordinate, rule MovementRule) map[Coordinate]int {
 	return gs.findReachableTiles(start, rule, gs.Grid)
@@ -136,4 +138,47 @@ func (u Unit) NewBombPlacementRule() MovementRule {
 		// All pass, but can't land on any occupant. Landing is handled in other place.
 		PassPermissions: PassUnits | PassSoftBlocks | PassHardBlocks | PassItems | PassBombs,
 	}
+}
+
+// FindAllowedTiles deduces the tiles that an occupant can reach and actually land on.
+// It returns coordinates with distance from the start.
+func (gs *GameState) FindAllowedTiles(start Coordinate, rule MovementRule, occupantType OccupantType) map[Coordinate]int {
+	reachable := gs.FindReachableTiles(start, rule)
+	allowed := make(map[Coordinate]int)
+	for pos, steps := range reachable {
+		if gs.IsLandingLegal(pos, occupantType) != nil {
+			continue
+		}
+		allowed[pos] = steps
+	}
+	return allowed
+}
+
+// FindAllowedTilesForCommand returns tiles a unit can reach for a given command type.
+// Encapsulates rule selection so callers don't need to know MovementRule internals.
+func (gs *GameState) FindAllowedTilesForCommand(unitID UnitID, turnCmdType TurnCmdType) (map[Coordinate]int, error) {
+	unit, err := gs.findUnit(unitID, true)
+	if err != nil {
+		return nil, err
+	}
+
+	switch turnCmdType {
+	case TurnCmdMove:
+		return gs.FindAllowedTiles(unit.Position, unit.NewMovementRule(), OccupantUnit), nil
+	case TurnCmdPlaceBomb:
+		return gs.FindAllowedTiles(unit.Position, unit.NewBombPlacementRule(), OccupantBomb), nil
+	default:
+		return nil, fmt.Errorf("%w: %s", ErrUnsupportedCommand, turnCmdType)
+	}
+}
+
+func (gs *GameState) findUnit(unitID UnitID, isAlive bool) (*Unit, error) {
+	unit, ok := gs.Units[unitID]
+	if !ok {
+		return nil, fmt.Errorf("%w: unit %#x", ErrUnitNotFound, unitID)
+	}
+	if isAlive && unit.HP <= 0 {
+		return nil, fmt.Errorf("%w: unit %#x", ErrUnitDead, unitID)
+	}
+	return unit, nil
 }

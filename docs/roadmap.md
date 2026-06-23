@@ -47,10 +47,10 @@
   - [x] Reset
   - [x] Commit
   - [x] Surrender
-- [ ] HTTP Handlers for TurnCommands
+- [x] HTTP Handlers for TurnCommands
   - [x] Move
   - [x] PlaceBomb
-  - [ ] GetAllowedTiles, which is different from GetReachableTiles (may move to Phase 3)
+  - [x] GetAllowedTiles, which is different from GetReachableTiles (may move to Phase 3)
 - [ ] Match Room
   - [x] Creation
   - [ ] Housekeep based on the last activity time

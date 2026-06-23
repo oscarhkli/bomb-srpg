@@ -4,6 +4,7 @@ import (
 	"bomb-srpg/engine"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -831,6 +832,91 @@ func TestServerStateManager_GetMatchConfig(t *testing.T) {
 			}
 			if tt.validate != nil {
 				tt.validate(t, gameCfg, s, roomID)
+			}
+		})
+	}
+}
+
+func TestServerStateManager_GetAllowedTiles(t *testing.T) {
+	cmpFunc := func(a, b engine.Coordinate) int {
+		if a.X != b.X {
+			return a.X - b.X
+		}
+		return a.Y - b.Y
+	}
+
+	tests := []struct {
+		name        string
+		setup       func(t *testing.T) (string, *ServerStateManager)
+		unitID      engine.UnitID
+		turnCmdType engine.TurnCmdType
+		wantErr     error
+		validate    func(t *testing.T, allowed []engine.Coordinate, s *ServerStateManager, roomID string)
+	}{
+		{
+			name: "Success",
+			setup: func(t *testing.T) (string, *ServerStateManager) {
+				s := NewServerStateManager()
+				roomID, _ := s.CreateMatchRoom()
+				s.CreateMatch(roomID, validGameCfg())
+				return roomID, s
+			},
+			unitID:      engine.NewUnitID(1, 0),
+			turnCmdType: engine.TurnCmdPlaceBomb,
+			wantErr:     nil,
+			validate: func(t *testing.T, allowed []engine.Coordinate, s *ServerStateManager, roomID string) {
+				want := []engine.Coordinate{
+					{X: 2, Y: 8}, {X: 5, Y: 8}, {X: 6, Y: 8}, {X: 4, Y: 7}, {X: 4, Y: 6},
+				}
+				slices.SortFunc(want, cmpFunc)
+				if !slices.Equal(want, allowed) {
+					t.Errorf("Expected coordinates %#v, got %#v", want, allowed)
+				}
+			},
+		},
+		{
+			name: "Unsupported command",
+			setup: func(t *testing.T) (string, *ServerStateManager) {
+				s := NewServerStateManager()
+				roomID, _ := s.CreateMatchRoom()
+				s.CreateMatch(roomID, validGameCfg())
+				return roomID, s
+			},
+			unitID:      engine.NewUnitID(1, 0),
+			turnCmdType: "invalid",
+			wantErr:     engine.ErrUnsupportedCommand,
+			validate:    func(t *testing.T, allowed []engine.Coordinate, s *ServerStateManager, roomID string) {},
+		},
+		{
+			name: "Room Not Found",
+			setup: func(t *testing.T) (string, *ServerStateManager) {
+				return "NONEXISTENT", NewServerStateManager()
+			},
+			wantErr:  ErrRoomNotFound,
+			validate: func(t *testing.T, allowed []engine.Coordinate, s *ServerStateManager, roomID string) {},
+		},
+		{
+			name: "Match Not Found",
+			setup: func(t *testing.T) (string, *ServerStateManager) {
+				s := NewServerStateManager()
+				roomID, _ := s.CreateMatchRoom()
+				return roomID, s
+			},
+			wantErr:  ErrMatchNotFound,
+			validate: func(t *testing.T, allowed []engine.Coordinate, s *ServerStateManager, roomID string) {},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			roomID, s := tt.setup(t)
+			allowed, err := s.GetAllowedTiles(roomID, tt.unitID, tt.turnCmdType)
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("GetAllowedTiles() error = %v, want %v", err, tt.wantErr)
+			}
+			slices.SortFunc(allowed, cmpFunc)
+			if tt.validate != nil {
+				tt.validate(t, allowed, s, roomID)
 			}
 		})
 	}

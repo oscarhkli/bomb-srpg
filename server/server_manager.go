@@ -4,9 +4,12 @@ import (
 	"bomb-srpg/engine"
 	"errors"
 	"fmt"
+	"log"
 	"log/slog"
+	"maps"
 	"math/rand/v2"
 	"net/http"
+	"slices"
 	"sync"
 	"time"
 )
@@ -286,4 +289,24 @@ func (s *ServerStateManager) GetMatchConfig(roomID string) (*engine.GameCfg, err
 	}
 
 	return &room.Match.GameCfg, nil
+}
+
+// GetAllowedTiles gets the hints for Player to identify which tiles are available according to the TurnCmdAction
+// Returns the coordinates of the allowed tiles or an error if any pre-check is violated
+func (s *ServerStateManager) GetAllowedTiles(roomID string, unitID engine.UnitID, turnCmdType engine.TurnCmdType) ([]engine.Coordinate, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	log.Println("GetAllowedTiles")
+	room, err := s.roomReadyForMatch(roomID)
+	if err != nil {
+		return nil, err
+	}
+
+	allowedTiles, err := room.Match.WorkingState.FindAllowedTilesForCommand(unitID, turnCmdType)
+	log.Println(allowedTiles, err)
+	if err != nil {
+		return nil, err
+	}
+
+	return slices.Collect(maps.Keys(allowedTiles)), nil
 }
