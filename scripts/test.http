@@ -27,3 +27,52 @@ Content-Type: application/json
 
 ### Get State
 GET {{baseUrl}}/api/match-rooms/{{roomId}}/match/state
+
+### Turn Command (move)
+POST {{baseUrl}}/api/match-rooms/{{roomId}}/match/turn-commands
+Content-Type: application/json
+
+{
+  "type": "move",
+  "unitId": 16,
+  "target": {
+    "x": 4,
+    "y": 7
+  }
+}
+
+### Turn Command (placeBomb)
+POST {{baseUrl}}/api/match-rooms/{{roomId}}/match/turn-commands
+Content-Type: application/json
+
+{
+  "type": "placeBomb",
+  "unitId": 16,
+  "target": {
+    "x": 4,
+    "y": 5
+  }
+}
+
+### Start Turn
+POST {{baseUrl}}/api/match-rooms/{{roomId}}/match/start-turn
+
+### Reset Turn
+POST {{baseUrl}}/api/match-rooms/{{roomId}}/match/reset
+
+### Resolve
+POST {{baseUrl}}/api/match-rooms/{{roomId}}/match/resolve
+
+### Surrender
+POST {{baseUrl}}/api/match-rooms/{{roomId}}/match/surrender
+Content-Type: application/json
+
+{
+  "teamId": 1
+}
+
+### Get Match Config
+GET {{baseUrl}}/api/match-rooms/{{roomId}}/match/config
+
+### Get Allowed Tiles
+GET {{baseUrl}}/api/match-rooms/{{roomId}}/match/allowed-tiles?unitId=16$turnCmdType=placeBomb

@@ -112,8 +112,8 @@ The server does **not** auto-call `StartTurn()` on match creation. Client explic
 2. `GET /match-rooms/{id}/match/state` → clean Turn 1 state (no sudden death yet)
 3. `POST /match-rooms/{id}/match/start-turn` → `StartTurn()` injects sudden death if `MaxTurns=0`
 4. `GET /match/state` → state with bombs (animatable)
-5. Planning: `POST /move`, `POST /bomb`, `POST /reset` (sandbox)
-6. `POST /commit` → `ResolveTurn()`, returns events + next turn
+5. Planning: `POST /turn-commands`, `POST /reset` (sandbox)
+6. `POST /resolve` → `ResolveTurn()`, returns events + next turn
 7. Loop: `GET /state` → `POST /start-turn` → ...
 
 Surrender: `POST /surrender` (either team, any time).
@@ -125,6 +125,7 @@ Surrender: `POST /surrender` (either team, any time).
 - **Locking**: Global `mu` (Phase 2), per-room deferred to Phase 4
 - **Stale cleanup**: 10min timeout, 30s interval, `LastActivity` updated on every request
 - **CreateMatch**: Full GameCfg required (Phase 2); partial/join deferred to Phase 4
+- **Player authorization with anonymous tokens**: Room IDs and UnitIDs are guessable. Any client with a room ID can impersonate any player. The solution is to adopt per-team cryptographically random tokens generated and stored in a new Match, returned once in `CreateMatchResponse`. Token will be validated in mutation endpoints. No restriction to read-only enpoints at the moment.
 
 # File Structure (WIP)
 

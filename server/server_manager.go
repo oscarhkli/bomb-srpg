@@ -2,6 +2,7 @@ package server
 
 import (
 	"bomb-srpg/engine"
+	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -15,8 +16,10 @@ import (
 )
 
 const (
-	roomIDLength      = 5
-	crockfordAlphabet = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+	roomIDLength          = 5
+	crockfordAlphabet     = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+	RoomInactivityTimeout = 5 * time.Minute
+	CleanupInterval       = 1 * time.Minute
 )
 
 var (
@@ -119,7 +122,6 @@ func (s *ServerStateManager) CreateMatchRoom() (string, error) {
 		LastActivity: time.Now(),
 	}
 
-	slog.Info("match room created", "roomID", id)
 	return id, nil
 }
 
@@ -157,6 +159,7 @@ func (s *ServerStateManager) CreateMatch(roomID string, gameCfg engine.GameCfg) 
 	}
 
 	room.Match = match
+	room.LastActivity = time.Now()
 
 	return nil
 }
@@ -207,6 +210,7 @@ func (s *ServerStateManager) SubmitTurnCommand(roomID string, cmd engine.TurnCom
 		return nil, fmt.Errorf("%w: turnCommand=%+v: %v", ErrInvalidTurnCmd, cmd, err)
 	}
 
+	room.LastActivity = time.Now()
 	return room.Match.WorkingState, nil
 }
 
@@ -227,6 +231,7 @@ func (s *ServerStateManager) StartTurn(roomID string) (*engine.GameState, error)
 		return nil, fmt.Errorf("%w: match already ended", ErrMatchEnded)
 	}
 
+	room.LastActivity = time.Now()
 	return room.Match.WorkingState, nil
 }
 
@@ -243,6 +248,7 @@ func (s *ServerStateManager) ResetTurn(roomID string) (*engine.GameState, error)
 
 	room.Match.ResetTurn()
 
+	room.LastActivity = time.Now()
 	return room.Match.WorkingState, nil
 }
 
@@ -257,7 +263,9 @@ func (s *ServerStateManager) ResolveTurn(roomID string) ([]engine.GameEvent, err
 		return nil, err
 	}
 
-	return room.Match.ResolveTurn(), nil
+	events := room.Match.ResolveTurn()
+	room.LastActivity = time.Now()
+	return events, nil
 }
 
 // ResetTurn sends Surrender signal to engine to end the current Match in a given MatchRoom.
@@ -275,7 +283,9 @@ func (s *ServerStateManager) Surrender(roomID string, teamID int) ([]engine.Game
 		return nil, err
 	}
 
-	return room.Match.Surrender(teamID), nil
+	events := room.Match.Surrender(teamID)
+	room.LastActivity = time.Now()
+	return events, nil
 }
 
 // GetMatchConfig gets the GameConfig of the current Match in a given MatchRoom.
@@ -309,4 +319,35 @@ func (s *ServerStateManager) GetAllowedTiles(roomID string, unitID engine.UnitID
 	}
 
 	return slices.Collect(maps.Keys(allowedTiles)), nil
+}
+
+// StartCleanupLoop runs background cleanup until ctx is cancelled.
+func (s *ServerStateManager) StartCleanupLoop(ctx context.Context, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	go func() {
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				s.cleanupInactiveRooms()
+			}
+		}
+	}()
+}
+
+// cleanupInactiveRooms removes rooms inactive > RoomInactivityTimeout OR already ended.
+func (s *ServerStateManager) cleanupInactiveRooms() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now := time.Now()
+	for id, room := range s.Rooms {
+		inactive := now.Sub(room.LastActivity) > RoomInactivityTimeout
+		ended := room.Match != nil && room.Match.WinnerTeamID != 0
+		if inactive || ended {
+			delete(s.Rooms, id)
+			slog.Info("removed room", "roomID", id, "inactive", inactive, "ended", ended)
+		}
+	}
 }

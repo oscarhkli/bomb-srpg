@@ -2,11 +2,13 @@ package server
 
 import (
 	"bomb-srpg/engine"
+	"context"
 	"errors"
 	"fmt"
 	"slices"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestServerStateManager_CreateMatchRoom(t *testing.T) {
@@ -121,6 +123,111 @@ func isValidCrockfordCode(s string) bool {
 		}
 	}
 	return true
+}
+
+func TestServerStateManager_LastActivityUpdated(t *testing.T) {
+	tests := []struct {
+		name   string
+		setup  func(t *testing.T) (string, *ServerStateManager)
+		action func(t *testing.T, s *ServerStateManager, roomID string)
+	}{
+		{
+			name: "CreateMatch updates LastActivity",
+			setup: func(t *testing.T) (string, *ServerStateManager) {
+				s := NewServerStateManager()
+				roomID, _ := s.CreateMatchRoom()
+				return roomID, s
+			},
+			action: func(t *testing.T, s *ServerStateManager, roomID string) {
+				s.CreateMatch(roomID, validGameCfg())
+			},
+		},
+		{
+			name: "SubmitTurnCommand updates LastActivity",
+			setup: func(t *testing.T) (string, *ServerStateManager) {
+				roomID, s := createTestRoom(t)
+				return roomID, s
+			},
+			action: func(t *testing.T, s *ServerStateManager, roomID string) {
+				uID := engine.NewUnitID(1, 0)
+				s.SubmitTurnCommand(roomID, engine.NewMoveCommand(uID, engine.Coordinate{X: 4, Y: 7}))
+			},
+		},
+		{
+			name: "StartTurn updates LastActivity",
+			setup: func(t *testing.T) (string, *ServerStateManager) {
+				roomID, s := createTestRoom(t)
+				return roomID, s
+			},
+			action: func(t *testing.T, s *ServerStateManager, roomID string) {
+				s.StartTurn(roomID)
+			},
+		},
+		{
+			name: "ResetTurn updates LastActivity",
+			setup: func(t *testing.T) (string, *ServerStateManager) {
+				roomID, s := createTestRoom(t)
+				return roomID, s
+			},
+			action: func(t *testing.T, s *ServerStateManager, roomID string) {
+				s.ResetTurn(roomID)
+			},
+		},
+		{
+			name: "ResolveTurn updates LastActivity",
+			setup: func(t *testing.T) (string, *ServerStateManager) {
+				roomID, s := createTestRoom(t)
+				s.SubmitTurnCommand(roomID, engine.NewPlaceBombCommand(16, engine.Coordinate{X: 4, Y: 7}))
+				return roomID, s
+			},
+			action: func(t *testing.T, s *ServerStateManager, roomID string) {
+				s.ResolveTurn(roomID)
+			},
+		},
+		{
+			name: "Surrender updates LastActivity",
+			setup: func(t *testing.T) (string, *ServerStateManager) {
+				roomID, s := createTestRoom(t)
+				return roomID, s
+			},
+			action: func(t *testing.T, s *ServerStateManager, roomID string) {
+				s.Surrender(roomID, 1)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			roomID, s := tt.setup(t)
+			before := time.Now()
+			time.Sleep(10 * time.Millisecond)
+			tt.action(t, s, roomID)
+
+			s.mu.RLock()
+			defer s.mu.RUnlock()
+			room := s.Rooms[roomID]
+			if room.LastActivity.Before(before) || room.LastActivity.Equal(before) {
+				t.Errorf("LastActivity not updated: before=%v, after=%v", before, room.LastActivity)
+			}
+		})
+	}
+}
+
+func TestServerStateManager_ReadOnlyMethodsDoNotUpdateLastActivity(t *testing.T) {
+	roomID, s := createTestRoom(t)
+	before := time.Now()
+	time.Sleep(10 * time.Millisecond)
+
+	s.GetMatchState(roomID)
+	s.GetMatchConfig(roomID)
+	s.GetAllowedTiles(roomID, engine.NewUnitID(1, 0), engine.TurnCmdPlaceBomb)
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	room := s.Rooms[roomID]
+	if !room.LastActivity.Equal(before) && !room.LastActivity.Before(before) {
+		t.Errorf("LastActivity should not be updated by read-only methods: before=%v, after=%v", before, room.LastActivity)
+	}
 }
 
 func validGameCfg() engine.GameCfg {
@@ -920,4 +1027,55 @@ func TestServerStateManager_GetAllowedTiles(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestServerStateManager_cleanupInactiveRooms(t *testing.T) {
+	s := NewServerStateManager()
+
+	// Room 1: active (recent activity)
+	roomID1, _ := s.CreateMatchRoom()
+	s.CreateMatch(roomID1, validGameCfg())
+
+	// Room 2: inactive (old LastActivity)
+	roomID2, _ := s.CreateMatchRoom()
+	s.CreateMatch(roomID2, validGameCfg())
+	s.mu.Lock()
+	s.Rooms[roomID2].LastActivity = time.Now().Add(-6 * time.Minute)
+	s.mu.Unlock()
+
+	// Room 3: ended match
+	roomID3, _ := s.CreateMatchRoom()
+	s.CreateMatch(roomID3, validGameCfg())
+	s.mu.Lock()
+	s.Rooms[roomID3].Match.WinnerTeamID = 1
+	s.mu.Unlock()
+
+	// Run cleanup
+	s.cleanupInactiveRooms()
+
+	// Verify
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if _, ok := s.Rooms[roomID1]; !ok {
+		t.Error("active room should not be cleaned")
+	}
+	if _, ok := s.Rooms[roomID2]; ok {
+		t.Error("inactive room should be cleaned")
+	}
+	if _, ok := s.Rooms[roomID3]; ok {
+		t.Error("ended match room should be cleaned")
+	}
+}
+
+func TestServerStateManager_StartCleanupLoop_Cancellation(t *testing.T) {
+	s := NewServerStateManager()
+	ctx, cancel := context.WithCancel(context.Background())
+
+	s.StartCleanupLoop(ctx, 10*time.Millisecond)
+	time.Sleep(25 * time.Millisecond) // let it tick a couple times
+	cancel()
+	time.Sleep(10 * time.Millisecond) // let goroutine exit
+
+	// No panic/leak = success
 }
