@@ -15,6 +15,7 @@ func TestMatch_ResetTurn(t *testing.T) {
 				unitID: {HP: 5},
 			},
 		},
+		PlaybackLog: []GameEvent{NewUnitMovedEvent(16, Coordinate{X: 1, Y: 2}, Coordinate{X: 1, Y: 3})},
 	}
 	m.WorkingState = m.TrueState.DeepCopy()
 
@@ -28,6 +29,9 @@ func TestMatch_ResetTurn(t *testing.T) {
 	}
 	if m.TrueState.Units[unitID].HP != 5 || m.WorkingState.Units[unitID].HasMoved {
 		t.Errorf("CRITICAL POINTER LEAK: Sandbox action permanently corrupted your master TrueState checkpoint!")
+	}
+	if len(m.PlaybackLog) > 0 {
+		t.Errorf("Rollback invariant broken: playbackLog still exists after reset!")
 	}
 }
 

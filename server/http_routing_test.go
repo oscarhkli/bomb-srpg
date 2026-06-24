@@ -14,18 +14,9 @@ import (
 func TestHTTPRouting(t *testing.T) {
 	mux := http.NewServeMux()
 	serverState := NewServerStateManager()
+	handler := NewHandler(serverState)
 
-	mux.HandleFunc("GET /api/archetypes", serverState.HandleGetAllArchetypes)
-	mux.HandleFunc("POST /api/match-rooms", serverState.HandleCreateMatchRoom)
-	mux.HandleFunc("POST /api/match-rooms/{roomID}/match", serverState.HandleCreateMatch)
-	mux.HandleFunc("GET /api/match-rooms/{roomID}/match/state", serverState.HandleGetMatchState)
-	mux.HandleFunc("POST /api/match-rooms/{roomID}/match/turn-commands", serverState.HandleSubmitTurnCommand)
-	mux.HandleFunc("POST /api/match-rooms/{roomID}/match/start-turn", serverState.HandleStartTurn)
-	mux.HandleFunc("POST /api/match-rooms/{roomID}/match/reset-turn", serverState.HandleResetTurn)
-	mux.HandleFunc("POST /api/match-rooms/{roomID}/match/resolve-turn", serverState.HandleResolveTurn)
-	mux.HandleFunc("POST /api/match-rooms/{roomID}/match/surrender", serverState.HandleSurrender)
-	mux.HandleFunc("GET /api/match-rooms/{roomID}/match/config", serverState.HandleGetMatchConfig)
-	mux.HandleFunc("GET /api/match-rooms/{roomID}/match/allowed-tiles", serverState.HandleGetAllowedTiles)
+	RegisterRoutes(mux, handler)
 
 	server := httptest.NewServer(mux)
 	defer server.Close()
@@ -151,51 +142,51 @@ func TestHTTPRouting(t *testing.T) {
 			wantStatus: http.StatusMethodNotAllowed,
 		},
 		{
-			name:       "POST /api/match-rooms/{roomID}/match/reset-turn (404 - no room)",
+			name:       "POST /api/match-rooms/{roomID}/match/reset (404 - no room)",
 			method:     "POST",
-			path:       "/api/match-rooms/DUMMY/match/reset-turn",
+			path:       "/api/match-rooms/DUMMY/match/reset",
 			wantStatus: http.StatusNotFound,
 		},
 		{
-			name:       "GET /api/match-rooms/{roomID}/match/reset-turn (405)",
+			name:       "GET /api/match-rooms/{roomID}/match/reset (405)",
 			method:     "GET",
-			path:       "/api/match-rooms/DUMMY/match/reset-turn",
+			path:       "/api/match-rooms/DUMMY/match/reset",
 			wantStatus: http.StatusMethodNotAllowed,
 		},
 		{
-			name:       "PUT /api/match-rooms/{roomID}/match/reset-turn (405)",
+			name:       "PUT /api/match-rooms/{roomID}/match/reset (405)",
 			method:     "PUT",
-			path:       "/api/match-rooms/DUMMY/match/reset-turn",
+			path:       "/api/match-rooms/DUMMY/match/reset",
 			wantStatus: http.StatusMethodNotAllowed,
 		},
 		{
-			name:       "DELETE /api/match-rooms/{roomID}/match/reset-turn (405)",
+			name:       "DELETE /api/match-rooms/{roomID}/match/reset (405)",
 			method:     "DELETE",
-			path:       "/api/match-rooms/DUMMY/match/reset-turn",
+			path:       "/api/match-rooms/DUMMY/match/reset",
 			wantStatus: http.StatusMethodNotAllowed,
 		},
 		{
-			name:       "POST /api/match-rooms/{roomID}/match/resolve-turn (404 - no room)",
+			name:       "POST /api/match-rooms/{roomID}/match/resolve (404 - no room)",
 			method:     "POST",
-			path:       "/api/match-rooms/DUMMY/match/resolve-turn",
+			path:       "/api/match-rooms/DUMMY/match/resolve",
 			wantStatus: http.StatusNotFound,
 		},
 		{
-			name:       "GET /api/match-rooms/{roomID}/match/resolve-turn (405)",
+			name:       "GET /api/match-rooms/{roomID}/match/resolve (405)",
 			method:     "GET",
-			path:       "/api/match-rooms/DUMMY/match/resolve-turn",
+			path:       "/api/match-rooms/DUMMY/match/resolve",
 			wantStatus: http.StatusMethodNotAllowed,
 		},
 		{
-			name:       "PUT /api/match-rooms/{roomID}/match/resolve-turn (405)",
+			name:       "PUT /api/match-rooms/{roomID}/match/resolve (405)",
 			method:     "PUT",
-			path:       "/api/match-rooms/DUMMY/match/resolve-turn",
+			path:       "/api/match-rooms/DUMMY/match/resolve",
 			wantStatus: http.StatusMethodNotAllowed,
 		},
 		{
-			name:       "DELETE /api/match-rooms/{roomID}/match/resolve-turn (405)",
+			name:       "DELETE /api/match-rooms/{roomID}/match/resolve (405)",
 			method:     "DELETE",
-			path:       "/api/match-rooms/DUMMY/match/resolve-turn",
+			path:       "/api/match-rooms/DUMMY/match/resolve",
 			wantStatus: http.StatusMethodNotAllowed,
 		},
 		{
@@ -300,6 +291,12 @@ func TestHTTPRouting(t *testing.T) {
 			}
 			if body != nil {
 				req.Header.Set("Content-Type", "application/json")
+			}
+			// Add dummy token for mutating endpoints that require auth
+			if strings.Contains(tt.name, "turn-commands") || strings.Contains(tt.name, "start-turn") ||
+				strings.Contains(tt.name, "reset") || strings.Contains(tt.name, "resolve") ||
+				strings.Contains(tt.name, "surrender") {
+				req.Header.Set("Authorization", "Bearer dummy-token")
 			}
 
 			resp, err := http.DefaultClient.Do(req)

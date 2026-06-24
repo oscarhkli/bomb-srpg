@@ -1,16 +1,21 @@
 @baseUrl = http://localhost:8080
 @roomId = {{createRoom.response.body.id}}
+@token1 = {{createMatch.response.body.playerTokens.0}}
+@token2 = {{createMatch.response.body.playerTokens.1}}
 
 
 ### Get Archetypes
 GET http://localhost:8080/api/archetypes
 Content-Type: application/json
 
+
 ### Create Room
 # @name createRoom
 POST {{baseUrl}}/api/match-rooms
 
+
 ### Create Match
+# @name createMatch
 POST {{baseUrl}}/api/match-rooms/{{roomId}}/match
 Content-Type: application/json
 
@@ -25,12 +30,15 @@ Content-Type: application/json
   }
 }
 
+
 ### Get State
 GET {{baseUrl}}/api/match-rooms/{{roomId}}/match/state
+
 
 ### Turn Command (move)
 POST {{baseUrl}}/api/match-rooms/{{roomId}}/match/turn-commands
 Content-Type: application/json
+Authorization: Bearer {{token1}}
 
 {
   "type": "move",
@@ -41,9 +49,11 @@ Content-Type: application/json
   }
 }
 
+
 ### Turn Command (placeBomb)
 POST {{baseUrl}}/api/match-rooms/{{roomId}}/match/turn-commands
 Content-Type: application/json
+Authorization: Bearer {{token1}}
 
 {
   "type": "placeBomb",
@@ -54,25 +64,35 @@ Content-Type: application/json
   }
 }
 
+
 ### Start Turn
 POST {{baseUrl}}/api/match-rooms/{{roomId}}/match/start-turn
+Authorization: Bearer {{token1}}
+
 
 ### Reset Turn
 POST {{baseUrl}}/api/match-rooms/{{roomId}}/match/reset
+Authorization: Bearer {{token1}}
+
 
 ### Resolve
 POST {{baseUrl}}/api/match-rooms/{{roomId}}/match/resolve
+Authorization: Bearer {{token1}}
+
 
 ### Surrender
 POST {{baseUrl}}/api/match-rooms/{{roomId}}/match/surrender
 Content-Type: application/json
+Authorization: Bearer {{token1}}
 
 {
   "teamId": 1
 }
 
+
 ### Get Match Config
 GET {{baseUrl}}/api/match-rooms/{{roomId}}/match/config
 
+
 ### Get Allowed Tiles
-GET {{baseUrl}}/api/match-rooms/{{roomId}}/match/allowed-tiles?unitId=16$turnCmdType=placeBomb
+GET {{baseUrl}}/api/match-rooms/{{roomId}}/match/allowed-tiles?unitId=16&turnCmdType=placeBomb

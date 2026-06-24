@@ -2,14 +2,23 @@ package server
 
 import (
 	"bomb-srpg/engine"
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"slices"
 	"strings"
 	"testing"
 	"time"
 )
+
+func TestMain(m *testing.M) {
+	slog.SetDefault(slog.New(slog.NewTextHandler(nil, &slog.HandlerOptions{
+		Level: slog.LevelError + 1, // Discard all logs
+	})))
+	m.Run()
+}
 
 func TestServerStateManager_CreateMatchRoom(t *testing.T) {
 	tests := []struct {
@@ -128,85 +137,85 @@ func isValidCrockfordCode(s string) bool {
 func TestServerStateManager_LastActivityUpdated(t *testing.T) {
 	tests := []struct {
 		name   string
-		setup  func(t *testing.T) (string, *ServerStateManager)
-		action func(t *testing.T, s *ServerStateManager, roomID string)
+		setup  func(t *testing.T) (string, *ServerStateManager, [2]string)
+		action func(t *testing.T, s *ServerStateManager, roomID string, tokens [2]string)
 	}{
 		{
 			name: "CreateMatch updates LastActivity",
-			setup: func(t *testing.T) (string, *ServerStateManager) {
+			setup: func(t *testing.T) (string, *ServerStateManager, [2]string) {
 				s := NewServerStateManager()
 				roomID, _ := s.CreateMatchRoom()
-				return roomID, s
+				return roomID, s, [2]string{}
 			},
-			action: func(t *testing.T, s *ServerStateManager, roomID string) {
-				s.CreateMatch(roomID, validGameCfg())
+			action: func(t *testing.T, s *ServerStateManager, roomID string, _ [2]string) {
+				_, _ = s.CreateMatch(roomID, validGameCfg())
 			},
 		},
 		{
 			name: "SubmitTurnCommand updates LastActivity",
-			setup: func(t *testing.T) (string, *ServerStateManager) {
-				roomID, s := createTestRoom(t)
-				return roomID, s
+			setup: func(t *testing.T) (string, *ServerStateManager, [2]string) {
+				roomID, tokens, s := createTestRoom(t)
+				return roomID, s, tokens
 			},
-			action: func(t *testing.T, s *ServerStateManager, roomID string) {
+			action: func(t *testing.T, s *ServerStateManager, roomID string, tokens [2]string) {
 				uID := engine.NewUnitID(1, 0)
-				s.SubmitTurnCommand(roomID, engine.NewMoveCommand(uID, engine.Coordinate{X: 4, Y: 7}))
+				s.SubmitTurnCommand(roomID, engine.NewMoveCommand(uID, engine.Coordinate{X: 4, Y: 7}), tokens[0])
 			},
 		},
 		{
 			name: "StartTurn updates LastActivity",
-			setup: func(t *testing.T) (string, *ServerStateManager) {
-				roomID, s := createTestRoom(t)
-				return roomID, s
+			setup: func(t *testing.T) (string, *ServerStateManager, [2]string) {
+				roomID, tokens, s := createTestRoom(t)
+				return roomID, s, tokens
 			},
-			action: func(t *testing.T, s *ServerStateManager, roomID string) {
-				s.StartTurn(roomID)
+			action: func(t *testing.T, s *ServerStateManager, roomID string, tokens [2]string) {
+				s.StartTurn(roomID, tokens[0])
 			},
 		},
 		{
 			name: "ResetTurn updates LastActivity",
-			setup: func(t *testing.T) (string, *ServerStateManager) {
-				roomID, s := createTestRoom(t)
-				return roomID, s
+			setup: func(t *testing.T) (string, *ServerStateManager, [2]string) {
+				roomID, tokens, s := createTestRoom(t)
+				return roomID, s, tokens
 			},
-			action: func(t *testing.T, s *ServerStateManager, roomID string) {
-				s.ResetTurn(roomID)
+			action: func(t *testing.T, s *ServerStateManager, roomID string, tokens [2]string) {
+				s.ResetTurn(roomID, tokens[0])
 			},
 		},
 		{
 			name: "ResolveTurn updates LastActivity",
-			setup: func(t *testing.T) (string, *ServerStateManager) {
-				roomID, s := createTestRoom(t)
-				s.SubmitTurnCommand(roomID, engine.NewPlaceBombCommand(16, engine.Coordinate{X: 4, Y: 7}))
-				return roomID, s
+			setup: func(t *testing.T) (string, *ServerStateManager, [2]string) {
+				roomID, tokens, s := createTestRoom(t)
+				s.SubmitTurnCommand(roomID, engine.NewPlaceBombCommand(16, engine.Coordinate{X: 4, Y: 7}), tokens[0])
+				return roomID, s, tokens
 			},
-			action: func(t *testing.T, s *ServerStateManager, roomID string) {
-				s.ResolveTurn(roomID)
+			action: func(t *testing.T, s *ServerStateManager, roomID string, tokens [2]string) {
+				s.ResolveTurn(roomID, tokens[0])
 			},
 		},
 		{
 			name: "Surrender updates LastActivity",
-			setup: func(t *testing.T) (string, *ServerStateManager) {
-				roomID, s := createTestRoom(t)
-				return roomID, s
+			setup: func(t *testing.T) (string, *ServerStateManager, [2]string) {
+				roomID, tokens, s := createTestRoom(t)
+				return roomID, s, tokens
 			},
-			action: func(t *testing.T, s *ServerStateManager, roomID string) {
-				s.Surrender(roomID, 1)
+			action: func(t *testing.T, s *ServerStateManager, roomID string, tokens [2]string) {
+				s.Surrender(roomID, 1, tokens[0])
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			roomID, s := tt.setup(t)
+			roomID, s, tokens := tt.setup(t)
 			before := time.Now()
 			time.Sleep(10 * time.Millisecond)
-			tt.action(t, s, roomID)
+			tt.action(t, s, roomID, tokens)
 
 			s.mu.RLock()
 			defer s.mu.RUnlock()
 			room := s.Rooms[roomID]
-			if room.LastActivity.Before(before) || room.LastActivity.Equal(before) {
+			if !room.LastActivity.After(before) {
 				t.Errorf("LastActivity not updated: before=%v, after=%v", before, room.LastActivity)
 			}
 		})
@@ -214,7 +223,7 @@ func TestServerStateManager_LastActivityUpdated(t *testing.T) {
 }
 
 func TestServerStateManager_ReadOnlyMethodsDoNotUpdateLastActivity(t *testing.T) {
-	roomID, s := createTestRoom(t)
+	roomID, _, s := createTestRoom(t)
 	before := time.Now()
 	time.Sleep(10 * time.Millisecond)
 
@@ -240,12 +249,12 @@ func validGameCfg() engine.GameCfg {
 	}
 }
 
-func createTestRoom(t *testing.T) (string, *ServerStateManager) {
+func createTestRoom(t *testing.T) (string, [2]string, *ServerStateManager) {
 	t.Helper()
 	s := NewServerStateManager()
 	roomID, _ := s.CreateMatchRoom()
-	s.CreateMatch(roomID, validGameCfg())
-	return roomID, s
+	tokens, _ := s.CreateMatch(roomID, validGameCfg())
+	return roomID, tokens, s
 }
 
 func TestMapError(t *testing.T) {
@@ -373,12 +382,20 @@ func TestServerStateManager_CreateMatch(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			roomID, s := tt.setup(t)
-			err := s.CreateMatch(roomID, tt.gameCfg)
+			playerTokens, err := s.CreateMatch(roomID, tt.gameCfg)
 			if !errors.Is(err, tt.wantErr) {
 				t.Fatalf("CreateMatch() error = %v, want %v", err, tt.wantErr)
 			}
 			if tt.validate != nil {
 				tt.validate(t, s, roomID)
+			}
+			if err == nil {
+				if len(playerTokens) != 2 || playerTokens[0] == "" || playerTokens[1] == "" || playerTokens[0] == playerTokens[1] {
+					t.Errorf("Expected 2 unique non-empty PlayerToken, got %v", playerTokens)
+				}
+				if playerTokens != s.Rooms[roomID].PlayerTokens {
+					t.Errorf("Expected response and MatchRoom share the same PlayerTokens, response %v vs MatchRoom %v", playerTokens, s.Rooms[roomID].PlayerTokens)
+				}
 			}
 		})
 	}
@@ -447,18 +464,18 @@ func TestServerStateManager_GetMatchState(t *testing.T) {
 func TestServerStateManager_SubmitTurnCommand(t *testing.T) {
 	tests := []struct {
 		name     string
-		setup    func(t *testing.T) (string, *ServerStateManager, engine.TurnCommand)
+		setup    func(t *testing.T) (string, *ServerStateManager, engine.TurnCommand, string)
 		wantErr  error
 		validate func(t *testing.T, gs *engine.GameState, s *ServerStateManager, roomID string, cmd engine.TurnCommand)
 	}{
 		{
 			name: "Success",
-			setup: func(t *testing.T) (string, *ServerStateManager, engine.TurnCommand) {
-				roomID, s := createTestRoom(t)
+			setup: func(t *testing.T) (string, *ServerStateManager, engine.TurnCommand, string) {
+				roomID, tokens, s := createTestRoom(t)
 				uID := engine.NewUnitID(1, 0)
 				newPos := engine.Coordinate{X: 4, Y: 7}
 				cmd := engine.NewMoveCommand(uID, newPos)
-				return roomID, s, cmd
+				return roomID, s, cmd, tokens[0]
 			},
 			wantErr: nil,
 			validate: func(t *testing.T, gs *engine.GameState, s *ServerStateManager, roomID string, cmd engine.TurnCommand) {
@@ -478,12 +495,12 @@ func TestServerStateManager_SubmitTurnCommand(t *testing.T) {
 		},
 		{
 			name: "Invalid TurnCommand (out of range)",
-			setup: func(t *testing.T) (string, *ServerStateManager, engine.TurnCommand) {
-				roomID, s := createTestRoom(t)
+			setup: func(t *testing.T) (string, *ServerStateManager, engine.TurnCommand, string) {
+				roomID, tokens, s := createTestRoom(t)
 				uID := engine.NewUnitID(1, 0)
 				newPos := engine.Coordinate{X: 4, Y: 7777}
 				cmd := engine.NewMoveCommand(uID, newPos)
-				return roomID, s, cmd
+				return roomID, s, cmd, tokens[0]
 			},
 			wantErr: ErrInvalidTurnCmd,
 			validate: func(t *testing.T, gs *engine.GameState, s *ServerStateManager, roomID string, cmd engine.TurnCommand) {
@@ -502,12 +519,12 @@ func TestServerStateManager_SubmitTurnCommand(t *testing.T) {
 		},
 		{
 			name: "Room Not Found",
-			setup: func(t *testing.T) (string, *ServerStateManager, engine.TurnCommand) {
+			setup: func(t *testing.T) (string, *ServerStateManager, engine.TurnCommand, string) {
 				s := NewServerStateManager()
 				uID := engine.NewUnitID(1, 0)
 				newPos := engine.Coordinate{X: 4, Y: 7777}
 				cmd := engine.NewMoveCommand(uID, newPos)
-				return "NONEXISTENT", s, cmd
+				return "NONEXISTENT", s, cmd, "dummy-token"
 			},
 			wantErr: ErrRoomNotFound,
 			validate: func(t *testing.T, gs *engine.GameState, s *ServerStateManager, roomID string, cmd engine.TurnCommand) {
@@ -518,13 +535,13 @@ func TestServerStateManager_SubmitTurnCommand(t *testing.T) {
 		},
 		{
 			name: "Match Not Found",
-			setup: func(t *testing.T) (string, *ServerStateManager, engine.TurnCommand) {
+			setup: func(t *testing.T) (string, *ServerStateManager, engine.TurnCommand, string) {
 				s := NewServerStateManager()
 				roomID, _ := s.CreateMatchRoom()
 				uID := engine.NewUnitID(1, 0)
 				newPos := engine.Coordinate{X: 4, Y: 7777}
 				cmd := engine.NewMoveCommand(uID, newPos)
-				return roomID, s, cmd
+				return roomID, s, cmd, "dummy-token"
 			},
 			wantErr: ErrMatchNotFound,
 			validate: func(t *testing.T, gs *engine.GameState, s *ServerStateManager, roomID string, cmd engine.TurnCommand) {
@@ -537,8 +554,8 @@ func TestServerStateManager_SubmitTurnCommand(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			roomID, s, cmd := tt.setup(t)
-			gs, err := s.SubmitTurnCommand(roomID, cmd)
+			roomID, s, cmd, token := tt.setup(t)
+			gs, err := s.SubmitTurnCommand(roomID, cmd, token)
 			if !errors.Is(err, tt.wantErr) {
 				t.Fatalf("SubmitTurnCommand() error = %v, want %v", err, tt.wantErr)
 			}
@@ -552,17 +569,17 @@ func TestServerStateManager_SubmitTurnCommand(t *testing.T) {
 func TestServerStateManager_StartTurn(t *testing.T) {
 	tests := []struct {
 		name     string
-		setup    func(t *testing.T) (string, *ServerStateManager)
+		setup    func(t *testing.T) (string, *ServerStateManager, string)
 		wantErr  error
 		validate func(t *testing.T, gs *engine.GameState, s *ServerStateManager, roomID string)
 	}{
 		{
 			name: "Success",
-			setup: func(t *testing.T) (string, *ServerStateManager) {
-				roomID, s := createTestRoom(t)
+			setup: func(t *testing.T) (string, *ServerStateManager, string) {
+				roomID, tokens, s := createTestRoom(t)
 				s.Rooms[roomID].Match.TrueState.Turn = 1000
 				s.Rooms[roomID].Match.WorkingState.Turn = 1000
-				return roomID, s
+				return roomID, s, tokens[0]
 			},
 			wantErr: nil,
 			validate: func(t *testing.T, gs *engine.GameState, s *ServerStateManager, roomID string) {
@@ -581,10 +598,10 @@ func TestServerStateManager_StartTurn(t *testing.T) {
 		},
 		{
 			name: "Match already ended",
-			setup: func(t *testing.T) (string, *ServerStateManager) {
-				roomID, s := createTestRoom(t)
+			setup: func(t *testing.T) (string, *ServerStateManager, string) {
+				roomID, tokens, s := createTestRoom(t)
 				s.Rooms[roomID].Match.WinnerTeamID = 1
-				return roomID, s
+				return roomID, s, tokens[0]
 			},
 			wantErr: ErrMatchEnded,
 			validate: func(t *testing.T, gs *engine.GameState, s *ServerStateManager, roomID string) {
@@ -595,9 +612,9 @@ func TestServerStateManager_StartTurn(t *testing.T) {
 		},
 		{
 			name: "Room Not Found",
-			setup: func(t *testing.T) (string, *ServerStateManager) {
+			setup: func(t *testing.T) (string, *ServerStateManager, string) {
 				s := NewServerStateManager()
-				return "NONEXISTENT", s
+				return "NONEXISTENT", s, "dummy-token"
 			},
 			wantErr: ErrRoomNotFound,
 			validate: func(t *testing.T, gs *engine.GameState, s *ServerStateManager, roomID string) {
@@ -608,10 +625,10 @@ func TestServerStateManager_StartTurn(t *testing.T) {
 		},
 		{
 			name: "Match Not Found",
-			setup: func(t *testing.T) (string, *ServerStateManager) {
+			setup: func(t *testing.T) (string, *ServerStateManager, string) {
 				s := NewServerStateManager()
 				roomID, _ := s.CreateMatchRoom()
-				return roomID, s
+				return roomID, s, "dummy-token"
 			},
 			wantErr: ErrMatchNotFound,
 			validate: func(t *testing.T, gs *engine.GameState, s *ServerStateManager, roomID string) {
@@ -624,8 +641,8 @@ func TestServerStateManager_StartTurn(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			roomID, s := tt.setup(t)
-			gs, err := s.StartTurn(roomID)
+			roomID, s, token := tt.setup(t)
+			gs, err := s.StartTurn(roomID, token)
 			if !errors.Is(err, tt.wantErr) {
 				t.Fatalf("StartTurn() error = %v, want %v", err, tt.wantErr)
 			}
@@ -639,16 +656,16 @@ func TestServerStateManager_StartTurn(t *testing.T) {
 func TestServerStateManager_ResetTurn(t *testing.T) {
 	tests := []struct {
 		name     string
-		setup    func(t *testing.T) (string, *ServerStateManager)
+		setup    func(t *testing.T) (string, *ServerStateManager, string)
 		wantErr  error
 		validate func(t *testing.T, gs *engine.GameState, s *ServerStateManager, roomID string)
 	}{
 		{
 			name: "Success",
-			setup: func(t *testing.T) (string, *ServerStateManager) {
-				roomID, s := createTestRoom(t)
+			setup: func(t *testing.T) (string, *ServerStateManager, string) {
+				roomID, tokens, s := createTestRoom(t)
 				s.Rooms[roomID].Match.WorkingState.Units[16].HasMoved = true
-				return roomID, s
+				return roomID, s, tokens[0]
 			},
 			wantErr: nil,
 			validate: func(t *testing.T, gs *engine.GameState, s *ServerStateManager, roomID string) {
@@ -667,9 +684,9 @@ func TestServerStateManager_ResetTurn(t *testing.T) {
 		},
 		{
 			name: "Room Not Found",
-			setup: func(t *testing.T) (string, *ServerStateManager) {
+			setup: func(t *testing.T) (string, *ServerStateManager, string) {
 				s := NewServerStateManager()
-				return "NONEXISTENT", s
+				return "NONEXISTENT", s, "dummy-token"
 			},
 			wantErr: ErrRoomNotFound,
 			validate: func(t *testing.T, gs *engine.GameState, s *ServerStateManager, roomID string) {
@@ -680,10 +697,10 @@ func TestServerStateManager_ResetTurn(t *testing.T) {
 		},
 		{
 			name: "Match Not Found",
-			setup: func(t *testing.T) (string, *ServerStateManager) {
+			setup: func(t *testing.T) (string, *ServerStateManager, string) {
 				s := NewServerStateManager()
 				roomID, _ := s.CreateMatchRoom()
-				return roomID, s
+				return roomID, s, "dummy-token"
 			},
 			wantErr: ErrMatchNotFound,
 			validate: func(t *testing.T, gs *engine.GameState, s *ServerStateManager, roomID string) {
@@ -696,8 +713,8 @@ func TestServerStateManager_ResetTurn(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			roomID, s := tt.setup(t)
-			gs, err := s.ResetTurn(roomID)
+			roomID, s, token := tt.setup(t)
+			gs, err := s.ResetTurn(roomID, token)
 			if !errors.Is(err, tt.wantErr) {
 				t.Fatalf("ResetTurn() error = %v, want %v", err, tt.wantErr)
 			}
@@ -711,17 +728,17 @@ func TestServerStateManager_ResetTurn(t *testing.T) {
 func TestServerStateManager_ResolveTurn(t *testing.T) {
 	tests := []struct {
 		name     string
-		setup    func(t *testing.T) (string, *ServerStateManager)
+		setup    func(t *testing.T) (string, *ServerStateManager, string)
 		wantErr  error
 		validate func(t *testing.T, gameEvents []engine.GameEvent, s *ServerStateManager, roomID string)
 	}{
 		{
 			name: "Success",
-			setup: func(t *testing.T) (string, *ServerStateManager) {
-				roomID, s := createTestRoom(t)
-				s.SubmitTurnCommand(roomID, engine.NewPlaceBombCommand(16, engine.Coordinate{X: 4, Y: 7}))
+			setup: func(t *testing.T) (string, *ServerStateManager, string) {
+				roomID, tokens, s := createTestRoom(t)
+				s.SubmitTurnCommand(roomID, engine.NewPlaceBombCommand(16, engine.Coordinate{X: 4, Y: 7}), tokens[0])
 				s.Rooms[roomID].Match.WorkingState.Bombs[engine.NewBombID(1, 1, 16)].Countdown = 1 // force the bomb to explode in the next ResolveTurn
-				return roomID, s
+				return roomID, s, tokens[0]
 			},
 			wantErr: nil,
 			validate: func(t *testing.T, gameEvents []engine.GameEvent, s *ServerStateManager, roomID string) {
@@ -743,9 +760,9 @@ func TestServerStateManager_ResolveTurn(t *testing.T) {
 		},
 		{
 			name: "Room Not Found",
-			setup: func(t *testing.T) (string, *ServerStateManager) {
+			setup: func(t *testing.T) (string, *ServerStateManager, string) {
 				s := NewServerStateManager()
-				return "NONEXISTENT", s
+				return "NONEXISTENT", s, "dummy-token"
 			},
 			wantErr: ErrRoomNotFound,
 			validate: func(t *testing.T, gameEvents []engine.GameEvent, s *ServerStateManager, roomID string) {
@@ -756,10 +773,10 @@ func TestServerStateManager_ResolveTurn(t *testing.T) {
 		},
 		{
 			name: "Match Not Found",
-			setup: func(t *testing.T) (string, *ServerStateManager) {
+			setup: func(t *testing.T) (string, *ServerStateManager, string) {
 				s := NewServerStateManager()
 				roomID, _ := s.CreateMatchRoom()
-				return roomID, s
+				return roomID, s, "dummy-token"
 			},
 			wantErr: ErrMatchNotFound,
 			validate: func(t *testing.T, gameEvents []engine.GameEvent, s *ServerStateManager, roomID string) {
@@ -772,8 +789,8 @@ func TestServerStateManager_ResolveTurn(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			roomID, s := tt.setup(t)
-			gameEvents, err := s.ResolveTurn(roomID)
+			roomID, s, token := tt.setup(t)
+			gameEvents, err := s.ResolveTurn(roomID, token)
 			if !errors.Is(err, tt.wantErr) {
 				t.Fatalf("ResolveTurn() error = %v, want %v", err, tt.wantErr)
 			}
@@ -787,16 +804,16 @@ func TestServerStateManager_ResolveTurn(t *testing.T) {
 func TestServerStateManager_Surrender(t *testing.T) {
 	tests := []struct {
 		name     string
-		setup    func(t *testing.T) (string, *ServerStateManager)
+		setup    func(t *testing.T) (string, *ServerStateManager, [2]string)
 		req      SurrenderRequest
 		wantErr  error
 		validate func(t *testing.T, gameEvents []engine.GameEvent, s *ServerStateManager, roomID string)
 	}{
 		{
 			name: "Success",
-			setup: func(t *testing.T) (string, *ServerStateManager) {
-				roomID, s := createTestRoom(t)
-				return roomID, s
+			setup: func(t *testing.T) (string, *ServerStateManager, [2]string) {
+				roomID, tokens, s := createTestRoom(t)
+				return roomID, s, tokens
 			},
 			req:     SurrenderRequest{TeamID: 1},
 			wantErr: nil,
@@ -812,16 +829,16 @@ func TestServerStateManager_Surrender(t *testing.T) {
 				if got, want := gameEvents[0].WinnerTeamID, 2; got != want {
 					t.Errorf("Expected gameEvent WinnerTeamID = %v, got %v", want, got)
 				}
-				if got, want := room.Match.WinnerTeamID, 2; got != want {
-					t.Errorf("Expected match winner = %v, got %v", want, got)
+				if room.Match != nil {
+					t.Errorf("Expected match is deleted, got %v", room.Match)
 				}
 			},
 		},
 		{
 			name: "Invalid SurrenderRequest",
-			setup: func(t *testing.T) (string, *ServerStateManager) {
-				roomID, s := createTestRoom(t)
-				return roomID, s
+			setup: func(t *testing.T) (string, *ServerStateManager, [2]string) {
+				roomID, tokens, s := createTestRoom(t)
+				return roomID, s, tokens
 			},
 			req:     SurrenderRequest{TeamID: 3},
 			wantErr: ErrInvalidConfig,
@@ -841,9 +858,9 @@ func TestServerStateManager_Surrender(t *testing.T) {
 		},
 		{
 			name: "Room Not Found",
-			setup: func(t *testing.T) (string, *ServerStateManager) {
+			setup: func(t *testing.T) (string, *ServerStateManager, [2]string) {
 				s := NewServerStateManager()
-				return "NONEXISTENT", s
+				return "NONEXISTENT", s, [2]string{"dummy", "dummy"}
 			},
 			req:     SurrenderRequest{TeamID: 1},
 			wantErr: ErrRoomNotFound,
@@ -855,10 +872,10 @@ func TestServerStateManager_Surrender(t *testing.T) {
 		},
 		{
 			name: "Match Not Found",
-			setup: func(t *testing.T) (string, *ServerStateManager) {
+			setup: func(t *testing.T) (string, *ServerStateManager, [2]string) {
 				s := NewServerStateManager()
 				roomID, _ := s.CreateMatchRoom()
-				return roomID, s
+				return roomID, s, [2]string{"dummy", "dummy"}
 			},
 			req:     SurrenderRequest{TeamID: 1},
 			wantErr: ErrMatchNotFound,
@@ -872,8 +889,14 @@ func TestServerStateManager_Surrender(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			roomID, s := tt.setup(t)
-			gameEvents, err := s.Surrender(roomID, tt.req.TeamID)
+			roomID, s, tokens := tt.setup(t)
+			var token string
+			if tt.req.TeamID >= 1 && tt.req.TeamID <= 2 {
+				token = tokens[tt.req.TeamID-1]
+			} else {
+				token = "dummy-token"
+			}
+			gameEvents, err := s.Surrender(roomID, tt.req.TeamID, token)
 			if !errors.Is(err, tt.wantErr) {
 				t.Fatalf("Surrender() error = %v, want %v", err, tt.wantErr)
 			}
@@ -1078,4 +1101,35 @@ func TestServerStateManager_StartCleanupLoop_Cancellation(t *testing.T) {
 	time.Sleep(10 * time.Millisecond) // let goroutine exit
 
 	// No panic/leak = success
+}
+
+func TestServerStateManager_WithLoggerOption(t *testing.T) {
+	customLogger := slog.New(slog.NewTextHandler(&testLogWriter{t: t}, nil))
+	s := NewServerStateManager(WithLogger(customLogger))
+	if s.Logger != customLogger {
+		t.Errorf("WithLogger option not applied")
+	}
+}
+
+func TestHandler_WithLoggerOption(t *testing.T) {
+	customLogger := slog.New(slog.NewTextHandler(&testLogWriter{t: t}, nil))
+	s := NewServerStateManager()
+	h := NewHandler(s, WithHandlerLogger(customLogger))
+	if h.Logger != customLogger {
+		t.Errorf("WithHandlerLogger option not applied")
+	}
+}
+
+// testLogger returns a logger that writes to t.Log (only visible on failure or -v).
+func testLogger(t *testing.T) *slog.Logger {
+	return slog.New(slog.NewTextHandler(&testLogWriter{t: t}, nil))
+}
+
+type testLogWriter struct {
+	t *testing.T
+}
+
+func (w *testLogWriter) Write(p []byte) (int, error) {
+	w.t.Log(string(bytes.TrimSpace(p)))
+	return len(p), nil
 }
