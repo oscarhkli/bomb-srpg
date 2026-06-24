@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := test
-.PHONY: fmt vet test coverage build run
+.PHONY: fmt vet test test-race coverage build run
 
 fmt:
 	go fmt ./...
@@ -9,6 +9,9 @@ vet: fmt
 
 test: vet
 	go test -cover -coverprofile=coverage.txt ./cli/... ./engine/... ./server/...
+
+test-race:
+	go test -race ./cli/... ./engine/... ./server/...
 
 coverage: test
 	go tool cover -html=coverage.txt

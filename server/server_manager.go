@@ -75,6 +75,7 @@ func mapError(err error) (int, string) {
 
 // MatchRoom wraps the core engine match instance with server-layer network metadata.
 type MatchRoom struct {
+	mu           sync.RWMutex
 	ID           string
 	Match        *engine.Match
 	LastActivity time.Time
@@ -83,8 +84,7 @@ type MatchRoom struct {
 }
 
 type ServerStateManager struct {
-	mu             sync.RWMutex
-	Rooms          map[string]*MatchRoom
+	Rooms          sync.Map
 	generateRoomID func(int) string
 	Logger         *slog.Logger
 }
@@ -103,9 +103,14 @@ func WithLogger(logger *slog.Logger) Option {
 // It uses the Crockford32 alphabet to generate collision-resistant room IDs.
 func NewServerStateManager(opts ...Option) *ServerStateManager {
 	manager := &ServerStateManager{
-		Rooms:          make(map[string]*MatchRoom),
-		generateRoomID: generateRoomID,
-		Logger:         slog.Default(),
+		generateRoomID: func(length int) string {
+			code := make([]byte, length)
+			for i := range length {
+				code[i] = crockfordAlphabet[rand.IntN(len(crockfordAlphabet))]
+			}
+			return string(code)
+		},
+		Logger: slog.Default(),
 	}
 	for _, opt := range opts {
 		opt(manager)
@@ -117,43 +122,24 @@ func NewServerStateManager(opts ...Option) *ServerStateManager {
 // CreateMatchRoom generates a unique room ID and registers an empty MatchRoom.
 // It retries up to 5 times on ID collision. Returns the room ID or an error if exhausted.
 func (s *ServerStateManager) CreateMatchRoom() (string, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	maxRetry := 5
 
 	var id string
-	found := false
 	for range maxRetry {
 		id = s.generateRoomID(roomIDLength)
-		if _, ok := s.Rooms[id]; !ok {
-			found = true
-			break
+		room := &MatchRoom{
+			ID:           id,
+			Match:        nil,
+			LastActivity: time.Now(),
+			Logger:       s.Logger.With("roomID", id),
+		}
+		if _, loaded := s.Rooms.LoadOrStore(id, room); !loaded {
+			return id, nil
 		}
 	}
 
-	if !found {
-		s.Logger.Warn("failed to generate room ID", "retries", maxRetry)
-		return "", fmt.Errorf("room unavailable: failed to generate a MatchRoom ID after %d times of retry", maxRetry)
-	}
-
-	s.Rooms[id] = &MatchRoom{
-		ID:           id,
-		Match:        nil,
-		LastActivity: time.Now(),
-		Logger:       s.Logger.With("roomID", id),
-	}
-
-	return id, nil
-}
-
-func generateRoomID(length int) string {
-	code := make([]byte, length)
-	for i := range length {
-		code[i] = crockfordAlphabet[rand.IntN(len(crockfordAlphabet))]
-	}
-
-	return string(code)
+	s.Logger.Warn("failed to generate room ID", "retries", maxRetry)
+	return "", fmt.Errorf("room unavailable: failed to generate a MatchRoom ID after %d times of retry", maxRetry)
 }
 
 func generatePlayerToken() (string, error) {
@@ -167,14 +153,15 @@ func generatePlayerToken() (string, error) {
 // CreateMatch initialize the game in a given MatchRoom.
 // Returns an error if any setup rule is violated.
 func (s *ServerStateManager) CreateMatch(roomID string, gameCfg engine.GameCfg) ([2]string, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	room, ok := s.Rooms[roomID]
+	roomVal, ok := s.Rooms.Load(roomID)
 	if !ok {
 		s.Logger.Warn("match room not found", "roomID", roomID)
 		return [2]string{}, fmt.Errorf("%w: roomID=%s", ErrRoomNotFound, roomID)
 	}
+	room := roomVal.(*MatchRoom)
+
+	room.mu.Lock()
+	defer room.mu.Unlock()
 
 	if room.Match != nil {
 		s.Logger.Warn("match already exists", "roomID", roomID)
@@ -219,11 +206,15 @@ func (mr *MatchRoom) validatePlayerToken(teamID int, token string) error {
 }
 
 func (s *ServerStateManager) roomReadyForMatch(roomID string) (*MatchRoom, error) {
-	room, ok := s.Rooms[roomID]
+	roomVal, ok := s.Rooms.Load(roomID)
 	if !ok {
 		s.Logger.Warn("match room not found", "roomID", roomID)
 		return nil, fmt.Errorf("%w: roomID=%s", ErrRoomNotFound, roomID)
 	}
+	room := roomVal.(*MatchRoom)
+
+	room.mu.RLock()
+	defer room.mu.RUnlock()
 
 	if room.Match == nil {
 		s.Logger.Warn("match not found", "roomID", roomID)
@@ -236,9 +227,6 @@ func (s *ServerStateManager) roomReadyForMatch(roomID string) (*MatchRoom, error
 // GetMatchState gets the WorkingState of the Match in a given MatchRoom.
 // Returns the WorkingState or an error if any pre-check is violated.
 func (s *ServerStateManager) GetMatchState(roomID string) (*engine.GameState, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
 	room, err := s.roomReadyForMatch(roomID)
 	if err != nil {
 		return nil, err
@@ -250,12 +238,19 @@ func (s *ServerStateManager) GetMatchState(roomID string) (*engine.GameState, er
 // SubmitTurnCommand delivers TurnCommand to engine to move a Unit or place a bomb in a given MatchRoom.
 // Returns the latest WorkingState or an error if any pre-check is violated
 func (s *ServerStateManager) SubmitTurnCommand(roomID string, cmd engine.TurnCommand, token string) (*engine.GameState, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	roomVal, ok := s.Rooms.Load(roomID)
+	if !ok {
+		s.Logger.Warn("match room not found", "roomID", roomID)
+		return nil, fmt.Errorf("%w: roomID=%s", ErrRoomNotFound, roomID)
+	}
+	room := roomVal.(*MatchRoom)
 
-	room, err := s.roomReadyForMatch(roomID)
-	if err != nil {
-		return nil, err
+	room.mu.Lock()
+	defer room.mu.Unlock()
+
+	if room.Match == nil {
+		s.Logger.Warn("match not found", "roomID", roomID)
+		return nil, fmt.Errorf("%w: roomID=%s", ErrMatchNotFound, roomID)
 	}
 
 	teamID := int(cmd.UnitID >> 4)
@@ -263,9 +258,9 @@ func (s *ServerStateManager) SubmitTurnCommand(roomID string, cmd engine.TurnCom
 		return nil, err
 	}
 
-	err = room.Match.ApplyTurnCommand(cmd)
+	err := room.Match.ApplyTurnCommand(cmd)
 	if err != nil {
-		s.Logger.Error("invalid turn command", "roomID", roomID, "turnCmdType", cmd.Type, "error", err)
+		room.Logger.Error("invalid turn command", "turnCmdType", cmd.Type, "error", err)
 		return nil, fmt.Errorf("%w: turnCommand=%+v: %v", ErrInvalidTurnCmd, cmd, err)
 	}
 
@@ -276,12 +271,19 @@ func (s *ServerStateManager) SubmitTurnCommand(roomID string, cmd engine.TurnCom
 // StartTurn sends StartTurn signal engine to start a new turn in a given MatchRoom.
 // Returns the latest WorkingState or an error if any pre-check is violated
 func (s *ServerStateManager) StartTurn(roomID string, token string) (*engine.GameState, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	roomVal, ok := s.Rooms.Load(roomID)
+	if !ok {
+		s.Logger.Warn("match room not found", "roomID", roomID)
+		return nil, fmt.Errorf("%w: roomID=%s", ErrRoomNotFound, roomID)
+	}
+	room := roomVal.(*MatchRoom)
 
-	room, err := s.roomReadyForMatch(roomID)
-	if err != nil {
-		return nil, err
+	room.mu.Lock()
+	defer room.mu.Unlock()
+
+	if room.Match == nil {
+		s.Logger.Warn("match not found", "roomID", roomID)
+		return nil, fmt.Errorf("%w: roomID=%s", ErrMatchNotFound, roomID)
 	}
 
 	teamID := room.Match.WorkingState.ActiveTeam
@@ -302,12 +304,19 @@ func (s *ServerStateManager) StartTurn(roomID string, token string) (*engine.Gam
 // ResetTurn sends ResetTurn signal to engine to drop the current WorkingState and reset to TrueState in a given MatchRoom.
 // Returns the latest WorkingState or an error if any pre-check is violated
 func (s *ServerStateManager) ResetTurn(roomID string, token string) (*engine.GameState, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	roomVal, ok := s.Rooms.Load(roomID)
+	if !ok {
+		s.Logger.Warn("match room not found", "roomID", roomID)
+		return nil, fmt.Errorf("%w: roomID=%s", ErrRoomNotFound, roomID)
+	}
+	room := roomVal.(*MatchRoom)
 
-	room, err := s.roomReadyForMatch(roomID)
-	if err != nil {
-		return nil, err
+	room.mu.Lock()
+	defer room.mu.Unlock()
+
+	if room.Match == nil {
+		s.Logger.Warn("match not found", "roomID", roomID)
+		return nil, fmt.Errorf("%w: roomID=%s", ErrMatchNotFound, roomID)
 	}
 
 	teamID := room.Match.WorkingState.ActiveTeam
@@ -324,12 +333,19 @@ func (s *ServerStateManager) ResetTurn(roomID string, token string) (*engine.Gam
 // ResetTurn sends ResolveTurn signal to engine to calculate the impacts of the Player's action in a given MatchRoom.
 // Returns the gameEvents or an error if any pre-check is violated
 func (s *ServerStateManager) ResolveTurn(roomID string, token string) ([]engine.GameEvent, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	roomVal, ok := s.Rooms.Load(roomID)
+	if !ok {
+		s.Logger.Warn("match room not found", "roomID", roomID)
+		return nil, fmt.Errorf("%w: roomID=%s", ErrRoomNotFound, roomID)
+	}
+	room := roomVal.(*MatchRoom)
 
-	room, err := s.roomReadyForMatch(roomID)
-	if err != nil {
-		return nil, err
+	room.mu.Lock()
+	defer room.mu.Unlock()
+
+	if room.Match == nil {
+		s.Logger.Warn("match not found", "roomID", roomID)
+		return nil, fmt.Errorf("%w: roomID=%s", ErrMatchNotFound, roomID)
 	}
 
 	teamID := room.Match.WorkingState.ActiveTeam
@@ -349,29 +365,36 @@ func (s *ServerStateManager) Surrender(roomID string, teamID int, token string) 
 		return nil, fmt.Errorf("%w: team must be 1 or 2", ErrInvalidConfig)
 	}
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	roomVal, ok := s.Rooms.Load(roomID)
+	if !ok {
+		s.Logger.Warn("match room not found", "roomID", roomID)
+		return nil, fmt.Errorf("%w: roomID=%s", ErrRoomNotFound, roomID)
+	}
+	room := roomVal.(*MatchRoom)
 
-	room, err := s.roomReadyForMatch(roomID)
-	if err != nil {
-		return nil, err
+	room.mu.Lock()
+	if room.Match == nil {
+		room.mu.Unlock()
+		s.Logger.Warn("match not found", "roomID", roomID)
+		return nil, fmt.Errorf("%w: roomID=%s", ErrMatchNotFound, roomID)
 	}
 
 	if err := room.validatePlayerToken(teamID, token); err != nil {
+		room.mu.Unlock()
 		return nil, err
 	}
 
 	events := room.Match.Surrender(teamID)
 	room.Match = nil
 	room.LastActivity = time.Now()
+	room.mu.Unlock()
+
+	s.Rooms.Delete(roomID)
 	return events, nil
 }
 
 // GetMatchConfig gets the GameConfig of the current Match in a given MatchRoom.
 func (s *ServerStateManager) GetMatchConfig(roomID string) (*engine.GameCfg, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
 	room, err := s.roomReadyForMatch(roomID)
 	if err != nil {
 		return nil, err
@@ -383,9 +406,6 @@ func (s *ServerStateManager) GetMatchConfig(roomID string) (*engine.GameCfg, err
 // GetAllowedTiles gets the hints for Player to identify which tiles are available according to the TurnCmdAction
 // Returns the coordinates of the allowed tiles or an error if any pre-check is violated
 func (s *ServerStateManager) GetAllowedTiles(roomID string, unitID engine.UnitID, turnCmdType engine.TurnCmdType) ([]engine.Coordinate, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
 	room, err := s.roomReadyForMatch(roomID)
 	if err != nil {
 		return nil, err
@@ -418,16 +438,19 @@ func (s *ServerStateManager) StartCleanupLoop(ctx context.Context, interval time
 
 // cleanupInactiveRooms removes rooms inactive > RoomInactivityTimeout OR already ended.
 func (s *ServerStateManager) cleanupInactiveRooms() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	now := time.Now()
-	for id, room := range s.Rooms {
+	s.Rooms.Range(func(key, value any) bool {
+		room := value.(*MatchRoom)
+		room.mu.Lock()
 		inactive := now.Sub(room.LastActivity) > RoomInactivityTimeout
 		ended := room.Match != nil && room.Match.WinnerTeamID != 0
-		if inactive || ended {
-			delete(s.Rooms, id)
-			s.Logger.Info("removed room", "roomID", id, "inactive", inactive, "ended", ended)
+		shouldDelete := inactive || ended
+		room.mu.Unlock()
+
+		if shouldDelete {
+			s.Rooms.Delete(key)
+			s.Logger.Info("removed room", "roomID", key, "inactive", inactive, "ended", ended)
 		}
-	}
+		return true
+	})
 }
