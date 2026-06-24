@@ -164,14 +164,14 @@ func (s *ServerStateManager) CreateMatch(roomID string, gameCfg engine.GameCfg) 
 	defer room.mu.Unlock()
 
 	if room.Match != nil {
-		s.Logger.Warn("match already exists", "roomID", roomID)
+		room.Logger.Warn("match already exists", "roomID", roomID)
 		return [2]string{}, fmt.Errorf("%w: roomID=%s", ErrMatchExists, roomID)
 	}
 
 	match, err := engine.InitGame(gameCfg)
 
 	if err != nil {
-		s.Logger.Error("invalid game config", "roomID", roomID, "error", err)
+		room.Logger.Error("invalid game config", "roomID", roomID, "error", err)
 		return [2]string{}, fmt.Errorf("%w: gameCfg=%+v: %v", ErrInvalidConfig, gameCfg, err)
 	}
 
@@ -179,7 +179,7 @@ func (s *ServerStateManager) CreateMatch(roomID string, gameCfg engine.GameCfg) 
 	for i := range 2 {
 		token, err := generatePlayerToken()
 		if err != nil {
-			s.Logger.Warn("failed to generate player token", "roomID", roomID, "player", i)
+			room.Logger.Warn("failed to generate player token", "roomID", roomID, "player", i)
 			return [2]string{}, fmt.Errorf("failed to generate playerToken for Player %d in MatchRoom %v", i, roomID)
 		}
 
@@ -217,7 +217,7 @@ func (s *ServerStateManager) roomReadyForMatch(roomID string) (*MatchRoom, error
 	defer room.mu.RUnlock()
 
 	if room.Match == nil {
-		s.Logger.Warn("match not found", "roomID", roomID)
+		room.Logger.Warn("match not found", "roomID", roomID)
 		return nil, fmt.Errorf("%w: roomID=%s", ErrMatchNotFound, roomID)
 	}
 
@@ -282,7 +282,7 @@ func (s *ServerStateManager) StartTurn(roomID string, token string) (*engine.Gam
 	defer room.mu.Unlock()
 
 	if room.Match == nil {
-		s.Logger.Warn("match not found", "roomID", roomID)
+		room.Logger.Warn("match not found", "roomID", roomID)
 		return nil, fmt.Errorf("%w: roomID=%s", ErrMatchNotFound, roomID)
 	}
 
@@ -315,7 +315,7 @@ func (s *ServerStateManager) ResetTurn(roomID string, token string) (*engine.Gam
 	defer room.mu.Unlock()
 
 	if room.Match == nil {
-		s.Logger.Warn("match not found", "roomID", roomID)
+		room.Logger.Warn("match not found", "roomID", roomID)
 		return nil, fmt.Errorf("%w: roomID=%s", ErrMatchNotFound, roomID)
 	}
 
@@ -344,7 +344,7 @@ func (s *ServerStateManager) ResolveTurn(roomID string, token string) ([]engine.
 	defer room.mu.Unlock()
 
 	if room.Match == nil {
-		s.Logger.Warn("match not found", "roomID", roomID)
+		room.Logger.Warn("match not found", "roomID", roomID)
 		return nil, fmt.Errorf("%w: roomID=%s", ErrMatchNotFound, roomID)
 	}
 
@@ -375,7 +375,7 @@ func (s *ServerStateManager) Surrender(roomID string, teamID int, token string) 
 	room.mu.Lock()
 	if room.Match == nil {
 		room.mu.Unlock()
-		s.Logger.Warn("match not found", "roomID", roomID)
+		room.Logger.Warn("match not found", "roomID", roomID)
 		return nil, fmt.Errorf("%w: roomID=%s", ErrMatchNotFound, roomID)
 	}
 
