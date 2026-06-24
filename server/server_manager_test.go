@@ -2,14 +2,23 @@ package server
 
 import (
 	"bomb-srpg/engine"
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"slices"
 	"strings"
 	"testing"
 	"time"
 )
+
+func TestMain(m *testing.M) {
+	slog.SetDefault(slog.New(slog.NewTextHandler(nil, &slog.HandlerOptions{
+		Level: slog.LevelError + 1, // Discard all logs
+	})))
+	m.Run()
+}
 
 func TestServerStateManager_CreateMatchRoom(t *testing.T) {
 	tests := []struct {
@@ -1092,4 +1101,35 @@ func TestServerStateManager_StartCleanupLoop_Cancellation(t *testing.T) {
 	time.Sleep(10 * time.Millisecond) // let goroutine exit
 
 	// No panic/leak = success
+}
+
+func TestServerStateManager_WithLoggerOption(t *testing.T) {
+	customLogger := slog.New(slog.NewTextHandler(&testLogWriter{t: t}, nil))
+	s := NewServerStateManager(WithLogger(customLogger))
+	if s.Logger != customLogger {
+		t.Errorf("WithLogger option not applied")
+	}
+}
+
+func TestHandler_WithLoggerOption(t *testing.T) {
+	customLogger := slog.New(slog.NewTextHandler(&testLogWriter{t: t}, nil))
+	s := NewServerStateManager()
+	h := NewHandler(s, WithHandlerLogger(customLogger))
+	if h.Logger != customLogger {
+		t.Errorf("WithHandlerLogger option not applied")
+	}
+}
+
+// testLogger returns a logger that writes to t.Log (only visible on failure or -v).
+func testLogger(t *testing.T) *slog.Logger {
+	return slog.New(slog.NewTextHandler(&testLogWriter{t: t}, nil))
+}
+
+type testLogWriter struct {
+	t *testing.T
+}
+
+func (w *testLogWriter) Write(p []byte) (int, error) {
+	w.t.Log(string(bytes.TrimSpace(p)))
+	return len(p), nil
 }

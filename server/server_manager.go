@@ -79,20 +79,36 @@ type MatchRoom struct {
 	Match        *engine.Match
 	LastActivity time.Time
 	PlayerTokens [2]string // [0]=Team1, [1]=Team2
+	Logger       *slog.Logger
 }
 
 type ServerStateManager struct {
 	mu             sync.RWMutex
 	Rooms          map[string]*MatchRoom
 	generateRoomID func(int) string
+	Logger         *slog.Logger
+}
+
+// Option configures a ServerStateManager.
+type Option func(*ServerStateManager)
+
+// WithLogger sets the logger for the ServerStateManager.
+func WithLogger(logger *slog.Logger) Option {
+	return func(s *ServerStateManager) {
+		s.Logger = logger
+	}
 }
 
 // NewServerStateManager constructs a new ServerStateManager with an empty room map.
 // It uses the Crockford32 alphabet to generate collision-resistant room IDs.
-func NewServerStateManager() *ServerStateManager {
+func NewServerStateManager(opts ...Option) *ServerStateManager {
 	manager := &ServerStateManager{
 		Rooms:          make(map[string]*MatchRoom),
 		generateRoomID: generateRoomID,
+		Logger:         slog.Default(),
+	}
+	for _, opt := range opts {
+		opt(manager)
 	}
 
 	return manager
@@ -117,7 +133,7 @@ func (s *ServerStateManager) CreateMatchRoom() (string, error) {
 	}
 
 	if !found {
-		slog.Warn("failed to generate room ID", "retries", maxRetry)
+		s.Logger.Warn("failed to generate room ID", "retries", maxRetry)
 		return "", fmt.Errorf("room unavailable: failed to generate a MatchRoom ID after %d times of retry", maxRetry)
 	}
 
@@ -125,6 +141,7 @@ func (s *ServerStateManager) CreateMatchRoom() (string, error) {
 		ID:           id,
 		Match:        nil,
 		LastActivity: time.Now(),
+		Logger:       s.Logger,
 	}
 
 	return id, nil
@@ -155,19 +172,19 @@ func (s *ServerStateManager) CreateMatch(roomID string, gameCfg engine.GameCfg) 
 
 	room, ok := s.Rooms[roomID]
 	if !ok {
-		slog.Warn("match room not found", "roomID", roomID)
+		s.Logger.Warn("match room not found", "roomID", roomID)
 		return [2]string{}, fmt.Errorf("%w: roomID=%s", ErrRoomNotFound, roomID)
 	}
 
 	if room.Match != nil {
-		slog.Warn("match already exists", "roomID", roomID)
+		s.Logger.Warn("match already exists", "roomID", roomID)
 		return [2]string{}, fmt.Errorf("%w: roomID=%s", ErrMatchExists, roomID)
 	}
 
 	match, err := engine.InitGame(gameCfg)
 
 	if err != nil {
-		slog.Error("invalid game config", "roomID", roomID, "error", err)
+		s.Logger.Error("invalid game config", "roomID", roomID, "error", err)
 		return [2]string{}, fmt.Errorf("%w: gameCfg=%+v: %v", ErrInvalidConfig, gameCfg, err)
 	}
 
@@ -175,7 +192,7 @@ func (s *ServerStateManager) CreateMatch(roomID string, gameCfg engine.GameCfg) 
 	for i := range 2 {
 		token, err := generatePlayerToken()
 		if err != nil {
-			slog.Warn("failed to generate player token", "roomID", roomID, "player", i)
+			s.Logger.Warn("failed to generate player token", "roomID", roomID, "player", i)
 			return [2]string{}, fmt.Errorf("failed to generate playerToken for Player %d in MatchRoom %v", i, roomID)
 		}
 
@@ -204,12 +221,12 @@ func (mr *MatchRoom) validatePlayerToken(teamID int, token string) error {
 func (s *ServerStateManager) roomReadyForMatch(roomID string) (*MatchRoom, error) {
 	room, ok := s.Rooms[roomID]
 	if !ok {
-		slog.Warn("match room not found", "roomID", roomID)
+		s.Logger.Warn("match room not found", "roomID", roomID)
 		return nil, fmt.Errorf("%w: roomID=%s", ErrRoomNotFound, roomID)
 	}
 
 	if room.Match == nil {
-		slog.Warn("match not found", "roomID", roomID)
+		s.Logger.Warn("match not found", "roomID", roomID)
 		return nil, fmt.Errorf("%w: roomID=%s", ErrMatchNotFound, roomID)
 	}
 
@@ -248,7 +265,7 @@ func (s *ServerStateManager) SubmitTurnCommand(roomID string, cmd engine.TurnCom
 
 	err = room.Match.ApplyTurnCommand(cmd)
 	if err != nil {
-		slog.Error("invalid turn command", "roomID", roomID, "turnCmdType", cmd.Type, "error", err)
+		s.Logger.Error("invalid turn command", "roomID", roomID, "turnCmdType", cmd.Type, "error", err)
 		return nil, fmt.Errorf("%w: turnCommand=%+v: %v", ErrInvalidTurnCmd, cmd, err)
 	}
 
@@ -410,7 +427,7 @@ func (s *ServerStateManager) cleanupInactiveRooms() {
 		ended := room.Match != nil && room.Match.WinnerTeamID != 0
 		if inactive || ended {
 			delete(s.Rooms, id)
-			slog.Info("removed room", "roomID", id, "inactive", inactive, "ended", ended)
+			s.Logger.Info("removed room", "roomID", id, "inactive", inactive, "ended", ended)
 		}
 	}
 }

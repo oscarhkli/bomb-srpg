@@ -56,11 +56,12 @@
   - [x] Housekeep based on the last activity time
   - [x] Get Match State
 - [x] Authorization token
+- [ ] Per-room fine-grained locking
 
-## Phase 3: Graphical Browser Client & UI Integration
-- **Goal:** Drop the console interface and build a graphical browser client.
-- **Scope:** The frontend renders the grid using Phaser.js and an HTML5 Canvas layer. Includes Optimistic UI client rendering.
-- **DoD:** Two local human players can play a full pass-and-play match on a single browser window using standard HTTP requests. Terminal runner is deprecated or isolated.
+## Phase 3: Rough Graphical Browser Client (Local)
+- **Goal:** Build a minimally playable Phaser.js client that runs locally — prioritize function over polish.
+- **Scope:** Phaser.js + Canvas rendering grid from JSON state, click -> HTTP command mapping, basic action log, victory screen. No animations/polish required.
+- **DoD:** Two local human players can play a full pass-and-play match in a browser at `localhost:8080` via HTTP polling. Terminal runner deprecated.
 
 ### TODO
 - [ ] Phaser.js Engine & Asset Loading Boilerplate
@@ -71,10 +72,29 @@
 - [ ] Interaction with Server
 - [ ] VictoryResult
   - [ ] Rematch
-- [ ] Per-room fine-grained locking
-- [ ] Deployment
 
-## Phase 4a: Add WebSockets
+## Phase 4: Cloud Deployment
+- **Goal:** Deploy the game publicly so anyone can play via a URL without local setup.
+- **Scope:** Containerize, provision cloud VM / managed service, configure HTTPS, domain, health checks, graceful shutdown. CI/CD pipeline.
+- **DoD:** Game accessible at a stable public URL. Two players on different networks can complete a match. Zero local build required.
+
+### TODO
+- [ ] Dockerfile
+- [ ] Choose hosting
+- [ ] CI/CD
+- [ ] HTTPS + custom domain
+- [ ] Health endpoint + graceful shutdown verification
+- [ ] Load test?
+
+## Phase 5a: UI Refinement (Polish Pass)
+- **Goal:** Elevate the rough local client to a presentable, responsive, accessible experience.
+- **Scope:** Sprite/animation polish, mobile-responsive layout, turn timer UI, action replay animation, settings panel.
+- **DoD:** Game feels "finished" visually. Works well on desktop + mobile browsers. No placeholder art remains.
+
+### TODO
+- [ ] Mobile-responsive layout
+
+## Phase 5b: Add WebSockets
 - **Goal:** Upgrade the networking layer to support live, real-time online multiplayer between separate machines.
 - **Scope:** Connection pool management in Go, game room/lobby routers, and client disconnect handling.
 - **DoD:** Two players on completely separate computers/browsers can join a unique game room via a URL and play a full match with real-time UI synchronization without manual page refreshes.
@@ -87,9 +107,8 @@
   - [ ] GameCfg + Team formation
   - [ ] Interruption handling
 - [ ] Room config mutability after creation
-- [ ] Player identity/auth (headers, tokens)
 
-## Phase 4b: More Character Classes & Skills
+## Phase 6a: More Character Classes & Skills
 - **Goal:** Expand game depth by transitioning from basic stats to a flexible, component-based unit and ability engine.
 - **Scope:** Implement advanced unit types (Archers with min/max range limits, Mages utilizing Area-of-Effect parameters, Flying units overriding structural obstructions).
 - **DoD:** New characters can be selected and use their unique skills inside the game, with both the web frontend rendering the visuals and the Go backend fully validating the custom actions.
@@ -98,7 +117,7 @@
 - [ ] Skill, e.g., prolonging the count down
 - [ ] Advance path finding algorithm (e.g., float, jump, etc.)
 
-## Phase 4c: Terrain & Power-Up Items
+## Phase 6b: Terrain & Power-Up Items
 - **Goal:** Expand game depth by adding reactive terrain effects and power-up items. The latter will dynamically alter the character's stats during turn validation.
 - **Scope:** Power-up spawn math, movement resolution interceptors, and dynamic terrain modifiers (mud slowing navigation, lava shortern bomb countdown, water extinguishing explosives).
 - **DoD:** A character can move across varied terrain with accurate movement point deductions, roll back gathered power-ups correctly on turn reset, and permanently collect buffs that modify backend stats upon commitment.
@@ -107,7 +126,7 @@
 - [ ] Terrains: Lava, Water
 - [ ] Softblock with / without items
 
-## Phase 5: Add Computer Player with AI
+## Phase 7: Add Computer Player with AI
 - **Goal:** Introduce a single-player mode against an automated opponent.
 - **Scope:** Heuristic-based enemy unit logic running inside an asynchronous backend goroutine worker.
 - **DoD:** A player can play a match against a local AI opponent that automatically calculates and executes its movements when its turn segment activates.
