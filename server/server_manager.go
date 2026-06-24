@@ -345,6 +345,7 @@ func (s *ServerStateManager) Surrender(roomID string, teamID int, token string) 
 	}
 
 	events := room.Match.Surrender(teamID)
+	room.Match = nil
 	room.LastActivity = time.Now()
 	return events, nil
 }
@@ -402,6 +403,7 @@ func (s *ServerStateManager) StartCleanupLoop(ctx context.Context, interval time
 func (s *ServerStateManager) cleanupInactiveRooms() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
 	now := time.Now()
 	for id, room := range s.Rooms {
 		inactive := now.Sub(room.LastActivity) > RoomInactivityTimeout

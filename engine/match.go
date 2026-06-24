@@ -5,10 +5,11 @@ import (
 	"math/rand"
 )
 
-// ResetTurn discards the mid-turn WorkingState
+// ResetTurn discards the mid-turn WorkingState and PlaybackLog
 // and rollback to the beginning of the turn with deep copy of TrueState
 func (m *Match) ResetTurn() {
 	m.WorkingState = m.TrueState.DeepCopy()
+	m.PlaybackLog = []GameEvent{}
 }
 
 // SubmitAction registers a validated mid-turn planning step permanently.

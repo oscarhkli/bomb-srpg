@@ -820,8 +820,8 @@ func TestServerStateManager_Surrender(t *testing.T) {
 				if got, want := gameEvents[0].WinnerTeamID, 2; got != want {
 					t.Errorf("Expected gameEvent WinnerTeamID = %v, got %v", want, got)
 				}
-				if got, want := room.Match.WinnerTeamID, 2; got != want {
-					t.Errorf("Expected match winner = %v, got %v", want, got)
+				if room.Match != nil {
+					t.Errorf("Expected match is deleted, got %v", room.Match)
 				}
 			},
 		},

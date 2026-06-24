@@ -1505,8 +1505,8 @@ func TestHandleSurrender(t *testing.T) {
 		if got, want := response[0].WinnerTeamID, 2; got != want {
 			t.Errorf("Expected gameEvent WinnerTeamID = %v, got %v", want, got)
 		}
-		if got, want := s.Rooms[roomID].Match.WinnerTeamID, 2; got != want {
-			t.Errorf("Expected match winner = %v, got %v", want, got)
+		if s.Rooms[roomID].Match != nil {
+			t.Errorf("Expected match is deleted, got %v", s.Rooms[roomID].Match)
 		}
 	})
 

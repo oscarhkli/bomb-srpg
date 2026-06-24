@@ -46,7 +46,7 @@
   - [x] Start Turn
   - [x] Reset
   - [x] Commit
-  - [x] Surrender
+  - [x] Surrender with delete Match
 - [x] HTTP Handlers for TurnCommands
   - [x] Move
   - [x] PlaceBomb
@@ -55,7 +55,7 @@
   - [x] Creation
   - [x] Housekeep based on the last activity time
   - [x] Get Match State
-- [ ] Authorization token
+- [x] Authorization token
 
 ## Phase 3: Graphical Browser Client & UI Integration
 - **Goal:** Drop the console interface and build a graphical browser client.
