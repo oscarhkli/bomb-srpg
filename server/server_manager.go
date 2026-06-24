@@ -7,7 +7,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"log"
 	"log/slog"
 	"maps"
 	"math/rand/v2"
@@ -31,6 +30,7 @@ var (
 	ErrMatchNotFound  = errors.New("match not found")
 	ErrInvalidConfig  = errors.New("invalid game config")
 	ErrInvalidTurnCmd = errors.New("invalid turn command")
+	ErrInvalidToken   = errors.New("invalid player token")
 )
 
 // mapError converts an error to an HTTP status code and message.
@@ -44,6 +44,8 @@ func mapError(err error) (int, string) {
 		return http.StatusBadRequest, err.Error()
 	case errors.Is(err, ErrInvalidTurnCmd):
 		return http.StatusConflict, err.Error()
+	case errors.Is(err, ErrInvalidToken):
+		return http.StatusUnauthorized, err.Error()
 	case errors.Is(err, engine.ErrInvalidStagePreset),
 		errors.Is(err, engine.ErrInvalidTeamSize),
 		errors.Is(err, engine.ErrMissingKing),
@@ -187,6 +189,18 @@ func (s *ServerStateManager) CreateMatch(roomID string, gameCfg engine.GameCfg) 
 	return tokens, nil
 }
 
+func (mr *MatchRoom) validatePlayerToken(teamID int, token string) error {
+	idx := teamID - 1
+	if idx < 0 || idx > 1 {
+		return ErrInvalidConfig
+	}
+
+	if mr.PlayerTokens[idx] != token {
+		return ErrInvalidToken
+	}
+	return nil
+}
+
 func (s *ServerStateManager) roomReadyForMatch(roomID string) (*MatchRoom, error) {
 	room, ok := s.Rooms[roomID]
 	if !ok {
@@ -218,12 +232,17 @@ func (s *ServerStateManager) GetMatchState(roomID string) (*engine.GameState, er
 
 // SubmitTurnCommand delivers TurnCommand to engine to move a Unit or place a bomb in a given MatchRoom.
 // Returns the latest WorkingState or an error if any pre-check is violated
-func (s *ServerStateManager) SubmitTurnCommand(roomID string, cmd engine.TurnCommand) (*engine.GameState, error) {
+func (s *ServerStateManager) SubmitTurnCommand(roomID string, cmd engine.TurnCommand, token string) (*engine.GameState, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	room, err := s.roomReadyForMatch(roomID)
 	if err != nil {
+		return nil, err
+	}
+
+	teamID := int(cmd.UnitID >> 4)
+	if err := room.validatePlayerToken(teamID, token); err != nil {
 		return nil, err
 	}
 
@@ -239,12 +258,17 @@ func (s *ServerStateManager) SubmitTurnCommand(roomID string, cmd engine.TurnCom
 
 // StartTurn sends StartTurn signal engine to start a new turn in a given MatchRoom.
 // Returns the latest WorkingState or an error if any pre-check is violated
-func (s *ServerStateManager) StartTurn(roomID string) (*engine.GameState, error) {
+func (s *ServerStateManager) StartTurn(roomID string, token string) (*engine.GameState, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	room, err := s.roomReadyForMatch(roomID)
 	if err != nil {
+		return nil, err
+	}
+
+	teamID := room.Match.WorkingState.ActiveTeam
+	if err := room.validatePlayerToken(teamID, token); err != nil {
 		return nil, err
 	}
 
@@ -260,12 +284,17 @@ func (s *ServerStateManager) StartTurn(roomID string) (*engine.GameState, error)
 
 // ResetTurn sends ResetTurn signal to engine to drop the current WorkingState and reset to TrueState in a given MatchRoom.
 // Returns the latest WorkingState or an error if any pre-check is violated
-func (s *ServerStateManager) ResetTurn(roomID string) (*engine.GameState, error) {
+func (s *ServerStateManager) ResetTurn(roomID string, token string) (*engine.GameState, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	room, err := s.roomReadyForMatch(roomID)
 	if err != nil {
+		return nil, err
+	}
+
+	teamID := room.Match.WorkingState.ActiveTeam
+	if err := room.validatePlayerToken(teamID, token); err != nil {
 		return nil, err
 	}
 
@@ -277,12 +306,17 @@ func (s *ServerStateManager) ResetTurn(roomID string) (*engine.GameState, error)
 
 // ResetTurn sends ResolveTurn signal to engine to calculate the impacts of the Player's action in a given MatchRoom.
 // Returns the gameEvents or an error if any pre-check is violated
-func (s *ServerStateManager) ResolveTurn(roomID string) ([]engine.GameEvent, error) {
+func (s *ServerStateManager) ResolveTurn(roomID string, token string) ([]engine.GameEvent, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	room, err := s.roomReadyForMatch(roomID)
 	if err != nil {
+		return nil, err
+	}
+
+	teamID := room.Match.WorkingState.ActiveTeam
+	if err := room.validatePlayerToken(teamID, token); err != nil {
 		return nil, err
 	}
 
@@ -293,7 +327,7 @@ func (s *ServerStateManager) ResolveTurn(roomID string) ([]engine.GameEvent, err
 
 // ResetTurn sends Surrender signal to engine to end the current Match in a given MatchRoom.
 // Returns the gameEvents or an error if any pre-check is violated
-func (s *ServerStateManager) Surrender(roomID string, teamID int) ([]engine.GameEvent, error) {
+func (s *ServerStateManager) Surrender(roomID string, teamID int, token string) ([]engine.GameEvent, error) {
 	if teamID != 1 && teamID != 2 {
 		return nil, fmt.Errorf("%w: team must be 1 or 2", ErrInvalidConfig)
 	}
@@ -303,6 +337,10 @@ func (s *ServerStateManager) Surrender(roomID string, teamID int) ([]engine.Game
 
 	room, err := s.roomReadyForMatch(roomID)
 	if err != nil {
+		return nil, err
+	}
+
+	if err := room.validatePlayerToken(teamID, token); err != nil {
 		return nil, err
 	}
 
@@ -329,14 +367,14 @@ func (s *ServerStateManager) GetMatchConfig(roomID string) (*engine.GameCfg, err
 func (s *ServerStateManager) GetAllowedTiles(roomID string, unitID engine.UnitID, turnCmdType engine.TurnCmdType) ([]engine.Coordinate, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	log.Println("GetAllowedTiles")
+
 	room, err := s.roomReadyForMatch(roomID)
 	if err != nil {
 		return nil, err
 	}
 
 	allowedTiles, err := room.Match.WorkingState.FindAllowedTilesForCommand(unitID, turnCmdType)
-	log.Println(allowedTiles, err)
+
 	if err != nil {
 		return nil, err
 	}

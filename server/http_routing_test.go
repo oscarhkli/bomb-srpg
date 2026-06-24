@@ -301,6 +301,12 @@ func TestHTTPRouting(t *testing.T) {
 			if body != nil {
 				req.Header.Set("Content-Type", "application/json")
 			}
+			// Add dummy token for mutating endpoints that require auth
+			if strings.Contains(tt.name, "turn-commands") || strings.Contains(tt.name, "start-turn") ||
+				strings.Contains(tt.name, "reset-turn") || strings.Contains(tt.name, "resolve-turn") ||
+				strings.Contains(tt.name, "surrender") {
+				req.Header.Set("Authorization", "Bearer dummy-token")
+			}
 
 			resp, err := http.DefaultClient.Do(req)
 			if err != nil {

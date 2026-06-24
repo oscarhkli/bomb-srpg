@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 )
 
 // CreateMatchRoomResponse is returned when a new match room is created.
@@ -140,7 +141,14 @@ func (s *ServerStateManager) HandleSubmitTurnCommand(w http.ResponseWriter, r *h
 		return
 	}
 
-	gs, err := s.SubmitTurnCommand(roomID, req)
+	token, err := s.extractBearerToken(r)
+	if err != nil {
+		code, msg := mapError(err)
+		http.Error(w, msg, code)
+		return
+	}
+
+	gs, err := s.SubmitTurnCommand(roomID, req, token)
 	if err != nil {
 		code, msg := mapError(err)
 		slog.Warn("submit turn command failed", "roomID", roomID, "error", err)
@@ -158,11 +166,31 @@ func (s *ServerStateManager) HandleSubmitTurnCommand(w http.ResponseWriter, r *h
 	}
 }
 
+func (s *ServerStateManager) extractBearerToken(r *http.Request) (string, error) {
+	auth := r.Header.Get("Authorization")
+	if auth == "" {
+		return "", ErrInvalidToken
+	}
+	token := strings.TrimPrefix(auth, "Bearer ")
+	if token == auth {
+		return "", ErrInvalidToken
+	}
+	return token, nil
+}
+
 // HandleStartTurn sends StartTurn signal engine to start a new turn in a given MatchRoom.
 // It encodes the gameState as JSON and writes them to the response.
 func (s *ServerStateManager) HandleStartTurn(w http.ResponseWriter, r *http.Request) {
 	roomID := r.PathValue("roomID")
-	gs, err := s.StartTurn(roomID)
+
+	token, err := s.extractBearerToken(r)
+	if err != nil {
+		code, msg := mapError(err)
+		http.Error(w, msg, code)
+		return
+	}
+
+	gs, err := s.StartTurn(roomID, token)
 	if err != nil {
 		code, msg := mapError(err)
 		slog.Warn("start turn failed", "roomID", roomID, "error", err)
@@ -184,7 +212,15 @@ func (s *ServerStateManager) HandleStartTurn(w http.ResponseWriter, r *http.Requ
 // It encodes the gameState as JSON and writes them to the response.
 func (s *ServerStateManager) HandleResetTurn(w http.ResponseWriter, r *http.Request) {
 	roomID := r.PathValue("roomID")
-	gs, err := s.ResetTurn(roomID)
+
+	token, err := s.extractBearerToken(r)
+	if err != nil {
+		code, msg := mapError(err)
+		http.Error(w, msg, code)
+		return
+	}
+
+	gs, err := s.ResetTurn(roomID, token)
 	if err != nil {
 		code, msg := mapError(err)
 		slog.Warn("reset turn failed", "roomID", roomID, "error", err)
@@ -206,7 +242,15 @@ func (s *ServerStateManager) HandleResetTurn(w http.ResponseWriter, r *http.Requ
 // It encodes the gameEvents as JSON and writes them to the response.
 func (s *ServerStateManager) HandleResolveTurn(w http.ResponseWriter, r *http.Request) {
 	roomID := r.PathValue("roomID")
-	gameEvents, err := s.ResolveTurn(roomID)
+
+	token, err := s.extractBearerToken(r)
+	if err != nil {
+		code, msg := mapError(err)
+		http.Error(w, msg, code)
+		return
+	}
+
+	gameEvents, err := s.ResolveTurn(roomID, token)
 	if err != nil {
 		code, msg := mapError(err)
 		slog.Warn("res turn failed", "roomID", roomID, "error", err)
@@ -236,7 +280,14 @@ func (s *ServerStateManager) HandleSurrender(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	gameEvents, err := s.Surrender(roomID, req.TeamID)
+	token, err := s.extractBearerToken(r)
+	if err != nil {
+		code, msg := mapError(err)
+		http.Error(w, msg, code)
+		return
+	}
+
+	gameEvents, err := s.Surrender(roomID, req.TeamID, token)
 	if err != nil {
 		code, msg := mapError(err)
 		slog.Warn("res turn failed", "roomID", roomID, "error", err)
