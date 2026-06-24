@@ -141,7 +141,7 @@ func (s *ServerStateManager) CreateMatchRoom() (string, error) {
 		ID:           id,
 		Match:        nil,
 		LastActivity: time.Now(),
-		Logger:       s.Logger,
+		Logger:       s.Logger.With("roomID", id),
 	}
 
 	return id, nil

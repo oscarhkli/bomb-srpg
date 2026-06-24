@@ -16,17 +16,7 @@ func TestHTTPRouting(t *testing.T) {
 	serverState := NewServerStateManager()
 	handler := NewHandler(serverState)
 
-	mux.HandleFunc("GET /api/archetypes", handler.HandleGetAllArchetypes)
-	mux.HandleFunc("POST /api/match-rooms", handler.HandleCreateMatchRoom)
-	mux.HandleFunc("POST /api/match-rooms/{roomID}/match", handler.HandleCreateMatch)
-	mux.HandleFunc("GET /api/match-rooms/{roomID}/match/state", handler.HandleGetMatchState)
-	mux.HandleFunc("POST /api/match-rooms/{roomID}/match/turn-commands", handler.HandleSubmitTurnCommand)
-	mux.HandleFunc("POST /api/match-rooms/{roomID}/match/start-turn", handler.HandleStartTurn)
-	mux.HandleFunc("POST /api/match-rooms/{roomID}/match/reset", handler.HandleResetTurn)
-	mux.HandleFunc("POST /api/match-rooms/{roomID}/match/resolve", handler.HandleResolveTurn)
-	mux.HandleFunc("POST /api/match-rooms/{roomID}/match/surrender", handler.HandleSurrender)
-	mux.HandleFunc("GET /api/match-rooms/{roomID}/match/config", handler.HandleGetMatchConfig)
-	mux.HandleFunc("GET /api/match-rooms/{roomID}/match/allowed-tiles", handler.HandleGetAllowedTiles)
+	RegisterRoutes(mux, handler)
 
 	server := httptest.NewServer(mux)
 	defer server.Close()
