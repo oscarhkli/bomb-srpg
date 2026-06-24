@@ -4,8 +4,8 @@ Turn-based Strategy Game
 ## Current Status
 
 [Details here](/docs/roadmap.md)
-- [ ] Phase 1: CLI (legacy)
-- [ ] Phase 2: HTTP API
+- [x] Phase 1: CLI (legacy)
+- [x] Phase 2: HTTP API
 - [ ] Phase 3: Phaser UI
 - [ ] Phase 4: Cloud deployment
 - [ ] Phase 5: WebSocket
