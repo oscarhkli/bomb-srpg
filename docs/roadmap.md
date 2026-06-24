@@ -56,7 +56,7 @@
   - [x] Housekeep based on the last activity time
   - [x] Get Match State
 - [x] Authorization token
-- [ ] Per-room fine-grained locking
+- [x] Per-room fine-grained locking
 
 ## Phase 3: Rough Graphical Browser Client (Local)
 - **Goal:** Build a minimally playable Phaser.js client that runs locally — prioritize function over polish.
