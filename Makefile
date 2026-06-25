@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := test
-.PHONY: fmt vet test test-race coverage build run
+.PHONY: fmt vet test test-race coverage build run web-dev web-test web-lint web-build
 
 fmt:
 	go fmt ./...
@@ -27,3 +27,15 @@ run: build
 
 run-server: build-server
 	./bin/srpg-web
+
+web-dev:
+	cd web && npm run dev
+
+web-test:
+	cd web && npm run test:run
+
+web-lint:
+	cd web && npm run lint && npm run typecheck
+
+web-build:
+	cd web && npm run build
