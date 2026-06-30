@@ -14,7 +14,7 @@ export default defineConfig({
     },
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'html'],
+      reporter: ['text', 'html', 'json-summary', 'json'],
       reportsDirectory: './coverage',
       exclude: [
         'src/main.ts',    // Phaser bootstrap — requires real DOM + WebGL, not jsdom
