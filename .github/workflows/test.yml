@@ -70,15 +70,17 @@ jobs:
       actions: read
       pull-requests: write
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - name: Download web coverage artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: web-coverage
+          path: web/coverage
 
       - name: Run Vitest Coverage Report Action
         uses: davelosert/vitest-coverage-report-action@v2
         with:
-          json-summary-artifact-name: web-coverage
-          json-summary-path: coverage-summary.json
-          json-final-path: coverage-final.json
+          json-summary-path: web/coverage/coverage-summary.json
+          json-final-path: web/coverage/coverage-final.json
           name: 'Web (Vitest)'
 
   code_coverage:
