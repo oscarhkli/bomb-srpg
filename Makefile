@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := test
-.PHONY: fmt vet test test-race coverage build run web-dev web-test web-lint web-build
+.PHONY: fmt vet test test-race coverage build run web-dev web-test web-lint web-build web-coverage
 
 fmt:
 	go fmt ./...
@@ -39,3 +39,6 @@ web-lint:
 
 web-build:
 	cd web && npm run build
+
+web-coverage:
+	cd web && npm run test:run -- --coverage
