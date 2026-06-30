@@ -11,6 +11,19 @@ export default defineConfig({
       deps: {
         inline: ['phaser']
       }
+    },
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'html'],
+      reportsDirectory: './coverage',
+      exclude: [
+        'src/main.ts',    // Phaser bootstrap — requires real DOM + WebGL, not jsdom
+        'src/counter.ts', // Vite scaffold leftover
+        'src/test/**',    // test infrastructure
+        'src/assets/**',  // static files
+        'src/types/**',   // pure TS interfaces, no runtime logic
+        'src/style.css',
+      ]
     }
   }
 })
