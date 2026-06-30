@@ -64,7 +64,7 @@
 - **DoD:** Two local human players can play a full pass-and-play match in a browser at `localhost:8080` via HTTP polling. Terminal runner deprecated.
 
 ### TODO
-- [ ] Phaser.js Engine & Asset Loading Boilerplate
+- [x] Phaser.js Engine & Asset Loading Boilerplate
 - [ ] Match Lounge
 - [ ] Board & Sprite Rendering from JSON State
 - [ ] Input Mapping (Converting Clicks to HTTP Commands)
