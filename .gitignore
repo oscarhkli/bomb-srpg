@@ -38,6 +38,7 @@ bin/
 # Agentic Tools
 AGENTS.md
 CLAUDE.md
+docs/plans
 
 # Web development specific ignores
 

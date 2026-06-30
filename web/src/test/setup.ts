@@ -1,3 +1,8 @@
+// Mock Path2D globally for jsdom (not implemented by jsdom)
+;(globalThis as Record<string, unknown>).Path2D ??= class MockPath2D {
+  addPath(): void { /* stub */ }
+}
+
 // Mock Phaser globals for unit tests (no real canvas/WebGL)
 const mockGameObjectFactory = {
   sprite: vi.fn(),
