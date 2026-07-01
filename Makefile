@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := test
-.PHONY: fmt vet test test-race coverage build run web-dev web-test web-lint web-build web-coverage
+.PHONY: fmt vet test test-race coverage build run web-dev web-test web-lint web-build web-coverage gen-spec-index
 
 fmt:
 	go fmt ./...
@@ -42,3 +42,6 @@ web-build:
 
 web-coverage:
 	cd web && npm run test:run -- --coverage
+
+gen-spec-index:
+	go run scripts/gen-spec-index.go
