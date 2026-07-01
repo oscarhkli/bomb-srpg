@@ -22,7 +22,8 @@ export default [
     rules: {
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
       '@typescript-eslint/consistent-type-imports': 'error',
-      '@typescript-eslint/no-floating-promises': 'warn'
+      '@typescript-eslint/no-floating-promises': 'warn',
+      curly: ['error', 'all']
     }
   },
   prettier
