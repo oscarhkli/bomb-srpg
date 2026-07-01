@@ -1,0 +1,13 @@
+specs:
+  - file: match-p3-spec001.md
+    status: Done
+    category: MatchScene
+    completion-date: 2026-07-01
+  - file: match-p3-spec002.md
+    status: Parked Draft
+    category: MatchScene
+    completion-date:
+  - file: match-p5-spec001.md
+    status: Parked Draft
+    category: MatchScene
+    completion-date:
