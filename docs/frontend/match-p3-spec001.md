@@ -99,15 +99,15 @@ No polling in Phase 3.1 — the grid is static until the next spec introduces tu
 ## Terrain Visual Spec
 
 Each `Tile` is rendered as a filled 48×48px rectangle using Phaser's `Graphics` API.
-Exact hex values are defined in `constants.ts` under `TERRAIN_COLORS`.
+Hex values below are the source of truth; `constants.ts`'s `TERRAIN_COLORS` must match this table.
 
-| `TerrainType`   | Fill   | Behaviour (from engine)                                    |
-|-----------------|--------|------------------------------------------------------------|
-| `TerrainPlain`  | Green  | Walkable by all units                                      |
-| `TerrainBlock`  | Grey   | Solid wall — not walkable, flyable, or jumpable            |
-| `TerrainTower`  | Brown  | High wall — not walkable, flyable, or jumpable             |
-| `TerrainWater`  | Blue   | Not walkable; flyable/jumpable; bombs disappear on contact |
-| `TerrainLava`   | Orange | Not walkable; flyable/jumpable; bomb countdown forced to 1 |
+| `TerrainType`   | Fill   | Hex        | Behaviour (from engine)                                    |
+|-----------------|--------|------------|--------------------------------------------------------------|
+| `TerrainPlain`  | Green  | `0x4caf50` | Walkable by all units                                      |
+| `TerrainBlock`  | Grey   | `0x9e9e9e` | Solid wall — not walkable, flyable, or jumpable            |
+| `TerrainTower`  | Brown  | `0x795548` | High wall — not walkable, flyable, or jumpable             |
+| `TerrainWater`  | Blue   | `0x2196f3` | Not walkable; flyable/jumpable; bombs disappear on contact |
+| `TerrainLava`   | Orange | `0xff9800` | Not walkable; flyable/jumpable; bomb countdown forced to 1 |
 
 All tiles share a **1px black border** to visually separate adjacent tiles.
 Border color is defined as `TERRAIN_BORDER_COLOR` in `constants.ts`.
@@ -138,3 +138,7 @@ Replace `src/main.ts` with the Phaser game bootstrap (registered scenes, canvas 
 2. Each tile's fill color matches `TERRAIN_COLORS[tile.type]`; a 1px black border is visible between all adjacent tiles.
 3. On scene entry, the camera is centered on the grid regardless of grid size.
 4. Given `getMatchState()` returns a network error, an error message is displayed — not a silent blank canvas.
+
+## Log
+
+Implementation issues found during the build (non spec gaps) are tracked in [`match-p3-spec001-log.md`](./match-p3-spec001-log.md).

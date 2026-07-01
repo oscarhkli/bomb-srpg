@@ -18,16 +18,23 @@ export function initToken(tok: string): void {
   token = tok
 }
 
-function requireRoom(): { roomId: string; token: string } {
-  if (roomId === undefined || token === undefined) {
-    throw new Error('Call initRoom() and initToken() before using room-scoped endpoints')
+function requireRoomId(): string {
+  if (roomId === undefined) {
+    throw new Error('Call initRoom() before using room-scoped endpoints')
   }
-  return { roomId, token }
+  return roomId
+}
+
+function requireToken(): string {
+  if (token === undefined) {
+    throw new Error('Call initToken() before using authenticated endpoints')
+  }
+  return token
 }
 
 function authHeaders(): HeadersInit {
   return {
-    Authorization: `Bearer ${requireRoom().token}`,
+    Authorization: `Bearer ${requireToken()}`,
   }
 }
 
@@ -59,7 +66,7 @@ export async function createMatchRoom(): Promise<CreateMatchRoomResponse> {
 }
 
 export async function createMatch(req: CreateMatchRequest): Promise<CreateMatchResponse> {
-  const { roomId } = requireRoom()
+  const roomId = requireRoomId()
   const res = await fetch(buildUrl(`/api/match-rooms/${roomId}/match`), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -69,13 +76,13 @@ export async function createMatch(req: CreateMatchRequest): Promise<CreateMatchR
 }
 
 export async function getMatchState(): Promise<GameState> {
-  const { roomId } = requireRoom()
+  const roomId = requireRoomId()
   const res = await fetch(buildUrl(`/api/match-rooms/${roomId}/match/state`))
   return handleResponse<GameState>(res)
 }
 
 export async function startTurn(): Promise<GameState> {
-  const { roomId } = requireRoom()
+  const roomId = requireRoomId()
   const res = await fetch(buildUrl(`/api/match-rooms/${roomId}/match/start-turn`), {
     method: 'POST',
     headers: authHeaders(),
@@ -84,7 +91,7 @@ export async function startTurn(): Promise<GameState> {
 }
 
 export async function submitTurnCommand(cmd: TurnCommand): Promise<GameState> {
-  const { roomId } = requireRoom()
+  const roomId = requireRoomId()
   const res = await fetch(buildUrl(`/api/match-rooms/${roomId}/match/turn-commands`), {
     method: 'POST',
     headers: { ...authHeaders(), 'Content-Type': 'application/json' },
@@ -94,7 +101,7 @@ export async function submitTurnCommand(cmd: TurnCommand): Promise<GameState> {
 }
 
 export async function resetTurn(): Promise<GameState> {
-  const { roomId } = requireRoom()
+  const roomId = requireRoomId()
   const res = await fetch(buildUrl(`/api/match-rooms/${roomId}/match/reset`), {
     method: 'POST',
     headers: authHeaders(),
@@ -103,7 +110,7 @@ export async function resetTurn(): Promise<GameState> {
 }
 
 export async function resolveTurn(): Promise<GameEvent[]> {
-  const { roomId } = requireRoom()
+  const roomId = requireRoomId()
   const res = await fetch(buildUrl(`/api/match-rooms/${roomId}/match/resolve`), {
     method: 'POST',
     headers: authHeaders(),
@@ -112,7 +119,7 @@ export async function resolveTurn(): Promise<GameEvent[]> {
 }
 
 export async function surrender(req: SurrenderRequest): Promise<GameEvent[]> {
-  const { roomId } = requireRoom()
+  const roomId = requireRoomId()
   const res = await fetch(buildUrl(`/api/match-rooms/${roomId}/match/surrender`), {
     method: 'POST',
     headers: { ...authHeaders(), 'Content-Type': 'application/json' },
@@ -122,19 +129,19 @@ export async function surrender(req: SurrenderRequest): Promise<GameEvent[]> {
 }
 
 export async function getMatchConfig(): Promise<GameCfg> {
-  const { roomId } = requireRoom()
+  const roomId = requireRoomId()
   const res = await fetch(buildUrl(`/api/match-rooms/${roomId}/match/config`))
   return handleResponse<GameCfg>(res)
 }
 
 export async function getVictoryResult(): Promise<GameEvent[]> {
-  const { roomId } = requireRoom()
+  const roomId = requireRoomId()
   const res = await fetch(buildUrl(`/api/match-rooms/${roomId}/match/victory`))
   return handleResponse<GameEvent[]>(res)
 }
 
 export async function getAllowedTiles(req: AllowedTilesRequest): Promise<AllowedTilesResponse> {
-  const { roomId } = requireRoom()
+  const roomId = requireRoomId()
   const query = {
     unitId: String(req.unitId),
     turnCmdType: req.turnCmdType,

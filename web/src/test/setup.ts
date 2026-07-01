@@ -3,21 +3,34 @@
   addPath(): void { /* stub */ }
 }
 
+// Shared fake Graphics/Text instances so chained calls (fillStyle().fillRect(), setOrigin())
+// don't throw on the bare vi.fn() that add.graphics()/add.text() would otherwise return.
+export const mockGraphics = {
+  fillStyle: vi.fn().mockReturnThis(),
+  fillRect: vi.fn().mockReturnThis(),
+  lineStyle: vi.fn().mockReturnThis(),
+  strokeRect: vi.fn().mockReturnThis()
+}
+
+export const mockText = {
+  setOrigin: vi.fn().mockReturnThis()
+}
+
 // Mock Phaser globals for unit tests (no real canvas/WebGL)
 const mockGameObjectFactory = {
   sprite: vi.fn(),
-  graphics: vi.fn(),
-  text: vi.fn(),
+  graphics: vi.fn(() => mockGraphics),
+  text: vi.fn(() => mockText),
   container: vi.fn(),
   renderTexture: vi.fn(),
   tileSprite: vi.fn(),
   bitmapText: vi.fn()
 }
 
-const mockScene = {
+export const mockScene = {
   add: mockGameObjectFactory,
   make: mockGameObjectFactory,
-  cameras: { main: { width: 1280, height: 720 } },
+  cameras: { main: { width: 1280, height: 720, centerOn: vi.fn() } },
   scale: { width: 1280, height: 720 },
   sys: { game: { config: { width: 1280, height: 720 } } },
   load: {
@@ -135,3 +148,9 @@ HTMLCanvasElement.prototype.getContext = vi.fn((contextId: string) => {
   if (contextId === '2d') return mockContext as unknown as CanvasRenderingContext2D
   return null
 }) as unknown as HTMLCanvasElement['getContext']
+
+// Scene subclasses `import Phaser from 'phaser'` and `extends Phaser.Scene` — redirect that
+// import to the mocked global.Phaser above so `this.add`/`this.cameras` are populated.
+vi.mock('phaser', () => ({
+  default: (globalThis as Record<string, unknown>).Phaser
+}))

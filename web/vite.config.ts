@@ -7,8 +7,7 @@ export default defineConfig({
   },
   // Phaser 4 targets modern browsers, ESNext output
   build: {
-    target: 'esnext',
-    minify: 'terser'
+    target: 'esnext'
   },
   // Dev server proxy to Go backend (avoids CORS)
   server: {
