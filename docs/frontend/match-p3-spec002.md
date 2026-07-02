@@ -46,14 +46,13 @@ Once `roomId` and `playerTokens` are obtained, log them though `console.log()`. 
 
 Refer to `references/state.json` for the sample `getMatchState()` json.
 
-For each `gameState.grid.tile`, if `occupantType` is:
+Each occupant carries its own `position: Coordinate`, so render directly from the three arrays instead of looping `gameState.grid`:
 
-- `OccupantNone`: there should be nothing on that grid.
-- `OccupantUnit`: render a unit there. Find the id in `gameState.units` for the unit details. Note that units with `hp` = 0 should not be rendered.
-- `OccupantSoftBlock`: render a softBlock there. Find the id in `gameState.softBlocks` for the softblock details.
-- `OccupantBomb`: render a bomb there. Find the id in `gameState.bombs` for the bomb details.
+- `gameState.units`: render each `Unit` at its `position`. Units with `hp` = 0 are dead, so they must be filtered out here.
+- `gameState.softBlocks`: render each `SoftBlock` at its `position`.
+- `gameState.bombs`: render each `Bomb` at its `position`.
 
-We expect `Occupant` must be found in either `gameState.units`, `gameState.softBlocks`, `gameState.bombs`. If not, reuse spec001's `showError()` to display an error message and the match shouldn't be proceeded.
+Destroyed bombs and softBlocks are removed from their arrays server-side (on detonation / destruction), so no liveness filter is needed for them. Presence in the array means "render it."
 
 ### Logging via User Interactions
 
