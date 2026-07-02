@@ -1,0 +1,655 @@
+
+{
+  "turn": 1,
+  "activeTeam": 1,
+  "grid": [
+    [
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantUnit",
+        "occupantId": 36
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantUnit",
+        "occupantId": 34
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantUnit",
+        "occupantId": 32
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantUnit",
+        "occupantId": 33
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantUnit",
+        "occupantId": 35
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      }
+    ],
+    [
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      }
+    ],
+    [
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      }
+    ],
+    [
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      }
+    ],
+    [
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantItem",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainBlock",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantItem",
+        "occupantId": 1
+      },
+      {
+        "type": "TerrainBlock",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainBlock",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantItem",
+        "occupantId": 2
+      },
+      {
+        "type": "TerrainBlock",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantItem",
+        "occupantId": 3
+      }
+    ],
+    [
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      }
+    ],
+    [
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      }
+    ],
+    [
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      }
+    ],
+    [
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantUnit",
+        "occupantId": 19
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantUnit",
+        "occupantId": 17
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantUnit",
+        "occupantId": 16
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantUnit",
+        "occupantId": 18
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantUnit",
+        "occupantId": 20
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      },
+      {
+        "type": "TerrainPlain",
+        "occupantType": "OccupantNone",
+        "occupantId": 0
+      }
+    ]
+  ],
+  "units": [
+    {
+      "id": 20,
+      "type": "Bandit",
+      "position": {
+        "x": 6,
+        "y": 8
+      },
+      "speed": 3,
+      "bombMaxRange": 1,
+      "bombPower": 2,
+      "maxBombCount": 2,
+      "bombUsed": 0,
+      "team": 1,
+      "hp": 1,
+      "skills": [],
+      "hasMoved": false,
+      "hasUsedSkill": false
+    },
+    {
+      "id": 32,
+      "type": "King",
+      "position": {
+        "x": 4,
+        "y": 0
+      },
+      "speed": 1,
+      "bombMaxRange": 2,
+      "bombPower": 2,
+      "maxBombCount": 2,
+      "bombUsed": 0,
+      "team": 2,
+      "hp": 1,
+      "skills": [],
+      "hasMoved": false,
+      "hasUsedSkill": false
+    },
+    {
+      "id": 33,
+      "type": "Witch",
+      "position": {
+        "x": 5,
+        "y": 0
+      },
+      "speed": 1,
+      "bombMaxRange": 2,
+      "bombPower": 2,
+      "maxBombCount": 2,
+      "bombUsed": 0,
+      "team": 2,
+      "hp": 1,
+      "skills": [],
+      "hasMoved": false,
+      "hasUsedSkill": false
+    },
+    {
+      "id": 35,
+      "type": "Bandit",
+      "position": {
+        "x": 6,
+        "y": 0
+      },
+      "speed": 3,
+      "bombMaxRange": 1,
+      "bombPower": 2,
+      "maxBombCount": 2,
+      "bombUsed": 0,
+      "team": 2,
+      "hp": 1,
+      "skills": [],
+      "hasMoved": false,
+      "hasUsedSkill": false
+    },
+    {
+      "id": 16,
+      "type": "King",
+      "position": {
+        "x": 4,
+        "y": 8
+      },
+      "speed": 1,
+      "bombMaxRange": 2,
+      "bombPower": 2,
+      "maxBombCount": 2,
+      "bombUsed": 0,
+      "team": 1,
+      "hp": 1,
+      "skills": [],
+      "hasMoved": false,
+      "hasUsedSkill": false
+    },
+    {
+      "id": 18,
+      "type": "Fighter",
+      "position": {
+        "x": 5,
+        "y": 8
+      },
+      "speed": 2,
+      "bombMaxRange": 2,
+      "bombPower": 2,
+      "maxBombCount": 3,
+      "bombUsed": 0,
+      "team": 1,
+      "hp": 1,
+      "skills": [],
+      "hasMoved": false,
+      "hasUsedSkill": false
+    },
+    {
+      "id": 19,
+      "type": "Witch",
+      "position": {
+        "x": 2,
+        "y": 8
+      },
+      "speed": 1,
+      "bombMaxRange": 2,
+      "bombPower": 2,
+      "maxBombCount": 2,
+      "bombUsed": 0,
+      "team": 1,
+      "hp": 1,
+      "skills": [],
+      "hasMoved": false,
+      "hasUsedSkill": false
+    },
+    {
+      "id": 34,
+      "type": "Fighter",
+      "position": {
+        "x": 3,
+        "y": 0
+      },
+      "speed": 2,
+      "bombMaxRange": 2,
+      "bombPower": 2,
+      "maxBombCount": 3,
+      "bombUsed": 0,
+      "team": 2,
+      "hp": 1,
+      "skills": [],
+      "hasMoved": false,
+      "hasUsedSkill": false
+    },
+    {
+      "id": 36,
+      "type": "Bandit",
+      "position": {
+        "x": 2,
+        "y": 0
+      },
+      "speed": 3,
+      "bombMaxRange": 1,
+      "bombPower": 2,
+      "maxBombCount": 2,
+      "bombUsed": 0,
+      "team": 2,
+      "hp": 1,
+      "skills": [],
+      "hasMoved": false,
+      "hasUsedSkill": false
+    },
+    {
+      "id": 17,
+      "type": "Fighter",
+      "position": {
+        "x": 3,
+        "y": 8
+      },
+      "speed": 2,
+      "bombMaxRange": 2,
+      "bombPower": 2,
+      "maxBombCount": 3,
+      "bombUsed": 0,
+      "team": 1,
+      "hp": 1,
+      "skills": [],
+      "hasMoved": false,
+      "hasUsedSkill": false
+    }
+  ],
+  "bombs": [
+    {
+      "id": 268500993,
+      "ownerId": 16,
+      "position": {
+        "x": 4,
+        "y": 5
+      },
+      "range": 2,
+      "countdown": 5
+    }
+  ],
+  "softBlocks": [
+    {
+      "id": 0,
+      "position": {
+        "x": 0,
+        "y": 4
+      }
+    },
+    {
+      "id": 1,
+      "position": {
+        "x": 2,
+        "y": 4
+      }
+    },
+    {
+      "id": 2,
+      "position": {
+        "x": 6,
+        "y": 4
+      }
+    },
+    {
+      "id": 3,
+      "position": {
+        "x": 8,
+        "y": 4
+      }
+    }
+  ],
+  "turnCommands": null
+}
