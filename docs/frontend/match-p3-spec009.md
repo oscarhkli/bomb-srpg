@@ -1,8 +1,8 @@
 ---
-title: "Phase 3.4: Render Move and PlaceBomb"
+title: "Phase 3.9: Render Camera Navigation"
 ---
 
-# Render Move and PlaceBomb
+# Render Camera Navigation
 
 Ignore the below as it's only a copied template.
 

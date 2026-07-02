@@ -11,7 +11,7 @@ Phase 3.1 renders the static `grid` tiles. This spec adds the dynamic layer for 
 ## Goal
 
 - Log `roomId`, `playerTokens` once it's obtained though browser DevTool.
-- `MatchScene` renders each `Unit`, `SoftBlock` and `Bombs` from `GameState` as procedural shapes on the correct `Tile`.
+- `MatchScene` renders each `Unit`, `SoftBlock` and `Bomb` from `GameState` as procedural shapes on the correct `Tile`.
 
 ## Non-Goal
 
@@ -23,7 +23,8 @@ Phase 3.1 renders the static `grid` tiles. This spec adds the dynamic layer for 
 
 ## Limitation
 
-- As currently many components are missing, many testing can't be easily done at the moment. They'll be revisited later when we work on resolveTurn.
+- Rendering correctness for all three occupant types (including bombs) is verifiable now via unit tests that mock `getMatchState()` with a hand-built `GameState` fixture — no live `placeBomb` or `resolveTurn` is required, consistent with how spec001 already tests terrain/grid rendering.
+- What remains blocked until later specs is **manual verification via `make web-dev`** — since the initial `DevBootScene` setup has no way to put a bomb on the board, or to trigger countdown/detonation, death, or destruction, those can't be eyeballed in a real browser session yet. Revisit once `placeBomb` and `resolveTurn` land:
   - Bomb countdown and detonation
   - Unit died
   - SoftBlock destroyed
@@ -35,13 +36,13 @@ No change from spec001.
 
 ## Data Fetching
 
-No change from spec001 — `getMatchState()` is called once on `create()`. Units and SoftBlock are drawn from the same `GameState` snapshot.
+No change from spec001 — `getMatchState()` is called once on `create()`. Units, SoftBlocks and Bombs are drawn from the same `GameState` snapshot.
 
 Once `roomId` and `playerTokens` are obtained, log them though `console.log()`. This is useful in early stage debugging.
 
-## Visual Spec of Debug Panel
+## Visual Spec of Occupants
 
-### Location of Occupants
+### Location
 
 Refer to `references/state.json` for the sample `getMatchState()` json.
 
@@ -49,12 +50,14 @@ For each `gameState.grid.tile`, if `occupantType` is:
 
 - `OccupantNone`: there should be nothing on that grid.
 - `OccupantUnit`: render a unit there. Find the id in `gameState.units` for the unit details. Note that units with `hp` = 0 should not be rendered.
-- `OccupantSoftBlock`: render a bomb there. Find the id in `gameState.softblocks` for the bomb details.
+- `OccupantSoftBlock`: render a softBlock there. Find the id in `gameState.softBlocks` for the softblock details.
 - `OccupantBomb`: render a bomb there. Find the id in `gameState.bombs` for the bomb details.
 
-We expect `Occupant` must be found in either `gameState.units`, `gameState.softblocks`, `gameState.bombs`. If not, an error message should be displayed and the match shouldn't be proceeded.
+We expect `Occupant` must be found in either `gameState.units`, `gameState.softBlocks`, `gameState.bombs`. If not, reuse spec001's `showError()` to display an error message and the match shouldn't be proceeded.
 
 ### Logging via User Interactions
+
+Each occupant (`Unit`, `SoftBlock`, `Bomb`) is rendered as its own `Graphics` instance (not sharing the grid's terrain `Graphics` object), so it can carry its own interactive hit area. Set each occupant's hit area to a **48×48px** rectangle matching its `Tile` bounds (not shrunk) — clicking anywhere on the tile counts as clicking its occupant, consistent with the tile being the atomic click unit for future tile-targeting specs.
 
 All occupants rendered in grid will be clickable in future. Add an event handler: When a occupant is clicked, log the message through `console.log()`. The message should contains `<occupantType> <occupantId> is clicked` followed by the properties of the clicked occupant. The real action implementation will be deferred to in future.
 
@@ -73,13 +76,13 @@ Archetype shape is drawn inside the fill (white stroke):
 | ---------------------------- | --------- |
 | King                         | Star      |
 | Fighter                      | Square    |
-| Witch                        | Trigangle |
+| Witch                        | Triangle  |
 | Bandit                       | Circle    |
 
 ### SoftBlock
 
-Each `SoftBlock` is rendered as a **42×42px** rounded rectangel centered on its `Tile` using Phaser's `Graphics` API.
-`constants.ts`'s `SOFTBLOCK_COLORS` must match `0xe6e6e6`.
+Each `SoftBlock` is rendered as a **42×42px** rounded rectangle centered on its `Tile` using Phaser's `Graphics` API.
+`constants.ts`'s `SOFTBLOCK_COLOR` must match `0xe6e6e6`.
 
 ### Bomb
 
@@ -101,8 +104,8 @@ At this stage, we only render the initialization of a Match. To ease the testing
 
 1. Given a `GameState` with two teams, each `Unit` renders on the correct tile with the correct team color and archetype shape.
 2. Given a `GameState` with bombs, each `Bomb` renders on the correct tile with the correct color and shape.
-3. Given a `GameState` with softblocks, each `SoftBlock` renders on the correct tile with the correct color and shape.
+3. Given a `GameState` with softBlocks, each `SoftBlock` renders on the correct tile with the correct color and shape.
 4. Given `roomId` and `playerTokens` obtained from backend, the browser DevTool should display `roomId` and `playerTokens`.
 5. Given a `Unit` shown in `grid`, When user clicks the `Unit`, the browser DevTool should display `Unit` details.
 6. Given a `Bomb` shown in `grid`, When user clicks the `Bomb`, the browser DevTool should display `Bomb` details.
-7. Given a `SoftBlocks` shown in `grid`, When user clicks the `SoftBlocks`, the browser DevTool should display `SoftBlocks` details.
+7. Given a `SoftBlock` shown in `grid`, When user clicks the `SoftBlock`, the browser DevTool should display `SoftBlock` details.

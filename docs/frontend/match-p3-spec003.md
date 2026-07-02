@@ -1,8 +1,8 @@
 ---
-title: "Phase 3.4: Render Move and PlaceBomb"
+title: "Phase 3.3: Render Resolve Turn"
 ---
 
-# Render Move and PlaceBomb
+# Render Resolve Turn
 
 Ignore the below as it's only a copied template.
 
