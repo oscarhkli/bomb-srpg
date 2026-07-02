@@ -1,7 +1,9 @@
 // Mock Path2D globally for jsdom (not implemented by jsdom)
-;(globalThis as Record<string, unknown>).Path2D ??= class MockPath2D {
-  addPath(): void { /* stub */ }
-}
+(globalThis as Record<string, unknown>).Path2D ??= class MockPath2D {
+  addPath(): void {
+    /* stub */
+  }
+};
 
 // Shared fake Graphics/Text instances so chained calls (fillStyle().fillRect(), setOrigin())
 // don't throw on the bare vi.fn() that add.graphics()/add.text() would otherwise return.
@@ -9,12 +11,12 @@ export const mockGraphics = {
   fillStyle: vi.fn().mockReturnThis(),
   fillRect: vi.fn().mockReturnThis(),
   lineStyle: vi.fn().mockReturnThis(),
-  strokeRect: vi.fn().mockReturnThis()
-}
+  strokeRect: vi.fn().mockReturnThis(),
+};
 
 export const mockText = {
-  setOrigin: vi.fn().mockReturnThis()
-}
+  setOrigin: vi.fn().mockReturnThis(),
+};
 
 // Mock Phaser globals for unit tests (no real canvas/WebGL)
 const mockGameObjectFactory = {
@@ -24,8 +26,8 @@ const mockGameObjectFactory = {
   container: vi.fn(),
   renderTexture: vi.fn(),
   tileSprite: vi.fn(),
-  bitmapText: vi.fn()
-}
+  bitmapText: vi.fn(),
+};
 
 export const mockScene = {
   add: mockGameObjectFactory,
@@ -40,7 +42,7 @@ export const mockScene = {
     audio: vi.fn(),
     json: vi.fn(),
     on: vi.fn(),
-    once: vi.fn()
+    once: vi.fn(),
   },
   tweens: { add: vi.fn() },
   time: { addEvent: vi.fn() },
@@ -48,17 +50,21 @@ export const mockScene = {
   input: {
     on: vi.fn(),
     off: vi.fn(),
-    keyboard: { addKey: vi.fn(), createCursorKeys: vi.fn(() => ({})) }
+    keyboard: { addKey: vi.fn(), createCursorKeys: vi.fn(() => ({})) },
   },
   children: { getAll: vi.fn(() => []) },
-  game: { config: { width: 1280, height: 720 } }
-}
+  game: { config: { width: 1280, height: 720 } },
+};
 
 // @ts-expect-error - global mock for tests
 // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
 global.Phaser = {
   Game: vi.fn(),
-  Scene: class { constructor() { Object.assign(this, mockScene) } },
+  Scene: class {
+    constructor() {
+      Object.assign(this, mockScene);
+    }
+  },
   AUTO: 0,
   CANVAS: 1,
   WEBGL: 2,
@@ -68,15 +74,33 @@ global.Phaser = {
   Math: {
     Between: (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min,
     Clamp: (v: number, min: number, max: number) => Math.max(min, Math.min(max, v)),
-    Linear: (a: number, b: number, t: number) => a + (b - a) * t
+    Linear: (a: number, b: number, t: number) => a + (b - a) * t,
   },
   Geom: {
-    Rectangle: class { constructor(public x: number, public y: number, public width: number, public height: number) {} },
-    Circle: class { constructor(public x: number, public y: number, public radius: number) {} },
-    Point: class { constructor(public x: number, public y: number) {} }
+    Rectangle: class {
+      constructor(
+        public x: number,
+        public y: number,
+        public width: number,
+        public height: number
+      ) {}
+    },
+    Circle: class {
+      constructor(
+        public x: number,
+        public y: number,
+        public radius: number
+      ) {}
+    },
+    Point: class {
+      constructor(
+        public x: number,
+        public y: number
+      ) {}
+    },
   },
-  Display: { Color: { ValueToColor: vi.fn() } }
-}
+  Display: { Color: { ValueToColor: vi.fn() } },
+};
 
 // Mock canvas for jsdom
 const mockContext = {
@@ -141,16 +165,16 @@ const mockContext = {
   drawWidgetAsOnScreen: vi.fn(),
   drawWindow: vi.fn(),
   demote: vi.fn(),
-  getTransform: vi.fn(() => new DOMMatrix())
-}
+  getTransform: vi.fn(() => new DOMMatrix()),
+};
 
 HTMLCanvasElement.prototype.getContext = vi.fn((contextId: string) => {
-  if (contextId === '2d') return mockContext as unknown as CanvasRenderingContext2D
-  return null
-}) as unknown as HTMLCanvasElement['getContext']
+  if (contextId === '2d') return mockContext as unknown as CanvasRenderingContext2D;
+  return null;
+}) as unknown as HTMLCanvasElement['getContext'];
 
 // Scene subclasses `import Phaser from 'phaser'` and `extends Phaser.Scene` — redirect that
 // import to the mocked global.Phaser above so `this.add`/`this.cameras` are populated.
 vi.mock('phaser', () => ({
-  default: (globalThis as Record<string, unknown>).Phaser
-}))
+  default: (globalThis as Record<string, unknown>).Phaser,
+}));
