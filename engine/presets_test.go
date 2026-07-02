@@ -32,10 +32,10 @@ func TestGetArchetype(t *testing.T) {
 			expectedName:   "Witch",
 		},
 		{
-			name:           "Existing archetype Thief",
-			inputName:      "Thief",
+			name:           "Existing archetype Bandit",
+			inputName:      "Bandit",
 			expectedExists: true,
-			expectedName:   "Thief",
+			expectedName:   "Bandit",
 		},
 		{
 			name:           "Non-existing archetype",
@@ -59,7 +59,7 @@ func TestGetArchetype(t *testing.T) {
 }
 
 func TestStatBoundaries(t *testing.T) {
-	archetypes := []string{"King", "Fighter", "Witch", "Thief"}
+	archetypes := []string{"King", "Fighter", "Witch", "Bandit"}
 	for _, name := range archetypes {
 		t.Run(name, func(t *testing.T) {
 			archetype, exists := GetArchetype(name)
@@ -97,7 +97,7 @@ func TestGetAllArchetypes(t *testing.T) {
 	missing := map[string]bool{
 		"Fighter": true,
 		"Witch":   true,
-		"Thief":   true,
+		"Bandit":  true,
 	}
 
 	for _, archeTypes := range archeTypes {

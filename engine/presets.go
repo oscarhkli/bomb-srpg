@@ -40,8 +40,8 @@ var archetypesRegistry = map[string]Archetype{
 		PresetSkills: map[SkillType]bool{},
 		IsSelectable: true,
 	},
-	"Thief": {
-		Name:         "Thief",
+	"Bandit": {
+		Name:         "Bandit",
 		BaseSpeed:    3,
 		BombMaxRange: 1,
 		BombMinRange: 1,
