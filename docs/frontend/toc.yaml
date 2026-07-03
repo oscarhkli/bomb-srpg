@@ -14,16 +14,28 @@ specs:
   - file: match-p3-spec004.md
     status: Parked Draft
     category: MatchScene
-    completion-date::
+    completion-date:
   - file: match-p3-spec008.md
     status: Parked Draft
     category: MatchScene
-    completion-date::
+    completion-date:
   - file: match-p3-spec009.md
     status: Parked Draft
     category: MatchScene
-    completion-date::
+    completion-date:
   - file: match-p5-spec001.md
+    status: Parked Draft
+    category: MatchScene
+    completion-date:
+  - file: lounge-p3-spec001.md
+    status: Parked Draft
+    category: MatchScene
+    completion-date:
+  - file: title-p3-spec001.md
+    status: Parked Draft
+    category: MatchScene
+    completion-date:
+  - file: victory-p3-spec001.md
     status: Parked Draft
     category: MatchScene
     completion-date:

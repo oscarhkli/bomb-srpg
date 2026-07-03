@@ -127,7 +127,26 @@ Surrender: `POST /surrender` (either team, any time).
 - **CreateMatch**: Full GameCfg required (Phase 2); partial/join deferred to Phase 4
 - **Player authorization with anonymous tokens**: Room IDs and UnitIDs are guessable. Any client with a room ID can impersonate any player. The solution is to adopt per-team cryptographically random tokens generated and stored in a new Match, returned once in `CreateMatchResponse`. Token will be validated in mutation endpoints. No restriction to read-only enpoints at the moment.
 
-# File Structure (WIP)
+## 9. Phase 3 Frontend Toolchain & Decisions
+
+- **Build Tool**: Vite provides native ESM and instant hot-module reloading (HMR), eliminating webpack-style rebuild delays during development.
+- **Language**: TypeScript (strict mode) mirrors Go's compile-time safety and catches index/type errors before browser execution.
+- **Game Framework**: Phaser 4.2.0 (breaking changes from v3: renderer, filter system, tint mechanism). Latest stable build compatible with procedural Graphics API.
+- **Test Runner**: Vitest integrates with Vite, reuses Vite's config, maintains Jest-compatible APIs for rapid iteration.
+- **Linting & Formatting**: ESLint + @typescript-eslint for static analysis, Prettier for deterministic code style.
+- **Logical Resolution**: Fixed at `1280x720` to simplify UI layout math (16×9 aspect ratio).
+- **Tile Size**: `48px` per cell provides visual clarity on standard desktop monitors while fitting 16x16 grids in viewport.
+- **Mock Mode**: TitleScene includes an offline-play button for development (test game flow without backend connectivity).
+- **Input Model**: Click-only interaction for Phase 3 (keyboard shortcuts deferred to Phase 5 polish pass).
+- **Retro Art Strategy**: Phaser Graphics API generates all visuals procedurally (no sprite sheets required):
+  - **Tiles**: Colored rectangles with borders.
+  - **Units**: Geometric shapes (circles, triangles, pentagons, stars) tinted by team color.
+  - **Bombs**: Filled circles with countdown text overlay.
+  - **Soft Walls**: Rounded rectangles.
+  - **Explosions**: Tile color flash effect (simple visual feedback).
+
+
+## File Structure (WIP)
 
 ```text
 bomb-srpg
@@ -166,9 +185,9 @@ bomb-srpg
 └── web/public                  <-- Phase 3: Phaser.js Frontend UI
 ```
 
-# Gameplay
+## Gameplay
 
-## UX Lifecycle and Screen States
+### UX Lifecycle and Screen States
 
 The game flow operates through a decoupled presentation layer managed entirely on the frontend via Phaser.js. The interface transitions through three distinct layout states:
 
@@ -189,7 +208,7 @@ The game flow operates through a decoupled presentation layer managed entirely o
    - The user conducts their gameplay rounds step-by-step until an engine victory or surrender condition updates `WinnerTeamID != 0`.
    - Upon match resolution, the UI resets and routes the player cleanly back to the Match Lounge configuration state.
 
-## In-Turn Action Economy Rules
+### In-Turn Action Economy Rules
 
 To preserve strategic depth and prevent infinite execution exploits within a single sandbox turn planning cycle, each individual `Unit` is strictly bounded by a rigid action economy:
 
