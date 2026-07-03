@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := test
-.PHONY: fmt vet test test-race coverage build run web-dev web-test web-lint web-build web-coverage gen-spec-index
+.PHONY: fmt vet test test-race coverage build run web-dev web-test web-lint web-format web-typecheck web-build web-coverage gen-spec-index
 
 fmt:
 	go fmt ./...
@@ -31,16 +31,22 @@ run-server: build-server
 web-dev:
 	cd web && npm run dev
 
-web-test:
+web-format:
+	cd web && npm run format
+
+web-typecheck:
+	cd web && npm run typecheck
+
+web-test: web-format web-typecheck
 	cd web && npm run test:run
 
 web-lint:
-	cd web && npm run lint && npm run typecheck
+	cd web && npm run format:check && npm run lint
 
-web-build:
+web-build: web-format web-typecheck
 	cd web && npm run build
 
-web-coverage:
+web-coverage: web-format web-typecheck
 	cd web && npm run test:run -- --coverage
 
 gen-spec-index:

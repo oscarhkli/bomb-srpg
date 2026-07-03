@@ -40,8 +40,8 @@ var archetypesRegistry = map[string]Archetype{
 		PresetSkills: map[SkillType]bool{},
 		IsSelectable: true,
 	},
-	"Thief": {
-		Name:         "Thief",
+	"Bandit": {
+		Name:         "Bandit",
 		BaseSpeed:    3,
 		BombMaxRange: 1,
 		BombMinRange: 1,
@@ -117,7 +117,7 @@ var stagePresetsRegistry = map[string]StagePreset{
 			".........",
 			".........",
 		},
-		SoftBlocks:          []Coordinate{{0, 4}, {2, 4}, {6, 4}, {8, 4}},
+		SoftBlocks:          []Coordinate{{0, 4}, {2, 4}, {4, 4}, {6, 4}, {8, 4}},
 		P1StartingPositions: [5]Coordinate{{4, 8}, {3, 8}, {5, 8}, {2, 8}, {6, 8}},
 		P2StartingPositions: [5]Coordinate{{4, 0}, {5, 0}, {3, 0}, {6, 0}, {2, 0}},
 	},

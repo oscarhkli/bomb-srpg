@@ -13,8 +13,8 @@ func main() {
 		MaxTurns:       30,
 		AllowResetTurn: true,
 		SuddenDeath:    true,
-		P1Teams:        []string{"King", "Witch", "Thief", "Fighter", "Fighter"},
-		P2Teams:        []string{"King", "Witch", "Thief", "Fighter", "Fighter"},
+		P1Teams:        []string{"King", "Witch", "Bandit", "Fighter", "Fighter"},
+		P2Teams:        []string{"King", "Witch", "Bandit", "Fighter", "Fighter"},
 	}
 
 	match, err := engine.InitGame(gameCfg)

@@ -20,7 +20,7 @@ func TestInitGameState_Suite(t *testing.T) {
 			cfg: GameCfg{
 				StagePreset: "MAP01",
 				P1Teams:     []string{"King", "Fighter", "Witch", "Fighter", "Fighter"},
-				P2Teams:     []string{"King", "Fighter", "Witch", "Thief", "Witch"},
+				P2Teams:     []string{"King", "Fighter", "Witch", "Bandit", "Witch"},
 			},
 			expectError:        false,
 			expectedTotalUnits: 10, // 5 for each player
@@ -109,7 +109,7 @@ func TestInitGameState_Suite(t *testing.T) {
 			name: "Failure: Player 1 has more than 5 units",
 			cfg: GameCfg{
 				StagePreset: "MAP01",
-				P1Teams:     []string{"King", "Fighter", "Witch", "Thief", "Witch", "Fighter"},
+				P1Teams:     []string{"King", "Fighter", "Witch", "Bandit", "Witch", "Fighter"},
 				P2Teams:     []string{"King", "Fighter"},
 			},
 			expectError:   true,
@@ -120,7 +120,7 @@ func TestInitGameState_Suite(t *testing.T) {
 			cfg: GameCfg{
 				StagePreset: "MAP01",
 				P1Teams:     []string{"King", "Fighter"},
-				P2Teams:     []string{"King", "Fighter", "Witch", "Thief", "Witch", "Fighter"},
+				P2Teams:     []string{"King", "Fighter", "Witch", "Bandit", "Witch", "Fighter"},
 			},
 			expectError:   true,
 			errorContains: "Player 2 must have between 1 and 5 units",
@@ -445,7 +445,7 @@ func TestInitGame_AllGood(t *testing.T) {
 	gameCfg := GameCfg{
 		StagePreset: "MAP01",
 		P1Teams:     []string{"King", "Fighter"},
-		P2Teams:     []string{"King", "Thief"},
+		P2Teams:     []string{"King", "Bandit"},
 	}
 	match, err := InitGame(gameCfg)
 	if err != nil {

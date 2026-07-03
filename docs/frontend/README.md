@@ -13,8 +13,15 @@ Specs will be written prior to development—partly handcrafted, and partly gene
 | Specs | Category | Status | Completion Date |
 | --- | --- | --- | --- |
 | [Phase 3.1: Initialize Match Grid](match-p3-spec001.md) | MatchScene | Done | 2026-07-01 |
-| [Phase 3.2: Render Units and Bombs + Camera Navigation](match-p3-spec002.md) | MatchScene | Parked Draft | — |
+| [Phase 3.2: Render Units, SoftBlocks and Bombs](match-p3-spec002.md) | MatchScene | Done | 2026-07-03 |
+| [Phase 3.3: Render Resolve Turn](match-p3-spec003.md) | MatchScene | Parked Draft | — |
+| [Phase 3.4: Render Move and PlaceBomb](match-p3-spec004.md) | MatchScene | Parked Draft | — |
+| [Phase 3.8: Render Resolve Turn Animation](match-p3-spec008.md) | MatchScene | Parked Draft | — |
+| [Phase 3.9: Render Camera Navigation](match-p3-spec009.md) | MatchScene | Parked Draft | — |
 | [Phase 5.1: 2.5D Isometric Grid](match-p5-spec001.md) | MatchScene | Parked Draft | — |
+| [Phase 3.TBD: Lounge Scene](lounge-p3-spec001.md) | MatchScene | Parked Draft | — |
+| [Phase 3.TBD: Title Scene](title-p3-spec001.md) | MatchScene | Parked Draft | — |
+| [Phase 3.TBD: Victory Scene](victory-p3-spec001.md) | MatchScene | Parked Draft | — |
 <!-- END SPEC TABLE -->
 
 ## Workflow
