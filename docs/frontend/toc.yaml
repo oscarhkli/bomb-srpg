@@ -4,9 +4,9 @@ specs:
     category: MatchScene
     completion-date: 2026-07-01
   - file: match-p3-spec002.md
-    status: Ready
+    status: Done
     category: MatchScene
-    completion-date:
+    completion-date: 2026-07-03
   - file: match-p3-spec003.md
     status: Parked Draft
     category: MatchScene

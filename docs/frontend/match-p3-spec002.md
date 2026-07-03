@@ -74,7 +74,7 @@ Archetype shape is drawn inside the fill (white stroke):
 | Archetype (by `type` string) | Shape     |
 | ---------------------------- | --------- |
 | King                         | Star      |
-| Fighter                      | Square    |
+| Fighter                      | Pentagon  |
 | Witch                        | Triangle  |
 | Bandit                       | Circle    |
 
@@ -108,3 +108,7 @@ At this stage, we only render the initialization of a Match. To ease the testing
 5. Given a `Unit` shown in `grid`, When user clicks the `Unit`, the browser DevTool should display `Unit` details.
 6. Given a `Bomb` shown in `grid`, When user clicks the `Bomb`, the browser DevTool should display `Bomb` details.
 7. Given a `SoftBlock` shown in `grid`, When user clicks the `SoftBlock`, the browser DevTool should display `SoftBlock` details.
+
+## Log
+
+Implementation issues found during the build (non spec gaps) are tracked in [match-p3-spec002-log.md](./match-p3-spec002-log.md).

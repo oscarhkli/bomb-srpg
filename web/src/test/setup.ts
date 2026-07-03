@@ -5,24 +5,40 @@
   }
 };
 
-// Shared fake Graphics/Text instances so chained calls (fillStyle().fillRect(), setOrigin())
+// Fake Graphics/Text instances so chained calls (fillStyle().fillRect(), setOrigin())
 // don't throw on the bare vi.fn() that add.graphics()/add.text() would otherwise return.
-export const mockGraphics = {
-  fillStyle: vi.fn().mockReturnThis(),
-  fillRect: vi.fn().mockReturnThis(),
-  lineStyle: vi.fn().mockReturnThis(),
-  strokeRect: vi.fn().mockReturnThis(),
-};
+// Each occupant (grid + every unit/softBlock/bomb) gets its own Graphics instance with its
+// own interactive hit area, so add.graphics()/add.text() must return a FRESH object per call
+// — use mockScene.add.graphics.mock.results[i].value / add.text.mock.results[i].value to
+// inspect a specific call's instance.
+export function createMockGraphics() {
+  return {
+    fillStyle: vi.fn().mockReturnThis(),
+    fillRect: vi.fn().mockReturnThis(),
+    fillCircle: vi.fn().mockReturnThis(),
+    fillPoints: vi.fn().mockReturnThis(),
+    fillRoundedRect: vi.fn().mockReturnThis(),
+    lineStyle: vi.fn().mockReturnThis(),
+    strokeRect: vi.fn().mockReturnThis(),
+    strokeRoundedRect: vi.fn().mockReturnThis(),
+    strokePoints: vi.fn().mockReturnThis(),
+    strokeCircle: vi.fn().mockReturnThis(),
+    setInteractive: vi.fn().mockReturnThis(),
+    on: vi.fn().mockReturnThis(),
+  };
+}
 
-export const mockText = {
-  setOrigin: vi.fn().mockReturnThis(),
-};
+export function createMockText() {
+  return {
+    setOrigin: vi.fn().mockReturnThis(),
+  };
+}
 
 // Mock Phaser globals for unit tests (no real canvas/WebGL)
 const mockGameObjectFactory = {
   sprite: vi.fn(),
-  graphics: vi.fn(() => mockGraphics),
-  text: vi.fn(() => mockText),
+  graphics: vi.fn(() => createMockGraphics()),
+  text: vi.fn(() => createMockText()),
   container: vi.fn(),
   renderTexture: vi.fn(),
   tileSprite: vi.fn(),
@@ -72,12 +88,19 @@ global.Phaser = {
   Physics: { Arcade: {} },
   Tilemaps: {},
   Math: {
+    Vector2: class {
+      constructor(
+        public x: number,
+        public y: number
+      ) {}
+    },
     Between: (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min,
     Clamp: (v: number, min: number, max: number) => Math.max(min, Math.min(max, v)),
     Linear: (a: number, b: number, t: number) => a + (b - a) * t,
   },
   Geom: {
     Rectangle: class {
+      static Contains = vi.fn();
       constructor(
         public x: number,
         public y: number,
