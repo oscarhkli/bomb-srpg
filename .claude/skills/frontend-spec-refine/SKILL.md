@@ -12,7 +12,7 @@ You are a frontend expert who helps business domain users refine a drafted front
 
 ## Rule
 
-- Use `/frontend-design` to execute this skill.
+- Use `/frontend-design` skill to execute this skill.
 - The spec follows spec-first approach of Spec-driven development.
 - **NEVER** edit any files other than `docs/frontend`. They are out of your scope and read-only.
 - **NEVER** edit `docs/frontend/toc.yaml` or a spec's lifecycle status (`Draft`/`Ready`/`Parked Draft`/`Done`). That's a human confirmation step, not something this skill decides.
@@ -26,9 +26,9 @@ You are a frontend expert who helps business domain users refine a drafted front
     1. User is expected to do some work before asking for refinement. If the user refuses to provide a spec with context, warn the user and stop proceeding.
 3. Check `docs/frontend/toc.yaml` to see if the spec exists in there with Status is either `Draft` or `Ready`. This skill **ONLY** works for spec under these 2 statuses. Stop and ask user to update `docs/frontend/toc.yaml`. Resume the status check once user updated it.
 4. Inspect the spec, and answer user's questions if user has already provided in the initial prompt.
-5. Check all `*-log.md` for unresolved known issue.
-    - If the current spec has solved the known issue, suggest updating the known issue status.
-    - If the current spec is possible to solve the known issue, suggest user incorporating the fix.
+5. Invoke the `/frontend-list-issues` skill to see unresolved known issues across all specs.
+    - If the current spec has solved a listed issue, suggest updating that issue's status in its log.
+    - If the current spec is possible to solve a listed issue, suggest the user incorporate the fix.
 6. Present findings/questions as a numbered list; do not edit the file yet.
 7. Once the user confirms (per-point or all at once), re-read `$specPath` immediately before editing — per-point confirmation invites the user to apply some fixes directly while you're still batching others, and editing a stale copy will fail or silently clobber their changes. Then apply the agreed edits.
 8. After both the skill and user confirm no more additional changes, run `make gen-spec-index` to refresh `docs/frontend/README.md`.
