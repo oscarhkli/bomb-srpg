@@ -143,7 +143,7 @@ func TestMatch_CommandMoveUnit(t *testing.T) {
 		setupState    func() *Match // Context setup helper
 		wantErr       bool
 		errContains   string
-		verifyResults func(t *testing.T, m *Match) // Post-execution state check
+		verifyResults func(t *testing.T, m *Match, evts []GameEvent) // Post-execution state check
 	}
 
 	validUnitID := NewUnitID(1, 0)
@@ -305,7 +305,7 @@ func TestMatch_CommandMoveUnit(t *testing.T) {
 				return m
 			},
 			wantErr: false,
-			verifyResults: func(t *testing.T, m *Match) {
+			verifyResults: func(t *testing.T, m *Match, evts []GameEvent) {
 				oldCell := m.WorkingState.Grid[origin.Y][origin.X]
 				if oldCell.OccupantType != OccupantNone {
 					t.Errorf("expected old tile to be cleared, got type %v", oldCell.OccupantType)
@@ -326,7 +326,14 @@ func TestMatch_CommandMoveUnit(t *testing.T) {
 				}
 				event := m.PlaybackLog[0]
 				if event.Type != GameEvtUnitMoved || event.UnitID != validUnitID || event.From == nil || event.To == nil || *event.From != origin || *event.To != validTarget {
-					t.Errorf("malformed UnitMovedEvent logged: %+v", m.PlaybackLog[0])
+					t.Errorf("malformed UnitMovedEvent logged: %+v", event)
+				}
+				if len(evts) != 1 {
+					t.Errorf("expected 1 GameEvent returned, got %d", len(evts))
+				}
+				resEvt := evts[0]
+				if resEvt.Type != GameEvtUnitMoved || resEvt.UnitID != validUnitID || resEvt.From == nil || resEvt.To == nil || *resEvt.From != origin || *resEvt.To != validTarget {
+					t.Errorf("malformed UnitMovedEvent returned: %+v", resEvt)
 				}
 			},
 		},
@@ -337,7 +344,7 @@ func TestMatch_CommandMoveUnit(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			match := tt.setupState()
 
-			err := match.CommandMoveUnit(tt.unitID, tt.target)
+			gameEvents, err := match.CommandMoveUnit(tt.unitID, tt.target)
 
 			// Error checking
 			if (err != nil) != tt.wantErr {
@@ -349,7 +356,11 @@ func TestMatch_CommandMoveUnit(t *testing.T) {
 
 			// State validation checking
 			if tt.verifyResults != nil {
-				tt.verifyResults(t, match)
+				tt.verifyResults(t, match, gameEvents)
+			} else {
+				if len(gameEvents) > 0 {
+					t.Errorf("expected empty gameEvents return, got %#v", gameEvents)
+				}
 			}
 		})
 	}
@@ -364,7 +375,7 @@ func TestMatch_CommandPlaceBomb(t *testing.T) {
 		setupState    func() *Match // Context setup helper
 		wantErr       bool
 		errContains   string
-		verifyResults func(t *testing.T, m *Match) // Post-execution state check
+		verifyResults func(t *testing.T, m *Match, evts []GameEvent) // Post-execution state check
 	}
 
 	// Constants for easy setup
@@ -578,7 +589,7 @@ func TestMatch_CommandPlaceBomb(t *testing.T) {
 				return m
 			},
 			wantErr: false,
-			verifyResults: func(t *testing.T, m *Match) {
+			verifyResults: func(t *testing.T, m *Match, evts []GameEvent) {
 				if m.WorkingState.TurnBombCounter != 1 {
 					t.Errorf("expected TurnBombCounter to be 1, got %d", m.WorkingState.TurnBombCounter)
 				}
@@ -608,7 +619,14 @@ func TestMatch_CommandPlaceBomb(t *testing.T) {
 				}
 				event := m.PlaybackLog[0]
 				if event.Type != GameEvtBombPlaced || event.UnitID != validUnitID || event.BombID != expectedBombID || event.Position == nil || *event.Position != validTarget || event.Range != 3 || event.Countdown != 5 {
-					t.Errorf("malformed BombPlacedEvent logged: %+v", m.PlaybackLog[0])
+					t.Errorf("malformed BombPlacedEvent logged: %+v", event)
+				}
+				if len(evts) != 1 {
+					t.Errorf("expected 1 GameEvent returned, got %d", len(evts))
+				}
+				resEvt := evts[0]
+				if resEvt.Type != GameEvtBombPlaced || resEvt.UnitID != validUnitID || resEvt.BombID != expectedBombID || resEvt.Position == nil || *resEvt.Position != validTarget || resEvt.Range != 3 || resEvt.Countdown != 5 {
+					t.Errorf("malformed BombPlacedEvent returned: %+v", resEvt)
 				}
 			},
 		},
@@ -619,7 +637,7 @@ func TestMatch_CommandPlaceBomb(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			match := tt.setupState()
 
-			err := match.CommandPlaceBomb(tt.unitID, tt.target)
+			gameEvents, err := match.CommandPlaceBomb(tt.unitID, tt.target)
 
 			// Error validation checking
 			if (err != nil) != tt.wantErr {
@@ -631,7 +649,11 @@ func TestMatch_CommandPlaceBomb(t *testing.T) {
 
 			// State transformation post-checks
 			if tt.verifyResults != nil {
-				tt.verifyResults(t, match)
+				tt.verifyResults(t, match, gameEvents)
+			} else {
+				if len(gameEvents) > 0 {
+					t.Errorf("expected empty gameEvents return, got %#v", gameEvents)
+				}
 			}
 		})
 	}
@@ -676,10 +698,13 @@ func TestMatch_ApplyTurnCommand(t *testing.T) {
 
 		cmd := NewMoveCommand(uID, Coordinate{1, 0})
 
-		err := m.ApplyTurnCommand(cmd)
+		gameEvents, err := m.ApplyTurnCommand(cmd)
 
 		if err != nil {
 			t.Errorf("ApplyCommand for MoveCommand failed unexpectedly: %v", err)
+		}
+		if len(gameEvents) == 0 {
+			t.Error("Expected gameEvents returned, got none")
 		}
 
 	})
@@ -693,10 +718,13 @@ func TestMatch_ApplyTurnCommand(t *testing.T) {
 
 		cmd := NewPlaceBombCommand(uID, Coordinate{1, 0})
 
-		err := m.ApplyTurnCommand(cmd)
+		gameEvents, err := m.ApplyTurnCommand(cmd)
 
 		if err != nil {
 			t.Errorf("ApplyCommand for PlaceBombCommand failed unexpectedly: %v", err)
+		}
+		if len(gameEvents) == 0 {
+			t.Error("Expected gameEvents returned, got none")
 		}
 
 	})
@@ -710,10 +738,13 @@ func TestMatch_ApplyTurnCommand(t *testing.T) {
 
 		cmd := TurnCommand{Type: "invalid", UnitID: uID, Target: Coordinate{1, 0}}
 
-		err := m.ApplyTurnCommand(cmd)
+		gameEvents, err := m.ApplyTurnCommand(cmd)
 
 		if err == nil || !strings.Contains(err.Error(), "unsupported command type") {
 			t.Errorf("Expect ApplyCommand for invalid type should fail, but got %#v", err)
+		}
+		if len(gameEvents) > 0 {
+			t.Errorf("Expected empty gameEvents returned, got %#v", gameEvents)
 		}
 
 	})

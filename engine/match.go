@@ -42,39 +42,39 @@ func (m *Match) Surrender(teamID int) []GameEvent {
 }
 
 // ApplyTurnCommand accepts any packaged action and forwards it to the true match logic.
-func (m *Match) ApplyTurnCommand(cmd TurnCommand) error {
+func (m *Match) ApplyTurnCommand(cmd TurnCommand) ([]GameEvent, error) {
 	switch cmd.Type {
 	case TurnCmdMove:
 		return m.CommandMoveUnit(cmd.UnitID, cmd.Target)
 	case TurnCmdPlaceBomb:
 		return m.CommandPlaceBomb(cmd.UnitID, cmd.Target)
 	default:
-		return fmt.Errorf("%w: %s", ErrUnsupportedCommand, cmd.Type)
+		return []GameEvent{}, fmt.Errorf("%w: %s", ErrUnsupportedCommand, cmd.Type)
 	}
 }
 
 // CommandMoveUnit executes a unit relocation after verifying game rule compliance.
 // It calculates the active range, updates the board matrix, and commits a UnitMovedEvent.
 // Returns an error if the pathing rules are violated or if the target cell is blocked.
-func (m *Match) CommandMoveUnit(unitID UnitID, target Coordinate) error {
+func (m *Match) CommandMoveUnit(unitID UnitID, target Coordinate) ([]GameEvent, error) {
 	unit, err := m.validateActiveUnit(unitID)
 	if err != nil {
-		return err
+		return []GameEvent{}, err
 	}
 
 	if unit.HasMoved {
-		return fmt.Errorf("%w: unit %#x already moved this turn", ErrAlreadyMoved, unitID)
+		return []GameEvent{}, fmt.Errorf("%w: unit %#x already moved this turn", ErrAlreadyMoved, unitID)
 	}
 
 	tiles := m.WorkingState.FindReachableTiles(unit.Position, unit.NewMovementRule())
 
 	if _, ok := tiles[target]; !ok {
-		return ErrOutOfMoveRange
+		return []GameEvent{}, ErrOutOfMoveRange
 	}
 
 	// err will always be nil at the moment, not testable until the Skills implementation in Phase 4
 	if err = m.WorkingState.IsLandingLegal(target, OccupantUnit); err != nil {
-		return fmt.Errorf("%w: %w", ErrInvalidLanding, err)
+		return []GameEvent{}, fmt.Errorf("%w: %w", ErrInvalidLanding, err)
 	}
 
 	oldPos := unit.Position
@@ -83,9 +83,10 @@ func (m *Match) CommandMoveUnit(unitID UnitID, target Coordinate) error {
 	unit.Position = target
 	unit.HasMoved = true
 
-	m.SubmitAction(NewUnitMovedEvent(unitID, oldPos, target))
+	gameEvent := NewUnitMovedEvent(unitID, oldPos, target)
+	m.SubmitAction(gameEvent)
 
-	return nil
+	return []GameEvent{gameEvent}, nil
 }
 
 func (m *Match) validateActiveUnit(unitID UnitID) (*Unit, error) {
@@ -112,38 +113,38 @@ func (m *Match) validateActiveUnit(unitID UnitID) (*Unit, error) {
 // CommandPlaceBomb executes a bomb deployment after verifying unit's bomb availability and grid compliance.
 // It validates placement range, registers a new Bomb state tracking instance, and commits a BombPlacedEvent.
 // Returns an error if the unit is running out of bombs, the target is out of range, or the cell is blocked.
-func (m *Match) CommandPlaceBomb(unitID UnitID, target Coordinate) error {
+func (m *Match) CommandPlaceBomb(unitID UnitID, target Coordinate) ([]GameEvent, error) {
 	// identify the unit and check the availability
 	unit, err := m.validateActiveUnit(unitID)
 	if err != nil {
-		return err
+		return []GameEvent{}, err
 	}
 
 	if unit.HasUsedSkill {
-		return fmt.Errorf("%w: unit %#x already used skill this turn", ErrAlreadyUsedSkill, unitID)
+		return []GameEvent{}, fmt.Errorf("%w: unit %#x already used skill this turn", ErrAlreadyUsedSkill, unitID)
 	}
 
 	if unit.BombUsed >= unit.MaxBombCount {
-		return fmt.Errorf("%w: unit %#x out of bombs", ErrOutOfBombs, unitID)
+		return []GameEvent{}, fmt.Errorf("%w: unit %#x out of bombs", ErrOutOfBombs, unitID)
 	}
 
 	tiles := m.WorkingState.FindReachableTiles(unit.Position, unit.NewBombPlacementRule())
 
 	if _, ok := tiles[target]; !ok {
-		return ErrOutOfBombRange
+		return []GameEvent{}, ErrOutOfBombRange
 	}
 
 	if err = m.WorkingState.IsLandingLegal(target, OccupantBomb); err != nil {
-		return fmt.Errorf("%w: %w", ErrInvalidLanding, err)
+		return []GameEvent{}, fmt.Errorf("%w: %w", ErrInvalidLanding, err)
 	}
 
-	m.placeBomb(unitID, target, unit.BombPower)
+	gameEvents := m.placeBomb(unitID, target, unit.BombPower)
 	unit.HasUsedSkill = true
 
-	return nil
+	return gameEvents, nil
 }
 
-func (m *Match) placeBomb(unitID UnitID, target Coordinate, bombPower int) {
+func (m *Match) placeBomb(unitID UnitID, target Coordinate, bombPower int) []GameEvent {
 	m.WorkingState.TurnBombCounter++
 	bomb := &Bomb{
 		ID:        NewBombID(m.WorkingState.Turn, m.WorkingState.TurnBombCounter, unitID),
@@ -155,7 +156,10 @@ func (m *Match) placeBomb(unitID UnitID, target Coordinate, bombPower int) {
 	m.WorkingState.Bombs[bomb.ID] = bomb
 	m.WorkingState.UpdateStageOccupant(target, OccupantBomb, int64(bomb.ID))
 
-	m.SubmitAction(NewBombPlacedEvent(unitID, bomb.ID, target, bomb.Range, bomb.Countdown))
+	evt := NewBombPlacedEvent(unitID, bomb.ID, target, bomb.Range, bomb.Countdown)
+	m.SubmitAction(evt)
+
+	return []GameEvent{evt}
 }
 
 // IsLandingLegal checks if the target is legal to be landed by a certain occupantType.

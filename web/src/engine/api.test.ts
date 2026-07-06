@@ -190,22 +190,16 @@ describe('api.ts', () => {
 
   describe('submitTurnCommand', () => {
     const cmdFixture: TurnCommand = { type: 'move', unitId: 1, target: { x: 1, y: 1 } };
-    const stateFixture: GameState = {
-      turn: 1,
-      activeTeam: 0,
-      grid: [],
-      units: [],
-      bombs: [],
-      softBlocks: [],
-      turnCommands: [],
-    };
+    const fixture: GameEvent[] = [
+      { type: 'unitMoved', unitId: 1, from: { x: 1, y: 0 }, to: { x: 1, y: 1 } },
+    ];
 
     it('should POST command with auth and return game state', async () => {
-      mockOk(200, stateFixture);
+      mockOk(200, fixture);
 
       const result = await submitTurnCommand(cmdFixture);
 
-      expect(result).toEqual(stateFixture);
+      expect(result).toEqual(fixture);
       const [, options] = mockFetch.mock.calls[0] as [string, RequestInit];
       expect(options.method).toBe('POST');
       expect(options.headers).toHaveProperty('Authorization', 'Bearer test-token-abc');

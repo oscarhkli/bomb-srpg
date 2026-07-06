@@ -237,7 +237,7 @@ func (s *ServerStateManager) GetMatchState(roomID string) (*engine.GameState, er
 
 // SubmitTurnCommand delivers TurnCommand to engine to move a Unit or place a bomb in a given MatchRoom.
 // Returns the latest WorkingState or an error if any pre-check is violated
-func (s *ServerStateManager) SubmitTurnCommand(roomID string, cmd engine.TurnCommand, token string) (*engine.GameState, error) {
+func (s *ServerStateManager) SubmitTurnCommand(roomID string, cmd engine.TurnCommand, token string) ([]engine.GameEvent, error) {
 	roomVal, ok := s.Rooms.Load(roomID)
 	if !ok {
 		s.Logger.Warn("match room not found", "roomID", roomID)
@@ -258,14 +258,14 @@ func (s *ServerStateManager) SubmitTurnCommand(roomID string, cmd engine.TurnCom
 		return nil, err
 	}
 
-	err := room.Match.ApplyTurnCommand(cmd)
+	gameEvents, err := room.Match.ApplyTurnCommand(cmd)
 	if err != nil {
 		room.Logger.Error("invalid turn command", "turnCmdType", cmd.Type, "error", err)
 		return nil, fmt.Errorf("%w: turnCommand=%+v: %v", ErrInvalidTurnCmd, cmd, err)
 	}
 
 	room.LastActivity = time.Now()
-	return room.Match.WorkingState, nil
+	return gameEvents, nil
 }
 
 // StartTurn sends StartTurn signal engine to start a new turn in a given MatchRoom.
