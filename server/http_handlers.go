@@ -158,7 +158,7 @@ func (h *Handler) HandleGetMatchState(w http.ResponseWriter, r *http.Request) {
 }
 
 // HandleSubmitTurnCommand delivers TurnCommand to engine to move a Unit or place a bomb in a given MatchRoom.
-// It encodes the gameState as JSON and writes them to the response.
+// It encodes the gameEvents as JSON and writes them to the response.
 func (h *Handler) HandleSubmitTurnCommand(w http.ResponseWriter, r *http.Request) {
 	roomID := r.PathValue("roomID")
 
@@ -188,8 +188,8 @@ func (h *Handler) HandleSubmitTurnCommand(w http.ResponseWriter, r *http.Request
 	w.WriteHeader(http.StatusOK)
 
 	if err := json.NewEncoder(w).Encode(gs); err != nil {
-		h.Logger.Error("encode gameState failed", "error", err)
-		http.Error(w, "Failed to encode gameState", http.StatusInternalServerError)
+		h.Logger.Error("encode gameEvents failed", "error", err)
+		http.Error(w, "Failed to encode gameEvents", http.StatusInternalServerError)
 		return
 	}
 }

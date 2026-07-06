@@ -236,7 +236,7 @@ func (s *ServerStateManager) GetMatchState(roomID string) (*engine.GameState, er
 }
 
 // SubmitTurnCommand delivers TurnCommand to engine to move a Unit or place a bomb in a given MatchRoom.
-// Returns the latest WorkingState or an error if any pre-check is violated
+// Returns the GameEvents or an error if any pre-check is violated
 func (s *ServerStateManager) SubmitTurnCommand(roomID string, cmd engine.TurnCommand, token string) ([]engine.GameEvent, error) {
 	roomVal, ok := s.Rooms.Load(roomID)
 	if !ok {

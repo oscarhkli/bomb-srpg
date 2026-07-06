@@ -55,7 +55,7 @@ func (m *Match) ApplyTurnCommand(cmd TurnCommand) ([]GameEvent, error) {
 
 // CommandMoveUnit executes a unit relocation after verifying game rule compliance.
 // It calculates the active range, updates the board matrix, and commits a UnitMovedEvent.
-// Returns an error if the pathing rules are violated or if the target cell is blocked.
+// Returns GameEvents produced or an error if the pathing rules are violated or if the target cell is blocked.
 func (m *Match) CommandMoveUnit(unitID UnitID, target Coordinate) ([]GameEvent, error) {
 	unit, err := m.validateActiveUnit(unitID)
 	if err != nil {
@@ -112,7 +112,7 @@ func (m *Match) validateActiveUnit(unitID UnitID) (*Unit, error) {
 
 // CommandPlaceBomb executes a bomb deployment after verifying unit's bomb availability and grid compliance.
 // It validates placement range, registers a new Bomb state tracking instance, and commits a BombPlacedEvent.
-// Returns an error if the unit is running out of bombs, the target is out of range, or the cell is blocked.
+// Returns GameEvents produced or an error if the unit is running out of bombs, the target is out of range, or the cell is blocked.
 func (m *Match) CommandPlaceBomb(unitID UnitID, target Coordinate) ([]GameEvent, error) {
 	// identify the unit and check the availability
 	unit, err := m.validateActiveUnit(unitID)
