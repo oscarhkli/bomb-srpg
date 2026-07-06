@@ -1,5 +1,5 @@
 ---
-title: "Phase 3.8: Render Resolve Turn Animation"
+title: "Phase 3.x: Render Resolve Turn Animation"
 ---
 
 # Render Resolve Turn Animation
@@ -8,7 +8,7 @@ Ignore the below as it's only a copied template.
 
 ## Context
 
-Phase 3.1 renders the static `grid` tiles. This spec adds the dynamic layer: `units` and `bombs` drawn on top of the grid, plus pan and zoom so the player can navigate large grids (up to 15×15).
+Phase 3.1 renders the static `grid` tiles. This spec adds the dynamic layer: `units` and `bombs` drawn on top of the grid, plus pan and zoom so the player can navigate large grids (up to 15×15), plus rendering information when clicking `unit` and `bomb`
 
 ## Goal
 

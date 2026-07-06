@@ -733,7 +733,7 @@ func createTestRoomWithMatch(t *testing.T) (string, [2]string, *ServerStateManag
 
 func TestHandleSubmitTurnCommand(t *testing.T) {
 	t.Run("Success: submit a valid TurnCommand in an existing room", func(t *testing.T) {
-		roomID, playerTokens, _, h := createTestRoomWithMatch(t)
+		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
 
 		uID := engine.NewUnitID(1, 0)
 		newPos := engine.Coordinate{X: 4, Y: 7}
@@ -758,20 +758,26 @@ func TestHandleSubmitTurnCommand(t *testing.T) {
 			t.Errorf("Handler returned wrong content type: got %v want %v", contentType, expectedHeader)
 		}
 
-		var response ClientMatchStateResponse
+		var response []engine.GameEvent
 		if err := json.NewDecoder(rr.Body).Decode(&response); err != nil {
 			t.Fatalf("Failed to decode response JSON payload: %v", err)
 		}
-
-		for _, u := range response.Units {
-			if u.ID == uID {
-				if u.Position != newPos {
-					t.Errorf("Expected Unit %#X new position %#v, got %#v", uID, newPos, u.Position)
-				}
-				return
-			}
+		if len(response) != 1 {
+			t.Errorf("expected 1 GameEvent returned, got %d", len(response))
 		}
-		t.Errorf("Expected Unit %#X is missing from the result", uID)
+		resEvt := response[0]
+		validFrom := engine.Coordinate{X: 4, Y: 8}
+		if resEvt.Type != engine.GameEvtUnitMoved || resEvt.UnitID != uID || *resEvt.From != validFrom || *resEvt.To != newPos {
+			t.Errorf("malformed UnitMoveEvent returned: %+v", resEvt)
+		}
+
+		roomVal, _ := s.Rooms.Load(roomID)
+		room := roomVal.(*MatchRoom)
+		u := room.Match.WorkingState.Units[uID]
+
+		if u.Position != newPos {
+			t.Errorf("Expected Unit %#X new position %#v, got %#v", uID, newPos, u.Position)
+		}
 	})
 
 	t.Run("Failure: invalid TurnCommand", func(t *testing.T) {
@@ -905,9 +911,21 @@ func TestHandleSubmitTurnCommand(t *testing.T) {
 		rr := httptest.NewRecorder()
 		testMux("POST /api/match-rooms/{roomID}/match/turn-commands", h.HandleSubmitTurnCommand).ServeHTTP(rr, req)
 
-		assertObjectContract(t, rr.Body.Bytes(),
-			[]string{"turn", "activeTeam", "grid", "units", "bombs", "softBlocks", "turnCommands"},
-			assertMatchStateNested)
+		assertArrayContract(t, rr.Body.Bytes(),
+			[]string{"type", "unitId", "from", "to"},
+			func(t *testing.T, item map[string]any) {
+				t.Helper()
+				fromField := item["from"].(map[string]any)
+				toField := item["from"].(map[string]any)
+				for _, field := range []string{"x", "y"} {
+					if _, exists := fromField[field]; !exists {
+						t.Errorf("Contract Broken: from missing key '%s'", field)
+					}
+					if _, exists := toField[field]; !exists {
+						t.Errorf("Contract Broken: to missing key '%s'", field)
+					}
+				}
+			})
 	})
 
 	t.Run("Failure: missing Authorization header", func(t *testing.T) {

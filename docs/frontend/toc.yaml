@@ -8,10 +8,10 @@ specs:
     category: MatchScene
     completion-date: 2026-07-03
   - file: match-p3-spec003.md
-    status: Parked Draft
+    status: Draft
     category: MatchScene
     completion-date:
-  - file: match-p3-spec004.md
+  - file: match-p3-spec0044.md
     status: Parked Draft
     category: MatchScene
     completion-date:
@@ -29,13 +29,13 @@ specs:
     completion-date:
   - file: lounge-p3-spec001.md
     status: Parked Draft
-    category: MatchScene
+    category: LoungeScene
     completion-date:
   - file: title-p3-spec001.md
     status: Parked Draft
-    category: MatchScene
+    category: TitleScene
     completion-date:
   - file: victory-p3-spec001.md
     status: Parked Draft
-    category: MatchScene
+    category: VictoryScene
     completion-date:
