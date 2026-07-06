@@ -16,7 +16,7 @@ Phase 3.1 adds a click handler on `occupants`. This spec adds the actionable int
 
 ## Non-Goal
 
-- Polished animations or tweens.
+- Polished animations or tweens (easing curves, squash/stretch, particle effects, etc.) — a bare linear-motion tween for `Move` is in scope, see [Visual Effect for `unitMovedEvent`](#visual-effect-for-unitmovedevent).
 - HUD / status panel.
 - Player can click and view the information of `unit` and `bomb`.
 - Warning message about data out-of-sync with backend and frontend.
@@ -31,9 +31,9 @@ All the color HEX below will be adjusted in future to align with pixel style pal
 
 ## User Interaction and Data Fetching
 
-This spec consist of various user interactions. Some of them requires data fetching. Some of them submit action to server and react based on the resopnse.
+This spec consists of various user interactions. Some of them require data fetching. Some of them submit action to server and react based on the response.
 
-### TurnCommand Panel
+### TurnCommandPanel
 
 `TurnCommandPanel` is rendered as **192Wx144Hpx** rectangle when needed (to be explained later). It's transparent, with no border. This contains the actions available for Player so choose. To simplify in the early stage. There are 3 buttons in the panel, `moveButton`, `placeBombButton`, `backButton`, distributed in 2 rows as illustrated below:
 
@@ -44,19 +44,29 @@ This spec consist of various user interactions. Some of them requires data fetch
 +-------------+
 ```
 
-All 3 buttons are rendered as **92Wx64Hpx** pill-shape, filled with `0x583f0e` and ocpacity **20%**, with **8px** `0xdc9e23` border color ocpacity **100%**. Text color is also the same color and opacity as border. Font color is `Roboto`.
+All 3 buttons are rendered as **92Wx64Hpx** pill-shape, filled with `0x583f0e` and opacity **20%**, with **8px** `0xdc9e23` border color opacity **100%**. Text color is also the same color and opacity as border. Font family is `GAME_FONT_FAMILY` (see [Font](#font) below).
+
+`TurnCommandPanel` is positioned at the `Grid`'s right edge (a fixed gutter to the right of the last column), bottom-aligned with the `Grid`'s bottom edge. It does not follow or reposition per clicked `unit`.
 
 > Note: The dimensions of buttons are rough numbers. During the implementation, iterations might needed so that the numbers should be adjust to fit with the real scenario, update the specs and remove this line.
 
+### Font
+
+This spec introduces the game's first UI text, so it establishes the default font for the current phase: a single web font, loaded via a `<link>` tag in `index.html` (e.g. Google Fonts), referenced everywhere through one `constants.ts` value, `GAME_FONT_FAMILY` (e.g. `"'Roboto', sans-serif"` — the quoted family plus a generic fallback). `Roboto` is not mandated; any single web-safe font is acceptable as long as it's centralized behind this one constant so it can be swapped later without touching call sites.
+
 ### Store the Latest `gameState`
 
-In the upcoming sections, the user interaction depends on the `gameState` obtained in `getMatchState()`. There should be a way to store and refresh it when needed. See the next sections.
+`MatchScene` keeps the latest `gameState` as a private scene-instance field (same pattern already used for `roomId`/`playerTokens`, e.g. `private gameState!: GameState;`), not a separate store or global — this is a single-scene game with no cross-scene sharing need yet. It is set once in `create()` from the initial `getMatchState()` response, and reassigned whenever a later section obtains a fresh `GameState` (see [Refresh Final Sanity Check](#refresh-final-sanity-check)).
 
-> Note: Agent should determine how `gameState` should be kept in the frontend.
+### Initialize Player Token
+
+`playerTokens` (received from `DevBootScene` and stored on `MatchScene`, see spec001) is a tuple `[team1Token, team2Token]`. Before `submitTurnCommand()` can be called, the frontend must call `initToken(playerTokens[gameState.activeTeam - 1])` from `engine/api.ts` — this is currently never invoked anywhere, which would make every `submitTurnCommand()` call throw. Call it once, at the moment `TurnCommandPanel` opens for a `unit` (i.e., right after the User Interaction check below passes). Since this spec never triggers `resolveTurn()`, `activeTeam` cannot change mid-flow, so calling it again on a later click of the same team is a harmless no-op.
+
+> See `match-p3-spec010.md` (stub) for re-deriving this per `startTurn()` instead, once that lifecycle call is wired up.
 
 ### User Interaction
 
-`TurnCommandPanel` can only be shown and enabled when all the below situations are satified:
+`TurnCommandPanel` can only be shown and enabled when all the below situations are satisfied:
 
 1. A `unit` is clicked.
 2. `unit.team` equals to `state.activeTeam`.
@@ -69,11 +79,11 @@ Additionally:
 - If `unit.hasUsedSkill` is **true**, `placeBombButton` should be disabled and rendered with HEX `0x999999`. 
 
 > Non-goal note:  
-> Since currently we're working on Phase 3, where the game is pass-and-play. Both players are in the same client browser tab. For multiplayer online more, additional rules should be add for displaying and enabling `TurnCommandPanel`: The current client's team equals to `state.activeTeam`. 
+> Since currently we're working on Phase 3, where the game is pass-and-play. Both players are in the same client browser tab. For multiplayer online mode, additional rules should be add for displaying and enabling `TurnCommandPanel`: The current client's team equals to `state.activeTeam`. 
 
 ### Move
 
-If Player clicks `moveButton`, the frontend should call backend via `getAllowedTiles()`, using the payload:
+If Player clicks `moveButton`, first check the cache described in [Performance consideration](#performance-consideration) for key `(unitId, "move")`. On a cache hit, skip the network call and render the cached `tiles` directly. On a miss, call backend via `getAllowedTiles()`, using the payload:
 
 ```json 
 {
@@ -86,11 +96,10 @@ If non-200 HTTP result returns, display the errorMessage like how we handle Netw
 
 If 200 HTTP result returns with `AllowedTilesResponse`, these are the coordinates of the `tiles` that `unit` can move. For all matched `tiles`:
 
-- Add a layer of HEX `0x86c64f with opacity **30%** layer on top of it. This adds a "glowing effect" to those `tiles`.
-> Note: To be reviewed with Agent - there could be a better terminology in phaser to describe this visual effect.
+- Add a highlight overlay: HEX `0x86c64f` at opacity **30%**, layered on top of the tile.
 - Add a click handler: When clicked,
-  - The border of the glowing layer should change to `0xdaedca` with opacity **100%**.
-  - Confirm if Player wants to execute move (Details in next section).
+  - The border of the highlight overlay should change to `0xdaedca` with opacity **100%**.
+  - Confirm if Player wants to execute move (Details in [Confirm Dialog](#confirm-dialog) below).
     - If no, rollback to displaying `AllowedTiles`
     - If yes, use the selected `Coordinates` to `submitTurnCommand`
       ```json
@@ -102,9 +111,16 @@ If 200 HTTP result returns with `AllowedTilesResponse`, these are the coordinate
       ```
     - `GameEvent` Handling and the follow-up action will be described in next section.
 
+### Confirm Dialog
+
+When Player clicks a highlighted tile (for `Move` or `PlaceBomb`), `ConfirmDialog` appears: a **160Wx100Hpx** rectangle, centered on screen, filled with `0x1a1a1a` at opacity **60%** (dims the scene behind it), containing a short prompt text ("Confirm?") and two pill-shape buttons, `yesButton`/`noButton`, styled identically to `TurnCommandPanel`'s buttons (see [TurnCommand Panel](#turncommand-panel)).
+
+- Player clicks `yesButton` → proceed with `submitTurnCommand` as described above.
+- Player clicks `noButton` → dismiss `ConfirmDialog` and rollback to displaying `allowedTiles` (selected tile's border reverts, click handlers restored).
+
 ### Place Bomb
 
-The mechanism `placeBomb` is similar to `move`. To avoid repeating (unless Agent thinks we should explicitly repeat the section):
+The mechanism `placeBomb` is similar to `move`. To avoid repeating:
 
 - `moveButton` -> `placeBombButton`
 - `turnCmdType move` -> `turnCmdType placeBomb`
@@ -128,21 +144,32 @@ Player clicks placeBombButton -> Scene shows allowedTiles layer in 0xe69138
 
 If Player clicks `backButton` and there is nothing to rollback, `TurnCommandPanel` should then be hidden.
 
-`actionStack` should be cleared and `TurnCommandPanel` should be hidden when Player does not interact with the same unit, e.g., clicking other units, resetting turn (in future phase), etc..
+There are two distinct ways `TurnCommandPanel` closes — they must not be conflated:
+
+- **Incremental (`backButton`)**: pops one level off `actionStack`, rolling back to the prior visual state. Only hides the panel once the stack is already empty.
+- **Immediate (system-driven)**: any close that happens as a *side effect* rather than the player navigating back — after `submitTurnCommand()` resolves (success or failure, per [Follow-up Actions](#follow-up-actions-after-turncommand-submission)), or when the player interacts with a different unit, resets the turn (future phase), etc. — hides `TurnCommandPanel` **and clears `actionStack` entirely**, not a single pop. Without the full clear, clicking the same unit again would reopen the panel carrying stale stack entries from the action that just finished.
 
 ### Performance consideration
 
-There might be perfomance issue regarding `getAllowedTiles()` since each click calls API once, but the result mostly doesn't change. We might have to consider caching mechanism, or use an alternative data fetching, e.g., call `getAllowedTiles()` for both `move` and `placeBomb` when a unit is first clicked after each `TurnCommand` is executed.
+Resolved: cache `getAllowedTiles()` results, keyed per `(unitId, turnCmdType)`, held on `MatchScene` itself — not scoped to a single `TurnCommandPanel` session. Populate a key lazily the first time it's needed — i.e., on the first click of `moveButton`/`placeBombButton` for that `unit` (see [Move](#move)), not when the panel opens. A cache hit skips the network call entirely, including across switching between units (A → B → A reuses A's cached tiles).
+
+Invalidation must be a full clear (every key, every unit), not a per-unit one — because a successful action can change reachability for units *other* than the one that acted (e.g. a new bomb now blocks a different unit's path). The cache is cleared whenever `WorkingState` actually mutates:
+
+- `submitTurnCommand()` **succeeds** (per `engine/match.go`, `CommandMoveUnit`/`CommandPlaceBomb` return their error *before* mutating `WorkingState` on any validation failure, so a failed submission changes nothing and the cache stays valid).
+- `resetTurn()` — discards `WorkingState` and re-clones `TrueState`.
+- `resolveTurn()` — commits the sandbox to `TrueState` and advances the turn; see `match-p3-spec0044.md` (Parked Draft) for where this gets wired into the frontend.
+
+Neither `resetTurn()` nor `resolveTurn()` has frontend wiring yet (this spec doesn't add it) — flagging this now so whichever spec implements them doesn't miss clearing this cache. `resetTurn()` has no tracked spec yet.
 
 ## Follow-up Actions after TurnCommand Submission
 
-`TurnCommandPanel` should be closed no matter if `submitTurnCommand()` is successful or not.
+`TurnCommandPanel` should be closed no matter if `submitTurnCommand()` is successful or not — this is the "Immediate (system-driven)" close case described in [Back](#back), so `actionStack` must be cleared entirely here too, not just popped once.
 
 If non-200 HTTP result returns, display the errorMessage like how we handle Network error.
 
-The below states the follow-up action when 200 HTTP result returns
+The below states the follow-up action when 200 HTTP result returns:
 
-`submitTurnCommand()` **will** receive `gameEvents` instead of `gameState` before the implementation of this spec.
+`submitTurnCommand()` returns `gameEvents` (already implemented in `engine/api.ts`/`types/api.ts`, verified against `server/http_handlers.go` as of this spec).
 
 Currently we focus on `move` and `placeBomb` action. If there is any `gameEvent` with `type` other than `unitMoved` or `bombPlaced`, log it with `console.log()`.
 
@@ -152,13 +179,11 @@ Currently we focus on `move` and `placeBomb` action. If there is any `gameEvent`
 
 Validate if:
 - `unitMovedEvent.unitId` equals to `unitId` of current actor.
-- `grid[unitMovedEvent.from.y][unitMovedEvent.from.x].occupantUnit` and `occupantId` matches `unitMovedEvent.unitId` , i.e., the chosen `unit` is still in the `from` position.
-- `grid[unitMovedEvent.to.y][unitMovedEvent.to.x].OccupantNone`, i.e., can be occupied by the chosen `unit`.
+- `grid[unitMovedEvent.from.y][unitMovedEvent.from.x].occupantType` equals `'OccupantUnit'` and its `occupantId` matches `unitMovedEvent.unitId`, i.e., the chosen `unit` is still in the `from` position.
+- `grid[unitMovedEvent.to.y][unitMovedEvent.to.x].occupantType` equals `'OccupantNone'`, i.e., can be occupied by the chosen `unit`.
 - `unitId` exists in `gameState.units` and `position` matches with `unitMovedEvent.from`.
 
-> To be discussed:
-> 1. Are some of the validations redundant? 
-> 2. Should we smoothen the move animation here using the **Manhattan Movement** path, or just to move in a straight path and polish in future?
+Movement renders as a mild straight-line slide: tween the `unit` sprite's position from `from` to `to` in a single linear motion (Phaser `Tweens`/`TweenManager`, `ease: 'Linear'`, duration ~250–300ms — exact numbers tunable during implementation). This is plain positional interpolation, not the "polished animations" this spec's Non-Goal excludes — no easing curves, squash/stretch, or particle effects. A **Manhattan-path** tween (multi-segment, following the actual pathfinding route instead of a straight line) remains a future polish candidate, not a decision this spec needs to make.
 
 ### Visual Effect for `bombPlacedEvent`
 
@@ -166,10 +191,9 @@ Validate if:
 
 Validate if:
 - `bombPlacedEvent.unitId` equals to `unitId` of the chosen `unit`.
-- `grid[bombPlacedEvent.position.y][bombPlacedEvent.position.x].OccupantNone`, i.e., can be occupied by the new `bomb`.
+- `grid[bombPlacedEvent.position.y][bombPlacedEvent.position.x].occupantType` equals `'OccupantNone'`, i.e., can be occupied by the new `bomb`.
 
-> To be discussed:
-> 1. Are some of the validations redundant? 
+> Note: `engine/match.go`'s `IsLandingLegal()` enforces one occupant per tile — a `unit` and a `bomb` (or any two occupants) can never share a tile in this engine. The `topOnly`-click ambiguity flagged in `match-p3-spec002-log.md` (issue #4) therefore cannot occur for `unit`/`bomb` clicks; that issue can be marked resolved/moot when next updating that log.
 
 ## Refresh Final Sanity Check
 
@@ -181,7 +205,7 @@ Replace the frontend stored `gameState` by the latest obtained one.
 
 ## Acceptance Criteria
 
-1. Given a `GameState` with two teams, and `activeTeam` is **X**, when `Unit` of **Team X** is clicked, the player should see `TurnCommandPanel` with available action acccording to that `Unit`.
+1. Given a `GameState` with two teams, and `activeTeam` is **X**, when `Unit` of **Team X** is clicked, the player should see `TurnCommandPanel` with available action according to that `Unit`.
 2. Given a `GameState` with two teams, and `activeTeam` is **Y**, when `Unit` of **Team X** is clicked, the player should **NOT** see `TurnCommandPanel`. 
 3. Given Player clicks `Move`, `grid` should render `allowedTiles` when there is any available.
 4. Given Player clicks one of the `allowedTiles` and confirmed the action for `Move`, `Unit` should move to the target `coordinate`.
