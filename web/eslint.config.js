@@ -22,9 +22,14 @@ export default [
     rules: {
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
       '@typescript-eslint/consistent-type-imports': 'error',
-      '@typescript-eslint/no-floating-promises': 'warn',
-      curly: ['error', 'all']
+      '@typescript-eslint/no-floating-promises': 'warn'
     }
   },
-  prettier
+  prettier,
+  {
+    files: ['src/**/*.ts'],
+    rules: {
+      curly: ['error', 'all']
+    }
+  }
 ]

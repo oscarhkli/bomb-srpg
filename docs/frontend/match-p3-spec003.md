@@ -44,11 +44,9 @@ This spec consists of various user interactions. Some of them require data fetch
 +-------------+
 ```
 
-All 3 buttons are rendered as **92Wx64Hpx** pill-shape, filled with `0x583f0e` and opacity **20%**, with **8px** `0xdc9e23` border color opacity **100%**. Text color is also the same color and opacity as border. Font family is `GAME_FONT_FAMILY` (see [Font](#font) below).
+All 3 buttons are rendered as **46Wx32Hpx** pill-shape, filled with `0x583f0e` and opacity **20%**, with **2px** `0xdc9e23` border color opacity **100%**. Text color is also the same color and opacity as border. Font family is `GAME_FONT_FAMILY` (see [Font](#font) below). Buttons are spaced `PANEL_BUTTON_SPACING` (**12px**) apart, both horizontally (`Move`↔`Bomb`) and vertically (`Bomb`↔`Back`).
 
-`TurnCommandPanel` is positioned at the `Grid`'s right edge (a fixed gutter to the right of the last column), bottom-aligned with the `Grid`'s bottom edge. It does not follow or reposition per clicked `unit`.
-
-> Note: The dimensions of buttons are rough numbers. During the implementation, iterations might needed so that the numbers should be adjust to fit with the real scenario, update the specs and remove this line.
+`TurnCommandPanel` is positioned at the `Grid`'s right edge (a fixed gutter to the right of the last column), bottom-aligned with the `Grid`'s bottom edge. It does not follow or reposition per clicked `unit`. Unlike `ConfirmDialog` (see [Confirm Dialog](#confirm-dialog)), the panel is anchored to the grid in world space — it scrolls with the camera rather than staying pinned to the screen, since its position is spatially meaningful relative to the board.
 
 ### Font
 
@@ -96,7 +94,7 @@ If non-200 HTTP result returns, display the errorMessage like how we handle Netw
 
 If 200 HTTP result returns with `AllowedTilesResponse`, these are the coordinates of the `tiles` that `unit` can move. For all matched `tiles`:
 
-- Add a highlight overlay: HEX `0x86c64f` at opacity **30%**, layered on top of the tile.
+- Add a highlight overlay: HEX `0x86c64f` at opacity **65%**, layered on top of the tile.
 - Add a click handler: When clicked,
   - The border of the highlight overlay should change to `0xdaedca` with opacity **100%**.
   - Confirm if Player wants to execute move (Details in [Confirm Dialog](#confirm-dialog) below).
@@ -114,6 +112,8 @@ If 200 HTTP result returns with `AllowedTilesResponse`, these are the coordinate
 ### Confirm Dialog
 
 When Player clicks a highlighted tile (for `Move` or `PlaceBomb`), `ConfirmDialog` appears: a **160Wx100Hpx** rectangle, centered on screen, filled with `0x1a1a1a` at opacity **60%** (dims the scene behind it), containing a short prompt text ("Confirm?") and two pill-shape buttons, `yesButton`/`noButton`, styled identically to `TurnCommandPanel`'s buttons (see [TurnCommand Panel](#turncommand-panel)).
+
+`ConfirmDialog` is owned and instantiated by `MatchScene` directly, not by `TurnCommandPanel` — it's a scene-wide modal, not a panel-specific concern. `TurnCommandPanel` triggers it via injected callbacks (`showConfirm`/`hideConfirm`/`isConfirmOpen`) rather than holding its own instance. Because it must stay centered on screen regardless of where the camera has scrolled to (e.g. after `centerCamera` centers the view on the grid), every element of `ConfirmDialog` is pinned to the camera viewport (Phaser's `setScrollFactor(0)`) rather than drawn in world space.
 
 - Player clicks `yesButton` → proceed with `submitTurnCommand` as described above.
 - Player clicks `noButton` → dismiss `ConfirmDialog` and rollback to displaying `allowedTiles` (selected tile's border reverts, click handlers restored).
@@ -144,6 +144,8 @@ Player clicks placeBombButton -> Scene shows allowedTiles layer in 0xe69138
 
 If Player clicks `backButton` and there is nothing to rollback, `TurnCommandPanel` should then be hidden.
 
+While `ConfirmDialog` is open, `TurnCommandPanel`'s own buttons (including `backButton`) are not interactive — the dialog's `noButton` is the only rollback path out of that state, and it performs the same rollback `backButton` would perform at that stack depth (see [Confirm Dialog](#confirm-dialog)).
+
 There are two distinct ways `TurnCommandPanel` closes — they must not be conflated:
 
 - **Incremental (`backButton`)**: pops one level off `actionStack`, rolling back to the prior visual state. Only hides the panel once the stack is already empty.
@@ -165,7 +167,7 @@ Neither `resetTurn()` nor `resolveTurn()` has frontend wiring yet (this spec doe
 
 `TurnCommandPanel` should be closed no matter if `submitTurnCommand()` is successful or not — this is the "Immediate (system-driven)" close case described in [Back](#back), so `actionStack` must be cleared entirely here too, not just popped once.
 
-If non-200 HTTP result returns, display the errorMessage like how we handle Network error.
+If non-200 HTTP result returns, display the errorMessage like how we handle Network error. The [Refresh Final Sanity Check](#refresh-final-sanity-check) still runs after this, unconditionally, on both the success and failure paths — a failed submission indicates a problem on the frontend side (the backend is the source of truth), so re-fetching and re-rendering from `getMatchState()` happens regardless of `submitTurnCommand()`'s outcome.
 
 The below states the follow-up action when 200 HTTP result returns:
 
@@ -183,7 +185,7 @@ Validate if:
 - `grid[unitMovedEvent.to.y][unitMovedEvent.to.x].occupantType` equals `'OccupantNone'`, i.e., can be occupied by the chosen `unit`.
 - `unitId` exists in `gameState.units` and `position` matches with `unitMovedEvent.from`.
 
-Movement renders as a mild straight-line slide: tween the `unit` sprite's position from `from` to `to` in a single linear motion (Phaser `Tweens`/`TweenManager`, `ease: 'Linear'`, duration ~250–300ms — exact numbers tunable during implementation). This is plain positional interpolation, not the "polished animations" this spec's Non-Goal excludes — no easing curves, squash/stretch, or particle effects. A **Manhattan-path** tween (multi-segment, following the actual pathfinding route instead of a straight line) remains a future polish candidate, not a decision this spec needs to make.
+Movement renders as a mild straight-line slide: tween the `unit` sprite's position from `from` to `to` in a single linear motion (Phaser `Tweens`/`TweenManager`, `ease: 'Linear'`, duration `UNIT_MOVE_TWEEN_DURATION` = 500ms). This is plain positional interpolation, not the "polished animations" this spec's Non-Goal excludes — no easing curves, squash/stretch, or particle effects. A **Manhattan-path** tween (multi-segment, following the actual pathfinding route instead of a straight line) remains a future polish candidate, not a decision this spec needs to make.
 
 ### Visual Effect for `bombPlacedEvent`
 
@@ -197,7 +199,7 @@ Validate if:
 
 ## Refresh Final Sanity Check
 
-After all `gameEvents` are handled. call `getMatchState()` once for sanity check. If `grid` looks different with `gameState` expected, flag it in errorMessage, then re-render the `tiles`, `units` and `bombs` using new `gameState` as the same way as Phase 3.1 and 3.1.
+After all `gameEvents` are handled (or after a failed `submitTurnCommand()` — see [Follow-up Actions](#follow-up-actions-after-turncommand-submission)), call `getMatchState()` once for sanity check. Compare the freshly-fetched `grid` against a client-side prediction — the pre-action `grid` with the validated event's mutation(s) applied (e.g. the moved `unit`'s new position, the newly placed `bomb`) — not against the raw pre-action `gameState`. Comparing against the pre-action state directly would always differ after any successful action and produce a false-positive mismatch every turn, so that comparison must not be used. If the fetched `grid` differs from the prediction, flag it in errorMessage, then re-render the `tiles`, `units` and `bombs` using new `gameState` as the same way as Phase 3.1 and 3.1.
 
 Replace the frontend stored `gameState` by the latest obtained one.
 
@@ -211,3 +213,7 @@ Replace the frontend stored `gameState` by the latest obtained one.
 4. Given Player clicks one of the `allowedTiles` and confirmed the action for `Move`, `Unit` should move to the target `coordinate`.
 5. Given Player clicks `Bomb`, `grid` should render `allowedTiles` when there is any available.
 6. Given Player clicks one of the `allowedTiles` and confirmed the action for `Bomb`, `Bomb` should be placed on the target `coordinate`.
+
+## Log
+
+Implementation issues found during the build (non spec gaps) are tracked in [match-p3-spec003-log.md](./match-p3-spec003-log.md).

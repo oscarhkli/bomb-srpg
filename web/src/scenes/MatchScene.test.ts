@@ -1,6 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mockScene } from '../test/setup';
-import { initRoom, getMatchState } from '../engine/api';
+import {
+  initRoom,
+  initToken,
+  getMatchState,
+  getAllowedTiles,
+  submitTurnCommand,
+} from '../engine/api';
 import {
   TERRAIN_COLORS,
   TERRAIN_BORDER_COLOR,
@@ -11,7 +17,16 @@ import {
   BOMB_COLOR,
 } from '../constants';
 import MatchScene from './MatchScene';
-import type { GameState, Tile, TerrainType, Unit, SoftBlock, Bomb } from '../types/api';
+import type {
+  Coordinate,
+  GameEvent,
+  GameState,
+  Tile,
+  TerrainType,
+  Unit,
+  SoftBlock,
+  Bomb,
+} from '../types/api';
 
 vi.mock('../engine/api');
 
@@ -80,6 +95,33 @@ function occupantGraphics(index: number): ReturnType<typeof mockScene.add.graphi
 // The error text (when getMatchState rejects) is always the first Text instance created.
 function errorText(): ReturnType<typeof mockScene.add.text> {
   return mockScene.add.text.mock.results[0]!.value as ReturnType<typeof mockScene.add.text>;
+}
+
+function pointerDownOf(g: ReturnType<typeof mockScene.add.graphics>): () => void {
+  return g.on.mock.calls.find(call => call[0] === 'pointerdown')?.[1] as () => void;
+}
+
+// Drives the full UI path (click unit -> click Move/Bomb -> click allowed tile -> click Yes)
+// assuming getAllowedTiles is mocked to resolve with exactly one tile.
+async function submitViaUI(
+  unitGraphics: ReturnType<typeof mockScene.add.graphics>,
+  buttonIndex: 0 | 1 // 0 = Move, 1 = Bomb
+): Promise<void> {
+  pointerDownOf(unitGraphics)(); // opens TurnCommandPanel
+  const actionButtonGraphics = mockScene.add.graphics.mock.results
+    .slice(-3)
+    .map(r => r.value as ReturnType<typeof mockScene.add.graphics>)[buttonIndex];
+  pointerDownOf(actionButtonGraphics!)();
+  await Promise.resolve();
+  await Promise.resolve();
+  const [overlayTileGraphics] = mockScene.add.graphics.mock.results
+    .slice(-1)
+    .map(r => r.value as ReturnType<typeof mockScene.add.graphics>);
+  pointerDownOf(overlayTileGraphics!)();
+  const [, yesButtonGraphics] = mockScene.add.graphics.mock.results
+    .slice(-3)
+    .map(r => r.value as ReturnType<typeof mockScene.add.graphics>);
+  pointerDownOf(yesButtonGraphics!)();
 }
 
 beforeEach(() => {
@@ -325,6 +367,126 @@ describe('MatchScene', () => {
     consoleSpy.mockRestore();
   });
 
+  it('opens TurnCommandPanel and calls initToken when clicking a unit on the active team', async () => {
+    const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
+    vi.mocked(getMatchState).mockResolvedValue(
+      makeState([[plainTile()]], { activeTeam: 1, units: [unit] })
+    );
+
+    const scene = new MatchScene();
+    scene.create({ roomId: 'room-abc', playerTokens: ['team1-token', 'team2-token'] });
+    await Promise.resolve();
+
+    const graphicsBefore = mockScene.add.graphics.mock.calls.length;
+    const g = occupantGraphics(0);
+    const onPointerDown = g.on.mock.calls.find(
+      call => call[0] === 'pointerdown'
+    )?.[1] as () => void;
+
+    onPointerDown();
+
+    expect(initToken).toHaveBeenCalledWith('team1-token');
+    // TurnCommandPanel.openFor draws 3 new button Graphics (Move/Bomb/Back)
+    expect(mockScene.add.graphics.mock.calls.length).toBe(graphicsBefore + 3);
+  });
+
+  it('does not open TurnCommandPanel or call initToken when clicking a unit off the active team', async () => {
+    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const unit = makeUnit({ id: 7, team: 2, position: { x: 0, y: 0 } });
+    vi.mocked(getMatchState).mockResolvedValue(
+      makeState([[plainTile()]], { activeTeam: 1, units: [unit] })
+    );
+
+    const scene = new MatchScene();
+    scene.create({ roomId: 'room-abc', playerTokens: ['team1-token', 'team2-token'] });
+    await Promise.resolve();
+
+    const graphicsBefore = mockScene.add.graphics.mock.calls.length;
+    const g = occupantGraphics(0);
+    const onPointerDown = g.on.mock.calls.find(
+      call => call[0] === 'pointerdown'
+    )?.[1] as () => void;
+
+    onPointerDown();
+
+    expect(initToken).not.toHaveBeenCalled();
+    expect(consoleSpy).toHaveBeenCalledWith('Unit 7 is clicked', unit);
+    expect(mockScene.add.graphics.mock.calls.length).toBe(graphicsBefore);
+    consoleSpy.mockRestore();
+  });
+
+  it('caches getAllowedTiles per (unitId, turnCmdType): repeat moveButton clicks skip the network call', async () => {
+    const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
+    vi.mocked(getMatchState).mockResolvedValue(
+      makeState([[plainTile()]], { activeTeam: 1, units: [unit] })
+    );
+    vi.mocked(getAllowedTiles).mockResolvedValue([{ x: 1, y: 0 }]);
+
+    const scene = new MatchScene();
+    scene.create({ roomId: 'room-abc', playerTokens: ['t1', 't2'] });
+    await Promise.resolve();
+
+    const g = occupantGraphics(0);
+    const onUnitPointerDown = g.on.mock.calls.find(
+      call => call[0] === 'pointerdown'
+    )?.[1] as () => void;
+
+    // Open the panel, click Move, close it, reopen, click Move again.
+    onUnitPointerDown();
+    const [moveButtonGraphics] = mockScene.add.graphics.mock.results
+      .slice(-3)
+      .map(r => r.value as ReturnType<typeof mockScene.add.graphics>);
+    const clickMove = () =>
+      (
+        moveButtonGraphics!.on.mock.calls.find(call => call[0] === 'pointerdown')?.[1] as () => void
+      )();
+    clickMove();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    onUnitPointerDown(); // closes and reopens the panel for the same unit
+    onUnitPointerDown();
+    clickMove();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(getAllowedTiles).toHaveBeenCalledTimes(1);
+    expect(getAllowedTiles).toHaveBeenCalledWith({ unitId: 7, turnCmdType: 'move' });
+  });
+
+  it('shows an error when getAllowedTiles rejects', async () => {
+    const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
+    vi.mocked(getMatchState).mockResolvedValue(
+      makeState([[plainTile()]], { activeTeam: 1, units: [unit] })
+    );
+    vi.mocked(getAllowedTiles).mockRejectedValue(new Error('tiles unavailable'));
+
+    const scene = new MatchScene();
+    scene.create({ roomId: 'room-abc', playerTokens: ['t1', 't2'] });
+    await Promise.resolve();
+
+    const g = occupantGraphics(0);
+    const onUnitPointerDown = g.on.mock.calls.find(
+      call => call[0] === 'pointerdown'
+    )?.[1] as () => void;
+    onUnitPointerDown();
+
+    const [moveButtonGraphics] = mockScene.add.graphics.mock.results
+      .slice(-3)
+      .map(r => r.value as ReturnType<typeof mockScene.add.graphics>);
+    (
+      moveButtonGraphics!.on.mock.calls.find(call => call[0] === 'pointerdown')?.[1] as () => void
+    )();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(mockScene.add.text).toHaveBeenCalledWith(
+      expect.any(Number),
+      expect.any(Number),
+      'tiles unavailable'
+    );
+  });
+
   it('renders a SoftBlock as a light-grey 42x42 rounded rect centered on its tile', async () => {
     const block = makeSoftBlock({ position: { x: 1, y: 0 } });
     vi.mocked(getMatchState).mockResolvedValue(
@@ -439,5 +601,367 @@ describe('MatchScene', () => {
     expect(errorText().setOrigin).toHaveBeenCalledWith(0.5);
     expect(mockScene.add.graphics).not.toHaveBeenCalled();
     expect(mockScene.cameras.main.centerOn).not.toHaveBeenCalled();
+  });
+
+  it('handles a confirmed Move: submits the command, tweens the unit, and refreshes state', async () => {
+    const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
+    const initialGrid: Tile[][] = [
+      [{ type: 'TerrainPlain', occupantType: 'OccupantUnit', occupantId: 7 }, plainTile()],
+    ];
+    const target: Coordinate = { x: 1, y: 0 };
+    const movedUnit = makeUnit({ id: 7, team: 1, position: target });
+    const refreshedGrid: Tile[][] = [
+      [
+        tileOf('TerrainPlain'),
+        { type: 'TerrainPlain', occupantType: 'OccupantUnit', occupantId: 7 },
+      ],
+    ];
+
+    vi.mocked(getMatchState)
+      .mockResolvedValueOnce(makeState(initialGrid, { activeTeam: 1, units: [unit] }))
+      .mockResolvedValueOnce(makeState(refreshedGrid, { activeTeam: 2, units: [movedUnit] }));
+    vi.mocked(getAllowedTiles).mockResolvedValue([target]);
+    const events: GameEvent[] = [
+      { type: 'unitMoved', unitId: 7, from: { x: 0, y: 0 }, to: target },
+    ];
+    vi.mocked(submitTurnCommand).mockResolvedValue(events);
+
+    const scene = new MatchScene();
+    scene.create({ roomId: 'room-abc', playerTokens: ['t1', 't2'] });
+    await Promise.resolve();
+
+    const unitGraphics = occupantGraphics(0);
+    await submitViaUI(unitGraphics, 0);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(submitTurnCommand).toHaveBeenCalledWith({ type: 'move', unitId: 7, target });
+    expect(mockScene.tweens.add).toHaveBeenCalledWith(
+      expect.objectContaining({ targets: unitGraphics, x: 48, y: 0, ease: 'Linear' })
+    );
+    expect(getMatchState).toHaveBeenCalledTimes(2);
+    expect(mockScene.add.text).not.toHaveBeenCalledWith(
+      expect.any(Number),
+      expect.any(Number),
+      expect.stringContaining('out of sync')
+    );
+  });
+
+  it('handles a confirmed PlaceBomb: submits the command and renders the new bomb', async () => {
+    const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
+    const initialGrid: Tile[][] = [[plainTile(), plainTile()]];
+    const target: Coordinate = { x: 1, y: 0 };
+    const refreshedGrid: Tile[][] = [
+      [
+        tileOf('TerrainPlain'),
+        { type: 'TerrainPlain', occupantType: 'OccupantBomb', occupantId: 42 },
+      ],
+    ];
+
+    vi.mocked(getMatchState)
+      .mockResolvedValueOnce(makeState(initialGrid, { activeTeam: 1, units: [unit] }))
+      .mockResolvedValueOnce(
+        makeState(refreshedGrid, {
+          activeTeam: 2,
+          units: [unit],
+          bombs: [makeBomb({ id: 42, ownerId: 7, position: target, countdown: 3 })],
+        })
+      );
+    vi.mocked(getAllowedTiles).mockResolvedValue([target]);
+    const events: GameEvent[] = [
+      { type: 'bombPlaced', unitId: 7, bombId: 42, position: target, range: 2, countdown: 3 },
+    ];
+    vi.mocked(submitTurnCommand).mockResolvedValue(events);
+
+    const scene = new MatchScene();
+    scene.create({ roomId: 'room-abc', playerTokens: ['t1', 't2'] });
+    await Promise.resolve();
+
+    const unitGraphics = occupantGraphics(0);
+    await submitViaUI(unitGraphics, 1);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(submitTurnCommand).toHaveBeenCalledWith({ type: 'placeBomb', unitId: 7, target });
+    expect(getMatchState).toHaveBeenCalledTimes(2);
+    expect(mockScene.add.text).not.toHaveBeenCalledWith(
+      expect.any(Number),
+      expect.any(Number),
+      expect.stringContaining('out of sync')
+    );
+  });
+
+  it('shows an error and still refreshes state when submitTurnCommand rejects', async () => {
+    const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
+    const initialGrid: Tile[][] = [[plainTile(), plainTile()]];
+    const target: Coordinate = { x: 1, y: 0 };
+
+    vi.mocked(getMatchState)
+      .mockResolvedValueOnce(makeState(initialGrid, { activeTeam: 1, units: [unit] }))
+      .mockResolvedValueOnce(makeState(initialGrid, { activeTeam: 1, units: [unit] }));
+    vi.mocked(getAllowedTiles).mockResolvedValue([target]);
+    vi.mocked(submitTurnCommand).mockRejectedValue(new Error('stale token'));
+
+    const scene = new MatchScene();
+    scene.create({ roomId: 'room-abc', playerTokens: ['t1', 't2'] });
+    await Promise.resolve();
+
+    const unitGraphics = occupantGraphics(0);
+    await submitViaUI(unitGraphics, 0);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(mockScene.add.text).toHaveBeenCalledWith(
+      expect.any(Number),
+      expect.any(Number),
+      'stale token'
+    );
+    expect(getMatchState).toHaveBeenCalledTimes(2);
+  });
+
+  it('shows an error and stops processing when the unitMoved event is invalid', async () => {
+    const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
+    const initialGrid: Tile[][] = [[plainTile(), plainTile()]];
+    const target: Coordinate = { x: 1, y: 0 };
+
+    vi.mocked(getMatchState)
+      .mockResolvedValueOnce(makeState(initialGrid, { activeTeam: 1, units: [unit] }))
+      .mockResolvedValueOnce(makeState(initialGrid, { activeTeam: 1, units: [unit] }));
+    vi.mocked(getAllowedTiles).mockResolvedValue([target]);
+    // unitId mismatches the actor (7) — invalid per spec's unitMoved validation.
+    const events: GameEvent[] = [
+      { type: 'unitMoved', unitId: 999, from: { x: 0, y: 0 }, to: target },
+    ];
+    vi.mocked(submitTurnCommand).mockResolvedValue(events);
+
+    const scene = new MatchScene();
+    scene.create({ roomId: 'room-abc', playerTokens: ['t1', 't2'] });
+    await Promise.resolve();
+
+    const unitGraphics = occupantGraphics(0);
+    await submitViaUI(unitGraphics, 0);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(mockScene.add.text).toHaveBeenCalledWith(
+      expect.any(Number),
+      expect.any(Number),
+      'Invalid unitMoved event received from server'
+    );
+    expect(mockScene.tweens.add).not.toHaveBeenCalled();
+    expect(getMatchState).toHaveBeenCalledTimes(2); // refresh still runs
+  });
+
+  it('flags a mismatch when the refreshed grid differs from the predicted grid', async () => {
+    const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
+    const initialGrid: Tile[][] = [
+      [{ type: 'TerrainPlain', occupantType: 'OccupantUnit', occupantId: 7 }, plainTile()],
+    ];
+    const target: Coordinate = { x: 1, y: 0 };
+    // Refresh returns a grid that does NOT match the predicted post-move grid (unit missing).
+    const unexpectedGrid: Tile[][] = [[plainTile(), plainTile()]];
+
+    vi.mocked(getMatchState)
+      .mockResolvedValueOnce(makeState(initialGrid, { activeTeam: 1, units: [unit] }))
+      .mockResolvedValueOnce(makeState(unexpectedGrid, { activeTeam: 1, units: [unit] }));
+    vi.mocked(getAllowedTiles).mockResolvedValue([target]);
+    const events: GameEvent[] = [
+      { type: 'unitMoved', unitId: 7, from: { x: 0, y: 0 }, to: target },
+    ];
+    vi.mocked(submitTurnCommand).mockResolvedValue(events);
+
+    const scene = new MatchScene();
+    scene.create({ roomId: 'room-abc', playerTokens: ['t1', 't2'] });
+    await Promise.resolve();
+
+    const unitGraphics = occupantGraphics(0);
+    await submitViaUI(unitGraphics, 0);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(mockScene.add.text).toHaveBeenCalledWith(
+      expect.any(Number),
+      expect.any(Number),
+      'Match state is out of sync with the server'
+    );
+  });
+
+  it('ignores a unit click while a confirm dialog is already open', async () => {
+    const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
+    const initialGrid: Tile[][] = [
+      [{ type: 'TerrainPlain', occupantType: 'OccupantUnit', occupantId: 7 }, plainTile()],
+    ];
+    const target: Coordinate = { x: 1, y: 0 };
+
+    vi.mocked(getMatchState).mockResolvedValueOnce(
+      makeState(initialGrid, { activeTeam: 1, units: [unit] })
+    );
+    vi.mocked(getAllowedTiles).mockResolvedValue([target]);
+
+    const scene = new MatchScene();
+    scene.create({ roomId: 'room-abc', playerTokens: ['t1', 't2'] });
+    await Promise.resolve();
+
+    const unitGraphics = occupantGraphics(0);
+    pointerDownOf(unitGraphics)();
+    const [moveButtonGraphics] = mockScene.add.graphics.mock.results
+      .slice(-3)
+      .map(r => r.value as ReturnType<typeof mockScene.add.graphics>);
+    pointerDownOf(moveButtonGraphics!)();
+    await Promise.resolve();
+    await Promise.resolve();
+    const [overlayTileGraphics] = mockScene.add.graphics.mock.results
+      .slice(-1)
+      .map(r => r.value as ReturnType<typeof mockScene.add.graphics>);
+    pointerDownOf(overlayTileGraphics!)();
+
+    const [, yesButtonGraphics] = mockScene.add.graphics.mock.results
+      .slice(-3)
+      .map(r => r.value as ReturnType<typeof mockScene.add.graphics>);
+    const graphicsCallCountBeforeClick = mockScene.add.graphics.mock.calls.length;
+
+    pointerDownOf(unitGraphics)(); // clicking a unit while confirm is pending must be a no-op
+
+    expect(yesButtonGraphics!.destroy).not.toHaveBeenCalled();
+    expect(mockScene.add.graphics.mock.calls.length).toBe(graphicsCallCountBeforeClick);
+  });
+
+  it('ignores a second confirm-Yes click while the first submission is still in flight', async () => {
+    const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
+    const initialGrid: Tile[][] = [
+      [{ type: 'TerrainPlain', occupantType: 'OccupantUnit', occupantId: 7 }, plainTile()],
+    ];
+    const target: Coordinate = { x: 1, y: 0 };
+
+    vi.mocked(getMatchState).mockResolvedValueOnce(
+      makeState(initialGrid, { activeTeam: 1, units: [unit] })
+    );
+    vi.mocked(getAllowedTiles).mockResolvedValue([target]);
+    vi.mocked(submitTurnCommand).mockReturnValue(new Promise<GameEvent[]>(() => undefined));
+
+    const scene = new MatchScene();
+    scene.create({ roomId: 'room-abc', playerTokens: ['t1', 't2'] });
+    await Promise.resolve();
+
+    const unitGraphics = occupantGraphics(0);
+    pointerDownOf(unitGraphics)();
+    const [moveButtonGraphics] = mockScene.add.graphics.mock.results
+      .slice(-3)
+      .map(r => r.value as ReturnType<typeof mockScene.add.graphics>);
+    pointerDownOf(moveButtonGraphics!)();
+    await Promise.resolve();
+    await Promise.resolve();
+    const [overlayTileGraphics] = mockScene.add.graphics.mock.results
+      .slice(-1)
+      .map(r => r.value as ReturnType<typeof mockScene.add.graphics>);
+    pointerDownOf(overlayTileGraphics!)();
+    const [, firstYesButtonGraphics] = mockScene.add.graphics.mock.results
+      .slice(-3)
+      .map(r => r.value as ReturnType<typeof mockScene.add.graphics>);
+
+    pointerDownOf(firstYesButtonGraphics!)(); // submitTurnCommand now pending, never resolves in this test
+    pointerDownOf(overlayTileGraphics!)(); // re-click the still-visible tile
+    const [, secondYesButtonGraphics] = mockScene.add.graphics.mock.results
+      .slice(-3)
+      .map(r => r.value as ReturnType<typeof mockScene.add.graphics>);
+    pointerDownOf(secondYesButtonGraphics!)(); // second Yes click while the first is still in flight
+
+    expect(submitTurnCommand).toHaveBeenCalledTimes(1);
+  });
+
+  it('tweens a unit cumulatively across two sequential moves', async () => {
+    const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
+    const initialGrid: Tile[][] = [
+      [
+        { type: 'TerrainPlain', occupantType: 'OccupantUnit', occupantId: 7 },
+        plainTile(),
+        plainTile(),
+      ],
+    ];
+    const firstTarget: Coordinate = { x: 1, y: 0 };
+    const secondTarget: Coordinate = { x: 2, y: 0 };
+    const gridAfterFirstMove: Tile[][] = [
+      [
+        plainTile(),
+        { type: 'TerrainPlain', occupantType: 'OccupantUnit', occupantId: 7 },
+        plainTile(),
+      ],
+    ];
+    const gridAfterSecondMove: Tile[][] = [
+      [
+        plainTile(),
+        plainTile(),
+        { type: 'TerrainPlain', occupantType: 'OccupantUnit', occupantId: 7 },
+      ],
+    ];
+
+    vi.mocked(getMatchState)
+      .mockResolvedValueOnce(makeState(initialGrid, { activeTeam: 1, units: [unit] }))
+      .mockResolvedValueOnce(
+        makeState(gridAfterFirstMove, {
+          activeTeam: 1,
+          units: [makeUnit({ id: 7, team: 1, position: firstTarget })],
+        })
+      )
+      .mockResolvedValueOnce(
+        makeState(gridAfterSecondMove, {
+          activeTeam: 1,
+          units: [makeUnit({ id: 7, team: 1, position: secondTarget })],
+        })
+      );
+    vi.mocked(getAllowedTiles)
+      .mockResolvedValueOnce([firstTarget])
+      .mockResolvedValueOnce([secondTarget]);
+    vi.mocked(submitTurnCommand)
+      .mockResolvedValueOnce([
+        { type: 'unitMoved', unitId: 7, from: { x: 0, y: 0 }, to: firstTarget },
+      ])
+      .mockResolvedValueOnce([
+        { type: 'unitMoved', unitId: 7, from: firstTarget, to: secondTarget },
+      ]);
+
+    const scene = new MatchScene();
+    scene.create({ roomId: 'room-abc', playerTokens: ['t1', 't2'] });
+    await Promise.resolve();
+
+    const unitGraphics = occupantGraphics(0);
+    await submitViaUI(unitGraphics, 0);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // The mock Graphics object never actually animates (tweens.add is a no-op spy), so simulate
+    // the first tween having completed by advancing the object's position ourselves before the
+    // second move — this is what the real Phaser tween would have left it at.
+    unitGraphics.x = 48;
+    unitGraphics.y = 0;
+
+    pointerDownOf(unitGraphics)();
+    const [moveButtonGraphics] = mockScene.add.graphics.mock.results
+      .slice(-3)
+      .map(r => r.value as ReturnType<typeof mockScene.add.graphics>);
+    pointerDownOf(moveButtonGraphics!)();
+    await Promise.resolve();
+    await Promise.resolve();
+    const [overlayTileGraphics] = mockScene.add.graphics.mock.results
+      .slice(-1)
+      .map(r => r.value as ReturnType<typeof mockScene.add.graphics>);
+    pointerDownOf(overlayTileGraphics!)();
+    const [, yesButtonGraphics] = mockScene.add.graphics.mock.results
+      .slice(-3)
+      .map(r => r.value as ReturnType<typeof mockScene.add.graphics>);
+    pointerDownOf(yesButtonGraphics!)();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(mockScene.tweens.add).toHaveBeenLastCalledWith(
+      expect.objectContaining({ targets: unitGraphics, x: 96, y: 0 })
+    );
   });
 });

@@ -13,6 +13,8 @@
 // inspect a specific call's instance.
 export function createMockGraphics() {
   return {
+    x: 0,
+    y: 0,
     fillStyle: vi.fn().mockReturnThis(),
     fillRect: vi.fn().mockReturnThis(),
     fillCircle: vi.fn().mockReturnThis(),
@@ -25,12 +27,19 @@ export function createMockGraphics() {
     strokeCircle: vi.fn().mockReturnThis(),
     setInteractive: vi.fn().mockReturnThis(),
     on: vi.fn().mockReturnThis(),
+    off: vi.fn().mockReturnThis(),
+    setDepth: vi.fn().mockReturnThis(),
+    setScrollFactor: vi.fn().mockReturnThis(),
+    destroy: vi.fn(),
   };
 }
 
 export function createMockText() {
   return {
     setOrigin: vi.fn().mockReturnThis(),
+    setDepth: vi.fn().mockReturnThis(),
+    setScrollFactor: vi.fn().mockReturnThis(),
+    destroy: vi.fn(),
   };
 }
 
@@ -192,7 +201,9 @@ const mockContext = {
 };
 
 HTMLCanvasElement.prototype.getContext = vi.fn((contextId: string) => {
-  if (contextId === '2d') return mockContext as unknown as CanvasRenderingContext2D;
+  if (contextId === '2d') {
+    return mockContext as unknown as CanvasRenderingContext2D;
+  }
   return null;
 }) as unknown as HTMLCanvasElement['getContext'];
 
