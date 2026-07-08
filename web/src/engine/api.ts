@@ -96,13 +96,13 @@ export async function getMatchState(): Promise<GameState> {
   return handleResponse<GameState>(res);
 }
 
-export async function startTurn(): Promise<GameState> {
+export async function startTurn(): Promise<GameEvent[]> {
   const roomId = requireRoomId();
   const res = await fetch(buildUrl(`/api/match-rooms/${roomId}/match/start-turn`), {
     method: 'POST',
     headers: authHeaders(),
   });
-  return handleResponse<GameState>(res);
+  return handleResponse<GameEvent[]>(res);
 }
 
 export async function submitTurnCommand(cmd: TurnCommand): Promise<GameEvent[]> {
