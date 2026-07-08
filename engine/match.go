@@ -291,6 +291,7 @@ func (m *Match) tickCountdownsAndQueueFuses() ([]BombID, map[BombID]bool) {
 		}
 
 		bomb.Countdown--
+		m.SubmitAction(NewBombCountdownUpdatedEvent(id, bomb.Countdown))
 		if bomb.Countdown == 0 {
 			queue = append(queue, id)
 			ignited[id] = true

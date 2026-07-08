@@ -1374,7 +1374,7 @@ func TestHandleResolveTurn(t *testing.T) {
 			t.Fatalf("Failed to decode response JSON payload: %v", err)
 		}
 
-		if got, want := response, 5; len(got) != want {
+		if got, want := response, 6; len(got) != want {
 			t.Errorf("Expected %d gameEvents returned, got %#v", want, got)
 		}
 		if got, want := room.Match.WorkingState.Units[uID].HP, 0; got != want {

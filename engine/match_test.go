@@ -982,10 +982,14 @@ func TestMatch_ResolveTurn_ExplosionAndBlast(t *testing.T) {
 		m.WorkingState.Grid[5][5] = Tile{OccupantType: OccupantBomb, OccupantID: int64(b1)}
 		m.WorkingState.Grid[15][15] = Tile{OccupantType: OccupantBomb, OccupantID: int64(b2)}
 
-		events := m.ResolveTurn()
+		evts := m.ResolveTurn()
 
-		if len(events) != 0 {
-			t.Errorf("Expected zero events for ticking bomb, got %v", len(events))
+		if len(evts) != 1 {
+			t.Errorf("expected 1 GameEvent returned, got %d", len(evts))
+		}
+		resEvt := evts[0]
+		if resEvt.Type != GameEvtBombCountdownUpdated || resEvt.BombID != b1 || resEvt.Countdown != 2 {
+			t.Errorf("malformed EvtBombCountdownUpdated returned: %+v", resEvt)
 		}
 		if m.WorkingState.Bombs[b1].Countdown != 2 {
 			t.Errorf("Expected Bomb %#X to reduce to 2, got %d", b1, m.WorkingState.Bombs[b1].Countdown)

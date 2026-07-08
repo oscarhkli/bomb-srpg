@@ -796,7 +796,7 @@ func TestServerStateManager_ResolveTurn(t *testing.T) {
 				}
 				room := roomVal.(*MatchRoom)
 
-				if got, want := gameEvents, 5; len(got) != want {
+				if got, want := gameEvents, 6; len(got) != want {
 					t.Errorf("Expected %d gameEvents returned, got %#v", want, got)
 				}
 				if got, want := room.Match.WorkingState.Units[16].HP, 0; got != want {
