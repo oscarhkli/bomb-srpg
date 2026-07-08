@@ -197,7 +197,7 @@ func (m *Match) StartTurn() {
 }
 
 // injectSuddenDeathHazards picks 2 random unoccupied tiles and drop bombs there.
-func (m *Match) injectSuddenDeathHazards() error {
+func (m *Match) injectSuddenDeathHazards() []GameEvent {
 	emptyTilePos := []Coordinate{}
 	for y, row := range m.WorkingState.Grid {
 		for x, tile := range row {
@@ -213,11 +213,12 @@ func (m *Match) injectSuddenDeathHazards() error {
 
 	limit := min(len(emptyTilePos), SuddenDeathBombs)
 
+	gameEvts := []GameEvent{}
 	for _, target := range emptyTilePos[:limit] {
-		m.placeBomb(SystemUnitID, target, BombDefaultPower)
+		gameEvts = append(gameEvts, m.placeBomb(SystemUnitID, target, BombDefaultPower)...)
 	}
 
-	return nil
+	return gameEvts
 }
 
 // ResolveTurn controls everything in between turns:
@@ -237,11 +238,11 @@ func (m *Match) ResolveTurn() []GameEvent {
 		switch result {
 		case MatchDraw:
 			m.WinnerTeamID = -1
-			m.SubmitAction(NewMatchEndedEvent(-1, true))
+			m.PlaybackLog = append(m.PlaybackLog, NewMatchEndedEvent(-1, true))
 
 		case MatchWin:
 			m.WinnerTeamID = winner
-			m.SubmitAction(NewMatchEndedEvent(winner, false))
+			m.PlaybackLog = append(m.PlaybackLog, NewMatchEndedEvent(winner, false))
 
 		case MatchInProgress:
 			m.WorkingState.Turn++
@@ -291,7 +292,7 @@ func (m *Match) tickCountdownsAndQueueFuses() ([]BombID, map[BombID]bool) {
 		}
 
 		bomb.Countdown--
-		m.SubmitAction(NewBombCountdownUpdatedEvent(id, bomb.Countdown))
+		m.PlaybackLog = append(m.PlaybackLog, NewBombCountdownUpdatedEvent(id, bomb.Countdown))
 		if bomb.Countdown == 0 {
 			queue = append(queue, id)
 			ignited[id] = true
@@ -359,7 +360,7 @@ func (m *Match) processChainDetonations(
 
 		m.WorkingState.ClearStageTile(currBomb.Position)
 		delete(m.WorkingState.Bombs, currBombID)
-		m.SubmitAction(NewBombExplodedEvent(currBombID, affectedPos))
+		m.PlaybackLog = append(m.PlaybackLog, NewBombExplodedEvent(currBombID, affectedPos))
 	}
 }
 
@@ -387,11 +388,11 @@ func (m *Match) handleDelayedBatchDamage(
 		}
 
 		unit.HP -= 1
-		m.SubmitAction(NewUnitDamagedEvent(unitID, unit.HP))
+		m.PlaybackLog = append(m.PlaybackLog, NewUnitDamagedEvent(unitID, unit.HP))
 
 		if unit.HP <= 0 {
 			m.WorkingState.ClearStageTile(unit.Position)
-			m.SubmitAction(NewUnitDiedEvent(unitID))
+			m.PlaybackLog = append(m.PlaybackLog, NewUnitDiedEvent(unitID))
 		}
 	}
 
@@ -403,7 +404,7 @@ func (m *Match) handleDelayedBatchDamage(
 
 		m.WorkingState.ClearStageTile(softBlock.Position)
 		delete(m.WorkingState.SoftBlocks, softBlockID)
-		m.SubmitAction(NewSoftBlockDestroyedEvent(softBlockID, softBlock.Position))
+		m.PlaybackLog = append(m.PlaybackLog, NewSoftBlockDestroyedEvent(softBlockID, softBlock.Position))
 	}
 
 	// TODO: Item destruction in future phase
