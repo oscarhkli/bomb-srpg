@@ -1030,13 +1030,21 @@ func TestHandleStartTurn(t *testing.T) {
 			t.Errorf("Handler returned wrong content type: got %v want %v", contentType, expectedHeader)
 		}
 
-		var response ClientMatchStateResponse
+		var response []engine.GameEvent
 		if err := json.NewDecoder(rr.Body).Decode(&response); err != nil {
 			t.Fatalf("Failed to decode response JSON payload: %v", err)
 		}
 
 		if got, want := len(room.Match.WorkingState.Bombs), 2; got != want {
 			t.Errorf("Expected SuddenDeath triggered and drop %d bombs, got %d", want, got)
+		}
+		if len(response) != 2 {
+			t.Errorf("expected 2 GameEvent returned, got %d", len(response))
+		}
+		for _, evt := range response {
+			if evt.Type != engine.GameEvtBombPlaced {
+				t.Errorf("malformed EvtBombPlaced returned: %+v", evt)
+			}
 		}
 	})
 
@@ -1097,7 +1105,12 @@ func TestHandleStartTurn(t *testing.T) {
 	})
 
 	t.Run("Test Contract", func(t *testing.T) {
-		roomID, playerTokens, _, h := createTestRoomWithMatch(t)
+		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
+		roomVal, _ := s.Rooms.Load(roomID)
+		room := roomVal.(*MatchRoom)
+		room.Match.TrueState.Turn = 99999
+		room.Match.WorkingState.Turn = 99999
+
 		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/start-turn", nil)
 		if err != nil {
 			t.Fatalf("Failed to create request: %v", err)
@@ -1107,9 +1120,17 @@ func TestHandleStartTurn(t *testing.T) {
 		rr := httptest.NewRecorder()
 		testMux("POST /api/match-rooms/{roomID}/match/start-turn", h.HandleStartTurn).ServeHTTP(rr, req)
 
-		assertObjectContract(t, rr.Body.Bytes(),
-			[]string{"turn", "activeTeam", "grid", "units", "bombs", "softBlocks", "turnCommands"},
-			assertMatchStateNested)
+		assertArrayContract(t, rr.Body.Bytes(),
+			[]string{"type", "unitId", "bombId", "position", "range", "countdown"},
+			func(t *testing.T, item map[string]any) {
+				t.Helper()
+				positionField := item["position"].(map[string]any)
+				for _, field := range []string{"x", "y"} {
+					if _, exists := positionField[field]; !exists {
+						t.Errorf("Contract Broken: from missing key '%s'", field)
+					}
+				}
+			})
 	})
 
 	t.Run("Failure: missing Authorization header", func(t *testing.T) {
@@ -1374,7 +1395,7 @@ func TestHandleResolveTurn(t *testing.T) {
 			t.Fatalf("Failed to decode response JSON payload: %v", err)
 		}
 
-		if got, want := response, 5; len(got) != want {
+		if got, want := response, 6; len(got) != want {
 			t.Errorf("Expected %d gameEvents returned, got %#v", want, got)
 		}
 		if got, want := room.Match.WorkingState.Units[uID].HP, 0; got != want {

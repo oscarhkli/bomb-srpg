@@ -12,6 +12,8 @@ const (
 	GameEvtUnitDied GameEvtType = "unitDied"
 	// GameEvtBombPlaced signals a new bomb was deployed.
 	GameEvtBombPlaced GameEvtType = "bombPlaced"
+	// GameEvtBombCountdownUpdated signals a bomb updated its countdown, for both increase or decrease
+	GameEvtBombCountdownUpdated GameEvtType = "bombCountdownUpdated"
 	// GameEvtBombExploded signals a bomb detonated and lists affected tiles.
 	GameEvtBombExploded GameEvtType = "bombExploded"
 	// GameEvtSoftBlockDestroyed signals a soft block was destroyed.
@@ -57,6 +59,11 @@ func NewUnitDiedEvent(unitID UnitID) GameEvent {
 // NewBombPlacedEvent creates a bomb placed event.
 func NewBombPlacedEvent(unitID UnitID, bombID BombID, pos Coordinate, rangeVal, countdown int) GameEvent {
 	return GameEvent{Type: GameEvtBombPlaced, UnitID: unitID, BombID: bombID, Position: &pos, Range: rangeVal, Countdown: countdown}
+}
+
+// NewBombCountdownUpdatedEvent creats a bomb countdown updated event.
+func NewBombCountdownUpdatedEvent(bombID BombID, countdown int) GameEvent {
+	return GameEvent{Type: GameEvtBombCountdownUpdated, BombID: bombID, Countdown: countdown}
 }
 
 // NewBombExplodedEvent creates a bomb exploded event.

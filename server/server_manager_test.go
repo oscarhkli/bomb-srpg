@@ -497,7 +497,7 @@ func TestServerStateManager_SubmitTurnCommand(t *testing.T) {
 		name     string
 		setup    func(t *testing.T) (string, *ServerStateManager, engine.TurnCommand, string)
 		wantErr  error
-		validate func(t *testing.T, gameEvts []engine.GameEvent, s *ServerStateManager, roomID string, cmd engine.TurnCommand)
+		validate func(t *testing.T, gameEvents []engine.GameEvent, s *ServerStateManager, roomID string, cmd engine.TurnCommand)
 	}{
 		{
 			name: "Success",
@@ -509,7 +509,7 @@ func TestServerStateManager_SubmitTurnCommand(t *testing.T) {
 				return roomID, s, cmd, tokens[0]
 			},
 			wantErr: nil,
-			validate: func(t *testing.T, gameEvts []engine.GameEvent, s *ServerStateManager, roomID string, cmd engine.TurnCommand) {
+			validate: func(t *testing.T, gameEvents []engine.GameEvent, s *ServerStateManager, roomID string, cmd engine.TurnCommand) {
 				roomVal, ok := s.Rooms.Load(roomID)
 				if !ok {
 					t.Fatal("Room not found")
@@ -520,10 +520,10 @@ func TestServerStateManager_SubmitTurnCommand(t *testing.T) {
 				if gotPos := room.Match.WorkingState.Units[uID].Position; gotPos != newPos {
 					t.Errorf("Expected Unit %#X new position %#v, got %#v", uID, newPos, gotPos)
 				}
-				if len(gameEvts) != 1 {
-					t.Errorf("expected 1 GameEvent returned, got %d", len(gameEvts))
+				if len(gameEvents) != 1 {
+					t.Errorf("expected 1 GameEvent returned, got %d", len(gameEvents))
 				}
-				resEvt := gameEvts[0]
+				resEvt := gameEvents[0]
 				validFrom := engine.Coordinate{X: 4, Y: 8}
 				if resEvt.Type != engine.GameEvtUnitMoved || resEvt.UnitID != uID || *resEvt.From != validFrom || *resEvt.To != newPos {
 					t.Errorf("malformed UnitMoveEvent returned: %+v", resEvt)
@@ -540,7 +540,7 @@ func TestServerStateManager_SubmitTurnCommand(t *testing.T) {
 				return roomID, s, cmd, tokens[0]
 			},
 			wantErr: ErrInvalidTurnCmd,
-			validate: func(t *testing.T, gameEvts []engine.GameEvent, s *ServerStateManager, roomID string, cmd engine.TurnCommand) {
+			validate: func(t *testing.T, gameEvents []engine.GameEvent, s *ServerStateManager, roomID string, cmd engine.TurnCommand) {
 				roomVal, ok := s.Rooms.Load(roomID)
 				if !ok {
 					t.Fatal("Room not found")
@@ -550,8 +550,8 @@ func TestServerStateManager_SubmitTurnCommand(t *testing.T) {
 				if gotPos := room.Match.WorkingState.Units[uID].Position; gotPos.X == 4 && gotPos.Y == 7777 {
 					t.Errorf("Expected Unit %#X didn't move", uID)
 				}
-				if len(gameEvts) > 0 {
-					t.Errorf("Expected gameEvents to be empty, got %p", gameEvts)
+				if len(gameEvents) > 0 {
+					t.Errorf("Expected gameEvents to be empty, got %p", gameEvents)
 				}
 			},
 		},
@@ -565,9 +565,9 @@ func TestServerStateManager_SubmitTurnCommand(t *testing.T) {
 				return "NONEXISTENT", s, cmd, "dummy-token"
 			},
 			wantErr: ErrRoomNotFound,
-			validate: func(t *testing.T, gameEvts []engine.GameEvent, s *ServerStateManager, roomID string, cmd engine.TurnCommand) {
-				if len(gameEvts) > 0 {
-					t.Errorf("Expected gameEvents to be empty, got %p", gameEvts)
+			validate: func(t *testing.T, gameEvents []engine.GameEvent, s *ServerStateManager, roomID string, cmd engine.TurnCommand) {
+				if len(gameEvents) > 0 {
+					t.Errorf("Expected gameEvents to be empty, got %p", gameEvents)
 				}
 			},
 		},
@@ -582,9 +582,9 @@ func TestServerStateManager_SubmitTurnCommand(t *testing.T) {
 				return roomID, s, cmd, "dummy-token"
 			},
 			wantErr: ErrMatchNotFound,
-			validate: func(t *testing.T, gameEvts []engine.GameEvent, s *ServerStateManager, roomID string, cmd engine.TurnCommand) {
-				if len(gameEvts) > 0 {
-					t.Errorf("Expected gameEvents to be empty, got %p", gameEvts)
+			validate: func(t *testing.T, gameEvents []engine.GameEvent, s *ServerStateManager, roomID string, cmd engine.TurnCommand) {
+				if len(gameEvents) > 0 {
+					t.Errorf("Expected gameEvents to be empty, got %p", gameEvents)
 				}
 			},
 		},
@@ -593,12 +593,12 @@ func TestServerStateManager_SubmitTurnCommand(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			roomID, s, cmd, token := tt.setup(t)
-			gameEvts, err := s.SubmitTurnCommand(roomID, cmd, token)
+			gameEvents, err := s.SubmitTurnCommand(roomID, cmd, token)
 			if !errors.Is(err, tt.wantErr) {
 				t.Fatalf("SubmitTurnCommand() error = %v, want %v", err, tt.wantErr)
 			}
 			if tt.validate != nil {
-				tt.validate(t, gameEvts, s, roomID, cmd)
+				tt.validate(t, gameEvents, s, roomID, cmd)
 			}
 		})
 	}
@@ -609,7 +609,7 @@ func TestServerStateManager_StartTurn(t *testing.T) {
 		name     string
 		setup    func(t *testing.T) (string, *ServerStateManager, string)
 		wantErr  error
-		validate func(t *testing.T, gs *engine.GameState, s *ServerStateManager, roomID string)
+		validate func(t *testing.T, gameEvents []engine.GameEvent, s *ServerStateManager, roomID string)
 	}{
 		{
 			name: "Success",
@@ -622,7 +622,7 @@ func TestServerStateManager_StartTurn(t *testing.T) {
 				return roomID, s, tokens[0]
 			},
 			wantErr: nil,
-			validate: func(t *testing.T, gs *engine.GameState, s *ServerStateManager, roomID string) {
+			validate: func(t *testing.T, gameEvents []engine.GameEvent, s *ServerStateManager, roomID string) {
 				roomVal, ok := s.Rooms.Load(roomID)
 				if !ok {
 					t.Fatal("Room not found")
@@ -632,8 +632,13 @@ func TestServerStateManager_StartTurn(t *testing.T) {
 				if got, want := len(room.Match.WorkingState.Bombs), 2; got != want {
 					t.Errorf("Expected SuddenDeath triggered and drop %d bombs, got %d", want, got)
 				}
-				if gs != room.Match.WorkingState {
-					t.Errorf("Expected matchState pointer %p, got %p", room.Match.WorkingState, gs)
+				if len(gameEvents) != 2 {
+					t.Errorf("expected 2 GameEvent returned, got %d", len(gameEvents))
+				}
+				for _, evt := range gameEvents {
+					if evt.Type != engine.GameEvtBombPlaced {
+						t.Errorf("malformed EvtBombPlaced returned: %+v", evt)
+					}
 				}
 			},
 		},
@@ -647,9 +652,9 @@ func TestServerStateManager_StartTurn(t *testing.T) {
 				return roomID, s, tokens[0]
 			},
 			wantErr: ErrMatchEnded,
-			validate: func(t *testing.T, gs *engine.GameState, s *ServerStateManager, roomID string) {
-				if gs != nil {
-					t.Errorf("Expected matchState to be nil, got %p", gs)
+			validate: func(t *testing.T, gameEvents []engine.GameEvent, s *ServerStateManager, roomID string) {
+				if len(gameEvents) > 0 {
+					t.Errorf("Expected gameEvents to be empty, got %p", gameEvents)
 				}
 			},
 		},
@@ -660,9 +665,9 @@ func TestServerStateManager_StartTurn(t *testing.T) {
 				return "NONEXISTENT", s, "dummy-token"
 			},
 			wantErr: ErrRoomNotFound,
-			validate: func(t *testing.T, gs *engine.GameState, s *ServerStateManager, roomID string) {
-				if gs != nil {
-					t.Errorf("Expected matchState to be nil, got %p", gs)
+			validate: func(t *testing.T, gameEvents []engine.GameEvent, s *ServerStateManager, roomID string) {
+				if len(gameEvents) > 0 {
+					t.Errorf("Expected gameEvents to be empty, got %p", gameEvents)
 				}
 			},
 		},
@@ -674,9 +679,9 @@ func TestServerStateManager_StartTurn(t *testing.T) {
 				return roomID, s, "dummy-token"
 			},
 			wantErr: ErrMatchNotFound,
-			validate: func(t *testing.T, gs *engine.GameState, s *ServerStateManager, roomID string) {
-				if gs != nil {
-					t.Errorf("Expected matchState to be nil, got %p", gs)
+			validate: func(t *testing.T, gameEvents []engine.GameEvent, s *ServerStateManager, roomID string) {
+				if len(gameEvents) > 0 {
+					t.Errorf("Expected gameEvents to be empty, got %p", gameEvents)
 				}
 			},
 		},
@@ -685,12 +690,12 @@ func TestServerStateManager_StartTurn(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			roomID, s, token := tt.setup(t)
-			gs, err := s.StartTurn(roomID, token)
+			gameEvents, err := s.StartTurn(roomID, token)
 			if !errors.Is(err, tt.wantErr) {
 				t.Fatalf("StartTurn() error = %v, want %v", err, tt.wantErr)
 			}
 			if tt.validate != nil {
-				tt.validate(t, gs, s, roomID)
+				tt.validate(t, gameEvents, s, roomID)
 			}
 		})
 	}
@@ -796,7 +801,7 @@ func TestServerStateManager_ResolveTurn(t *testing.T) {
 				}
 				room := roomVal.(*MatchRoom)
 
-				if got, want := gameEvents, 5; len(got) != want {
+				if got, want := gameEvents, 6; len(got) != want {
 					t.Errorf("Expected %d gameEvents returned, got %#v", want, got)
 				}
 				if got, want := room.Match.WorkingState.Units[16].HP, 0; got != want {

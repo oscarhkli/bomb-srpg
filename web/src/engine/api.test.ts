@@ -159,17 +159,11 @@ describe('api.ts', () => {
   });
 
   describe('startTurn', () => {
-    const fixture: GameState = {
-      turn: 1,
-      activeTeam: 0,
-      grid: [],
-      units: [],
-      bombs: [],
-      softBlocks: [],
-      turnCommands: [],
-    };
+    const fixture: GameEvent[] = [
+      { type: 'bombPlaced', unitId: 0, position: { x: 1, y: 0 }, range: 1, countdown: 5 },
+    ];
 
-    it('should POST with Authorization header and return game state', async () => {
+    it('should POST with Authorization header and return game events', async () => {
       mockOk(200, fixture);
 
       const result = await startTurn();
@@ -194,7 +188,7 @@ describe('api.ts', () => {
       { type: 'unitMoved', unitId: 1, from: { x: 1, y: 0 }, to: { x: 1, y: 1 } },
     ];
 
-    it('should POST command with auth and return game state', async () => {
+    it('should POST command with auth and return game events', async () => {
       mockOk(200, fixture);
 
       const result = await submitTurnCommand(cmdFixture);

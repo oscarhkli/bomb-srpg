@@ -807,6 +807,21 @@ func TestGameState_IsLandingLegal_OccupantBomb(t *testing.T) {
 }
 
 func TestMatch_StartTurn_NotTriggeringSuddenDeath(t *testing.T) {
+	king, ok := GetArchetype("King")
+	if !ok {
+		t.Fatalf("Archetype King does not exist")
+	}
+
+	fighter, ok := GetArchetype("Fighter")
+	if !ok {
+		t.Fatalf("Archetype Fighter does not exist")
+	}
+
+	u1 := NewUnitID(1, 0)
+	u2 := NewUnitID(2, 0)
+	u3 := NewUnitID(1, 1)
+	u4 := NewUnitID(2, 1)
+
 	t.Run("match has reached a conclusion", func(t *testing.T) {
 		m := newTestMatch(3, 3)
 		m.GameCfg.SuddenDeath = true
@@ -815,25 +830,37 @@ func TestMatch_StartTurn_NotTriggeringSuddenDeath(t *testing.T) {
 		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 0}
 		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1}
 
-		m.StartTurn()
+		gameEvents := m.StartTurn()
 
 		if got, want := len(m.WorkingState.Bombs), 0; got != want {
 			t.Errorf("Victory Evaluation failure: Bomb count = %d, want: %d", got, want)
 		}
+		if len(gameEvents) > 0 {
+			t.Errorf("expected empty gameEvents return, got %#v", gameEvents)
+		}
+		if len(m.PlaybackLog) > 0 {
+			t.Errorf("expected empty PlaybackLog, got %#v", m.PlaybackLog)
+		}
 	})
 
-	t.Run("sudden disabled", func(t *testing.T) {
+	t.Run("suddenDeath disabled", func(t *testing.T) {
 		m := newTestMatch(3, 3)
 		m.GameCfg.SuddenDeath = false
-		u1 := NewUnitID(1, 0)
-		u2 := NewUnitID(2, 0)
-		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1}
-		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1}
+		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1, Position: Coordinate{0, 0}, Type: king}
+		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1, Position: Coordinate{0, 1}, Type: king}
+		m.WorkingState.Units[u3] = &Unit{ID: u3, Team: 1, HP: 1, Position: Coordinate{0, 7}, Type: fighter}
+		m.WorkingState.Units[u4] = &Unit{ID: u4, Team: 2, HP: 1, Position: Coordinate{0, 8}, Type: fighter}
 
-		m.StartTurn()
+		gameEvents := m.StartTurn()
 
 		if got, want := len(m.WorkingState.Bombs), 0; got != want {
 			t.Errorf("Sudden Death check failure: Bomb count = %d, want: %d", got, want)
+		}
+		if len(gameEvents) > 0 {
+			t.Errorf("expected empty gameEvents return, got %#v", gameEvents)
+		}
+		if len(m.PlaybackLog) > 0 {
+			t.Errorf("expected empty PlaybackLog, got %#v", m.PlaybackLog)
 		}
 	})
 
@@ -843,15 +870,21 @@ func TestMatch_StartTurn_NotTriggeringSuddenDeath(t *testing.T) {
 		m.TrueState.Turn = 100
 		m.WorkingState.Turn = 100
 		m.WorkingState.ActiveTeam = 2
-		u1 := NewUnitID(1, 0)
-		u2 := NewUnitID(2, 0)
-		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1}
-		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1}
+		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1, Position: Coordinate{0, 0}, Type: king}
+		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1, Position: Coordinate{0, 1}, Type: king}
+		m.WorkingState.Units[u3] = &Unit{ID: u3, Team: 1, HP: 1, Position: Coordinate{0, 7}, Type: fighter}
+		m.WorkingState.Units[u4] = &Unit{ID: u4, Team: 2, HP: 1, Position: Coordinate{0, 8}, Type: fighter}
 
-		m.StartTurn()
+		gameEvents := m.StartTurn()
 
 		if got, want := len(m.WorkingState.Bombs), 0; got != want {
 			t.Errorf("Turn limit check failure: Bomb count = %d, want: %d", got, want)
+		}
+		if len(gameEvents) > 0 {
+			t.Errorf("expected empty gameEvents return, got %#v", gameEvents)
+		}
+		if len(m.PlaybackLog) > 0 {
+			t.Errorf("expected empty PlaybackLog, got %#v", m.PlaybackLog)
 		}
 	})
 }
@@ -890,10 +923,16 @@ func TestMatch_StartTurn_SuddenDeath(t *testing.T) {
 		m.WorkingState.Grid[1][3].OccupantType = OccupantUnit
 		m.WorkingState.Grid[1][3].OccupantID = int64(u4)
 
-		m.StartTurn()
+		gameEvents := m.StartTurn()
 
 		if got, want := len(m.WorkingState.Bombs), SuddenDeathBombs; got != want {
 			t.Errorf("Sudden death bomb drop failure: Bomb count = %d, want: %d", got, want)
+		}
+		if len(gameEvents) != 2 {
+			t.Errorf("expected 2 gameEvents return, got %#v", gameEvents)
+		}
+		if len(m.PlaybackLog) > 0 {
+			t.Errorf("expected empty PlaybackLog, got %#v", m.PlaybackLog)
 		}
 	})
 
@@ -921,10 +960,16 @@ func TestMatch_StartTurn_SuddenDeath(t *testing.T) {
 		m.WorkingState.Grid[8][0].OccupantType = OccupantUnit
 		m.WorkingState.Grid[8][0].OccupantID = int64(u4)
 
-		m.StartTurn()
+		gameEvents := m.StartTurn()
 
 		if got, want := len(m.WorkingState.Bombs), 2; got != want {
 			t.Errorf("Sudden death bomb drop failure: Bomb count = %d, want: %d", got, want)
+		}
+		if len(gameEvents) != 1 {
+			t.Errorf("expected 1 gameEvents return, got %#v", gameEvents)
+		}
+		if len(m.PlaybackLog) > 0 {
+			t.Errorf("expected empty PlaybackLog, got %#v", m.PlaybackLog)
 		}
 	})
 
@@ -946,10 +991,16 @@ func TestMatch_StartTurn_SuddenDeath(t *testing.T) {
 		m.WorkingState.Grid[4][0].OccupantType = OccupantUnit
 		m.WorkingState.Grid[4][0].OccupantID = int64(u4)
 
-		m.StartTurn()
+		gameEvents := m.StartTurn()
 
 		if got, want := len(m.WorkingState.Bombs), 0; got != want {
 			t.Errorf("Sudden death bomb drop failure: Bomb count = %d, want: %d", got, want)
+		}
+		if len(gameEvents) > 0 {
+			t.Errorf("expected empty gameEvents return, got %#v", gameEvents)
+		}
+		if len(m.PlaybackLog) > 0 {
+			t.Errorf("expected empty PlaybackLog, got %#v", m.PlaybackLog)
 		}
 	})
 }
@@ -982,10 +1033,14 @@ func TestMatch_ResolveTurn_ExplosionAndBlast(t *testing.T) {
 		m.WorkingState.Grid[5][5] = Tile{OccupantType: OccupantBomb, OccupantID: int64(b1)}
 		m.WorkingState.Grid[15][15] = Tile{OccupantType: OccupantBomb, OccupantID: int64(b2)}
 
-		events := m.ResolveTurn()
+		evts := m.ResolveTurn()
 
-		if len(events) != 0 {
-			t.Errorf("Expected zero events for ticking bomb, got %v", len(events))
+		if len(evts) != 1 {
+			t.Errorf("expected 1 GameEvent returned, got %d", len(evts))
+		}
+		resEvt := evts[0]
+		if resEvt.Type != GameEvtBombCountdownUpdated || resEvt.BombID != b1 || resEvt.Countdown != 2 {
+			t.Errorf("malformed EvtBombCountdownUpdated returned: %+v", resEvt)
 		}
 		if m.WorkingState.Bombs[b1].Countdown != 2 {
 			t.Errorf("Expected Bomb %#X to reduce to 2, got %d", b1, m.WorkingState.Bombs[b1].Countdown)
