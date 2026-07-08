@@ -1121,7 +1121,7 @@ func TestHandleStartTurn(t *testing.T) {
 		testMux("POST /api/match-rooms/{roomID}/match/start-turn", h.HandleStartTurn).ServeHTTP(rr, req)
 
 		assertArrayContract(t, rr.Body.Bytes(),
-			[]string{"type", "bombId", "position", "range", "countdown"},
+			[]string{"type", "unitId", "bombId", "position", "range", "countdown"},
 			func(t *testing.T, item map[string]any) {
 				t.Helper()
 				positionField := item["position"].(map[string]any)
