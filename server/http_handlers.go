@@ -176,7 +176,7 @@ func (h *Handler) HandleSubmitTurnCommand(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	gameEvts, err := h.Manager.SubmitTurnCommand(roomID, req, token)
+	gameEvents, err := h.Manager.SubmitTurnCommand(roomID, req, token)
 	if err != nil {
 		code, msg := mapError(err)
 		h.Logger.Warn("submit turn command failed", "roomID", roomID, "error", err)
@@ -187,7 +187,7 @@ func (h *Handler) HandleSubmitTurnCommand(w http.ResponseWriter, r *http.Request
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 
-	if err := json.NewEncoder(w).Encode(gameEvts); err != nil {
+	if err := json.NewEncoder(w).Encode(gameEvents); err != nil {
 		h.Logger.Error("encode gameEvents failed", "error", err)
 		http.Error(w, "Failed to encode gameEvents", http.StatusInternalServerError)
 		return

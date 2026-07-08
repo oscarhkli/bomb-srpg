@@ -118,12 +118,12 @@ func (c *MatchController) routeGameAction(cmd string) {
 			return
 		}
 
-		gameEvts, err := c.Match.ApplyTurnCommand(engine.NewMoveCommand(unitID, target))
+		gameEvents, err := c.Match.ApplyTurnCommand(engine.NewMoveCommand(unitID, target))
 		if err != nil {
 			_ = c.View.RenderFeedback(false, fmt.Sprintf("Invalid move: %v", err))
 			return
 		}
-		_ = c.View.RenderFeedback(true, fmt.Sprintf("GameEvents: %#v", gameEvts))
+		_ = c.View.RenderFeedback(true, fmt.Sprintf("GameEvents: %#v", gameEvents))
 
 	case "bomb":
 		if len(token) < 4 {
@@ -137,12 +137,12 @@ func (c *MatchController) routeGameAction(cmd string) {
 			return
 		}
 
-		gameEvts, err := c.Match.ApplyTurnCommand(engine.NewPlaceBombCommand(unitID, target))
+		gameEvents, err := c.Match.ApplyTurnCommand(engine.NewPlaceBombCommand(unitID, target))
 		if err != nil {
 			_ = c.View.RenderFeedback(false, fmt.Sprintf("Invalid bomb placement: %v", err))
 			return
 		}
-		_ = c.View.RenderFeedback(true, fmt.Sprintf("GameEvents: %#v", gameEvts))
+		_ = c.View.RenderFeedback(true, fmt.Sprintf("GameEvents: %#v", gameEvents))
 
 	default:
 		_ = c.View.RenderFeedback(false, fmt.Sprintf("Unknown meta command: %s\n", cmd))

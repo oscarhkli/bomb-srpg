@@ -185,19 +185,30 @@ func (gs GameState) IsLandingLegal(target Coordinate, occupantType OccupantType)
 }
 
 // StartTurn sets up the environmental boundaries for the upcoming round.
-func (m *Match) StartTurn() {
+// Returns GameEvents when the match enters SuddenDeath
+func (m *Match) StartTurn() []GameEvent {
 	victoryResult, _ := m.evaluateVictoryConditions()
 	if victoryResult != MatchInProgress {
-		return // Match has reached a conclusion; abort round initialization
+		return []GameEvent{} // Match has reached a conclusion; abort round initialization
 	}
 
-	if m.GameCfg.SuddenDeath && m.TrueState.Turn > m.GameCfg.MaxTurns {
-		m.injectSuddenDeathHazards()
+	if !(m.GameCfg.SuddenDeath && m.TrueState.Turn > m.GameCfg.MaxTurns) {
+		return []GameEvent{}
 	}
+
+	m.injectSuddenDeathHazards()
+	m.TrueState = m.WorkingState.DeepCopy()
+
+	// Flush animation log arrays from the sandbox replay history buffer to the caller
+	gameEvents := make([]GameEvent, len(m.PlaybackLog))
+	copy(gameEvents, m.PlaybackLog)
+	m.PlaybackLog = []GameEvent{}
+
+	return gameEvents
 }
 
 // injectSuddenDeathHazards picks 2 random unoccupied tiles and drop bombs there.
-func (m *Match) injectSuddenDeathHazards() []GameEvent {
+func (m *Match) injectSuddenDeathHazards() {
 	emptyTilePos := []Coordinate{}
 	for y, row := range m.WorkingState.Grid {
 		for x, tile := range row {
@@ -213,12 +224,9 @@ func (m *Match) injectSuddenDeathHazards() []GameEvent {
 
 	limit := min(len(emptyTilePos), SuddenDeathBombs)
 
-	gameEvts := []GameEvent{}
 	for _, target := range emptyTilePos[:limit] {
-		gameEvts = append(gameEvts, m.placeBomb(SystemUnitID, target, BombDefaultPower)...)
+		m.placeBomb(SystemUnitID, target, BombDefaultPower)
 	}
-
-	return gameEvts
 }
 
 // ResolveTurn controls everything in between turns:

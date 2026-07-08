@@ -815,10 +815,16 @@ func TestMatch_StartTurn_NotTriggeringSuddenDeath(t *testing.T) {
 		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 0}
 		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1}
 
-		m.StartTurn()
+		gameEvents := m.StartTurn()
 
 		if got, want := len(m.WorkingState.Bombs), 0; got != want {
 			t.Errorf("Victory Evaluation failure: Bomb count = %d, want: %d", got, want)
+		}
+		if len(gameEvents) > 0 {
+			t.Errorf("expected empty gameEvents return, got %#v", gameEvents)
+		}
+		if len(m.PlaybackLog) > 0 {
+			t.Errorf("expected empty PlaybackLog, got %#v", m.PlaybackLog)
 		}
 	})
 
@@ -830,10 +836,16 @@ func TestMatch_StartTurn_NotTriggeringSuddenDeath(t *testing.T) {
 		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1}
 		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1}
 
-		m.StartTurn()
+		gameEvents := m.StartTurn()
 
 		if got, want := len(m.WorkingState.Bombs), 0; got != want {
 			t.Errorf("Sudden Death check failure: Bomb count = %d, want: %d", got, want)
+		}
+		if len(gameEvents) > 0 {
+			t.Errorf("expected empty gameEvents return, got %#v", gameEvents)
+		}
+		if len(m.PlaybackLog) > 0 {
+			t.Errorf("expected empty PlaybackLog, got %#v", m.PlaybackLog)
 		}
 	})
 
@@ -848,10 +860,16 @@ func TestMatch_StartTurn_NotTriggeringSuddenDeath(t *testing.T) {
 		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1}
 		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1}
 
-		m.StartTurn()
+		gameEvents := m.StartTurn()
 
 		if got, want := len(m.WorkingState.Bombs), 0; got != want {
 			t.Errorf("Turn limit check failure: Bomb count = %d, want: %d", got, want)
+		}
+		if len(gameEvents) > 0 {
+			t.Errorf("expected empty gameEvents return, got %#v", gameEvents)
+		}
+		if len(m.PlaybackLog) > 0 {
+			t.Errorf("expected empty PlaybackLog, got %#v", m.PlaybackLog)
 		}
 	})
 }
@@ -890,10 +908,16 @@ func TestMatch_StartTurn_SuddenDeath(t *testing.T) {
 		m.WorkingState.Grid[1][3].OccupantType = OccupantUnit
 		m.WorkingState.Grid[1][3].OccupantID = int64(u4)
 
-		m.StartTurn()
+		gameEvents := m.StartTurn()
 
 		if got, want := len(m.WorkingState.Bombs), SuddenDeathBombs; got != want {
 			t.Errorf("Sudden death bomb drop failure: Bomb count = %d, want: %d", got, want)
+		}
+		if len(gameEvents) != 2 {
+			t.Errorf("expected 2 gameEvents return, got %#v", gameEvents)
+		}
+		if len(m.PlaybackLog) > 0 {
+			t.Errorf("expected empty PlaybackLog, got %#v", m.PlaybackLog)
 		}
 	})
 
@@ -921,10 +945,16 @@ func TestMatch_StartTurn_SuddenDeath(t *testing.T) {
 		m.WorkingState.Grid[8][0].OccupantType = OccupantUnit
 		m.WorkingState.Grid[8][0].OccupantID = int64(u4)
 
-		m.StartTurn()
+		gameEvents := m.StartTurn()
 
 		if got, want := len(m.WorkingState.Bombs), 2; got != want {
 			t.Errorf("Sudden death bomb drop failure: Bomb count = %d, want: %d", got, want)
+		}
+		if len(gameEvents) != 1 {
+			t.Errorf("expected 1 gameEvents return, got %#v", gameEvents)
+		}
+		if len(m.PlaybackLog) > 0 {
+			t.Errorf("expected empty PlaybackLog, got %#v", m.PlaybackLog)
 		}
 	})
 
@@ -946,10 +976,16 @@ func TestMatch_StartTurn_SuddenDeath(t *testing.T) {
 		m.WorkingState.Grid[4][0].OccupantType = OccupantUnit
 		m.WorkingState.Grid[4][0].OccupantID = int64(u4)
 
-		m.StartTurn()
+		gameEvents := m.StartTurn()
 
 		if got, want := len(m.WorkingState.Bombs), 0; got != want {
 			t.Errorf("Sudden death bomb drop failure: Bomb count = %d, want: %d", got, want)
+		}
+		if len(gameEvents) > 0 {
+			t.Errorf("expected empty gameEvents return, got %#v", gameEvents)
+		}
+		if len(m.PlaybackLog) > 0 {
+			t.Errorf("expected empty PlaybackLog, got %#v", m.PlaybackLog)
 		}
 	})
 }
