@@ -13,6 +13,7 @@ This spec adds turn system command `ResolveTurn` control that trigger the server
 - `MatchScene` renders `TurnPanel` showing the current turn.
 - `MatchScene` renders `ResolveTurnButton`, allowing Player to end the turn.
 - Player can end the turn and see the effects after the backend calculation, e.g., `unit` died, `bomb` detonated, etc..
+- Determine the rendering sequence of `gameEvent` due to chain-reaction.
 
 ## Non-Goal
 
@@ -33,9 +34,11 @@ This spec adds turn system command `ResolveTurn` control that trigger the server
 
 This is required so `gameEvent` handlers below (`bombCountdownUpdated`, `bombExploded`, `softBlockDestroyed`) can look up and mutate/destroy the specific rendered object for a given ID, instead of scanning `boardObjects`.
 
+**Implementation note:** The `bombGraphicsById`/`softBlockGraphicsById`/`unitGraphicsById` maps are owned and mutated by `MatchScene`, but the event-sequencing/animation logic described in "ResolveTurn and the Subsequent Visual Effects" and "Rendering Sequence" below is implemented in a dedicated `web/src/rendering/` module (`resolveTurnPlayer.ts`, `blastEffects.ts`, `reachTime.ts`), not inline in `MatchScene`. `MatchScene` hands the resolved `gameEvents` batch and its graphics maps to `playResolveTurnEvents()`, which reads/mutates those maps and schedules all timing via `scene.time.delayedCall`. This keeps `MatchScene` focused on state/graphics ownership and UI wiring. Constants exclusive to this rendering module (blast/fire timing, colors, sizes, and their depth bands) live in a local `web/src/rendering/constants.ts` rather than the shared `web/src/constants.ts`, since they have no consumers outside that module.
+
 ### Turn Panel
 
-`TurnPanel` is rendered as **96Wx48Hpx** rounded square panel at the top left hand corner of the `MatchScene`, leaving 48px space from the top and left edges. It's depth is same as `TurnCommandPanel`.
+`TurnPanel` is rendered as **96Wx48Hpx** rounded square panel at the top left hand corner of the `MatchScene`, leaving 48px space from the top and left edges. Its depth is same as `TurnCommandPanel`.
 
 `TurnPanel` display 4 elements: A text `Turn`, `gameState.turn`, followed by a text `/`, then `gameCfg.maxTurns`. The rough sample display is shown below:
 
@@ -55,7 +58,7 @@ This is required so `gameEvent` handlers below (`bombCountdownUpdated`, `bombExp
 
 ### ResolveTurn Button
 
-`MatchScene` should render `ResolveButton` **48px** below its top edge. This is a **640Wx72** center-aligned text `End this turn`. Font family is `GAME_FONT_FAMILY`, font color is `PANEL_BUTTON_BORDER_COLOR`.
+`MatchScene` should render `ResolveButton` **48px** below its top edge. This is a **320Wx72** center-aligned text `End this turn`. Font family is `GAME_FONT_FAMILY`, font color is `PANEL_BUTTON_BORDER_COLOR`.
 
 A click handler should be added to `ResolveButton`, opening `ConfirmDialog` with text `Confirm to end this turn?`. If Player clicks `No`, `ConfirmDialog` will be closed. If Player clicks `Yes`, it will trigger `ResolveTurn`.
 
@@ -65,41 +68,47 @@ After the Player confirms to end the turn, frontend should call the backend via 
 
 If the API is correctly executed, the backend will do to all the heavy lift, and return a series of `gameEvents`. 
 
-### BombCountDownUpdatedEvent
+### BombCountdownUpdatedEvent
 
-`bombCountDownUpdatedEvent` should at least contain `bombId` and `countdown`. Missing one of them, or invalid values will make the game unable to proceed. Flag them in errorMessage if any.
+`bombCountdownUpdatedEvent` should at least contain `bombId` and `countdown`. Missing one of them, or invalid values will make the game unable to proceed. Flag them in errorMessage if any.
 
 Validate if:
-- `bomb` with `bombCountDownUpdatedEvent.bombId` exists in `gameState.bombs`.
+- `bomb` with `bombCountdownUpdatedEvent.bombId` exists in `gameState.bombs`.
 
-For each `bombCountDownUpdatedEvent`: 
+For each `bombCountdownUpdatedEvent`: 
 
-1. Re-render the number shown in the `bomb` using `bombCountDownUpdatedEvent.countdown`. If countdown is **0**, render a `!` with HEX `#0xff0000` instead.
+1. Re-render the number shown in the `bomb` using `bombCountdownUpdatedEvent.countdown`. If countdown is **0**, render a `!` with HEX `0xff0000` instead.
 
 ### BombExplodedEvent
 
-`bombExplodededEvent` should at least contain `bombId` and `affectedPositions`. Missing one of them, or invalid values will make the game unable to proceed. Flag them in errorMessage if any.
+`bombExplodedEvent` should at least contain `bombId` and `affectedPositions`. Missing one of them, or invalid values will make the game unable to proceed. Flag them in errorMessage if any.
 
 Validate if:
-- `bomb` with `bombExplodededEvent.bombId` exists in `gameState.bombs`.
-- `grid` contains all the coordinates in `affected`, i.e., no out-of-bound problem.
+- `bomb` with `bombExplodedEvent.bombId` exists in `gameState.bombs`.
+- `grid` contains all the coordinates in `affectedPositions`, i.e., no out-of-bound problem.
 
-This event renders a cardinal-ray blasting effect of a `bomb`. For each `bombExplodededEvents`:
+This event renders a cardinal-ray blasting effect of a `bomb`. For each `bombExplodedEvents`:
 
 1. Look up the `bomb's` position.
-2. Sort `affectedPositions` by **Manhattan distance**.
-3. Remove the `bomb` image from the `grid`.
-4. The animation should start from `bomb's` position, extending its blast length to the outermost in 4 directions simultaneously, at speed of **100ms per tile**.
-    - The blast should be rendered in 3-layer gradient color. The outermost starts with HEX `0xf58e27`, then `0xf5ee27`, to the innermost `0xfcfabb`. Opacity is **60%**.
-5. If `tile.occupantType` is not `OccupantNone`, render a fire shape on top of the blast and occupant, representing the occupant is burning. Opacity is *70%**.
+2. Remove the `bomb` image from the `grid`.
+3. The animation should start from `bomb's` position, extending its blast outward in 4 directions simultaneously. Tile `T` is reached at `reachTime(bombPosition, T) = distance(bombPosition, T) × BLAST_SPEED_MS_PER_TILE`, a new constant in `web/src/rendering/constants.ts` (placeholder value — tunable later without touching the sequencing rules below).
+    - Each of the 4 cardinal rays renders as a single beam that elongates outward over time (not per-tile flashes), reaching each tile at that tile's `reachTime`. The beam's fixed perpendicular width (the non-elongated dimension) is **32px** — narrower than the 48px tile — centered on the bomb's row/column. The beam (and its growing head/tip) is **pill-shaped** (fully-rounded rect), not a hard-edged rectangle.
+    - The blast should be rendered in 3-layer gradient color. The outermost starts with HEX `0xf58e27`, then `0xf5ee27`, to the innermost `0xfcfabb`. Opacity is **60%**. The gradient bands split the beam into thirds of *that direction's own* max blast length — a short-range ray is fully outer→inner across its short length, not truncated by an absolute-distance mapping shared across all rays.
 
-> Note: Work with agent on how to best describe the blast rendering.
-
-The blasting effect should last for **5s** from the blast center.
+Once the blast has finished growing, it lingers (burning) for `BLAST_DURATION_MS` (~4s, placeholder value) before fading out. This lingering tail does not block other unrelated `gameEvents` — independent bombs/occupant effects render concurrently during it.
 
 ### UnitDamagedEvent
 
-Skip it.
+`unitDamagedEvent` should at least contain `unitId` and `newHp`. Missing one of them, or invalid values will make the game unable to proceed. Flag them in errorMessage if any.
+
+Validate if:
+- `unit` with `unitDamagedEvent.unitId` exists in `gameState.units`.
+
+For each `unitDamagedEvent`:
+
+1. Look up the `unit's` position.
+2. Render a fire shape on top of the blast and `unit`, representing the `unit` is burning. Size is **42px** (larger than the 32px blast beam, so it visibly overlaps). Opacity is **70%**.
+3. If `unitDamageEvent.newHp > 0`, remove the fire after **3s**. Otherwise, let it burn until its `unitDiedEvent` being processed.
 
 ### UnitDiedEvent
 
@@ -108,11 +117,10 @@ Skip it.
 Validate if:
 - `unit` with `unitDiedEvent.unitId` exists in `gameState.units`.
 
-For each `unitDiedEvents`:
+For each `unitDiedEvent`:
 
 1. Look up the `unit's` position.
-2. Render a cross shape in HEX `0xff0000` on top of the `unit`.
-3. **3s** later, remove the `unit` of the cross.
+2. **3s** later after `unitDiedEvent` starts processing, remove the `unit` and the fire shape rendered when `unitDamagedEvent`.
 
 ### SoftBlockDestroyedEvent
 
@@ -121,22 +129,24 @@ For each `unitDiedEvents`:
 Validate if:
 - `softBlock` with `softBlockDestroyedEvent.softBlockId` exists in `gameState.softBlocks`.
 
-For each `softBlockDestroyedEvents`:
+`softBlockDestroyedEvent` does carry a `position` field on the wire, but it is intentionally ignored — position is always resolved via `softBlockGraphicsById`, for consistency with `unitDamagedEvent`/`unitDiedEvent`, which carry no `position` at all.
+
+For each `softBlockDestroyedEvent`:
 
 1. Look up the `softBlock's` position.
-2. Render a cross shape in HEX `0xff0000` on top of the `softBlock`.
-3. **3s** later, remove the `softBlock` of the cross.
+2. Render a fire shape on top of the blast and `softBlock`, representing the `softblock` is burning. Size is **42px** (larger than the 32px blast beam, so it visibly overlaps). Opacity is **70%**.
+3. **3s** later, remove the `softBlock` and the fire shape.
 
 ### Rendering Sequence
 
 This is the trickiest part. `Bombs` explodes with chain-reaction, meaning they could be exploded even if `countdown > 0`. Although backend has already sorted `gameEvents` chronologically, it doesn't explicitly state which `bombs` are exploded due to chain-reaction. An `Occupant` shouldn't be affected until the blast animation reaches its own `tile`.
 
 ```text
-bombCountDownUpdatedEvent-1; bombId-001, countdown-0
-bombCountDownUpdatedEvent-2; bombId-002, countdown-0
-bombCountDownUpdatedEvent-3; bombId-003, countdown-2
+bombCountdownUpdatedEvent-1; bombId-001, countdown-0
+bombCountdownUpdatedEvent-2; bombId-002, countdown-0
+bombCountdownUpdatedEvent-3; bombId-003, countdown-2
 bombExplodedEvent-4; bombId-001
-bombExplodedEvent-5; bombId-003
+bombExplodedEvent-5; bombId-002
 bombExplodedEvent-6; bombId-003
 unitDamagedEvent-7; unitId-007
 unitDiedEvent-8; unitId-007
@@ -147,18 +157,23 @@ unitDiedEvent-11; unitId-010
 
 In the above example of `gameEvents` returned.
 
-1. `bombCountDownUpdatedEvent-1`, `bombCountDownUpdatedEvent-2`, `bombCountDownUpdatedEvent-3` should be rendered concurrently first as they are the 1st group of `gameEvents`.
+1. `bombCountdownUpdatedEvent-1`, `bombCountdownUpdatedEvent-2`, `bombCountdownUpdatedEvent-3` should be rendered concurrently first as they are the 1st group of `gameEvents`.
 2. `bombExplodedEvent-4` and `bombExplodedEvent-5` should be rendered concurrently as their `countdown` reach **0**.
 3. `bombExplodedEvent-6` should be rendered only when the blast reaches `bombId-003`.
 4. `unitDamagedEvent-7`, `softBlockDestroyedEvent-9` and `unitDamagedEvent-10` should be rendered only when the blast reaches the corresponding `Occupant`.
-5. `unitDiedEvent-8` and ``unitDiedEvent-11` should be rendered after each of `unitDamagedEvent-7` and `unitDamagedEvent-10` handled. 
+5. `unitDiedEvent-8` and `unitDiedEvent-11` should be rendered after each of `unitDamagedEvent-7` and `unitDamagedEvent-10` handled. 
 
-> Note: Should discuss with Agent to see if backend need enhancement, e.g., adding `bombChainReactedEvent`.
+No backend enhancement (e.g. `bombChainReactedEvent`) is needed — chain reaction is derivable client-side. Bomb/unit/softBlock positions used for this derivation are sourced from the `gameState` snapshot taken immediately before `resolveTurn()` was called (not from the rendered `Graphics` objects, which are drawn with absolute pixel coordinates baked in and carry no readable tile position) — this is safe because no `unitMoved`/`bombPlaced` events occur within a `resolveTurn()` batch, so positions are static throughout.
 
+For `bombExplodedEvent-N`: if `bombId-N`'s position appears in one or more **earlier** `bombExplodedEvent`'s `affectedPositions` within the same batch, it is a chain reaction. If multiple earlier events qualify, the causer is whichever yields the **smallest resulting delay** — `causer.offset + reachTime(causer.position, thisBomb.position)` — not necessarily the earliest event in array order. Delay this bomb's render by that computed offset from the causer's blast-start. Otherwise (no earlier match), render it immediately in the concurrent "countdown reached 0" group.
+
+`unitDamagedEvent`/`unitDiedEvent`/`softBlockDestroyedEvent` follow the same rule: delay by `reachTime(causingBomb.position, occupant.position)` from the causing bomb's blast-start, using the same smallest-resulting-delay tie-break when more than one earlier `bombExplodedEvent`'s `affectedPositions` includes the occupant's position.
 
 ## Refresh Final Sanity Check
 
-Same operation as stated in [match-p3-spec004.md](match-p3-spec004.md#refresh-final-sanity-check).
+After all `gameEvents` are handled, call `getMatchState()` once for a final sanity check. Compare the freshly-fetched `gameState`'s `units`, `bombs`, and `softBlocks` against the client's own post-render bookkeeping (`unitGraphicsById`/`bombGraphicsById`/`softBlockGraphicsById`): each occupant's existence (no occupant the client still renders but the server no longer lists, and vice versa) and `position` must match. If a mismatch is found, flag it in errorMessage, then re-render the `tiles`, `units`, `bombs` and `softBlocks` using the new `gameState`.
+
+Replace the frontend stored `gameState` by the latest obtained one.
 
 ---
 
@@ -170,6 +185,11 @@ Same operation as stated in [match-p3-spec004.md](match-p3-spec004.md#refresh-fi
 4. Given a `bombCountdownUpdated` event with `countdown === 0`, when rendered, then the bomb shows a red `!` instead of a number.
 5. Given a `bombExploded` event, when rendered, then affected tiles show the blast effect and the bomb sprite is removed from the grid.
 6. Given a `bombExploded` event whose `affectedPositions` includes an occupied tile, when rendered, then a fire shape renders on top of that occupant.
-7. Given a `unitDied` event, when rendered, then a red cross appears over the `unit`; after 3s the `unit` is removed.
-8. Given a `softBlockDestroyed` event, when rendered, then a red cross appears over the `softBlock`; after 3s the `softBlock` is removed.
-9. Given a gameEvent missing a required field or referencing a non-existent bombId/unitId/softBlockId, when encountered, then an error message is shown and rendering halts per "game unable to proceed."
+7. Given a `unitDamaged` event, when rendered, then a fire shape appears over the `unit`; if `newHp > 0` (unit survives), the fire is removed after 3s with no further event.
+8. Given a `unitDamaged` event followed by a `unitDied` event for the same unit, when the `unitDied` event is processed, then 3s later the `unit` and its fire shape are both removed.
+9. Given a `softBlockDestroyed` event, when rendered, then a fire appears over the `softBlock`; after 3s the `softBlock` is removed.
+10. Given a gameEvent missing a required field or referencing a non-existent bombId/unitId/softBlockId, when encountered, then an error message is shown and rendering halts per "game unable to proceed."
+11. Given a `bombExploded` event whose `bombId`'s position is not in any earlier `bombExploded` event's `affectedPositions` in the same batch, when rendered, then it renders immediately, concurrent with other "countdown reached 0" bombs.
+12. Given a `bombExploded` event whose `bombId`'s position is in one or more earlier `bombExploded` events' `affectedPositions`, when rendered, then its render is delayed by `reachTime(causer.position, thisBomb.position)` from the causer's blast-start, where the causer is whichever earlier event yields the smallest resulting delay.
+13. Given a `unitDamaged`/`unitDied`/`softBlockDestroyed` event caused by a bomb's blast, when rendered, then it is delayed by `reachTime(causingBomb.position, occupant.position)` from that bomb's blast-start, with both positions resolved via the pre-resolve `gameState` snapshot, not the event's own `position` field.
+14. Given a bomb's blast is still in its lingering `BLAST_DURATION_MS` tail, when an unrelated gameEvent occurs, then that unrelated event renders concurrently, unblocked by the lingering blast.
