@@ -35,6 +35,7 @@ export const DEPTH_OCCUPANT = 10;
 export const DEPTH_ALLOWED_TILE_OVERLAY = 20;
 export const DEPTH_TURN_COMMAND_PANEL = 30;
 export const DEPTH_CONFIRM_DIALOG = 40;
+export const DEPTH_ERROR_PANEL = 50;
 
 // Phase 3.3's first UI text — single font referenced everywhere via this constant so it can
 // be swapped later without touching call sites. Loaded via a <link> tag in index.html.
@@ -62,9 +63,36 @@ export const ALLOWED_TILE_BOMB_COLOR = 0xe69138;
 export const ALLOWED_TILE_BOMB_ALPHA = 0.65;
 export const ALLOWED_TILE_BOMB_SELECTED_COLOR = 0xf7dec3;
 
-export const CONFIRM_DIALOG_WIDTH = 160;
-export const CONFIRM_DIALOG_HEIGHT = 100;
+export const CONFIRM_DIALOG_WIDTH = 240;
+export const CONFIRM_DIALOG_HEIGHT = 144;
 export const CONFIRM_DIALOG_DIM_COLOR = 0x1a1a1a;
 export const CONFIRM_DIALOG_DIM_ALPHA = 0.6;
 
 export const UNIT_MOVE_TWEEN_DURATION = 500;
+
+// TurnPanel
+export const TURN_PANEL_WIDTH = 96;
+export const TURN_PANEL_HEIGHT = 48;
+export const TURN_PANEL_MARGIN = 48;
+export const TURN_PANEL_PADDING = 8;
+export const TURN_PANEL_TEXT_COLOR = 0xeeeeee;
+export const TURN_PANEL_SUDDEN_DEATH_COLOR = 0xff0000;
+
+// ResolveTurnButton
+export const RESOLVE_BUTTON_WIDTH = 320;
+export const RESOLVE_BUTTON_HEIGHT = 72;
+export const RESOLVE_BUTTON_MARGIN_TOP = 48;
+export const RESOLVE_BUTTON_LABEL = 'End this turn';
+
+export const BOMB_COUNTDOWN_ZERO_COLOR = 0xff0000;
+
+// Error panel — fixed left-side panel so error text is always legible instead of overlapping
+// at screen-center.
+export const ERROR_PANEL_X = TURN_PANEL_MARGIN;
+export const ERROR_PANEL_Y = TURN_PANEL_MARGIN + TURN_PANEL_HEIGHT + 16;
+export const ERROR_PANEL_WIDTH = 240;
+export const ERROR_PANEL_HEIGHT = 400;
+export const ERROR_PANEL_PADDING = 8;
+export const ERROR_PANEL_BG_COLOR = 0x1a1a1a;
+export const ERROR_PANEL_BG_ALPHA = 0.75;
+export const ERROR_LINE_HEIGHT = 40;

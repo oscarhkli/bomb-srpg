@@ -60,7 +60,19 @@ This is required so `gameEvent` handlers below (`bombCountdownUpdated`, `bombExp
 
 `MatchScene` should render `ResolveButton` **48px** below its top edge. This is a **320Wx72** center-aligned text `End this turn`. Font family is `GAME_FONT_FAMILY`, font color is `PANEL_BUTTON_BORDER_COLOR`.
 
-A click handler should be added to `ResolveButton`, opening `ConfirmDialog` with text `Confirm to end this turn?`. If Player clicks `No`, `ConfirmDialog` will be closed. If Player clicks `Yes`, it will trigger `ResolveTurn`.
+A click handler should be added to `ResolveButton`, opening `ConfirmDialog` with text `Confirm to end this turn?`. If Player clicks `No`, `ConfirmDialog` will be closed. If Player clicks `Yes`, it will trigger `ResolveTurn`. If `TurnCommandPanel` currently has an open action (e.g. a unit's Move/Bomb panel with allowed tiles shown), clicking `ResolveButton` first resets it to closed/no-selection — `ConfirmDialog` for `ResolveTurn` should never appear on top of a stale, still-interactive `TurnCommandPanel` action stack.
+
+**`ConfirmDialog` size update:** `ConfirmDialog` (shared component, originally spec'd in spec003 at 160Wx100Hpx) is enlarged to **240Wx144Hpx** — the longer resolve-turn confirmation text no longer fits within the original size. This affects `ConfirmDialog` globally, not just its use here.
+
+### Error Panel
+
+All `errorMessage`s referenced throughout this spec (validation failures, network errors, final sanity-check mismatches, etc.) render in a fixed **Error Panel**, not as a one-off centered text — a single overlapping error was unreadable, and multiple errors within one action (e.g. a network failure followed by a refresh failure) must each stay legible.
+
+- Fixed position: same left margin as `TurnPanel` (`TURN_PANEL_MARGIN`), **16px** below `TurnPanel`'s bottom edge.
+- Size: **240Wx400Hpx**, dark semi-transparent background (`0x1a1a1a` at 75% opacity), depth above every other UI layer.
+- Pinned to the camera viewport (`setScrollFactor(0)`), like `TurnPanel`/`ResolveButton`/`ConfirmDialog`.
+- Each new error message is appended as its own word-wrapped line below the previous ones (not overlapping), padded **8px** from the panel edges.
+- The panel and its accumulated messages are cleared at the start of each new user-initiated action (a turn-command submission or a `ResolveTurn`) — not inside the board-refresh path itself, since some flows (e.g. the final sanity-check mismatch) call `showError` immediately before a synchronous board re-render, and clearing there would destroy the message before it's ever seen.
 
 ## ResolveTurn and the Subsequent Visual Effects
 
@@ -95,7 +107,7 @@ This event renders a cardinal-ray blasting effect of a `bomb`. For each `bombExp
     - Each of the 4 cardinal rays renders as a single beam that elongates outward over time (not per-tile flashes), reaching each tile at that tile's `reachTime`. The beam's fixed perpendicular width (the non-elongated dimension) is **32px** — narrower than the 48px tile — centered on the bomb's row/column. The beam (and its growing head/tip) is **pill-shaped** (fully-rounded rect), not a hard-edged rectangle.
     - The blast should be rendered in 3-layer gradient color. The outermost starts with HEX `0xf58e27`, then `0xf5ee27`, to the innermost `0xfcfabb`. Opacity is **60%**. The gradient bands split the beam into thirds of *that direction's own* max blast length — a short-range ray is fully outer→inner across its short length, not truncated by an absolute-distance mapping shared across all rays.
 
-Once the blast has finished growing, it lingers (burning) for `BLAST_DURATION_MS` (~4s, placeholder value) before fading out. This lingering tail does not block other unrelated `gameEvents` — independent bombs/occupant effects render concurrently during it.
+Once the blast has finished growing, it lingers (burning) for `BLAST_DURATION_MS` (~3s, placeholder value) before fading out. This lingering tail does not block other unrelated `gameEvents` — independent bombs/occupant effects render concurrently during it.
 
 ### UnitDamagedEvent
 
@@ -108,7 +120,7 @@ For each `unitDamagedEvent`:
 
 1. Look up the `unit's` position.
 2. Render a fire shape on top of the blast and `unit`, representing the `unit` is burning. Size is **42px** (larger than the 32px blast beam, so it visibly overlaps). Opacity is **70%**.
-3. If `unitDamageEvent.newHp > 0`, remove the fire after **3s**. Otherwise, let it burn until its `unitDiedEvent` being processed.
+3. If `unitDamageEvent.newHp > 0`, remove the fire after **5s**. Otherwise, let it burn until its `unitDiedEvent` being processed.
 
 ### UnitDiedEvent
 
@@ -120,7 +132,7 @@ Validate if:
 For each `unitDiedEvent`:
 
 1. Look up the `unit's` position.
-2. **3s** later after `unitDiedEvent` starts processing, remove the `unit` and the fire shape rendered when `unitDamagedEvent`.
+2. **5s** later after `unitDiedEvent` starts processing, remove the `unit` and the fire shape rendered when `unitDamagedEvent`.
 
 ### SoftBlockDestroyedEvent
 
@@ -135,7 +147,7 @@ For each `softBlockDestroyedEvent`:
 
 1. Look up the `softBlock's` position.
 2. Render a fire shape on top of the blast and `softBlock`, representing the `softblock` is burning. Size is **42px** (larger than the 32px blast beam, so it visibly overlaps). Opacity is **70%**.
-3. **3s** later, remove the `softBlock` and the fire shape.
+3. **5s** later, remove the `softBlock` and the fire shape.
 
 ### Rendering Sequence
 
@@ -185,9 +197,9 @@ Replace the frontend stored `gameState` by the latest obtained one.
 4. Given a `bombCountdownUpdated` event with `countdown === 0`, when rendered, then the bomb shows a red `!` instead of a number.
 5. Given a `bombExploded` event, when rendered, then affected tiles show the blast effect and the bomb sprite is removed from the grid.
 6. Given a `bombExploded` event whose `affectedPositions` includes an occupied tile, when rendered, then a fire shape renders on top of that occupant.
-7. Given a `unitDamaged` event, when rendered, then a fire shape appears over the `unit`; if `newHp > 0` (unit survives), the fire is removed after 3s with no further event.
-8. Given a `unitDamaged` event followed by a `unitDied` event for the same unit, when the `unitDied` event is processed, then 3s later the `unit` and its fire shape are both removed.
-9. Given a `softBlockDestroyed` event, when rendered, then a fire appears over the `softBlock`; after 3s the `softBlock` is removed.
+7. Given a `unitDamaged` event, when rendered, then a fire shape appears over the `unit`; if `newHp > 0` (unit survives), the fire is removed after 5s with no further event.
+8. Given a `unitDamaged` event followed by a `unitDied` event for the same unit, when the `unitDied` event is processed, then 5s later the `unit` and its fire shape are both removed.
+9. Given a `softBlockDestroyed` event, when rendered, then a fire appears over the `softBlock`; after 5s the `softBlock` is removed.
 10. Given a gameEvent missing a required field or referencing a non-existent bombId/unitId/softBlockId, when encountered, then an error message is shown and rendering halts per "game unable to proceed."
 11. Given a `bombExploded` event whose `bombId`'s position is not in any earlier `bombExploded` event's `affectedPositions` in the same batch, when rendered, then it renders immediately, concurrent with other "countdown reached 0" bombs.
 12. Given a `bombExploded` event whose `bombId`'s position is in one or more earlier `bombExploded` events' `affectedPositions`, when rendered, then its render is delayed by `reachTime(causer.position, thisBomb.position)` from the causer's blast-start, where the causer is whichever earlier event yields the smallest resulting delay.

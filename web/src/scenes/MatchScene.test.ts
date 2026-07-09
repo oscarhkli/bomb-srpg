@@ -4,8 +4,10 @@ import {
   initRoom,
   initToken,
   getMatchState,
+  getMatchConfig,
   getAllowedTiles,
   submitTurnCommand,
+  resolveTurn,
 } from '../engine/api';
 import {
   TERRAIN_COLORS,
@@ -16,9 +18,11 @@ import {
   SOFTBLOCK_CORNER_RADIUS,
   BOMB_COLOR,
 } from '../constants';
+import { playResolveTurnEvents } from '../rendering/resolveTurnPlayer';
 import MatchScene from './MatchScene';
 import type {
   Coordinate,
+  GameCfg,
   GameEvent,
   GameState,
   Tile,
@@ -29,6 +33,19 @@ import type {
 } from '../types/api';
 
 vi.mock('../engine/api');
+vi.mock('../rendering/resolveTurnPlayer');
+
+function makeCfg(overrides: Partial<GameCfg> = {}): GameCfg {
+  return {
+    stagePreset: 'default',
+    p1Teams: [],
+    p2Teams: [],
+    maxTurns: 30,
+    allowResetTurn: true,
+    suddenDeath: false,
+    ...overrides,
+  };
+}
 
 function makeState(grid: Tile[][], overrides: Partial<GameState> = {}): GameState {
   return {
@@ -92,9 +109,15 @@ function occupantGraphics(index: number): ReturnType<typeof mockScene.add.graphi
   >;
 }
 
-// The error text (when getMatchState rejects) is always the first Text instance created.
-function errorText(): ReturnType<typeof mockScene.add.text> {
-  return mockScene.add.text.mock.results[0]!.value as ReturnType<typeof mockScene.add.text>;
+// mockScene.add.text's mock.calls infer a `[]` call-signature (from its no-arg factory
+// implementation), so raw index access needs a cast — this helper centralizes it.
+function textCalls(): [number, number, string, ...unknown[]][] {
+  return mockScene.add.text.mock.calls as unknown as [number, number, string, ...unknown[]][];
+}
+
+function errorTextByMessage(message: string): ReturnType<typeof mockScene.add.text> {
+  const index = textCalls().findIndex(c => c[2] === message);
+  return mockScene.add.text.mock.results[index]!.value as ReturnType<typeof mockScene.add.text>;
 }
 
 function pointerDownOf(g: ReturnType<typeof mockScene.add.graphics>): () => void {
@@ -126,6 +149,8 @@ async function submitViaUI(
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(getMatchConfig).mockResolvedValue(makeCfg());
+  vi.mocked(playResolveTurnEvents).mockReturnValue({ ok: true, done: Promise.resolve() });
 });
 
 describe('MatchScene', () => {
@@ -483,7 +508,8 @@ describe('MatchScene', () => {
     expect(mockScene.add.text).toHaveBeenCalledWith(
       expect.any(Number),
       expect.any(Number),
-      'tiles unavailable'
+      'tiles unavailable',
+      expect.objectContaining({})
     );
   });
 
@@ -581,11 +607,12 @@ describe('MatchScene', () => {
     scene.create({ roomId: 'room-abc', playerTokens: ['t1', 't2'] });
     await Promise.resolve();
 
-    // Only the grid Graphics instance should exist — no occupant Graphics for the dead unit.
-    expect(mockScene.add.graphics).toHaveBeenCalledTimes(1);
+    // Baseline is grid(1) + ResolveTurnButton(1) + TurnPanel header(1) — no occupant
+    // Graphics for the dead unit on top of that.
+    expect(mockScene.add.graphics).toHaveBeenCalledTimes(3);
   });
 
-  it('shows an error message when getMatchState rejects, without rendering', async () => {
+  it('shows an error message in the error panel when getMatchState rejects, without rendering the board', async () => {
     vi.mocked(getMatchState).mockRejectedValue(new Error('network fail'));
 
     const scene = new MatchScene();
@@ -596,10 +623,11 @@ describe('MatchScene', () => {
     expect(mockScene.add.text).toHaveBeenCalledWith(
       expect.any(Number),
       expect.any(Number),
-      'Failed to load match state'
+      'Failed to load match state',
+      expect.objectContaining({})
     );
-    expect(errorText().setOrigin).toHaveBeenCalledWith(0.5);
-    expect(mockScene.add.graphics).not.toHaveBeenCalled();
+    // Only the error panel's own background Graphics exists — no board (grid) was rendered.
+    expect(mockScene.add.graphics).toHaveBeenCalledTimes(1);
     expect(mockScene.cameras.main.centerOn).not.toHaveBeenCalled();
   });
 
@@ -644,7 +672,8 @@ describe('MatchScene', () => {
     expect(mockScene.add.text).not.toHaveBeenCalledWith(
       expect.any(Number),
       expect.any(Number),
-      expect.stringContaining('out of sync')
+      expect.stringContaining('out of sync'),
+      expect.objectContaining({})
     );
   });
 
@@ -689,7 +718,8 @@ describe('MatchScene', () => {
     expect(mockScene.add.text).not.toHaveBeenCalledWith(
       expect.any(Number),
       expect.any(Number),
-      expect.stringContaining('out of sync')
+      expect.stringContaining('out of sync'),
+      expect.objectContaining({})
     );
   });
 
@@ -717,7 +747,8 @@ describe('MatchScene', () => {
     expect(mockScene.add.text).toHaveBeenCalledWith(
       expect.any(Number),
       expect.any(Number),
-      'stale token'
+      'stale token',
+      expect.objectContaining({})
     );
     expect(getMatchState).toHaveBeenCalledTimes(2);
   });
@@ -750,7 +781,8 @@ describe('MatchScene', () => {
     expect(mockScene.add.text).toHaveBeenCalledWith(
       expect.any(Number),
       expect.any(Number),
-      'Invalid unitMoved event received from server'
+      'Invalid unitMoved event received from server',
+      expect.objectContaining({})
     );
     expect(mockScene.tweens.add).not.toHaveBeenCalled();
     expect(getMatchState).toHaveBeenCalledTimes(2); // refresh still runs
@@ -787,7 +819,8 @@ describe('MatchScene', () => {
     expect(mockScene.add.text).toHaveBeenCalledWith(
       expect.any(Number),
       expect.any(Number),
-      'Match state is out of sync with the server'
+      'Match state is out of sync with the server',
+      expect.objectContaining({})
     );
   });
 
@@ -963,5 +996,237 @@ describe('MatchScene', () => {
     expect(mockScene.tweens.add).toHaveBeenLastCalledWith(
       expect.objectContaining({ targets: unitGraphics, x: 96, y: 0 })
     );
+  });
+
+  it('fetches gameCfg alongside match state and renders TurnPanel with turn/maxTurns/activeTeam', async () => {
+    vi.mocked(getMatchState).mockResolvedValue(
+      makeState([[plainTile()]], { turn: 4, activeTeam: 2 })
+    );
+    vi.mocked(getMatchConfig).mockResolvedValue(makeCfg({ maxTurns: 12 }));
+
+    const scene = new MatchScene();
+    scene.create({ roomId: 'room-abc', playerTokens: ['t1', 't2'] });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(getMatchConfig).toHaveBeenCalledOnce();
+    // TurnPanel renders "Turn" label text among the added texts.
+    expect(mockScene.add.text).toHaveBeenCalledWith(
+      expect.any(Number),
+      expect.any(Number),
+      'Turn',
+      expect.objectContaining({})
+    );
+    expect(mockScene.add.text).toHaveBeenCalledWith(
+      expect.any(Number),
+      expect.any(Number),
+      '4',
+      expect.objectContaining({})
+    );
+    expect(mockScene.add.text).toHaveBeenCalledWith(
+      expect.any(Number),
+      expect.any(Number),
+      '12',
+      expect.objectContaining({})
+    );
+  });
+
+  // With no units/softBlocks/bombs, Graphics creation order is: grid(0), ResolveTurnButton(1),
+  // TurnPanel header(2) — see the "does not render a Unit with hp 0" baseline above.
+  function resolveButtonGraphics(): ReturnType<typeof mockScene.add.graphics> {
+    return mockScene.add.graphics.mock.results[1]!.value as ReturnType<
+      typeof mockScene.add.graphics
+    >;
+  }
+
+  async function setUpEmptyBoardAndClickResolve(activeTeam = 1): Promise<void> {
+    vi.mocked(getMatchState).mockResolvedValue(makeState([[plainTile()]], { activeTeam }));
+
+    const scene = new MatchScene();
+    scene.create({ roomId: 'room-abc', playerTokens: ['team1-token', 'team2-token'] });
+    await Promise.resolve();
+
+    pointerDownOf(resolveButtonGraphics())();
+  }
+
+  it('pins ResolveTurnButton to the camera viewport (scrollFactor 0) instead of the grid/world', async () => {
+    vi.mocked(getMatchState).mockResolvedValue(makeState([[plainTile()]], { activeTeam: 1 }));
+
+    const scene = new MatchScene();
+    scene.create({ roomId: 'room-abc', playerTokens: ['t1', 't2'] });
+    await Promise.resolve();
+
+    expect(resolveButtonGraphics().setScrollFactor).toHaveBeenCalledWith(0);
+  });
+
+  it('clears the TurnCommandPanel action stack (treating it as nothing selected) when ResolveTurnButton opens the confirm dialog', async () => {
+    const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
+    vi.mocked(getMatchState).mockResolvedValue(
+      makeState([[plainTile()]], { activeTeam: 1, units: [unit] })
+    );
+    vi.mocked(getAllowedTiles).mockResolvedValue([{ x: 0, y: 0 }]);
+
+    const scene = new MatchScene();
+    scene.create({ roomId: 'room-abc', playerTokens: ['t1', 't2'] });
+    await Promise.resolve();
+
+    // Graphics creation order on create(): grid(0), unit(1), ResolveTurnButton(2), TurnPanel(3).
+    const resolveButton = mockScene.add.graphics.mock.results[2]!.value as ReturnType<
+      typeof mockScene.add.graphics
+    >;
+
+    // Open the unit's TurnCommandPanel (draws Move/Bomb/Back as the next 3 Graphics).
+    pointerDownOf(occupantGraphics(0))();
+    const [moveButtonGraphics] = mockScene.add.graphics.mock.results
+      .slice(-3)
+      .map(r => r.value as ReturnType<typeof mockScene.add.graphics>);
+
+    pointerDownOf(resolveButton)();
+
+    expect(moveButtonGraphics!.destroy).toHaveBeenCalled();
+  });
+
+  it('opens ConfirmDialog with the resolve-turn prompt when ResolveTurnButton is clicked', async () => {
+    await setUpEmptyBoardAndClickResolve();
+
+    expect(mockScene.add.text).toHaveBeenCalledWith(
+      expect.any(Number),
+      expect.any(Number),
+      'Confirm to end this turn?',
+      expect.objectContaining({})
+    );
+  });
+
+  it('on confirmed resolve: inits the active team token, calls resolveTurn, hands events to the player, then refreshes state', async () => {
+    await setUpEmptyBoardAndClickResolve(2);
+    vi.mocked(getMatchState).mockResolvedValue(makeState([[plainTile()]], { activeTeam: 1 }));
+    const events: GameEvent[] = [{ type: 'bombCountdownUpdated', bombId: 1, countdown: 2 }];
+    vi.mocked(resolveTurn).mockResolvedValue(events);
+
+    // ConfirmDialog's Yes button is the most-recently-created graphics among the last 3.
+    const [, yesButtonGraphics] = mockScene.add.graphics.mock.results
+      .slice(-3)
+      .map(r => r.value as ReturnType<typeof mockScene.add.graphics>);
+    pointerDownOf(yesButtonGraphics!)();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(initToken).toHaveBeenCalledWith('team2-token');
+    expect(resolveTurn).toHaveBeenCalledOnce();
+    expect(playResolveTurnEvents).toHaveBeenCalledOnce();
+    const [calledEvents, deps] = vi.mocked(playResolveTurnEvents).mock.calls[0]!;
+    expect(calledEvents).toBe(events);
+    expect(deps.gameStateSnapshot.activeTeam).toBe(2);
+    expect(getMatchState).toHaveBeenCalledTimes(2); // initial load + final sanity-check refresh
+  });
+
+  it('always refreshes state even when resolveTurn() itself rejects', async () => {
+    await setUpEmptyBoardAndClickResolve();
+    vi.mocked(resolveTurn).mockRejectedValue(new Error('resolve failed'));
+
+    const [, yesButtonGraphics] = mockScene.add.graphics.mock.results
+      .slice(-3)
+      .map(r => r.value as ReturnType<typeof mockScene.add.graphics>);
+    pointerDownOf(yesButtonGraphics!)();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(mockScene.add.text).toHaveBeenCalledWith(
+      expect.any(Number),
+      expect.any(Number),
+      'resolve failed',
+      expect.objectContaining({})
+    );
+    expect(getMatchState).toHaveBeenCalledTimes(2);
+    expect(playResolveTurnEvents).not.toHaveBeenCalled();
+  });
+
+  it('flags a mismatch when the post-resolve state has a bomb the client no longer tracks', async () => {
+    await setUpEmptyBoardAndClickResolve();
+    vi.mocked(resolveTurn).mockResolvedValue([]);
+    vi.mocked(getMatchState).mockResolvedValue(
+      makeState([[plainTile()]], { bombs: [makeBomb({ id: 1 })] })
+    );
+
+    const [, yesButtonGraphics] = mockScene.add.graphics.mock.results
+      .slice(-3)
+      .map(r => r.value as ReturnType<typeof mockScene.add.graphics>);
+    pointerDownOf(yesButtonGraphics!)();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(mockScene.add.text).toHaveBeenCalledWith(
+      expect.any(Number),
+      expect.any(Number),
+      'Match state is out of sync with the server',
+      expect.objectContaining({})
+    );
+  });
+
+  it('stacks multiple error messages within one action instead of overlapping at the same position', async () => {
+    await setUpEmptyBoardAndClickResolve();
+    vi.mocked(resolveTurn).mockRejectedValue(new Error('resolve failed'));
+    vi.mocked(getMatchState).mockRejectedValue(new Error('network down'));
+
+    const [, yesButtonGraphics] = mockScene.add.graphics.mock.results
+      .slice(-3)
+      .map(r => r.value as ReturnType<typeof mockScene.add.graphics>);
+    pointerDownOf(yesButtonGraphics!)();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const firstCall = textCalls().find(c => c[2] === 'resolve failed');
+    const secondCall = textCalls().find(c => c[2] === 'Failed to refresh match state');
+    expect(firstCall).toBeDefined();
+    expect(secondCall).toBeDefined();
+    expect(secondCall![1]).toBeGreaterThan(firstCall![1]);
+  });
+
+  it('clears previous error messages once a new turn command begins, so they do not accumulate across turns', async () => {
+    const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
+    const initialGrid: Tile[][] = [
+      [{ type: 'TerrainPlain', occupantType: 'OccupantUnit', occupantId: 7 }, plainTile()],
+    ];
+    const target: Coordinate = { x: 1, y: 0 };
+
+    vi.mocked(getMatchState).mockResolvedValueOnce(
+      makeState(initialGrid, { activeTeam: 1, units: [unit] })
+    );
+    vi.mocked(getAllowedTiles).mockRejectedValueOnce(new Error('tiles unavailable'));
+
+    const scene = new MatchScene();
+    scene.create({ roomId: 'room-abc', playerTokens: ['t1', 't2'] });
+    await Promise.resolve();
+
+    const unitGraphics = occupantGraphics(0);
+    pointerDownOf(unitGraphics)();
+    const [moveButtonGraphics] = mockScene.add.graphics.mock.results
+      .slice(-3)
+      .map(r => r.value as ReturnType<typeof mockScene.add.graphics>);
+    pointerDownOf(moveButtonGraphics!)();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const staleErrorText = errorTextByMessage('tiles unavailable');
+    expect(staleErrorText.destroy).not.toHaveBeenCalled();
+
+    // Now successfully submit a Move for the same unit — a fresh turn-command action.
+    vi.mocked(getMatchState)
+      .mockResolvedValueOnce(makeState(initialGrid, { activeTeam: 1, units: [unit] }))
+      .mockResolvedValueOnce(makeState(initialGrid, { activeTeam: 1, units: [unit] }));
+    vi.mocked(getAllowedTiles).mockResolvedValue([target]);
+    vi.mocked(submitTurnCommand).mockResolvedValue([
+      { type: 'unitMoved', unitId: 7, from: { x: 0, y: 0 }, to: target },
+    ]);
+    await submitViaUI(occupantGraphics(0), 0);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(staleErrorText.destroy).toHaveBeenCalled();
   });
 });

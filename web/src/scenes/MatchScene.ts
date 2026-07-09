@@ -3,11 +3,16 @@ import {
   initRoom,
   initToken,
   getMatchState,
+  getMatchConfig,
   getAllowedTiles,
   submitTurnCommand,
+  resolveTurn,
 } from '../engine/api';
 import TurnCommandPanel from '../ui/TurnCommandPanel';
 import ConfirmDialog from '../ui/ConfirmDialog';
+import TurnPanel from '../ui/TurnPanel';
+import { drawPillButton } from '../ui/pillButton';
+import { playResolveTurnEvents, type BombGraphics } from '../rendering/resolveTurnPlayer';
 import {
   TILE_SIZE,
   TERRAIN_COLORS,
@@ -22,12 +27,31 @@ import {
   SOFTBLOCK_CORNER_RADIUS,
   BOMB_COLOR,
   BOMB_SIZE,
+  ERROR_LINE_HEIGHT,
+  ERROR_PANEL_X,
+  ERROR_PANEL_Y,
+  ERROR_PANEL_WIDTH,
+  ERROR_PANEL_HEIGHT,
+  ERROR_PANEL_PADDING,
+  ERROR_PANEL_BG_COLOR,
+  ERROR_PANEL_BG_ALPHA,
   DEPTH_GRID,
   DEPTH_OCCUPANT,
+  DEPTH_TURN_COMMAND_PANEL,
+  DEPTH_ERROR_PANEL,
   UNIT_MOVE_TWEEN_DURATION,
+  PANEL_BUTTON_FILL_COLOR,
+  PANEL_BUTTON_FILL_ALPHA,
+  PANEL_BUTTON_BORDER_COLOR,
+  PANEL_BUTTON_BORDER_WIDTH,
+  RESOLVE_BUTTON_WIDTH,
+  RESOLVE_BUTTON_HEIGHT,
+  RESOLVE_BUTTON_MARGIN_TOP,
+  RESOLVE_BUTTON_LABEL,
 } from '../constants';
 import type {
   Coordinate,
+  GameCfg,
   GameEvent,
   GameState,
   Tile,
@@ -47,11 +71,18 @@ export default class MatchScene extends Phaser.Scene {
   private roomId!: string;
   private playerTokens!: [string, string];
   private gameState!: GameState;
+  private gameCfg!: GameCfg;
   private boardObjects: Phaser.GameObjects.GameObject[] = [];
   private unitGraphicsById = new Map<number, Phaser.GameObjects.Graphics>();
+  private bombGraphicsById = new Map<number, BombGraphics>();
+  private softBlockGraphicsById = new Map<number, Phaser.GameObjects.Graphics>();
   private allowedTilesCache = new Map<string, Coordinate[]>();
   private turnCommandPanel!: TurnCommandPanel;
   private confirmDialog!: ConfirmDialog;
+  private turnPanel!: TurnPanel;
+  private resolveButtonObjects: Phaser.GameObjects.GameObject[] = [];
+  private errorPanelBg: Phaser.GameObjects.Graphics | undefined;
+  private errorTexts: Phaser.GameObjects.Text[] = [];
   private isSubmitting = false;
 
   constructor() {
@@ -64,12 +95,13 @@ export default class MatchScene extends Phaser.Scene {
     console.log('roomId:', this.roomId, 'playerTokens:', this.playerTokens);
     initRoom(data.roomId);
     this.confirmDialog = new ConfirmDialog(this);
+    this.turnPanel = new TurnPanel(this);
     this.turnCommandPanel = new TurnCommandPanel(this, {
       getAllowedTiles: (unitId, turnCmdType) => this.getAllowedTilesCached(unitId, turnCmdType),
       onError: message => this.showError(message),
       onConfirmedSubmit: (turnCmdType, unitId, target) =>
         this.onConfirmedSubmit(turnCmdType, unitId, target),
-      showConfirm: (onYes, onNo) => this.confirmDialog.show(onYes, onNo),
+      showConfirm: (onYes, onNo) => this.confirmDialog.show(onYes, onNo, 'Confirm?'),
       hideConfirm: () => this.confirmDialog.hide(),
       isConfirmOpen: () => this.confirmDialog.isOpen,
     });
@@ -78,10 +110,29 @@ export default class MatchScene extends Phaser.Scene {
       .then(state => {
         this.renderBoard(state);
         this.centerCamera(state.grid);
+        this.renderResolveButton();
+        this.refreshTurnPanelIfReady();
       })
       .catch(() => {
         this.showError('Failed to load match state');
       });
+
+    getMatchConfig()
+      .then(cfg => {
+        this.gameCfg = cfg;
+        this.refreshTurnPanelIfReady();
+      })
+      .catch(() => {
+        this.showError('Failed to load match config');
+      });
+  }
+
+  // gameState and gameCfg are fetched via two independent promise chains (kept separate so
+  // MatchScene's initial render doesn't wait on both round-trips), so either may resolve first.
+  private refreshTurnPanelIfReady(): void {
+    if (this.gameState && this.gameCfg) {
+      this.turnPanel.update(this.gameState.turn, this.gameCfg.maxTurns, this.gameState.activeTeam);
+    }
   }
 
   private async getAllowedTilesCached(
@@ -107,6 +158,7 @@ export default class MatchScene extends Phaser.Scene {
       return;
     }
     this.isSubmitting = true;
+    this.clearErrors();
     try {
       const predictedGrid = cloneGrid(this.gameState.grid);
 
@@ -234,10 +286,98 @@ export default class MatchScene extends Phaser.Scene {
     }
   }
 
+  private renderResolveButton(): void {
+    this.resolveButtonObjects.forEach(obj => obj.destroy());
+    const { width } = this.cameras.main;
+    const x = width / 2 - RESOLVE_BUTTON_WIDTH / 2;
+    this.resolveButtonObjects = drawPillButton(
+      this,
+      x,
+      RESOLVE_BUTTON_MARGIN_TOP,
+      RESOLVE_BUTTON_WIDTH,
+      RESOLVE_BUTTON_HEIGHT,
+      RESOLVE_BUTTON_LABEL,
+      {
+        fillColor: PANEL_BUTTON_FILL_COLOR,
+        fillAlpha: PANEL_BUTTON_FILL_ALPHA,
+        borderColor: PANEL_BUTTON_BORDER_COLOR,
+        borderWidth: PANEL_BUTTON_BORDER_WIDTH,
+      },
+      DEPTH_TURN_COMMAND_PANEL,
+      () => this.onResolveButtonClicked(),
+      0
+    );
+  }
+
+  private onResolveButtonClicked(): void {
+    if (this.confirmDialog.isOpen || this.isSubmitting) {
+      return;
+    }
+    this.turnCommandPanel.closeImmediately();
+    this.confirmDialog.show(
+      () => void this.handleResolveTurn(),
+      () => this.confirmDialog.hide(),
+      'Confirm to end this turn?'
+    );
+  }
+
+  private async handleResolveTurn(): Promise<void> {
+    if (this.isSubmitting) {
+      return;
+    }
+    this.isSubmitting = true;
+    this.clearErrors();
+    try {
+      initToken(this.playerTokens[this.gameState.activeTeam - 1]!);
+      try {
+        const events = await resolveTurn();
+        const { ok, done } = playResolveTurnEvents(events, {
+          scene: this,
+          gameStateSnapshot: this.gameState,
+          unitGraphicsById: this.unitGraphicsById,
+          bombGraphicsById: this.bombGraphicsById,
+          softBlockGraphicsById: this.softBlockGraphicsById,
+          onError: message => this.showError(message),
+        });
+        if (ok) {
+          await done;
+        }
+      } catch (err) {
+        this.showError(err instanceof Error ? err.message : String(err));
+      }
+      await this.refreshFinalSanityCheckAfterResolve();
+    } finally {
+      this.isSubmitting = false;
+    }
+  }
+
+  private async refreshFinalSanityCheckAfterResolve(): Promise<void> {
+    try {
+      const freshState = await getMatchState();
+      if (
+        !occupantsMatch(
+          freshState,
+          this.unitGraphicsById,
+          this.bombGraphicsById,
+          this.softBlockGraphicsById
+        )
+      ) {
+        this.showError('Match state is out of sync with the server');
+      }
+      this.renderBoard(freshState);
+      this.turnPanel.update(freshState.turn, this.gameCfg.maxTurns, freshState.activeTeam);
+      this.renderResolveButton();
+    } catch {
+      this.showError('Failed to refresh match state');
+    }
+  }
+
   private renderBoard(state: GameState): void {
     this.boardObjects.forEach(obj => obj.destroy());
     this.boardObjects = [];
     this.unitGraphicsById.clear();
+    this.bombGraphicsById.clear();
+    this.softBlockGraphicsById.clear();
     this.gameState = state;
 
     this.renderGrid(state.grid);
@@ -334,6 +474,7 @@ export default class MatchScene extends Phaser.Scene {
         SOFTBLOCK_CORNER_RADIUS
       );
       this.attachClickLogger(g, block.position, `SoftBlock ${block.id}`, block);
+      this.softBlockGraphicsById.set(block.id, g);
     });
   }
 
@@ -353,6 +494,7 @@ export default class MatchScene extends Phaser.Scene {
     text.setDepth(DEPTH_OCCUPANT);
     this.boardObjects.push(text);
     this.attachClickLogger(g, bomb.position, `Bomb ${bomb.id}`, bomb);
+    this.bombGraphicsById.set(bomb.id, { circle: g, countdownText: text });
   }
 
   private attachClickLogger(
@@ -405,13 +547,70 @@ export default class MatchScene extends Phaser.Scene {
   }
 
   private showError(message: string): void {
-    const { width, height } = this.cameras.main;
-    this.add.text(width / 2, height / 2, message).setOrigin(0.5);
+    if (!this.errorPanelBg) {
+      const bg = this.add.graphics();
+      bg.setDepth(DEPTH_ERROR_PANEL);
+      bg.setScrollFactor(0);
+      bg.fillStyle(ERROR_PANEL_BG_COLOR, ERROR_PANEL_BG_ALPHA);
+      bg.fillRect(ERROR_PANEL_X, ERROR_PANEL_Y, ERROR_PANEL_WIDTH, ERROR_PANEL_HEIGHT);
+      this.errorPanelBg = bg;
+    }
+
+    const text = this.add.text(
+      ERROR_PANEL_X + ERROR_PANEL_PADDING,
+      ERROR_PANEL_Y + ERROR_PANEL_PADDING + this.errorTexts.length * ERROR_LINE_HEIGHT,
+      message,
+      { wordWrap: { width: ERROR_PANEL_WIDTH - ERROR_PANEL_PADDING * 2 } }
+    );
+    text.setDepth(DEPTH_ERROR_PANEL);
+    text.setScrollFactor(0);
+    this.errorTexts.push(text);
+  }
+
+  // Clears the error log at the start of each new user-initiated action (not inside
+  // renderBoard(), since some flows call showError() immediately before a synchronous
+  // renderBoard() — clearing there would destroy the message before it's ever seen).
+  private clearErrors(): void {
+    this.errorPanelBg?.destroy();
+    this.errorPanelBg = undefined;
+    this.errorTexts.forEach(t => t.destroy());
+    this.errorTexts = [];
   }
 }
 
 function cloneGrid(grid: Tile[][]): Tile[][] {
   return grid.map(row => row.map(tile => ({ ...tile })));
+}
+
+function occupantsMatch(
+  freshState: GameState,
+  unitGraphicsById: Map<number, Phaser.GameObjects.Graphics>,
+  bombGraphicsById: Map<number, BombGraphics>,
+  softBlockGraphicsById: Map<number, Phaser.GameObjects.Graphics>
+): boolean {
+  const liveUnits = freshState.units.filter(u => u.hp > 0);
+  if (liveUnits.length !== unitGraphicsById.size) {
+    return false;
+  }
+  if (!liveUnits.every(u => unitGraphicsById.has(u.id))) {
+    return false;
+  }
+
+  if (freshState.bombs.length !== bombGraphicsById.size) {
+    return false;
+  }
+  if (!freshState.bombs.every(b => bombGraphicsById.has(b.id))) {
+    return false;
+  }
+
+  if (freshState.softBlocks.length !== softBlockGraphicsById.size) {
+    return false;
+  }
+  if (!freshState.softBlocks.every(s => softBlockGraphicsById.has(s.id))) {
+    return false;
+  }
+
+  return true;
 }
 
 function gridsEqual(a: Tile[][], b: Tile[][]): boolean {

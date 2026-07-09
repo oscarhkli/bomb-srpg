@@ -26,7 +26,7 @@ export default class ConfirmDialog {
     return this.objects.length > 0;
   }
 
-  show(onYes: () => void, onNo: () => void): void {
+  show(onYes: () => void, onNo: () => void, text: string): void {
     this.hide();
 
     const { width, height } = this.scene.cameras.main;
@@ -40,7 +40,7 @@ export default class ConfirmDialog {
     bg.fillRect(x, y, CONFIRM_DIALOG_WIDTH, CONFIRM_DIALOG_HEIGHT);
     this.objects.push(bg);
 
-    const promptText = this.scene.add.text(width / 2, y + DIALOG_MARGIN, 'Confirm?', {
+    const promptText = this.scene.add.text(width / 2, y + DIALOG_MARGIN, text, {
       fontFamily: GAME_FONT_FAMILY,
       color: '#ffffff',
     });
