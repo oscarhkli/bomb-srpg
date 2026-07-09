@@ -21,6 +21,7 @@ export type GameEvtType =
   | 'unitDamaged'
   | 'unitDied'
   | 'bombPlaced'
+  | 'bombCountdownUpdated'
   | 'bombExploded'
   | 'softBlockDestroyed'
   | 'matchEnded';
@@ -95,6 +96,7 @@ export interface TurnCommand {
 // unitMoved: from, to
 // unitDamaged: newHp
 // bombPlaced: bombId, position, range, countdown
+// bombCountdownUpdated: bombId, countdown
 // bombExploded: bombId, affectedPositions
 // softBlockDestroyed: softBlockId, position
 // matchEnded: winnerTeamId, isDraw
