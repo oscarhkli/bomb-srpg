@@ -1077,6 +1077,10 @@ func TestMatch_ResolveTurn_ExplosionAndBlast(t *testing.T) {
 		m.WorkingState.Bombs[b2] = &Bomb{ID: b2, Countdown: 1, Range: 3, Position: Coordinate{0, 2}}
 		m.WorkingState.Grid[2][0] = Tile{OccupantType: OccupantBomb, OccupantID: int64(b2)}
 
+		sb1 := 1
+		m.WorkingState.SoftBlocks[sb1] = &SoftBlock{ID: sb1, Position: Coordinate{0, 3}}
+		m.WorkingState.Grid[3][0] = Tile{OccupantType: OccupantSoftBlock, OccupantID: int64(sb1)}
+
 		events := m.ResolveTurn()
 
 		if m.WorkingState.Units[u1].HP != 2 {
@@ -1087,21 +1091,28 @@ func TestMatch_ResolveTurn_ExplosionAndBlast(t *testing.T) {
 		}
 
 		damageEventsCount := 0
-		unitDieEventsCount := 0
+		unitDiedEventsCount := 0
+		softBlockDestroyedEventsCount := 0
 		for _, e := range events {
 			if e.Type == GameEvtUnitDamaged {
 				damageEventsCount++
 				continue
 			}
 			if e.Type == GameEvtUnitDied {
-				unitDieEventsCount++
+				unitDiedEventsCount++
+			}
+			if e.Type == GameEvtSoftBlockDestroyed {
+				softBlockDestroyedEventsCount++
 			}
 		}
 		if damageEventsCount != 2 {
 			t.Errorf("Expected exactly 2 damage log packet event, found %d", damageEventsCount)
 		}
-		if unitDieEventsCount != 1 {
-			t.Errorf("Expected exactly 1 casulty log packet event, found %d", unitDieEventsCount)
+		if unitDiedEventsCount != 1 {
+			t.Errorf("Expected exactly 1 casulty log packet event, found %d", unitDiedEventsCount)
+		}
+		if softBlockDestroyedEventsCount != 1 {
+			t.Errorf("Expected exactly 1 softBlock destroyed log packet event, found %d", softBlockDestroyedEventsCount)
 		}
 		if m.WorkingState.Grid[0][2].OccupantType != OccupantNone {
 			t.Errorf("Grid Clearance Bug: Exploded bomb positions %#v failed to revert to OccupantNone, got %v", Coordinate{2, 0}, m.WorkingState.Grid[0][2].OccupantType)
@@ -1114,6 +1125,9 @@ func TestMatch_ResolveTurn_ExplosionAndBlast(t *testing.T) {
 		}
 		if m.WorkingState.Grid[0][1].OccupantType != OccupantNone {
 			t.Errorf("Grid Clearance Bug: Dead unit positions %#v failed to revert to OccupantNone, got %v", Coordinate{1, 0}, m.WorkingState.Grid[0][1].OccupantType)
+		}
+		if m.WorkingState.Grid[3][0].OccupantType != OccupantNone {
+			t.Errorf("Grid Clearance Bug: Destroyed softBlock positions %#v failed to revert to OccupantNone, got %v", Coordinate{0, 3}, m.WorkingState.Grid[3][0].OccupantType)
 		}
 		if len(m.PlaybackLog) != 0 {
 			t.Errorf("Expectd clean slice array from PlaybackLog, got %d items", len(m.PlaybackLog))

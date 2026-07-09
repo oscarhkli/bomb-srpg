@@ -92,7 +92,7 @@ func initGameState(gameCfg GameCfg) (*GameState, error) {
 			Position: pos,
 		}
 
-		grid[pos.Y][pos.X].OccupantType = OccupantItem
+		grid[pos.Y][pos.X].OccupantType = OccupantSoftBlock
 		grid[pos.Y][pos.X].OccupantID = int64(i)
 	}
 

@@ -26,16 +26,16 @@ const (
 // Type determines the event variant; optional fields are omitted when zero.
 type GameEvent struct {
 	Type              GameEvtType  `json:"type"`
-	UnitID            UnitID       `json:"unitId,omitempty"`
+	UnitID            UnitID       `json:"unitId"`
 	BombID            BombID       `json:"bombId,omitempty"`
 	SoftBlockID       int          `json:"softBlockId,omitempty"`
 	ItemID            int          `json:"itemId,omitempty"`
 	Position          *Coordinate  `json:"position,omitempty"`
 	From              *Coordinate  `json:"from,omitempty"`
 	To                *Coordinate  `json:"to,omitempty"`
-	NewHP             int          `json:"newHp,omitempty"`
+	NewHP             int          `json:"newHp"`
 	Range             int          `json:"range,omitempty"`
-	Countdown         int          `json:"countdown,omitempty"`
+	Countdown         int          `json:"countdown"`
 	AffectedPositions []Coordinate `json:"affectedPositions,omitempty"`
 	WinnerTeamID      int          `json:"winnerTeamId,omitempty"`
 	IsDraw            bool         `json:"isDraw,omitempty"`

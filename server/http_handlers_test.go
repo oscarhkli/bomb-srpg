@@ -912,7 +912,8 @@ func TestHandleSubmitTurnCommand(t *testing.T) {
 		testMux("POST /api/match-rooms/{roomID}/match/turn-commands", h.HandleSubmitTurnCommand).ServeHTTP(rr, req)
 
 		assertArrayContract(t, rr.Body.Bytes(),
-			[]string{"type", "unitId", "from", "to"},
+			[]string{"type", "unitId", "from", "to",
+				"countdown", "newHp"}, // unrelated to this GameEvent
 			func(t *testing.T, item map[string]any) {
 				t.Helper()
 				fromField := item["from"].(map[string]any)
@@ -1121,7 +1122,8 @@ func TestHandleStartTurn(t *testing.T) {
 		testMux("POST /api/match-rooms/{roomID}/match/start-turn", h.HandleStartTurn).ServeHTTP(rr, req)
 
 		assertArrayContract(t, rr.Body.Bytes(),
-			[]string{"type", "unitId", "bombId", "position", "range", "countdown"},
+			[]string{"type", "unitId", "bombId", "position", "range", "countdown",
+				"newHp"}, // unrelated to this GameEvent
 			func(t *testing.T, item map[string]any) {
 				t.Helper()
 				positionField := item["position"].(map[string]any)
@@ -1477,7 +1479,8 @@ func TestHandleResolveTurn(t *testing.T) {
 		testMux("POST /api/match-rooms/{roomID}/match/resolve", h.HandleResolveTurn).ServeHTTP(rr, req)
 
 		assertArrayContract(t, rr.Body.Bytes(),
-			[]string{"type", "unitId", "bombId", "position", "range", "countdown"},
+			[]string{"type", "unitId", "bombId", "position", "range", "countdown",
+				"newHp"}, // unrelated to this GameEvent
 			func(t *testing.T, item map[string]any) {
 				t.Helper()
 				positionField := item["position"].(map[string]any)
@@ -1707,7 +1710,9 @@ func TestHandleSurrender(t *testing.T) {
 		rr := httptest.NewRecorder()
 		testMux("POST /api/match-rooms/{roomID}/match/surrender", h.HandleSurrender).ServeHTTP(rr, req)
 
-		assertArrayContract(t, rr.Body.Bytes(), []string{"type", "winnerTeamId"}, nil)
+		assertArrayContract(t, rr.Body.Bytes(), []string{"type", "winnerTeamId",
+			"unitId", "countdown", "newHp"}, // unrelated to this GameEvent
+			nil)
 	})
 
 	t.Run("Failure: missing Authorization header", func(t *testing.T) {
