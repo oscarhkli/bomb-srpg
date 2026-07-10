@@ -64,14 +64,8 @@
 - **DoD:** Two local human players can play a full pass-and-play match in a browser at `localhost:8080` via HTTP polling. Terminal runner deprecated.
 
 ### TODO
-- [x] Phaser.js Engine & Asset Loading Boilerplate
-- [ ] Match Lounge
-- [ ] Board & Sprite Rendering from JSON State
-- [ ] Input Mapping (Converting Clicks to HTTP Commands)
-- [ ] Action Log Animation Playback
-- [ ] Interaction with Server
-- [ ] VictoryResult
-  - [ ] Rematch
+
+Refer to [Frontend README](frontend/README.md)
 
 ## Phase 4: Cloud Deployment
 - **Goal:** Deploy the game publicly so anyone can play via a URL without local setup.
