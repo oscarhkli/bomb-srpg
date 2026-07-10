@@ -1,12 +1,48 @@
 import type Phaser from 'phaser';
-import type { GameState, Tile } from '../types/api';
+import type { Coordinate, GameEvent, GameState, TurnCommand } from '../types/api';
 import type { BombGraphics } from './resolveTurnPlayer';
 
 // Client/server state-reconciliation helpers. Pure (no Phaser scene needed) so they can be
-// unit-tested in isolation; used by MatchScene's optimistic-update and post-resolve sanity checks.
+// unit-tested in isolation; used by MatchScene's turn-command and post-resolve sanity checks.
 
-export function cloneGrid(grid: Tile[][]): Tile[][] {
-  return grid.map(row => row.map(tile => ({ ...tile })));
+export type AppliedTurnResult =
+  | { type: 'move'; unitId: number; to: Coordinate }
+  | { type: 'placeBomb'; bombId: number; position: Coordinate };
+
+// Extracts what the server actually reported happened (event data), not what the client
+// originally requested — a future engine change (push/swap) could make these differ.
+export function extractAppliedTarget(
+  cmd: TurnCommand,
+  events: GameEvent[]
+): AppliedTurnResult | undefined {
+  if (cmd.type === 'move') {
+    const e = events.find(ev => ev.type === 'unitMoved');
+    if (e?.unitId === undefined || !e.to) {
+      return undefined;
+    }
+    return { type: 'move', unitId: e.unitId, to: e.to };
+  }
+  const e = events.find(ev => ev.type === 'bombPlaced');
+  if (e?.bombId === undefined || !e.position) {
+    return undefined;
+  }
+  return { type: 'placeBomb', bombId: e.bombId, position: e.position };
+}
+
+// Spot-checks only the entity a turn command touched: a `move` never changes *who* exists
+// (only position), so a full existence sweep would be a no-op for it — this checks the one
+// thing the command was actually supposed to change. Compares against the server-reported
+// event data (`AppliedTurnResult`), not the originally requested command.
+export function turnCommandTargetMatches(
+  freshState: GameState,
+  result: AppliedTurnResult
+): boolean {
+  if (result.type === 'move') {
+    const unit = freshState.units.find(u => u.id === result.unitId);
+    return unit?.position.x === result.to.x && unit?.position.y === result.to.y;
+  }
+  const bomb = freshState.bombs.find(b => b.id === result.bombId);
+  return bomb?.position.x === result.position.x && bomb?.position.y === result.position.y;
 }
 
 export function occupantsMatch(
@@ -37,31 +73,5 @@ export function occupantsMatch(
     return false;
   }
 
-  return true;
-}
-
-export function gridsEqual(a: Tile[][], b: Tile[][]): boolean {
-  if (a.length !== b.length) {
-    return false;
-  }
-  for (let y = 0; y < a.length; y++) {
-    const rowA = a[y];
-    const rowB = b[y];
-    if (!rowA || rowA.length !== rowB?.length) {
-      return false;
-    }
-    for (let x = 0; x < rowA.length; x++) {
-      const tileA = rowA[x];
-      const tileB = rowB[x];
-      if (
-        !tileA ||
-        tileA.type !== tileB?.type ||
-        tileA.occupantType !== tileB.occupantType ||
-        tileA.occupantId !== tileB.occupantId
-      ) {
-        return false;
-      }
-    }
-  }
   return true;
 }

@@ -15,7 +15,12 @@ import ErrorPanel from '../ui/ErrorPanel';
 import { drawPillButton } from '../ui/pillButton';
 import { destroyAll } from '../ui/gameObjectUtils';
 import { playResolveTurnEvents, type BombGraphics } from '../rendering/resolveTurnPlayer';
-import { cloneGrid, gridsEqual, occupantsMatch } from '../rendering/stateSync';
+import {
+  extractAppliedTarget,
+  turnCommandTargetMatches,
+  occupantsMatch,
+  type AppliedTurnResult,
+} from '../rendering/stateSync';
 import {
   renderBoard as drawBoard,
   renderBomb as drawBomb,
@@ -40,7 +45,6 @@ import type {
   GameCfg,
   GameEvent,
   GameState,
-  Tile,
   TurnCmdType,
   TurnCommand,
   Unit,
@@ -83,8 +87,7 @@ export default class MatchScene extends Phaser.Scene {
     this.turnCommandPanel = new TurnCommandPanel(this, {
       getAllowedTiles: (unitId, turnCmdType) => this.getAllowedTilesCached(unitId, turnCmdType),
       onError: message => this.showError(message),
-      onConfirmedSubmit: (turnCmdType, unitId, target) =>
-        this.onConfirmedSubmit(turnCmdType, unitId, target),
+      onConfirmedSubmit: cmd => void this.handleTurnCommand(cmd),
       showConfirm: (onYes, onNo) => this.confirmDialog.show(onYes, onNo, 'Confirm?'),
       hideConfirm: () => this.confirmDialog.hide(),
       isConfirmOpen: () => this.confirmDialog.isOpen,
@@ -133,10 +136,6 @@ export default class MatchScene extends Phaser.Scene {
     return tiles;
   }
 
-  private onConfirmedSubmit(turnCmdType: TurnCmdType, unitId: number, target: Coordinate): void {
-    void this.handleTurnCommand({ type: turnCmdType, unitId, target });
-  }
-
   private async handleTurnCommand(cmd: TurnCommand): Promise<void> {
     if (this.isSubmitting) {
       return;
@@ -144,60 +143,48 @@ export default class MatchScene extends Phaser.Scene {
     this.isSubmitting = true;
     this.clearErrors();
     try {
-      const predictedGrid = cloneGrid(this.gameState.grid);
-
+      let applied: AppliedTurnResult | undefined;
       try {
         const gameEvents = await submitTurnCommand(cmd);
         this.allowedTilesCache.clear();
         this.turnCommandPanel.closeImmediately();
         for (const event of gameEvents) {
-          const ok = this.applyGameEvent(event, cmd.unitId, predictedGrid);
+          const ok = this.applyGameEvent(event);
           if (!ok) {
             break;
           }
         }
+        applied = extractAppliedTarget(cmd, gameEvents);
       } catch (err) {
         this.showError(err instanceof Error ? err.message : String(err));
         this.turnCommandPanel.closeImmediately();
       }
 
-      await this.refreshFinalSanityCheck(predictedGrid);
+      await this.refreshFinalSanityCheck(applied);
     } finally {
       this.isSubmitting = false;
     }
   }
 
-  private applyGameEvent(event: GameEvent, actorUnitId: number, predictedGrid: Tile[][]): boolean {
+  private inBounds(c: Coordinate): boolean {
+    return this.gameState.grid[c.y]?.[c.x] !== undefined;
+  }
+
+  private applyGameEvent(event: GameEvent): boolean {
     switch (event.type) {
       case 'unitMoved':
-        return this.applyUnitMoved(event, actorUnitId, predictedGrid);
+        return this.applyUnitMoved(event);
       case 'bombPlaced':
-        return this.applyBombPlaced(event, actorUnitId, predictedGrid);
+        return this.applyBombPlaced(event);
       default:
         return true;
     }
   }
 
-  private applyUnitMoved(event: GameEvent, actorUnitId: number, predictedGrid: Tile[][]): boolean {
+  private applyUnitMoved(event: GameEvent): boolean {
     const { unitId, from, to } = event;
-    const fromTile = from && this.gameState.grid[from.y]?.[from.x];
-    const toTile = to && this.gameState.grid[to.y]?.[to.x];
-    const actorAtFrom =
-      from &&
-      this.gameState.units.some(
-        u => u.id === unitId && u.position.x === from.x && u.position.y === from.y
-      );
 
-    if (
-      unitId === undefined ||
-      !from ||
-      !to ||
-      unitId !== actorUnitId ||
-      fromTile?.occupantType !== 'OccupantUnit' ||
-      fromTile.occupantId !== unitId ||
-      toTile?.occupantType !== 'OccupantNone' ||
-      !actorAtFrom
-    ) {
+    if (unitId === undefined || !from || !to || !this.inBounds(from) || !this.inBounds(to)) {
       this.showError('Invalid unitMoved event received from server');
       return false;
     }
@@ -215,31 +202,18 @@ export default class MatchScene extends Phaser.Scene {
       });
     }
 
-    const predictedFrom = predictedGrid[from.y]?.[from.x];
-    const predictedTo = predictedGrid[to.y]?.[to.x];
-    if (predictedFrom) {
-      predictedFrom.occupantType = 'OccupantNone';
-      predictedFrom.occupantId = 0;
-    }
-    if (predictedTo) {
-      predictedTo.occupantType = 'OccupantUnit';
-      predictedTo.occupantId = unitId;
-    }
-
     return true;
   }
 
-  private applyBombPlaced(event: GameEvent, actorUnitId: number, predictedGrid: Tile[][]): boolean {
+  private applyBombPlaced(event: GameEvent): boolean {
     const { unitId, bombId, position, countdown, range } = event;
-    const targetTile = position && this.gameState.grid[position.y]?.[position.x];
 
     if (
       unitId === undefined ||
       bombId === undefined ||
       !position ||
       countdown === undefined ||
-      unitId !== actorUnitId ||
-      targetTile?.occupantType !== 'OccupantNone'
+      !this.inBounds(position)
     ) {
       this.showError('Invalid bombPlaced event received from server');
       return false;
@@ -253,19 +227,13 @@ export default class MatchScene extends Phaser.Scene {
       countdown,
     });
 
-    const predictedTile = predictedGrid[position.y]?.[position.x];
-    if (predictedTile) {
-      predictedTile.occupantType = 'OccupantBomb';
-      predictedTile.occupantId = bombId;
-    }
-
     return true;
   }
 
-  private async refreshFinalSanityCheck(predictedGrid: Tile[][]): Promise<void> {
+  private async refreshFinalSanityCheck(applied: AppliedTurnResult | undefined): Promise<void> {
     try {
       const freshState = await getMatchState();
-      if (!gridsEqual(freshState.grid, predictedGrid)) {
+      if (!applied || !turnCommandTargetMatches(freshState, applied)) {
         this.showError('Match state is out of sync with the server');
         this.renderBoard(freshState);
       } else {

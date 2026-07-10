@@ -458,7 +458,7 @@ describe('MatchScene', () => {
     expect(getMatchState).toHaveBeenCalledTimes(2);
   });
 
-  it('shows an error and stops processing when the unitMoved event is invalid', async () => {
+  it('shows an error and stops processing when the unitMoved event is malformed (out-of-bounds target)', async () => {
     const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
     const initialGrid: Tile[][] = [[plainTile(), plainTile()]];
     const target: Coordinate = { x: 1, y: 0 };
@@ -467,9 +467,9 @@ describe('MatchScene', () => {
       .mockResolvedValueOnce(makeState(initialGrid, { activeTeam: 1, units: [unit] }))
       .mockResolvedValueOnce(makeState(initialGrid, { activeTeam: 1, units: [unit] }));
     vi.mocked(getAllowedTiles).mockResolvedValue([target]);
-    // unitId mismatches the actor (7) — invalid per spec's unitMoved validation.
+    // `to` is out-of-bounds for a 1x2 grid — structurally malformed, regardless of legality.
     const events: GameEvent[] = [
-      { type: 'unitMoved', unitId: 999, from: { x: 0, y: 0 }, to: target },
+      { type: 'unitMoved', unitId: 7, from: { x: 0, y: 0 }, to: { x: 99, y: 99 } },
     ];
     vi.mocked(submitTurnCommand).mockResolvedValue(events);
 
@@ -493,18 +493,98 @@ describe('MatchScene', () => {
     expect(getMatchState).toHaveBeenCalledTimes(2); // refresh still runs
   });
 
-  it('flags a mismatch when the refreshed grid differs from the predicted grid', async () => {
+  it('accepts a unitMoved event even when the client grid did not show the unit at `from` (no client-side legality re-derivation)', async () => {
+    const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
+    // Deliberately inconsistent with `unit`'s own position: the grid tile at `from` shows
+    // no occupant, even though the units array (the source boardRenderer used) has unit 7
+    // there. Previously this tripped the "mover was at from" tile-based re-derivation.
+    const initialGrid: Tile[][] = [[plainTile(), plainTile()]];
+    const target: Coordinate = { x: 1, y: 0 };
+    const movedUnit = makeUnit({ id: 7, team: 1, position: target });
+
+    vi.mocked(getMatchState)
+      .mockResolvedValueOnce(makeState(initialGrid, { activeTeam: 1, units: [unit] }))
+      .mockResolvedValueOnce(makeState(initialGrid, { activeTeam: 2, units: [movedUnit] }));
+    vi.mocked(getAllowedTiles).mockResolvedValue([target]);
+    const events: GameEvent[] = [
+      { type: 'unitMoved', unitId: 7, from: { x: 0, y: 0 }, to: target },
+    ];
+    vi.mocked(submitTurnCommand).mockResolvedValue(events);
+
+    const scene = new MatchScene();
+    scene.create({ roomId: 'room-abc', playerTokens: ['t1', 't2'] });
+    await Promise.resolve();
+
+    const unitGraphics = occupantGraphics(0);
+    await submitViaUI(unitGraphics, 0);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(mockScene.tweens.add).toHaveBeenCalledWith(
+      expect.objectContaining({ targets: unitGraphics, x: 48, y: 0, ease: 'Linear' })
+    );
+    expect(mockScene.add.text).not.toHaveBeenCalledWith(
+      expect.any(Number),
+      expect.any(Number),
+      'Invalid unitMoved event received from server',
+      expect.objectContaining({})
+    );
+  });
+
+  it('does not flag a mismatch when the server lands the unit on a different tile than requested (e.g. a future push/swap move)', async () => {
+    const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
+    const initialGrid: Tile[][] = [[plainTile(), plainTile(), plainTile()]];
+    const requestedTarget: Coordinate = { x: 1, y: 0 };
+    const actualTo: Coordinate = { x: 2, y: 0 };
+    const pushedUnit = makeUnit({ id: 7, team: 1, position: actualTo });
+
+    vi.mocked(getMatchState)
+      .mockResolvedValueOnce(makeState(initialGrid, { activeTeam: 1, units: [unit] }))
+      .mockResolvedValueOnce(makeState(initialGrid, { activeTeam: 2, units: [pushedUnit] }));
+    vi.mocked(getAllowedTiles).mockResolvedValue([requestedTarget]);
+    // Server reports the unit actually landed one tile further than the client requested.
+    const events: GameEvent[] = [
+      { type: 'unitMoved', unitId: 7, from: { x: 0, y: 0 }, to: actualTo },
+    ];
+    vi.mocked(submitTurnCommand).mockResolvedValue(events);
+
+    const scene = new MatchScene();
+    scene.create({ roomId: 'room-abc', playerTokens: ['t1', 't2'] });
+    await Promise.resolve();
+
+    const unitGraphics = occupantGraphics(0);
+    await submitViaUI(unitGraphics, 0);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(mockScene.add.text).not.toHaveBeenCalledWith(
+      expect.any(Number),
+      expect.any(Number),
+      expect.stringContaining('out of sync'),
+      expect.objectContaining({})
+    );
+    expect(mockScene.add.text).not.toHaveBeenCalledWith(
+      expect.any(Number),
+      expect.any(Number),
+      'Failed to refresh match state',
+      expect.objectContaining({})
+    );
+  });
+
+  it('flags a mismatch when the post-move refreshed state has the moved unit at the wrong position', async () => {
     const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
     const initialGrid: Tile[][] = [
       [{ type: 'TerrainPlain', occupantType: 'OccupantUnit', occupantId: 7 }, plainTile()],
     ];
     const target: Coordinate = { x: 1, y: 0 };
-    // Refresh returns a grid that does NOT match the predicted post-move grid (unit missing).
-    const unexpectedGrid: Tile[][] = [[plainTile(), plainTile()]];
+    // Refresh returns the actor unit still at its pre-move position (0,0), not the event's `to`.
+    const staleUnit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
 
     vi.mocked(getMatchState)
       .mockResolvedValueOnce(makeState(initialGrid, { activeTeam: 1, units: [unit] }))
-      .mockResolvedValueOnce(makeState(unexpectedGrid, { activeTeam: 1, units: [unit] }));
+      .mockResolvedValueOnce(makeState(initialGrid, { activeTeam: 1, units: [staleUnit] }));
     vi.mocked(getAllowedTiles).mockResolvedValue([target]);
     const events: GameEvent[] = [
       { type: 'unitMoved', unitId: 7, from: { x: 0, y: 0 }, to: target },

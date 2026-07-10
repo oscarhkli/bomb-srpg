@@ -70,12 +70,6 @@ function validate(events: GameEvent[], snapshot: GameState): string | null {
           if (!row?.[p.x]) {
             return `bombExploded event has an out-of-bounds affected position (${p.x}, ${p.y})`;
           }
-          if (p.x === bomb.position.x && p.y === bomb.position.y) {
-            continue; // the bomb's own tile is always part of its blast, not a directional ray
-          }
-          if (directionOf(bomb.position, p) === null) {
-            return `bombExploded event has a non-cardinal affected position (${p.x}, ${p.y})`;
-          }
         }
         break;
       }

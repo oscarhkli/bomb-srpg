@@ -181,7 +181,7 @@ describe('playResolveTurnEvents — validation', () => {
     expect(mockScene.time.delayedCall).not.toHaveBeenCalled();
   });
 
-  it('flags a bombExploded affected position that is not cardinally aligned with the bomb', () => {
+  it('flags a bombExploded affected position that is out-of-bounds', () => {
     const onError = vi.fn();
     const state = baseState({
       grid: grid5x5(),
@@ -189,8 +189,7 @@ describe('playResolveTurnEvents — validation', () => {
     });
 
     const result = playResolveTurnEvents(
-      // (3,3) is diagonal to the bomb at (2,2) — not on the same row or column.
-      [{ type: 'bombExploded', bombId: 1, affectedPositions: [{ x: 3, y: 3 }] }],
+      [{ type: 'bombExploded', bombId: 1, affectedPositions: [{ x: 99, y: 99 }] }],
       {
         scene: mockScene as never,
         gameStateSnapshot: state,
@@ -204,6 +203,38 @@ describe('playResolveTurnEvents — validation', () => {
     expect(result.ok).toBe(false);
     expect(onError).toHaveBeenCalledOnce();
     expect(mockScene.time.delayedCall).not.toHaveBeenCalled();
+  });
+
+  it('accepts an in-bounds bombExploded affected position that is not cardinally aligned with the bomb, rendering no beam for it', () => {
+    const onError = vi.fn();
+    const bombGraphicsById = new Map<number, BombGraphics>([
+      [1, { circle: createMockGraphics() as never, countdownText: createMockText() as never }],
+    ]);
+    const state = baseState({
+      grid: grid5x5(),
+      bombs: [{ id: 1, ownerId: 0x11, position: { x: 2, y: 2 }, range: 2, countdown: 0 }],
+    });
+
+    const result = playResolveTurnEvents(
+      // (3,3) is diagonal to the bomb at (2,2) — not on the same row or column, but in-bounds.
+      // A future engine change could plausibly emit this; it must not be rejected client-side.
+      [{ type: 'bombExploded', bombId: 1, affectedPositions: [{ x: 3, y: 3 }] }],
+      {
+        scene: mockScene as never,
+        gameStateSnapshot: state,
+        unitGraphicsById: new Map(),
+        bombGraphicsById,
+        softBlockGraphicsById: new Map(),
+        onError,
+      }
+    );
+
+    expect(result.ok).toBe(true);
+    expect(onError).not.toHaveBeenCalled();
+    delayedCallAt(0)();
+    // The bomb graphics are still cleaned up, but no beam is drawn since the only
+    // affected position has no cardinal direction from the bomb.
+    expect(mockScene.tweens.add).not.toHaveBeenCalled();
   });
 });
 

@@ -293,7 +293,7 @@ describe('TurnCommandPanel', () => {
     const { onYes } = latestConfirmCallbacks(showConfirm);
     onYes();
 
-    expect(onConfirmedSubmit).toHaveBeenCalledWith('move', 9, target);
+    expect(onConfirmedSubmit).toHaveBeenCalledWith({ type: 'move', unitId: 9, target });
   });
 
   it('ignores a second tile click while a confirm dialog is already open', async () => {

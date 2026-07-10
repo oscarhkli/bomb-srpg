@@ -22,12 +22,12 @@ import {
 } from '../constants';
 import { drawPillButton } from './pillButton';
 import { destroyAll } from './gameObjectUtils';
-import type { Coordinate, TurnCmdType, Unit } from '../types/api';
+import type { Coordinate, TurnCmdType, TurnCommand, Unit } from '../types/api';
 
 export interface TurnCommandPanelCallbacks {
   getAllowedTiles: (unitId: number, turnCmdType: TurnCmdType) => Promise<Coordinate[]>;
   onError: (message: string) => void;
-  onConfirmedSubmit: (turnCmdType: TurnCmdType, unitId: number, target: Coordinate) => void;
+  onConfirmedSubmit: (cmd: TurnCommand) => void;
   showConfirm: (onYes: () => void, onNo: () => void) => void;
   hideConfirm: () => void;
   isConfirmOpen: () => boolean;
@@ -203,7 +203,12 @@ export default class TurnCommandPanel {
         g.strokeRect(x, y, TILE_SIZE, TILE_SIZE);
         this.actionStack.push({ kind: 'confirmPending', turnCmdType, target: position });
         this.callbacks.showConfirm(
-          () => this.callbacks.onConfirmedSubmit(turnCmdType, unit.id, position),
+          () =>
+            this.callbacks.onConfirmedSubmit({
+              type: turnCmdType,
+              unitId: unit.id,
+              target: position,
+            }),
           () => this.onDialogNo()
         );
       });
