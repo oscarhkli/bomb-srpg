@@ -37,6 +37,7 @@ export function createMockGraphics() {
 
 export function createMockText() {
   return {
+    height: 16,
     setOrigin: vi.fn().mockReturnThis(),
     setDepth: vi.fn().mockReturnThis(),
     setScrollFactor: vi.fn().mockReturnThis(),

@@ -84,8 +84,6 @@ export const RESOLVE_BUTTON_HEIGHT = 72;
 export const RESOLVE_BUTTON_MARGIN_TOP = 48;
 export const RESOLVE_BUTTON_LABEL = 'End this turn';
 
-export const BOMB_COUNTDOWN_ZERO_COLOR = 0xff0000;
-
 // Error panel — fixed left-side panel so error text is always legible instead of overlapping
 // at screen-center.
 export const ERROR_PANEL_X = TURN_PANEL_MARGIN;
@@ -95,4 +93,3 @@ export const ERROR_PANEL_HEIGHT = 400;
 export const ERROR_PANEL_PADDING = 8;
 export const ERROR_PANEL_BG_COLOR = 0x1a1a1a;
 export const ERROR_PANEL_BG_ALPHA = 0.75;
-export const ERROR_LINE_HEIGHT = 40;

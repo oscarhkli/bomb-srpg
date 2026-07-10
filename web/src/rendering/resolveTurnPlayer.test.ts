@@ -70,6 +70,21 @@ describe('playResolveTurnEvents — bombCountdownUpdated', () => {
     expect(countdownText.setText).toHaveBeenCalledWith('!');
     expect(countdownText.setColor).toHaveBeenCalledWith('#ff0000');
   });
+
+  it('does not throw when the bomb graphics map has no entry for a validated bombId', () => {
+    // bombGraphicsById deliberately left empty — validate() only checks the snapshot,
+    // not that the graphics map is in sync with it.
+    playResolveTurnEvents([{ type: 'bombCountdownUpdated', bombId: 1, countdown: 3 }], {
+      scene: mockScene as never,
+      gameStateSnapshot: baseState(),
+      unitGraphicsById: new Map(),
+      bombGraphicsById: new Map(),
+      softBlockGraphicsById: new Map(),
+      onError: vi.fn(),
+    });
+
+    expect(() => delayedCallAt(0)()).not.toThrow();
+  });
 });
 
 describe('playResolveTurnEvents — validation', () => {
@@ -98,6 +113,87 @@ describe('playResolveTurnEvents — validation', () => {
       {
         scene: mockScene as never,
         gameStateSnapshot: baseState(),
+        unitGraphicsById: new Map(),
+        bombGraphicsById: new Map(),
+        softBlockGraphicsById: new Map(),
+        onError,
+      }
+    );
+
+    expect(result.ok).toBe(false);
+    expect(onError).toHaveBeenCalledOnce();
+    expect(mockScene.time.delayedCall).not.toHaveBeenCalled();
+  });
+
+  it('flags a negative countdown as an invalid value and schedules nothing', () => {
+    const onError = vi.fn();
+
+    const result = playResolveTurnEvents(
+      [{ type: 'bombCountdownUpdated', bombId: 1, countdown: -1 }],
+      {
+        scene: mockScene as never,
+        gameStateSnapshot: baseState(),
+        unitGraphicsById: new Map(),
+        bombGraphicsById: new Map(),
+        softBlockGraphicsById: new Map(),
+        onError,
+      }
+    );
+
+    expect(result.ok).toBe(false);
+    expect(onError).toHaveBeenCalledOnce();
+    expect(mockScene.time.delayedCall).not.toHaveBeenCalled();
+  });
+
+  it('flags a negative newHp as an invalid value and schedules nothing', () => {
+    const onError = vi.fn();
+    const state = baseState({
+      units: [
+        {
+          id: 0x21,
+          type: 'Bandit',
+          position: { x: 0, y: 0 },
+          speed: 3,
+          bombMaxRange: 2,
+          bombPower: 1,
+          maxBombCount: 1,
+          bombUsed: 0,
+          team: 2,
+          hp: 1,
+          skills: [],
+          hasMoved: false,
+          hasUsedSkill: false,
+        },
+      ],
+    });
+
+    const result = playResolveTurnEvents([{ type: 'unitDamaged', unitId: 0x21, newHp: -1 }], {
+      scene: mockScene as never,
+      gameStateSnapshot: state,
+      unitGraphicsById: new Map(),
+      bombGraphicsById: new Map(),
+      softBlockGraphicsById: new Map(),
+      onError,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(onError).toHaveBeenCalledOnce();
+    expect(mockScene.time.delayedCall).not.toHaveBeenCalled();
+  });
+
+  it('flags a bombExploded affected position that is not cardinally aligned with the bomb', () => {
+    const onError = vi.fn();
+    const state = baseState({
+      grid: grid5x5(),
+      bombs: [{ id: 1, ownerId: 0x11, position: { x: 2, y: 2 }, range: 2, countdown: 0 }],
+    });
+
+    const result = playResolveTurnEvents(
+      // (3,3) is diagonal to the bomb at (2,2) — not on the same row or column.
+      [{ type: 'bombExploded', bombId: 1, affectedPositions: [{ x: 3, y: 3 }] }],
+      {
+        scene: mockScene as never,
+        gameStateSnapshot: state,
         unitGraphicsById: new Map(),
         bombGraphicsById: new Map(),
         softBlockGraphicsById: new Map(),
@@ -165,6 +261,48 @@ describe('playResolveTurnEvents — bombExploded (non-chain)', () => {
     const tweenCfg = mockScene.tweens.add.mock.calls[0]![0] as { len: number; duration: number };
     expect(tweenCfg.len).toBe(2 * TILE_SIZE); // 2 tiles east
     expect(tweenCfg.duration).toBe(2 * BLAST_SPEED_MS_PER_TILE);
+  });
+
+  it("accepts the bomb's own origin tile in affectedPositions (the backend always includes it) and still renders", () => {
+    const onError = vi.fn();
+    const bombGraphicsById = new Map<number, BombGraphics>([
+      [1, { circle: createMockGraphics() as never, countdownText: createMockText() as never }],
+    ]);
+    const state = baseState({
+      grid: grid5x5(),
+      bombs: [{ id: 1, ownerId: 0x11, position: { x: 2, y: 2 }, range: 2, countdown: 0 }],
+    });
+
+    const result = playResolveTurnEvents(
+      [
+        {
+          type: 'bombExploded',
+          bombId: 1,
+          // The engine's raycast seeds the reachable set with the bomb's own tile,
+          // so (2,2) is always present alongside the outward ray tiles.
+          affectedPositions: [
+            { x: 2, y: 2 },
+            { x: 3, y: 2 },
+            { x: 4, y: 2 },
+          ],
+        },
+      ],
+      {
+        scene: mockScene as never,
+        gameStateSnapshot: state,
+        unitGraphicsById: new Map(),
+        bombGraphicsById,
+        softBlockGraphicsById: new Map(),
+        onError,
+      }
+    );
+
+    expect(result.ok).toBe(true);
+    expect(onError).not.toHaveBeenCalled();
+    // The origin tile no longer aborts rendering — the outward beam is still scheduled
+    // once the explosion's delayedCall(0) fires.
+    delayedCallAt(0)();
+    expect(mockScene.tweens.add).toHaveBeenCalledOnce();
   });
 });
 

@@ -1,9 +1,15 @@
 import type Phaser from 'phaser';
 import type { Coordinate, GameEvent, GameState } from '../types/api';
-import { BOMB_COUNTDOWN_ZERO_COLOR } from '../constants';
-import { BLAST_SPEED_MS_PER_TILE, BLAST_DURATION_MS, FIRE_DURATION_MS } from './constants';
+import {
+  BOMB_COUNTDOWN_ZERO_COLOR,
+  BOMB_COUNTDOWN_TEXT_COLOR,
+  BLAST_SPEED_MS_PER_TILE,
+  BLAST_DURATION_MS,
+  FIRE_DURATION_MS,
+} from './constants';
 import { cardinalDistance, reachTimeMs } from './reachTime';
 import { drawGrowingBeam, drawFireShape, type CardinalDirection } from './blastEffects';
+import { colorToCss } from '../ui/gameObjectUtils';
 
 export interface BombGraphics {
   circle: Phaser.GameObjects.Graphics;
@@ -24,13 +30,13 @@ export interface PlayResult {
   done: Promise<void>;
 }
 
-export function renderBombCountdownText(text: Phaser.GameObjects.Text, countdown: number): void {
+function renderBombCountdownText(text: Phaser.GameObjects.Text, countdown: number): void {
   if (countdown === 0) {
     text.setText('!');
-    text.setColor(`#${BOMB_COUNTDOWN_ZERO_COLOR.toString(16).padStart(6, '0')}`);
+    text.setColor(colorToCss(BOMB_COUNTDOWN_ZERO_COLOR));
   } else {
     text.setText(String(countdown));
-    text.setColor('#ffffff');
+    text.setColor(colorToCss(BOMB_COUNTDOWN_TEXT_COLOR));
   }
 }
 
@@ -42,6 +48,9 @@ function validate(events: GameEvent[], snapshot: GameState): string | null {
         if (bombId === undefined || countdown === undefined) {
           return 'bombCountdownUpdated event is missing bombId/countdown';
         }
+        if (!Number.isInteger(countdown) || countdown < 0) {
+          return `bombCountdownUpdated event has an invalid countdown ${countdown}`;
+        }
         if (!snapshot.bombs.some(b => b.id === bombId)) {
           return `bombCountdownUpdated event references unknown bombId ${bombId}`;
         }
@@ -52,13 +61,20 @@ function validate(events: GameEvent[], snapshot: GameState): string | null {
         if (bombId === undefined || affectedPositions === undefined) {
           return 'bombExploded event is missing bombId/affectedPositions';
         }
-        if (!snapshot.bombs.some(b => b.id === bombId)) {
+        const bomb = snapshot.bombs.find(b => b.id === bombId);
+        if (!bomb) {
           return `bombExploded event references unknown bombId ${bombId}`;
         }
         for (const p of affectedPositions) {
           const row = snapshot.grid[p.y];
           if (!row?.[p.x]) {
             return `bombExploded event has an out-of-bounds affected position (${p.x}, ${p.y})`;
+          }
+          if (p.x === bomb.position.x && p.y === bomb.position.y) {
+            continue; // the bomb's own tile is always part of its blast, not a directional ray
+          }
+          if (directionOf(bomb.position, p) === null) {
+            return `bombExploded event has a non-cardinal affected position (${p.x}, ${p.y})`;
           }
         }
         break;
@@ -67,6 +83,9 @@ function validate(events: GameEvent[], snapshot: GameState): string | null {
         const { unitId, newHp } = event;
         if (unitId === undefined || newHp === undefined) {
           return 'unitDamaged event is missing unitId/newHp';
+        }
+        if (!Number.isInteger(newHp) || newHp < 0) {
+          return `unitDamaged event has an invalid newHp ${newHp}`;
         }
         if (!snapshot.units.some(u => u.id === unitId)) {
           return `unitDamaged event references unknown unitId ${unitId}`;
@@ -171,7 +190,9 @@ export function playResolveTurnEvents(
       const { bombId, countdown } = event;
       deps.scene.time.delayedCall(0, () => {
         const bg = deps.bombGraphicsById.get(bombId!);
-        renderBombCountdownText(bg!.countdownText, countdown!);
+        if (bg) {
+          renderBombCountdownText(bg.countdownText, countdown!);
+        }
       });
     }
   }

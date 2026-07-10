@@ -21,6 +21,7 @@ import {
   TURN_COMMAND_PANEL_HEIGHT,
 } from '../constants';
 import { drawPillButton } from './pillButton';
+import { destroyAll } from './gameObjectUtils';
 import type { Coordinate, TurnCmdType, Unit } from '../types/api';
 
 export interface TurnCommandPanelCallbacks {
@@ -65,8 +66,7 @@ export default class TurnCommandPanel {
   closeImmediately(): void {
     this.callbacks.hideConfirm();
     this.hideAllowedTiles();
-    this.panelObjects.forEach(obj => obj.destroy());
-    this.panelObjects = [];
+    destroyAll(this.panelObjects);
     this.actionStack = [];
     this.currentUnit = undefined;
   }
@@ -213,7 +213,6 @@ export default class TurnCommandPanel {
   }
 
   private hideAllowedTiles(): void {
-    this.overlayTiles.forEach(g => g.destroy());
-    this.overlayTiles = [];
+    destroyAll(this.overlayTiles);
   }
 }

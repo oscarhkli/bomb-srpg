@@ -11,34 +11,20 @@ import {
 import TurnCommandPanel from '../ui/TurnCommandPanel';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import TurnPanel from '../ui/TurnPanel';
+import ErrorPanel from '../ui/ErrorPanel';
 import { drawPillButton } from '../ui/pillButton';
+import { destroyAll } from '../ui/gameObjectUtils';
 import { playResolveTurnEvents, type BombGraphics } from '../rendering/resolveTurnPlayer';
+import { cloneGrid, gridsEqual, occupantsMatch } from '../rendering/stateSync';
+import {
+  renderBoard as drawBoard,
+  renderBomb as drawBomb,
+  tileCenter,
+  type BoardRenderContext,
+} from '../rendering/boardRenderer';
 import {
   TILE_SIZE,
-  TERRAIN_COLORS,
-  TERRAIN_BORDER_COLOR,
-  TEAM_COLORS,
-  UNIT_SIZE,
-  OCCUPANT_STROKE_COLOR,
-  OCCUPANT_ICON_RADIUS,
-  OCCUPANT_ICON_STROKE_WIDTH,
-  SOFTBLOCK_COLOR,
-  SOFTBLOCK_SIZE,
-  SOFTBLOCK_CORNER_RADIUS,
-  BOMB_COLOR,
-  BOMB_SIZE,
-  ERROR_LINE_HEIGHT,
-  ERROR_PANEL_X,
-  ERROR_PANEL_Y,
-  ERROR_PANEL_WIDTH,
-  ERROR_PANEL_HEIGHT,
-  ERROR_PANEL_PADDING,
-  ERROR_PANEL_BG_COLOR,
-  ERROR_PANEL_BG_ALPHA,
-  DEPTH_GRID,
-  DEPTH_OCCUPANT,
   DEPTH_TURN_COMMAND_PANEL,
-  DEPTH_ERROR_PANEL,
   UNIT_MOVE_TWEEN_DURATION,
   PANEL_BUTTON_FILL_COLOR,
   PANEL_BUTTON_FILL_ALPHA,
@@ -58,8 +44,6 @@ import type {
   TurnCmdType,
   TurnCommand,
   Unit,
-  SoftBlock,
-  Bomb,
 } from '../types/api';
 
 export interface MatchSceneData {
@@ -81,8 +65,7 @@ export default class MatchScene extends Phaser.Scene {
   private confirmDialog!: ConfirmDialog;
   private turnPanel!: TurnPanel;
   private resolveButtonObjects: Phaser.GameObjects.GameObject[] = [];
-  private errorPanelBg: Phaser.GameObjects.Graphics | undefined;
-  private errorTexts: Phaser.GameObjects.Text[] = [];
+  private errorPanel!: ErrorPanel;
   private isSubmitting = false;
 
   constructor() {
@@ -96,6 +79,7 @@ export default class MatchScene extends Phaser.Scene {
     initRoom(data.roomId);
     this.confirmDialog = new ConfirmDialog(this);
     this.turnPanel = new TurnPanel(this);
+    this.errorPanel = new ErrorPanel(this);
     this.turnCommandPanel = new TurnCommandPanel(this, {
       getAllowedTiles: (unitId, turnCmdType) => this.getAllowedTilesCached(unitId, turnCmdType),
       onError: message => this.showError(message),
@@ -108,8 +92,8 @@ export default class MatchScene extends Phaser.Scene {
 
     getMatchState()
       .then(state => {
-        this.renderBoard(state);
-        this.centerCamera(state.grid);
+        const { cols, rows } = this.renderBoard(state);
+        this.cameras.main.centerOn((cols * TILE_SIZE) / 2, (rows * TILE_SIZE) / 2);
         this.renderResolveButton();
         this.refreshTurnPanelIfReady();
       })
@@ -261,7 +245,13 @@ export default class MatchScene extends Phaser.Scene {
       return false;
     }
 
-    this.renderBomb({ id: bombId, ownerId: unitId, position, range: range ?? 0, countdown });
+    drawBomb(this.boardCtx(), {
+      id: bombId,
+      ownerId: unitId,
+      position,
+      range: range ?? 0,
+      countdown,
+    });
 
     const predictedTile = predictedGrid[position.y]?.[position.x];
     if (predictedTile) {
@@ -287,7 +277,7 @@ export default class MatchScene extends Phaser.Scene {
   }
 
   private renderResolveButton(): void {
-    this.resolveButtonObjects.forEach(obj => obj.destroy());
+    destroyAll(this.resolveButtonObjects);
     const { width } = this.cameras.main;
     const x = width / 2 - RESOLVE_BUTTON_WIDTH / 2;
     this.resolveButtonObjects = drawPillButton(
@@ -310,7 +300,11 @@ export default class MatchScene extends Phaser.Scene {
   }
 
   private onResolveButtonClicked(): void {
-    if (this.confirmDialog.isOpen || this.isSubmitting) {
+    if (this.isSubmitting) {
+      return;
+    }
+    if (!this.gameCfg) {
+      this.showError('Match config is still loading, please try again shortly');
       return;
     }
     this.turnCommandPanel.closeImmediately();
@@ -372,79 +366,26 @@ export default class MatchScene extends Phaser.Scene {
     }
   }
 
-  private renderBoard(state: GameState): void {
-    this.boardObjects.forEach(obj => obj.destroy());
-    this.boardObjects = [];
-    this.unitGraphicsById.clear();
-    this.bombGraphicsById.clear();
-    this.softBlockGraphicsById.clear();
+  // Redraws the whole board and keeps the scene's grid-dependent state in sync. Returns the
+  // grid dimensions so create() can center the camera from the same source.
+  private renderBoard(state: GameState): { cols: number; rows: number } {
     this.gameState = state;
-
-    this.renderGrid(state.grid);
-    this.renderUnits(state.units);
-    this.renderSoftBlocks(state.softBlocks);
-    this.renderBombs(state.bombs);
-
-    const cols = state.grid[0]?.length ?? 0;
-    const rows = state.grid.length;
-    this.turnCommandPanel.setGridBounds(cols * TILE_SIZE, rows * TILE_SIZE);
+    const dims = drawBoard(this.boardCtx(), state);
+    this.turnCommandPanel.setGridBounds(dims.cols * TILE_SIZE, dims.rows * TILE_SIZE);
+    return dims;
   }
 
-  private renderGrid(grid: Tile[][]): void {
-    const g = this.add.graphics();
-    g.setDepth(DEPTH_GRID);
-    this.boardObjects.push(g);
-    g.lineStyle(1, TERRAIN_BORDER_COLOR);
-    for (let row = 0; row < grid.length; row++) {
-      const rowTiles = grid[row];
-      if (!rowTiles) {
-        continue;
-      }
-      for (let col = 0; col < rowTiles.length; col++) {
-        const tile = rowTiles[col];
-        if (!tile) {
-          continue;
-        }
-        const x = col * TILE_SIZE;
-        const y = row * TILE_SIZE;
-        g.fillStyle(TERRAIN_COLORS[tile.type]);
-        g.fillRect(x, y, TILE_SIZE, TILE_SIZE);
-        g.strokeRect(x, y, TILE_SIZE, TILE_SIZE);
-      }
-    }
-  }
-
-  private renderUnits(units: Unit[]): void {
-    units
-      .filter(unit => unit.hp > 0)
-      .forEach(unit => {
-        const { cx, cy } = tileCenter(unit.position);
-        const g = this.add.graphics();
-        g.setDepth(DEPTH_OCCUPANT);
-        this.boardObjects.push(g);
-        this.unitGraphicsById.set(unit.id, g);
-        const teamColor = TEAM_COLORS[unit.team];
-        if (teamColor === undefined) {
-          console.warn(`Unit ${unit.id} has unconfigured team ${unit.team}, rendering as white`);
-        }
-        g.fillStyle(teamColor ?? 0xffffff);
-        g.fillRect(cx - UNIT_SIZE / 2, cy - UNIT_SIZE / 2, UNIT_SIZE, UNIT_SIZE);
-        this.drawArchetypeIcon(g, unit.type, cx, cy);
-        this.attachUnitClickHandler(g, unit);
-      });
-  }
-
-  private attachUnitClickHandler(g: Phaser.GameObjects.Graphics, unit: Unit): void {
-    const hitArea = new Phaser.Geom.Rectangle(
-      unit.position.x * TILE_SIZE,
-      unit.position.y * TILE_SIZE,
-      TILE_SIZE,
-      TILE_SIZE
-    );
-    g.setInteractive(hitArea, (shape: Phaser.Geom.Rectangle, x: number, y: number) =>
-      Phaser.Geom.Rectangle.Contains(shape, x, y)
-    );
-    g.on('pointerdown', () => this.onUnitClicked(unit));
+  // The renderer draws occupants and wires their clicks; the scene keeps ownership of state and
+  // the click semantics (which is why onUnitClicked lives here, not in boardRenderer).
+  private boardCtx(): BoardRenderContext {
+    return {
+      scene: this,
+      boardObjects: this.boardObjects,
+      unitGraphicsById: this.unitGraphicsById,
+      bombGraphicsById: this.bombGraphicsById,
+      softBlockGraphicsById: this.softBlockGraphicsById,
+      onUnitClicked: unit => this.onUnitClicked(unit),
+    };
   }
 
   private onUnitClicked(unit: Unit): void {
@@ -459,222 +400,14 @@ export default class MatchScene extends Phaser.Scene {
     this.turnCommandPanel.openFor(unit);
   }
 
-  private renderSoftBlocks(softBlocks: SoftBlock[]): void {
-    softBlocks.forEach(block => {
-      const { cx, cy } = tileCenter(block.position);
-      const g = this.add.graphics();
-      g.setDepth(DEPTH_OCCUPANT);
-      this.boardObjects.push(g);
-      g.fillStyle(SOFTBLOCK_COLOR);
-      g.fillRoundedRect(
-        cx - SOFTBLOCK_SIZE / 2,
-        cy - SOFTBLOCK_SIZE / 2,
-        SOFTBLOCK_SIZE,
-        SOFTBLOCK_SIZE,
-        SOFTBLOCK_CORNER_RADIUS
-      );
-      this.attachClickLogger(g, block.position, `SoftBlock ${block.id}`, block);
-      this.softBlockGraphicsById.set(block.id, g);
-    });
-  }
-
-  private renderBombs(bombs: Bomb[]): void {
-    bombs.forEach(bomb => this.renderBomb(bomb));
-  }
-
-  private renderBomb(bomb: Bomb): void {
-    const { cx, cy } = tileCenter(bomb.position);
-    const g = this.add.graphics();
-    g.setDepth(DEPTH_OCCUPANT);
-    this.boardObjects.push(g);
-    g.fillStyle(BOMB_COLOR);
-    g.fillCircle(cx, cy, BOMB_SIZE / 2);
-    const text = this.add.text(cx, cy, String(bomb.countdown), { color: '#ffffff' });
-    text.setOrigin(0.5);
-    text.setDepth(DEPTH_OCCUPANT);
-    this.boardObjects.push(text);
-    this.attachClickLogger(g, bomb.position, `Bomb ${bomb.id}`, bomb);
-    this.bombGraphicsById.set(bomb.id, { circle: g, countdownText: text });
-  }
-
-  private attachClickLogger(
-    g: Phaser.GameObjects.Graphics,
-    position: Coordinate,
-    label: string,
-    details: unknown
-  ): void {
-    const hitArea = new Phaser.Geom.Rectangle(
-      position.x * TILE_SIZE,
-      position.y * TILE_SIZE,
-      TILE_SIZE,
-      TILE_SIZE
-    );
-    g.setInteractive(hitArea, (shape: Phaser.Geom.Rectangle, x: number, y: number) =>
-      Phaser.Geom.Rectangle.Contains(shape, x, y)
-    );
-    g.on('pointerdown', () => console.log(`${label} is clicked`, details));
-  }
-
-  private drawArchetypeIcon(
-    g: Phaser.GameObjects.Graphics,
-    archetype: string,
-    cx: number,
-    cy: number
-  ): void {
-    g.lineStyle(OCCUPANT_ICON_STROKE_WIDTH, OCCUPANT_STROKE_COLOR);
-    switch (archetype) {
-      case 'Bandit':
-        g.strokeCircle(cx, cy, OCCUPANT_ICON_RADIUS);
-        break;
-      case 'Witch':
-        g.strokePoints(regularPolygonPoints(cx, cy, 3, OCCUPANT_ICON_RADIUS), true);
-        break;
-      case 'Fighter':
-        g.strokePoints(regularPolygonPoints(cx, cy, 5, OCCUPANT_ICON_RADIUS), true);
-        break;
-      case 'King':
-        g.strokePoints(starPoints(cx, cy, 5, OCCUPANT_ICON_RADIUS, 4), true);
-        break;
-      default:
-        console.warn(`Unrecognized archetype "${archetype}", drawing no icon`);
-    }
-  }
-
-  private centerCamera(grid: Tile[][]): void {
-    const cols = grid[0]?.length ?? 0;
-    const rows = grid.length;
-    this.cameras.main.centerOn((cols * TILE_SIZE) / 2, (rows * TILE_SIZE) / 2);
-  }
-
   private showError(message: string): void {
-    if (!this.errorPanelBg) {
-      const bg = this.add.graphics();
-      bg.setDepth(DEPTH_ERROR_PANEL);
-      bg.setScrollFactor(0);
-      bg.fillStyle(ERROR_PANEL_BG_COLOR, ERROR_PANEL_BG_ALPHA);
-      bg.fillRect(ERROR_PANEL_X, ERROR_PANEL_Y, ERROR_PANEL_WIDTH, ERROR_PANEL_HEIGHT);
-      this.errorPanelBg = bg;
-    }
-
-    const text = this.add.text(
-      ERROR_PANEL_X + ERROR_PANEL_PADDING,
-      ERROR_PANEL_Y + ERROR_PANEL_PADDING + this.errorTexts.length * ERROR_LINE_HEIGHT,
-      message,
-      { wordWrap: { width: ERROR_PANEL_WIDTH - ERROR_PANEL_PADDING * 2 } }
-    );
-    text.setDepth(DEPTH_ERROR_PANEL);
-    text.setScrollFactor(0);
-    this.errorTexts.push(text);
+    this.errorPanel.show(message);
   }
 
   // Clears the error log at the start of each new user-initiated action (not inside
   // renderBoard(), since some flows call showError() immediately before a synchronous
   // renderBoard() — clearing there would destroy the message before it's ever seen).
   private clearErrors(): void {
-    this.errorPanelBg?.destroy();
-    this.errorPanelBg = undefined;
-    this.errorTexts.forEach(t => t.destroy());
-    this.errorTexts = [];
+    this.errorPanel.clear();
   }
-}
-
-function cloneGrid(grid: Tile[][]): Tile[][] {
-  return grid.map(row => row.map(tile => ({ ...tile })));
-}
-
-function occupantsMatch(
-  freshState: GameState,
-  unitGraphicsById: Map<number, Phaser.GameObjects.Graphics>,
-  bombGraphicsById: Map<number, BombGraphics>,
-  softBlockGraphicsById: Map<number, Phaser.GameObjects.Graphics>
-): boolean {
-  const liveUnits = freshState.units.filter(u => u.hp > 0);
-  if (liveUnits.length !== unitGraphicsById.size) {
-    return false;
-  }
-  if (!liveUnits.every(u => unitGraphicsById.has(u.id))) {
-    return false;
-  }
-
-  if (freshState.bombs.length !== bombGraphicsById.size) {
-    return false;
-  }
-  if (!freshState.bombs.every(b => bombGraphicsById.has(b.id))) {
-    return false;
-  }
-
-  if (freshState.softBlocks.length !== softBlockGraphicsById.size) {
-    return false;
-  }
-  if (!freshState.softBlocks.every(s => softBlockGraphicsById.has(s.id))) {
-    return false;
-  }
-
-  return true;
-}
-
-function gridsEqual(a: Tile[][], b: Tile[][]): boolean {
-  if (a.length !== b.length) {
-    return false;
-  }
-  for (let y = 0; y < a.length; y++) {
-    const rowA = a[y];
-    const rowB = b[y];
-    if (!rowA || rowA.length !== rowB?.length) {
-      return false;
-    }
-    for (let x = 0; x < rowA.length; x++) {
-      const tileA = rowA[x];
-      const tileB = rowB[x];
-      if (
-        !tileA ||
-        tileA.type !== tileB?.type ||
-        tileA.occupantType !== tileB.occupantType ||
-        tileA.occupantId !== tileB.occupantId
-      ) {
-        return false;
-      }
-    }
-  }
-  return true;
-}
-
-function tileCenter(position: Coordinate): { cx: number; cy: number } {
-  return {
-    cx: position.x * TILE_SIZE + TILE_SIZE / 2,
-    cy: position.y * TILE_SIZE + TILE_SIZE / 2,
-  };
-}
-
-// Vertices of a regular polygon centered at (cx, cy), first vertex pointing straight up.
-function regularPolygonPoints(
-  cx: number,
-  cy: number,
-  sides: number,
-  radius: number
-): Phaser.Math.Vector2[] {
-  return Array.from({ length: sides }, (_, i) => {
-    const angle = -Math.PI / 2 + (i * 2 * Math.PI) / sides;
-    return new Phaser.Math.Vector2(cx + radius * Math.cos(angle), cy + radius * Math.sin(angle));
-  });
-}
-
-// Vertices of a 5-pointed star centered at (cx, cy), alternating outer/inner radius,
-// first vertex pointing straight up.
-function starPoints(
-  cx: number,
-  cy: number,
-  points: number,
-  outerRadius: number,
-  innerRadius: number
-): Phaser.Math.Vector2[] {
-  const vertices: Phaser.Math.Vector2[] = [];
-  for (let i = 0; i < points * 2; i++) {
-    const radius = i % 2 === 0 ? outerRadius : innerRadius;
-    const angle = -Math.PI / 2 + (i * Math.PI) / points;
-    vertices.push(
-      new Phaser.Math.Vector2(cx + radius * Math.cos(angle), cy + radius * Math.sin(angle))
-    );
-  }
-  return vertices;
 }

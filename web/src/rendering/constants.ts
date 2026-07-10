@@ -17,3 +17,7 @@ export const BLAST_ALPHA = 0.6;
 export const FIRE_SHAPE_SIZE = 42;
 export const FIRE_ALPHA = 0.7;
 export const FIRE_DURATION_MS = 5000;
+
+// Bomb countdown text
+export const BOMB_COUNTDOWN_ZERO_COLOR = 0xff0000;
+export const BOMB_COUNTDOWN_TEXT_COLOR = 0xffffff;

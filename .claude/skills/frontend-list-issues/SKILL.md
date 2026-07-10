@@ -2,6 +2,7 @@
 name: frontend-list-issues
 description: Scan docs/frontend/*-log.md files for open (non-Solved) known issues and report them grouped by spec, without reading the full body of any log file. Use when the user asks what known issues are still open across frontend specs, or when another frontend-* skill needs a cross-spec issue summary before proceeding.
 allowed-tools: Bash
+model: "haiku"
 ---
 
 # Frontend List Issues

@@ -10,10 +10,7 @@ import {
   TURN_PANEL_TEXT_COLOR,
   TURN_PANEL_WIDTH,
 } from '../constants';
-
-function colorToCss(color: number): string {
-  return `#${color.toString(16).padStart(6, '0')}`;
-}
+import { destroyAll, colorToCss } from './gameObjectUtils';
 
 const HEADER_HEIGHT = TURN_PANEL_HEIGHT / 2;
 // Fixed pixel reservations for the right-aligned "NN / NN" value row so 1-vs-2-digit numbers
@@ -27,8 +24,7 @@ export default class TurnPanel {
   constructor(private readonly scene: Phaser.Scene) {}
 
   update(turn: number, maxTurns: number, activeTeam: number): void {
-    this.objects.forEach(o => o.destroy());
-    this.objects = [];
+    destroyAll(this.objects);
 
     const x = TURN_PANEL_MARGIN;
     const y = TURN_PANEL_MARGIN;

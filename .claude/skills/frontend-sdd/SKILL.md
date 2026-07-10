@@ -3,7 +3,6 @@ name: frontend-sdd
 description: Perform spec-driven frontend development. Work from reading spec to tests. Revise specs and flag known issues when necessary. Use when the user mentions "start frontend development", "do frontend development", "implement the frontend".
 arguments: [specPath]
 argument-hint: "<specPath>"
-model: sonnet
 ---
 
 # Frontend Spec-Driven Development

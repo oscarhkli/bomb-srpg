@@ -183,7 +183,7 @@ For `bombExplodedEvent-N`: if `bombId-N`'s position appears in one or more **ear
 
 ## Refresh Final Sanity Check
 
-After all `gameEvents` are handled, call `getMatchState()` once for a final sanity check. Compare the freshly-fetched `gameState`'s `units`, `bombs`, and `softBlocks` against the client's own post-render bookkeeping (`unitGraphicsById`/`bombGraphicsById`/`softBlockGraphicsById`): each occupant's existence (no occupant the client still renders but the server no longer lists, and vice versa) and `position` must match. If a mismatch is found, flag it in errorMessage, then re-render the `tiles`, `units`, `bombs` and `softBlocks` using the new `gameState`.
+After all `gameEvents` are handled, call `getMatchState()` once for a final sanity check. Compare the freshly-fetched `gameState`'s `units`, `bombs`, and `softBlocks` against the client's own post-render bookkeeping (`unitGraphicsById`/`bombGraphicsById`/`softBlockGraphicsById`): each occupant's existence must match by ID (no occupant the client still renders but the server no longer lists, and vice versa). Unlike the turn-command sanity check (which diffs `Tile[][]` directly and so can compare position too), this check does not compare `position` — the bookkeeping maps only hold Graphics/Text objects, which don't retain a readable tile position, so re-deriving it here isn't worth the cost. If a mismatch is found, flag it in errorMessage, then re-render the `tiles`, `units`, `bombs` and `softBlocks` using the new `gameState`.
 
 Replace the frontend stored `gameState` by the latest obtained one.
 
