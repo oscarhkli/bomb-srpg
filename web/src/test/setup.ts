@@ -17,6 +17,7 @@ export function createMockGraphics() {
     y: 0,
     fillStyle: vi.fn().mockReturnThis(),
     fillRect: vi.fn().mockReturnThis(),
+    clear: vi.fn().mockReturnThis(),
     fillCircle: vi.fn().mockReturnThis(),
     fillPoints: vi.fn().mockReturnThis(),
     fillRoundedRect: vi.fn().mockReturnThis(),
@@ -36,9 +37,12 @@ export function createMockGraphics() {
 
 export function createMockText() {
   return {
+    height: 16,
     setOrigin: vi.fn().mockReturnThis(),
     setDepth: vi.fn().mockReturnThis(),
     setScrollFactor: vi.fn().mockReturnThis(),
+    setText: vi.fn().mockReturnThis(),
+    setColor: vi.fn().mockReturnThis(),
     destroy: vi.fn(),
   };
 }
@@ -70,7 +74,7 @@ export const mockScene = {
     once: vi.fn(),
   },
   tweens: { add: vi.fn() },
-  time: { addEvent: vi.fn() },
+  time: { addEvent: vi.fn(), delayedCall: vi.fn() },
   events: { on: vi.fn(), off: vi.fn(), emit: vi.fn() },
   input: {
     on: vi.fn(),

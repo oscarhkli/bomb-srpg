@@ -3,7 +3,6 @@ name: frontend-spec-refine
 description: Review and refine the specs for frontend development. Review, analyze, guide, and collaborate with the user to refine a concrete design spec. Use when the user mentions "guide me to write frontend spec", "review the frontend spec", "refine the frontend spec", "guide me to write web spec", "review the web spec", "refine the web spec".
 arguments: [specPath]
 argument-hint: "<specPath>"
-model: sonnet
 ---
 
 # Frontend Spec Refinement

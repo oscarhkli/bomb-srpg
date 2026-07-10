@@ -1,15 +1,12 @@
 import Phaser from 'phaser';
 import { GAME_FONT_FAMILY } from '../constants';
+import { colorToCss } from './gameObjectUtils';
 
 export interface PillButtonStyle {
   fillColor: number;
   fillAlpha: number;
   borderColor: number;
   borderWidth: number;
-}
-
-function colorToCss(color: number): string {
-  return `#${color.toString(16).padStart(6, '0')}`;
 }
 
 // Draws a pill-shape button (rounded rect + border + centered label) per the shared styling

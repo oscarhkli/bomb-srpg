@@ -2,8 +2,8 @@ package engine
 
 const (
 	// SystemUnitID represents environmental or game-engine authoritative actions
-	// mapped explicitly to Team 0, Player 1 for sudden-death bomb drops.
-	SystemUnitID UnitID = 1
+	// mapped explicitly to Team 0, Player 0 for sudden-death bomb drops.
+	SystemUnitID UnitID = 0
 
 	// UnitID Configuration
 	UnitLocalShift = 0
