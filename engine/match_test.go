@@ -856,6 +856,9 @@ func TestMatch_StartTurn_NotTriggeringSuddenDeath(t *testing.T) {
 		if got, want := len(m.WorkingState.Bombs), 0; got != want {
 			t.Errorf("Sudden Death check failure: Bomb count = %d, want: %d", got, want)
 		}
+		if got, want := m.WorkingState.InSuddenDeath, false; got != want {
+			t.Errorf("Sudden Death check failure: InSuddenDeath = %v, want: %v", got, want)
+		}
 		if len(gameEvents) > 0 {
 			t.Errorf("expected empty gameEvents return, got %#v", gameEvents)
 		}
@@ -879,6 +882,9 @@ func TestMatch_StartTurn_NotTriggeringSuddenDeath(t *testing.T) {
 
 		if got, want := len(m.WorkingState.Bombs), 0; got != want {
 			t.Errorf("Turn limit check failure: Bomb count = %d, want: %d", got, want)
+		}
+		if got, want := m.WorkingState.InSuddenDeath, false; got != want {
+			t.Errorf("Sudden Death check failure: InSuddenDeath = %v, want: %v", got, want)
 		}
 		if len(gameEvents) > 0 {
 			t.Errorf("expected empty gameEvents return, got %#v", gameEvents)
@@ -928,6 +934,9 @@ func TestMatch_StartTurn_SuddenDeath(t *testing.T) {
 		if got, want := len(m.WorkingState.Bombs), SuddenDeathBombs; got != want {
 			t.Errorf("Sudden death bomb drop failure: Bomb count = %d, want: %d", got, want)
 		}
+		if got, want := m.WorkingState.InSuddenDeath, true; got != want {
+			t.Errorf("Sudden Death check failure: InSuddenDeath = %v, want: %v", got, want)
+		}
 		if len(gameEvents) != 2 {
 			t.Errorf("expected 2 gameEvents return, got %#v", gameEvents)
 		}
@@ -965,6 +974,9 @@ func TestMatch_StartTurn_SuddenDeath(t *testing.T) {
 		if got, want := len(m.WorkingState.Bombs), 2; got != want {
 			t.Errorf("Sudden death bomb drop failure: Bomb count = %d, want: %d", got, want)
 		}
+		if got, want := m.WorkingState.InSuddenDeath, true; got != want {
+			t.Errorf("Sudden Death check failure: InSuddenDeath = %v, want: %v", got, want)
+		}
 		if len(gameEvents) != 1 {
 			t.Errorf("expected 1 gameEvents return, got %#v", gameEvents)
 		}
@@ -995,6 +1007,9 @@ func TestMatch_StartTurn_SuddenDeath(t *testing.T) {
 
 		if got, want := len(m.WorkingState.Bombs), 0; got != want {
 			t.Errorf("Sudden death bomb drop failure: Bomb count = %d, want: %d", got, want)
+		}
+		if got, want := m.WorkingState.InSuddenDeath, true; got != want {
+			t.Errorf("Sudden Death check failure: InSuddenDeath = %v, want: %v", got, want)
 		}
 		if len(gameEvents) > 0 {
 			t.Errorf("expected empty gameEvents return, got %#v", gameEvents)

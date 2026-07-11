@@ -193,9 +193,11 @@ func (m *Match) StartTurn() []GameEvent {
 	}
 
 	if !(m.GameCfg.SuddenDeath && m.TrueState.Turn > m.GameCfg.MaxTurns) {
+		m.WorkingState.InSuddenDeath = false
 		return []GameEvent{}
 	}
 
+	m.WorkingState.InSuddenDeath = true
 	m.injectSuddenDeathHazards()
 	m.TrueState = m.WorkingState.DeepCopy()
 
