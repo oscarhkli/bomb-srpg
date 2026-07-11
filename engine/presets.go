@@ -16,7 +16,7 @@ var archetypesRegistry = map[string]Archetype{
 		MaxBombCount: 2,
 		BaseHP:       1,
 		PresetSkills: map[SkillType]bool{},
-		IsSelectable: false,
+		Selectable:   false,
 	},
 	"Fighter": {
 		Name:         "Fighter",
@@ -27,7 +27,7 @@ var archetypesRegistry = map[string]Archetype{
 		MaxBombCount: 3,
 		BaseHP:       1,
 		PresetSkills: map[SkillType]bool{},
-		IsSelectable: true,
+		Selectable:   true,
 	},
 	"Witch": {
 		Name:         "Witch",
@@ -38,7 +38,7 @@ var archetypesRegistry = map[string]Archetype{
 		MaxBombCount: 2,
 		BaseHP:       1,
 		PresetSkills: map[SkillType]bool{},
-		IsSelectable: true,
+		Selectable:   true,
 	},
 	"Bandit": {
 		Name:         "Bandit",
@@ -49,7 +49,7 @@ var archetypesRegistry = map[string]Archetype{
 		MaxBombCount: 2,
 		BaseHP:       1,
 		PresetSkills: map[SkillType]bool{},
-		IsSelectable: true,
+		Selectable:   true,
 	},
 }
 
@@ -127,7 +127,7 @@ var stagePresetsRegistry = map[string]StagePreset{
 func GetAllArchetypes() []Archetype {
 	results := []Archetype{}
 	for _, arch := range archetypesRegistry {
-		if arch.IsSelectable {
+		if arch.Selectable {
 			results = append(results, arch)
 		}
 	}

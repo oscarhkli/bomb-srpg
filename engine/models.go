@@ -137,7 +137,7 @@ type Archetype struct {
 	MaxBombCount int
 	BaseHP       int
 	PresetSkills map[SkillType]bool
-	IsSelectable bool
+	Selectable   bool
 }
 
 // MarshalJSON serializes Archetype struct to JSON that client needs
