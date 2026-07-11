@@ -16,7 +16,14 @@ import {
   getVictoryResult,
   getAllowedTiles,
 } from './api';
-import type { Archetype, GameState, GameEvent, GameCfg, TurnCommand } from '../types/api';
+import type {
+  Archetype,
+  GameState,
+  GameEvent,
+  GameCfg,
+  TurnCommand,
+  StartTurnResponse,
+} from '../types/api';
 
 const mockFetch = vi.fn();
 
@@ -129,6 +136,7 @@ describe('api.ts', () => {
   describe('getMatchState', () => {
     const fixture: GameState = {
       turn: 1,
+      inSuddenDeath: false,
       activeTeam: 0,
       grid: [],
       units: [],
@@ -159,11 +167,15 @@ describe('api.ts', () => {
   });
 
   describe('startTurn', () => {
-    const fixture: GameEvent[] = [
+    const gameEventFixture: GameEvent[] = [
       { type: 'bombPlaced', unitId: 0, position: { x: 1, y: 0 }, range: 1, countdown: 5 },
     ];
+    const fixture: StartTurnResponse = {
+      inSuddenDeath: false,
+      gameEvents: gameEventFixture,
+    };
 
-    it('should POST with Authorization header and return game events', async () => {
+    it('should POST with Authorization header and return startTurnResponse', async () => {
       mockOk(200, fixture);
 
       const result = await startTurn();
@@ -212,6 +224,7 @@ describe('api.ts', () => {
   describe('resetTurn', () => {
     const fixture: GameState = {
       turn: 1,
+      inSuddenDeath: false,
       activeTeam: 0,
       grid: [],
       units: [],

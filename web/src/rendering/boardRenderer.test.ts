@@ -70,6 +70,7 @@ function state(
 ) {
   return {
     turn: 1,
+    inSuddenDeath: false,
     activeTeam: 1,
     grid,
     units: parts.units ?? [],

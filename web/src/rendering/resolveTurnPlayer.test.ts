@@ -12,6 +12,7 @@ beforeEach(() => {
 function baseState(overrides: Partial<GameState> = {}): GameState {
   return {
     turn: 1,
+    inSuddenDeath: false,
     activeTeam: 1,
     grid: [[{ type: 'TerrainPlain', occupantType: 'OccupantBomb', occupantId: 1 }]],
     units: [],

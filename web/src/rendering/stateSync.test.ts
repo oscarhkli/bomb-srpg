@@ -11,6 +11,7 @@ function tile(overrides: Partial<Tile> = {}): Tile {
 function state(overrides: Partial<GameState> = {}): GameState {
   return {
     turn: 1,
+    inSuddenDeath: false,
     activeTeam: 1,
     grid: [[tile()]],
     units: [],

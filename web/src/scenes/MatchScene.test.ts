@@ -40,6 +40,7 @@ function makeCfg(overrides: Partial<GameCfg> = {}): GameCfg {
 function makeState(grid: Tile[][], overrides: Partial<GameState> = {}): GameState {
   return {
     turn: 1,
+    inSuddenDeath: false,
     activeTeam: 0,
     grid,
     units: [],

@@ -77,6 +77,7 @@ export interface Bomb {
 /** Complete game state snapshot */
 export interface GameState {
   turn: number;
+  inSuddenDeath: boolean;
   activeTeam: number;
   grid: Tile[][];
   units: Unit[];
@@ -149,3 +150,8 @@ export interface AllowedTilesRequest {
 }
 
 export type AllowedTilesResponse = Coordinate[];
+
+export interface StartTurnResponse {
+  inSuddenDeath: boolean;
+  gameEvents: GameEvent[];
+}
