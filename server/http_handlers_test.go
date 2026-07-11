@@ -701,7 +701,7 @@ func TestHandleGetMatchState(t *testing.T) {
 		testMux("GET /api/match-rooms/{roomID}/match/state", h.HandleGetMatchState).ServeHTTP(rr, req)
 
 		assertObjectContract(t, rr.Body.Bytes(),
-			[]string{"turn", "activeTeam", "grid", "units", "bombs", "softBlocks", "turnCommands"},
+			[]string{"turn", "inSuddenDeath", "activeTeam", "grid", "units", "bombs", "softBlocks", "turnCommands"},
 			assertMatchStateNested)
 	})
 }
@@ -1031,7 +1031,7 @@ func TestHandleStartTurn(t *testing.T) {
 			t.Errorf("Handler returned wrong content type: got %v want %v", contentType, expectedHeader)
 		}
 
-		var response []engine.GameEvent
+		var response StartTurnResponse
 		if err := json.NewDecoder(rr.Body).Decode(&response); err != nil {
 			t.Fatalf("Failed to decode response JSON payload: %v", err)
 		}
@@ -1039,13 +1039,16 @@ func TestHandleStartTurn(t *testing.T) {
 		if got, want := len(room.Match.WorkingState.Bombs), 2; got != want {
 			t.Errorf("Expected SuddenDeath triggered and drop %d bombs, got %d", want, got)
 		}
-		if len(response) != 2 {
-			t.Errorf("expected 2 GameEvent returned, got %d", len(response))
+		if len(response.GameEvents) != 2 {
+			t.Errorf("expected 2 GameEvent returned, got %d", len(response.GameEvents))
 		}
-		for _, evt := range response {
+		for _, evt := range response.GameEvents {
 			if evt.Type != engine.GameEvtBombPlaced {
 				t.Errorf("malformed EvtBombPlaced returned: %+v", evt)
 			}
+		}
+		if want, got := response.InSuddenDeath, true; want != got {
+			t.Errorf("Expected suddenDeath to be true, got %v", got)
 		}
 	})
 
@@ -1121,17 +1124,26 @@ func TestHandleStartTurn(t *testing.T) {
 		rr := httptest.NewRecorder()
 		testMux("POST /api/match-rooms/{roomID}/match/start-turn", h.HandleStartTurn).ServeHTTP(rr, req)
 
-		assertArrayContract(t, rr.Body.Bytes(),
-			[]string{"type", "unitId", "bombId", "position", "range", "countdown",
-				"newHp"}, // unrelated to this GameEvent
-			func(t *testing.T, item map[string]any) {
+		assertObjectContract(t, rr.Body.Bytes(),
+			[]string{"inSuddenDeath", "gameEvents"},
+			func(t *testing.T, raw map[string]any) {
 				t.Helper()
-				positionField := item["position"].(map[string]any)
-				for _, field := range []string{"x", "y"} {
-					if _, exists := positionField[field]; !exists {
-						t.Errorf("Contract Broken: from missing key '%s'", field)
-					}
+				gameEventsBytes, err := json.Marshal(raw["gameEvents"])
+				if err != nil {
+					t.Fatalf("Failed to re-marshal gameEvents: %v", err)
 				}
+				assertArrayContract(t, gameEventsBytes,
+					[]string{"type", "unitId", "bombId", "position", "range", "countdown",
+						"newHp"}, // unrelated to this GameEvent
+					func(t *testing.T, item map[string]any) {
+						t.Helper()
+						positionField := item["position"].(map[string]any)
+						for _, field := range []string{"x", "y"} {
+							if _, exists := positionField[field]; !exists {
+								t.Errorf("Contract Broken: from missing key '%s'", field)
+							}
+						}
+					})
 			})
 	})
 
@@ -1300,7 +1312,7 @@ func TestHandleResetTurn(t *testing.T) {
 		testMux("POST /api/match-rooms/{roomID}/match/reset", h.HandleResetTurn).ServeHTTP(rr, req)
 
 		assertObjectContract(t, rr.Body.Bytes(),
-			[]string{"turn", "activeTeam", "grid", "units", "bombs", "softBlocks", "turnCommands"},
+			[]string{"turn", "inSuddenDeath", "activeTeam", "grid", "units", "bombs", "softBlocks", "turnCommands"},
 			assertMatchStateNested)
 	})
 

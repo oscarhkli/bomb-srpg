@@ -609,7 +609,7 @@ func TestServerStateManager_StartTurn(t *testing.T) {
 		name     string
 		setup    func(t *testing.T) (string, *ServerStateManager, string)
 		wantErr  error
-		validate func(t *testing.T, gameEvents []engine.GameEvent, s *ServerStateManager, roomID string)
+		validate func(t *testing.T, inSuddenDeath bool, gameEvents []engine.GameEvent, s *ServerStateManager, roomID string)
 	}{
 		{
 			name: "Success",
@@ -622,7 +622,7 @@ func TestServerStateManager_StartTurn(t *testing.T) {
 				return roomID, s, tokens[0]
 			},
 			wantErr: nil,
-			validate: func(t *testing.T, gameEvents []engine.GameEvent, s *ServerStateManager, roomID string) {
+			validate: func(t *testing.T, inSuddenDeath bool, gameEvents []engine.GameEvent, s *ServerStateManager, roomID string) {
 				roomVal, ok := s.Rooms.Load(roomID)
 				if !ok {
 					t.Fatal("Room not found")
@@ -640,6 +640,9 @@ func TestServerStateManager_StartTurn(t *testing.T) {
 						t.Errorf("malformed EvtBombPlaced returned: %+v", evt)
 					}
 				}
+				if inSuddenDeath == false {
+					t.Errorf("Expected suddenDeath to be true, got %v", inSuddenDeath)
+				}
 			},
 		},
 		{
@@ -652,11 +655,6 @@ func TestServerStateManager_StartTurn(t *testing.T) {
 				return roomID, s, tokens[0]
 			},
 			wantErr: ErrMatchEnded,
-			validate: func(t *testing.T, gameEvents []engine.GameEvent, s *ServerStateManager, roomID string) {
-				if len(gameEvents) > 0 {
-					t.Errorf("Expected gameEvents to be empty, got %p", gameEvents)
-				}
-			},
 		},
 		{
 			name: "Room Not Found",
@@ -665,11 +663,6 @@ func TestServerStateManager_StartTurn(t *testing.T) {
 				return "NONEXISTENT", s, "dummy-token"
 			},
 			wantErr: ErrRoomNotFound,
-			validate: func(t *testing.T, gameEvents []engine.GameEvent, s *ServerStateManager, roomID string) {
-				if len(gameEvents) > 0 {
-					t.Errorf("Expected gameEvents to be empty, got %p", gameEvents)
-				}
-			},
 		},
 		{
 			name: "Match Not Found",
@@ -679,23 +672,25 @@ func TestServerStateManager_StartTurn(t *testing.T) {
 				return roomID, s, "dummy-token"
 			},
 			wantErr: ErrMatchNotFound,
-			validate: func(t *testing.T, gameEvents []engine.GameEvent, s *ServerStateManager, roomID string) {
-				if len(gameEvents) > 0 {
-					t.Errorf("Expected gameEvents to be empty, got %p", gameEvents)
-				}
-			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			roomID, s, token := tt.setup(t)
-			gameEvents, err := s.StartTurn(roomID, token)
+			inSuddenDeath, gameEvents, err := s.StartTurn(roomID, token)
 			if !errors.Is(err, tt.wantErr) {
 				t.Fatalf("StartTurn() error = %v, want %v", err, tt.wantErr)
 			}
 			if tt.validate != nil {
-				tt.validate(t, gameEvents, s, roomID)
+				tt.validate(t, inSuddenDeath, gameEvents, s, roomID)
+			} else {
+				if len(gameEvents) > 0 {
+					t.Errorf("Expected gameEvents to be empty, got %p", gameEvents)
+				}
+				if inSuddenDeath {
+					t.Errorf("Expected suddenDeath to be false, got %v", inSuddenDeath)
+				}
 			}
 		})
 	}

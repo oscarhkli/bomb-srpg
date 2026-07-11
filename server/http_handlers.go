@@ -59,6 +59,12 @@ type SurrenderRequest struct {
 	TeamID int `json:"teamId"`
 }
 
+// StartTurnResponse is returned to provide the result of Sudden Death
+type StartTurnResponse struct {
+	InSuddenDeath bool               `json:"inSuddenDeath"`
+	GameEvents    []engine.GameEvent `json:"gameEvents"`
+}
+
 // HandleGetAllArchetypes returns all available unit archetypes for the client to display in the lobby.
 // It encodes the archetype definitions as JSON and writes them to the response.
 func (h *Handler) HandleGetAllArchetypes(w http.ResponseWriter, r *http.Request) {
@@ -218,7 +224,7 @@ func (h *Handler) HandleStartTurn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	gameEvents, err := h.Manager.StartTurn(roomID, token)
+	inSuddenDeath, gameEvents, err := h.Manager.StartTurn(roomID, token)
 	if err != nil {
 		code, msg := mapError(err)
 		h.Logger.Warn("start turn failed", "roomID", roomID, "error", err)
@@ -229,7 +235,8 @@ func (h *Handler) HandleStartTurn(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 
-	if err := json.NewEncoder(w).Encode(gameEvents); err != nil {
+	res := StartTurnResponse{InSuddenDeath: inSuddenDeath, GameEvents: gameEvents}
+	if err := json.NewEncoder(w).Encode(res); err != nil {
 		h.Logger.Error("encode gameEvents failed", "error", err)
 		http.Error(w, "Failed to encode gameEvents", http.StatusInternalServerError)
 		return

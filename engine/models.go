@@ -245,6 +245,7 @@ type GameCfg struct {
 // GameState is the complete snapshot of a match at a point in time.
 type GameState struct {
 	Turn            int                // Current turn number (starts at 1)
+	InSuddenDeath   bool               // Indicate if the current turn is in Sudden Death
 	ActiveTeam      int                // Team whose turn it is (1 or 2)
 	TurnBombCounter int                // Bombs placed this turn (for BombID generation)
 	Grid            [][]Tile           // Board matrix [Y][X]
@@ -269,15 +270,17 @@ func (gs GameState) MarshalJSON() ([]byte, error) {
 		softBlocks = append(softBlocks, sb)
 	}
 	return json.Marshal(struct {
-		Turn         int           `json:"turn"`
-		ActiveTeam   int           `json:"activeTeam"`
-		Grid         [][]Tile      `json:"grid"`
-		Units        []*Unit       `json:"units"`
-		Bombs        []*Bomb       `json:"bombs"`
-		SoftBlocks   []*SoftBlock  `json:"softBlocks"`
-		TurnCommands []TurnCommand `json:"turnCommands"`
+		Turn          int           `json:"turn"`
+		InSuddenDeath bool          `json:"inSuddenDeath"`
+		ActiveTeam    int           `json:"activeTeam"`
+		Grid          [][]Tile      `json:"grid"`
+		Units         []*Unit       `json:"units"`
+		Bombs         []*Bomb       `json:"bombs"`
+		SoftBlocks    []*SoftBlock  `json:"softBlocks"`
+		TurnCommands  []TurnCommand `json:"turnCommands"`
 	}{
 		gs.Turn,
+		gs.InSuddenDeath,
 		gs.ActiveTeam,
 		gs.Grid,
 		units,
