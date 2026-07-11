@@ -16,12 +16,13 @@ Specs will be written prior to development—partly handcrafted, and partly gene
 | [Phase 3.2: Render Units, SoftBlocks and Bombs](match-p3-spec002.md) | MatchScene | Done | 2026-07-03 |
 | [Phase 3.3: Render Move and PlaceBomb](match-p3-spec003.md) | MatchScene | Done | 2026-07-07 |
 | [Phase 3.4: Render Resolve Turn](match-p3-spec004.md) | MatchScene | Done | 2026-07-10 |
-| [Phase 3.5: Turn Lifecycle Wiring (startTurn)](match-p3-spec005.md) | MatchScene | Draft | — |
+| [Phase 3.5: Turn Lifecycle Wiring (startTurn)](match-p3-spec005.md) | MatchScene | Ready | — |
 | [Phase 3.6: Victory Result](match-p3-spec006.md) | MatchScene | Draft | — |
 | [Phase 3.7: Reset Turn and Options Panel](match-p3-spec007.md) | MatchScene | Parked Draft | — |
 | [Phase 3.8: Surrender](match-p3-spec008.md) | MatchScene | Parked Draft | — |
 | [Phase 3.9: Render Occupant Information](match-p3-spec009.md) | MatchScene | Parked Draft | — |
 | [Phase 3.10: Render Camera Navigation](match-p3-spec010.md) | MatchScene | Parked Draft | — |
+| [Phase 3.11: MatchScene Render-Path Cleanup](match-p3-spec011.md) | MatchScene | Parked Draft | — |
 | [Phase 5.1: 2.5D Isometric Grid](match-p5-spec001.md) | MatchScene | Parked Draft | — |
 | [Phase 3.TBD: Lounge Scene](lounge-p3-spec001.md) | LoungeScene | Parked Draft | — |
 | [Phase 3.TBD: Title Scene](title-p3-spec001.md) | TitleScene | Parked Draft | — |

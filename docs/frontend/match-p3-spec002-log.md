@@ -29,4 +29,4 @@ Found via a `frontend-code-review` pass after implementation (already user-confi
 11. **`attachClickLogger`'s `console.log` dumps full Unit/SoftBlock/Bomb objects on every click.** No credential/PII in the current shape; general "don't ship verbose object dumps" note for whenever real interaction UI replaces this scaffolding.
     **Status: Deferred.**
 12. **The `'logs roomId and playerTokens on create'` test asserts on literal token values.** Coupling note for whenever the known-non-issue console.log itself gets removed — this test will need updating too.
-    **Status: Deferred.**
+    **Status: Resolved (match-p3-spec005).** spec005 removes the roomId/playerTokens console.log; implementing it must also update/remove this test's literal-token assertion.
