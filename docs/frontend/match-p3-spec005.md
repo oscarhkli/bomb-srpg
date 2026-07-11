@@ -43,16 +43,13 @@ Additionally, `MatchScene` no longer needs to `console.log` the `roomId` and `pl
 
 ## Sudden Death
 
-In this game, `suddenDeath` is triggered when:
+In this game, `suddenDeath` is triggered when `startTurnResponse.inSuddenDeath = true`, which is from the response of `startTurn()`.
 
-- `gameCfg.suddenDeath = true`
-- `gameState.turn > gameCfg.maxTurns`
-
-Backend will call `injectSuddenDeathHazards()`. As of Phase 3.5, 0-2 `bombPlacedEvents` will be returned. It's possible not to have any `bombPlacedEvents` received from the backend. As always, the frontend should trust what the backend provides.
+In `StartTurn()`, backend calls `injectSuddenDeathHazards()`. As of Phase 3.5, 0-2 `bombPlacedEvents` will be returned. It's possible not to have any `bombPlacedEvents` received from the backend. As always, the frontend should trust what the backend provides.
 
 ### Visual Effect of Sudden Death
 
-- Check if all 2 `suddenDeath` conditions are fulfilled.
+- Check if `startTurnResponse.inSuddenDeath = true`.
 - If not, end as the game hasn't reach sudden death yet.
 - If conditions are fulfilled,
   - Render an red warning cutscene (regardless the number of `bombPlacedEvents` received):
@@ -66,15 +63,11 @@ Backend will call `injectSuddenDeathHazards()`. As of Phase 3.5, 0-2 `bombPlaced
     - The `y` position should be as high as fully above the visibld screen.
     - Then the `bomb` should slide to the designated `tile` as stated in `bombPlacedEvent.position.y` in a straight line in **2s**.
 
-> Note:
->
-> 1. Should discuss with Agent to see if backend should add `state.IsInSuddenDeath` or stay as current spec for `suddenDeath` detection.
-> 2. Agent should suggest correct Phaser term regarding the red warning cutscene, stay ubiquitous languages.
-> 3. Timing value will be updated during the implementation
+> Note: Timing value will be updated during the implementation
 
 ## Visual Effect of Start Turn Cutscene
 
-As a simplified version, `MatchScene` renders a **100% width, 144px height** rectangle banner. Use `TEAM_COLORS` in `constants.ts`. `Player {X}'s Turn` is rendered in the center of the banner. Font color is '0xffffff`. Font size is **48px**
+As a simplified version, `MatchScene` renders a **100% width, 144px height** rectangle banner. Use `TEAM_COLORS` in `constants.ts`. `Player {X}'s Turn` is rendered in the center of the banner. Font color is `0xffffff`. Font size is **48px**
 
 This Cutscene fades in in **200ms**, stays on `MatchScene` for **2sec** and fades out in **200ms**.
 
@@ -109,5 +102,5 @@ The section states the whole game loop as of Phase 3.5. `MatchScene` may have to
 ## Acceptance Criteria
 
 1. Given `Start Turn Cutscene` is rendered, when `gameState.activeTeam` changes, then the fill color should match `TEAM_COLORS[activeTeam]`.
-2. Given `suddenDeath` conditions are fulfilled, when `startTurn` renders, then red warning cutscene should be shown, and `bombs` should drop from the sky according to the number of `bombPlacedEvents` received.
+2. Given `startTurnResponse.inSuddenDeath = true`, when `startTurn` renders, then red warning cutscene should be shown, and `bombs` should drop from the sky according to the number of `bombPlacedEvents` received.
 3. `roomId` and `playerTokens` shouldn't be seen in `console.log` again.
