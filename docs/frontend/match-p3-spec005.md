@@ -1,232 +1,113 @@
 ---
-title: "Phase 3.5: Game Cycle, Sudden Death and Victory Result"
+title: "Phase 3.5: Turn Lifecycle Wiring (startTurn)"
 ---
 
-# Victory Scene
+# Turn Lifecycle Wiring (startTurn)
 
 ## Context
 
-Reached from `MatchScene` once `WinnerTeamID != 0` (win, or `-1` for draw). Shows the match result and lets the player start over.
+`MatchScene` never calls `startTurn()` (`engine/api.ts`) today. Per `AGENTS.md`'s Turn Lifecycle rules, the client must explicitly call `POST /match/start-turn` for every turn, including Turn 1, to evaluate sudden-death / hazard injection. Phase 3.3 (Move/PlaceBomb) and Phase 3.4 (Resolve Turn) works around token initialization by re-deriving `initToken()` once per `TurnCommandPanel` open instead of once per turn boundary.
 
 ## Goal
 
-- Display result: winning team, or draw.
-- `[Rematch]` button → back to `LoungeScene` (or `TitleScene`) to configure a new match.
-
-_Stub only — flesh out Non-Goal / Scene Entry / Visual Spec / Acceptance Criteria per SPEC_TEMPLATE.md when ready to build._
-
-Ignore the below as it's only a copied template.
-
-## Context
-
-This spec adds the informational components on Canvas, displaying actionable interactions on `unit`: `Move` and `PlaceBomb`.
-
-## Goal
-
-- Player can command their own team's `unit` to move or place bomb, provided that it is legal to do so.
-- Player can view the allowedTiles per `TurnCmdType`
-- `MatchScene` renders `Unit` movement and new `Bombs` after receiving server's confirmation.
+- Wire `startTurn()` into the turn flow at the correct point(s).
+- Move `initToken()` to fire once per `startTurn()` resolution instead of once per panel-open or resolving turn, since `activeTeam` is stable between turns.
 
 ## Non-Goal
 
-- Polished animations or tweens (easing curves, squash/stretch, particle effects, etc.) — a bare linear-motion tween for `Move` is in scope, see [Visual Effect for `unitMovedEvent`](#visual-effect-for-unitmovedevent).
+- Polished animations or tweens (easing curves, squash/stretch, particle effects, etc.) — a bare linear-motion tween for `suddenDeath` is in scope, see [Visual Effect for `unitMovedEvent`](#visual-effect-for-unitmovedevent).
 - HUD / status panel.
-- Player can click and view the information of `unit` and `bomb`.
-- Warning message about data out-of-sync with backend and frontend.
 
 ## Scene Entry
 
 No change from spec001.
 
-## Notes on Coloring
+## Start Turn
 
-All the color HEX below will be adjusted in future to align with pixel style palettes. Always define in `constants.ts` for better maintenance.
+There are 4 steps in `startTurn`:
 
-## User Interaction and Data Fetching
+1. Store the contract `token` for this turn. See [below section](#player-token-handling).
+2. Call backend via `startTurn()`.
+3. Render `suddenDeath` bomb drop if the criteria satisfy.
+4. Render a cutscene to indicate it's P1/P2's turn.
 
-This spec consists of various user interactions. Some of them require data fetching. Some of them submit action to server and react based on the response.
+During the whole `startTurn` timeframe, **all** interactions/handlers in `MatchScene` should be **disabled**.
 
-### TurnCommandPanel
+Details are shown in the following sections.
 
-`TurnCommandPanel` is rendered as **192Wx144Hpx** rectangle when needed (to be explained later). It's transparent, with no border. This contains the actions available for Player so choose. To simplify in the early stage. There are 3 buttons in the panel, `moveButton`, `placeBombButton`, `backButton`, distributed in 2 rows as illustrated below:
+## Player Token Handling
 
-```text
-+-------------+
-| Move   Bomb |
-|        Back |
-+-------------+
-```
+Currently, `initToken()` is called in when unit is clicked and during `resolveTurn()`. However, the active token does not change until the turn is changed. From now on, `initToken()` should be called in `startTurn()` instead.
 
-All 3 buttons are rendered as **46Wx32Hpx** pill-shape, filled with `0x583f0e` and opacity **20%**, with **2px** `0xdc9e23` border color opacity **100%**. Text color is also the same color and opacity as border. Font family is `GAME_FONT_FAMILY` (see [Font](#font) below). Buttons are spaced `PANEL_BUTTON_SPACING` (**12px**) apart, both horizontally (`Move`↔`Bomb`) and vertically (`Bomb`↔`Back`).
+Additionally, `MatchScene` no longer needs to `console.log` the `roomId` and `playerTokens` during the initialization. This addresses `match-p3-spec002-log.md` #12.
 
-`TurnCommandPanel` is positioned at the `Grid`'s right edge (a fixed gutter to the right of the last column), bottom-aligned with the `Grid`'s bottom edge. It does not follow or reposition per clicked `unit`. Unlike `ConfirmDialog` (see [Confirm Dialog](#confirm-dialog)), the panel is anchored to the grid in world space — it scrolls with the camera rather than staying pinned to the screen, since its position is spatially meaningful relative to the board.
+## Sudden Death
 
-### Font
+In this game, `suddenDeath` is triggered when:
 
-This spec introduces the game's first UI text, so it establishes the default font for the current phase: a single web font, loaded via a `<link>` tag in `index.html` (e.g. Google Fonts), referenced everywhere through one `constants.ts` value, `GAME_FONT_FAMILY` (e.g. `"'Roboto', sans-serif"` — the quoted family plus a generic fallback). `Roboto` is not mandated; any single web-safe font is acceptable as long as it's centralized behind this one constant so it can be swapped later without touching call sites.
+- `gameCfg.suddenDeath = true`
+- `gameState.turn > gameCfg.maxTurns`
 
-### Store the Latest `gameState`
+Backend will call `injectSuddenDeathHazards()`. As of Phase 3.5, 0-2 `bombPlacedEvents` will be returned. It's possible not to have any `bombPlacedEvents` received from the backend. As always, the frontend should trust what the backend provides.
 
-`MatchScene` keeps the latest `gameState` as a private scene-instance field (same pattern already used for `roomId`/`playerTokens`, e.g. `private gameState!: GameState;`), not a separate store or global — this is a single-scene game with no cross-scene sharing need yet. It is set once in `create()` from the initial `getMatchState()` response, and reassigned whenever a later section obtains a fresh `GameState` (see [Refresh Final Sanity Check](#refresh-final-sanity-check)).
+### Visual Effect of Sudden Death
 
-### Initialize Player Token
+- Check if all 2 `suddenDeath` conditions are fulfilled.
+- If not, end as the game hasn't reach sudden death yet.
+- If conditions are fulfilled,
+  - Render an red warning cutscene (regardless the number of `bombPlacedEvents` received):
+    - It lasts for **3s**.
+    - Add a full canvas overlay in `TURN_PANEL_SUDDEN_DEATH_COLOR` in `constants.ts`.
+    - This overlay has repeating opacity change from **0%** to **90%** to **0%** in 500ms.
+  - **2s** after the red warning cutscene starts rendering, for each `bombPlacedEvents`:
+    - Render `bombPlacedEvent` similar to the way in `match-p3-spec003.md`, with a tween:
+    - We want to present the scenario as "drop the `bomb` from the sky"
+    - The `x` position should be the same as `bombPlacedEvent.position.x`.
+    - The `y` position should be as high as fully above the visibld screen.
+    - Then the `bomb` should slide to the designated `tile` as stated in `bombPlacedEvent.position.y` in a straight line in **2s**.
 
-`playerTokens` (received from `DevBootScene` and stored on `MatchScene`, see spec001) is a tuple `[team1Token, team2Token]`. Before `submitTurnCommand()` can be called, the frontend must call `initToken(playerTokens[gameState.activeTeam - 1])` from `engine/api.ts` — this is currently never invoked anywhere, which would make every `submitTurnCommand()` call throw. Call it once, at the moment `TurnCommandPanel` opens for a `unit` (i.e., right after the User Interaction check below passes). Since this spec never triggers `resolveTurn()`, `activeTeam` cannot change mid-flow, so calling it again on a later click of the same team is a harmless no-op.
+> Note:
+>
+> 1. Should discuss with Agent to see if backend should add `state.IsInSuddenDeath` or stay as current spec for `suddenDeath` detection.
+> 2. Agent should suggest correct Phaser term regarding the red warning cutscene, stay ubiquitous languages.
+> 3. Timing value will be updated during the implementation
 
-> See `match-p3-spec010.md` (stub) for re-deriving this per `startTurn()` instead, once that lifecycle call is wired up.
+## Visual Effect of Start Turn Cutscene
 
-### User Interaction
+As a simplified version, `MatchScene` renders a **100% width, 144px height** rectangle banner. Use `TEAM_COLORS` in `constants.ts`. `Player {X}'s Turn` is rendered in the center of the banner. Font color is '0xffffff`. Font size is **48px**
 
-`TurnCommandPanel` can only be shown and enabled when all the below situations are satisfied:
+This Cutscene fades in in **200ms**, stays on `MatchScene` for **2sec** and fades out in **200ms**.
 
-1. A `unit` is clicked.
-2. `unit.team` equals to `state.activeTeam`.
+## Game Loop
 
-Violating either means the unit is read-only. It prints a `console.log()` just as the current phase.
+The section states the whole game loop as of Phase 3.5. `MatchScene` may have to adjust accordingly.
 
-Additionally:
+> Question to agent:
+>
+> 1. Since we have no plan to change tileType in the mid-game, should we render the grid in the beginning instead re-rendering everytime in `renderBoard()`? The current flow does redundant rendering.
+> 2. Since we trust what the backend provides, the frontend mostly only do the rendering and player's interaction, is current sanity check really necessary, or YAGNI?
+> 3. If sanity check isn't necessary, do we really need to re-render every time when we refresh `gameState`?
 
-- If `unit.hasMoved` is **true**, `moveButton` should be disabled and rendered with HEX `0x999999`.
-- If `unit.hasUsedSkill` is **true**, `placeBombButton` should be disabled and rendered with HEX `0x999999`. 
-
-> Non-goal note:  
-> Since currently we're working on Phase 3, where the game is pass-and-play. Both players are in the same client browser tab. For multiplayer online mode, additional rules should be add for displaying and enabling `TurnCommandPanel`: The current client's team equals to `state.activeTeam`. 
-
-### Move
-
-If Player clicks `moveButton`, first check the cache described in [Performance consideration](#performance-consideration) for key `(unitId, "move")`. On a cache hit, skip the network call and render the cached `tiles` directly. On a miss, call backend via `getAllowedTiles()`, using the payload:
-
-```json 
-{
-  unitId: ${unit.id},
-  turnCmdType: "move"
-}
-```
-
-If non-200 HTTP result returns, display the errorMessage like how we handle Network error.
-
-If 200 HTTP result returns with `AllowedTilesResponse`, these are the coordinates of the `tiles` that `unit` can move. For all matched `tiles`:
-
-- Add a highlight overlay: HEX `0x86c64f` at opacity **65%**, layered on top of the tile.
-- Add a click handler: When clicked,
-  - The border of the highlight overlay should change to `0xdaedca` with opacity **100%**.
-  - Confirm if Player wants to execute move (Details in [Confirm Dialog](#confirm-dialog) below).
-    - If no, rollback to displaying `AllowedTiles`
-    - If yes, use the selected `Coordinates` to `submitTurnCommand`
-      ```json
-        {
-          type: "move";
-          unitId: ${unit.id};
-          target: ${the selected Coordinate};
-        }
-      ```
-    - `GameEvent` Handling and the follow-up action will be described in next section.
-
-### Confirm Dialog
-
-When Player clicks a highlighted tile (for `Move` or `PlaceBomb`), `ConfirmDialog` appears: a **160Wx100Hpx** rectangle, centered on screen, filled with `0x1a1a1a` at opacity **60%** (dims the scene behind it), containing a short prompt text ("Confirm?") and two pill-shape buttons, `yesButton`/`noButton`, styled identically to `TurnCommandPanel`'s buttons (see [TurnCommand Panel](#turncommand-panel)).
-
-`ConfirmDialog` is owned and instantiated by `MatchScene` directly, not by `TurnCommandPanel` — it's a scene-wide modal, not a panel-specific concern. `TurnCommandPanel` triggers it via injected callbacks (`showConfirm`/`hideConfirm`/`isConfirmOpen`) rather than holding its own instance. Because it must stay centered on screen regardless of where the camera has scrolled to (e.g. after `centerCamera` centers the view on the grid), every element of `ConfirmDialog` is pinned to the camera viewport (Phaser's `setScrollFactor(0)`) rather than drawn in world space.
-
-- Player clicks `yesButton` → proceed with `submitTurnCommand` as described above.
-- Player clicks `noButton` → dismiss `ConfirmDialog` and rollback to displaying `allowedTiles` (selected tile's border reverts, click handlers restored).
-
-### Place Bomb
-
-The mechanism `placeBomb` is similar to `move`. To avoid repeating:
-
-- `moveButton` -> `placeBombButton`
-- `turnCmdType move` -> `turnCmdType placeBomb`
-- move -> place a bomb
-- `0xdaedca` -> `0xe69138`
-- `0xdaedca` -> `0xf7dec3`
-
-### Back
-
-`TurnCommandPanel` should contains an `actionStack`, where Player's actions are recorded, and used for rollback when Player clicks the rollback button. Below scenario is an example:
-
-```text
-Player clicks a unit -> Scene shows TurnCommandPanel
-Player clicks moveButton -> Scene shows allowedTiles layer in 0xdaedca 
-Player clicks a tile -> Scene asks for confirmation
-Player clicks "No" -> Scene shows allowedTiles layer in 0xdaedca
-Player clicks backButton -> Scene hides allowedTiles layer
-Player clicks placeBombButton -> Scene shows allowedTiles layer in 0xe69138
-... (and it continues)
-```
-
-If Player clicks `backButton` and there is nothing to rollback, `TurnCommandPanel` should then be hidden.
-
-While `ConfirmDialog` is open, `TurnCommandPanel`'s own buttons (including `backButton`) are not interactive — the dialog's `noButton` is the only rollback path out of that state, and it performs the same rollback `backButton` would perform at that stack depth (see [Confirm Dialog](#confirm-dialog)).
-
-There are two distinct ways `TurnCommandPanel` closes — they must not be conflated:
-
-- **Incremental (`backButton`)**: pops one level off `actionStack`, rolling back to the prior visual state. Only hides the panel once the stack is already empty.
-- **Immediate (system-driven)**: any close that happens as a *side effect* rather than the player navigating back — after `submitTurnCommand()` resolves (success or failure, per [Follow-up Actions](#follow-up-actions-after-turncommand-submission)), or when the player interacts with a different unit, resets the turn (future phase), etc. — hides `TurnCommandPanel` **and clears `actionStack` entirely**, not a single pop. Without the full clear, clicking the same unit again would reopen the panel carrying stale stack entries from the action that just finished.
-
-### Performance consideration
-
-Resolved: cache `getAllowedTiles()` results, keyed per `(unitId, turnCmdType)`, held on `MatchScene` itself — not scoped to a single `TurnCommandPanel` session. Populate a key lazily the first time it's needed — i.e., on the first click of `moveButton`/`placeBombButton` for that `unit` (see [Move](#move)), not when the panel opens. A cache hit skips the network call entirely, including across switching between units (A → B → A reuses A's cached tiles).
-
-Invalidation must be a full clear (every key, every unit), not a per-unit one — because a successful action can change reachability for units *other* than the one that acted (e.g. a new bomb now blocks a different unit's path). The cache is cleared whenever `WorkingState` actually mutates:
-
-- `submitTurnCommand()` **succeeds** (per `engine/match.go`, `CommandMoveUnit`/`CommandPlaceBomb` return their error *before* mutating `WorkingState` on any validation failure, so a failed submission changes nothing and the cache stays valid).
-- `resetTurn()` — discards `WorkingState` and re-clones `TrueState`.
-- `resolveTurn()` — commits the sandbox to `TrueState` and advances the turn; see `match-p3-spec0044.md` (Parked Draft) for where this gets wired into the frontend.
-
-Neither `resetTurn()` nor `resolveTurn()` has frontend wiring yet (this spec doesn't add it) — flagging this now so whichever spec implements them doesn't miss clearing this cache. `resetTurn()` has no tracked spec yet.
-
-## Follow-up Actions after TurnCommand Submission
-
-`TurnCommandPanel` should be closed no matter if `submitTurnCommand()` is successful or not — this is the "Immediate (system-driven)" close case described in [Back](#back), so `actionStack` must be cleared entirely here too, not just popped once.
-
-If non-200 HTTP result returns, display the errorMessage like how we handle Network error. The [Refresh Final Sanity Check](#refresh-final-sanity-check) still runs after this, unconditionally, on both the success and failure paths — a failed submission indicates a problem on the frontend side (the backend is the source of truth), so re-fetching and re-rendering from `getMatchState()` happens regardless of `submitTurnCommand()`'s outcome.
-
-The below states the follow-up action when 200 HTTP result returns:
-
-`submitTurnCommand()` returns `gameEvents` (already implemented in `engine/api.ts`/`types/api.ts`, verified against `server/http_handlers.go` as of this spec).
-
-Currently we focus on `move` and `placeBomb` action. If there is any `gameEvent` with `type` other than `unitMoved` or `bombPlaced`, log it with `console.log()`.
-
-### Visual Effect for `unitMovedEvent`
-
-`unitMovedEvent` should contain at least `unitId`, `from` and `to`. Missing one of them, or invalid values will make the game unable to proceed. Flag them in errorMessage if any.
-
-Validate if:
-- `unitMovedEvent.unitId` equals to `unitId` of current actor.
-- `grid[unitMovedEvent.from.y][unitMovedEvent.from.x].occupantType` equals `'OccupantUnit'` and its `occupantId` matches `unitMovedEvent.unitId`, i.e., the chosen `unit` is still in the `from` position.
-- `grid[unitMovedEvent.to.y][unitMovedEvent.to.x].occupantType` equals `'OccupantNone'`, i.e., can be occupied by the chosen `unit`.
-- `unitId` exists in `gameState.units` and `position` matches with `unitMovedEvent.from`.
-
-Movement renders as a mild straight-line slide: tween the `unit` sprite's position from `from` to `to` in a single linear motion (Phaser `Tweens`/`TweenManager`, `ease: 'Linear'`, duration `UNIT_MOVE_TWEEN_DURATION` = 500ms). This is plain positional interpolation, not the "polished animations" this spec's Non-Goal excludes — no easing curves, squash/stretch, or particle effects. A **Manhattan-path** tween (multi-segment, following the actual pathfinding route instead of a straight line) remains a future polish candidate, not a decision this spec needs to make.
-
-### Visual Effect for `bombPlacedEvent`
-
-`bombPlacedEvent` should at least contain `bombId`, `unitId`, `position` and `countdown`. Missing one of them, or invalid values will make the game unable to proceed. Flag them in errorMessage if any.
-
-Validate if:
-- `bombPlacedEvent.unitId` equals to `unitId` of the chosen `unit`.
-- `grid[bombPlacedEvent.position.y][bombPlacedEvent.position.x].occupantType` equals `'OccupantNone'`, i.e., can be occupied by the new `bomb`.
-
-> Note: `engine/match.go`'s `IsLandingLegal()` enforces one occupant per tile — a `unit` and a `bomb` (or any two occupants) can never share a tile in this engine. The `topOnly`-click ambiguity flagged in `match-p3-spec002-log.md` (issue #4) therefore cannot occur for `unit`/`bomb` clicks; that issue can be marked resolved/moot when next updating that log.
-
-## Refresh Final Sanity Check
-
-After all `gameEvents` are handled (or after a failed `submitTurnCommand()` — see [Follow-up Actions](#follow-up-actions-after-turncommand-submission)), call `getMatchState()` once for sanity check. Compare the freshly-fetched `grid` against a client-side prediction — the pre-action `grid` with the validated event's mutation(s) applied (e.g. the moved `unit`'s new position, the newly placed `bomb`) — not against the raw pre-action `gameState`. Comparing against the pre-action state directly would always differ after any successful action and produce a false-positive mismatch every turn, so that comparison must not be used. If the fetched `grid` differs from the prediction, flag it in errorMessage, then re-render the `tiles`, `units` and `bombs` using new `gameState` as the same way as Phase 3.1 and 3.1.
-
-Replace the frontend stored `gameState` by the latest obtained one.
+1. `MatchScene` is launched by `LoungeScene` after a successful `createMatch()`. **All user interactions disabled.**
+2. `roomId` and `playerTokens` are stored in `MatchScene`.
+3. Render the environment, i.e., `grid`.
+4. `getMatchState()` to render the `occupants` and `TurnPanel`.
+5. Start the Game Loop:
+   1. `getMatchState()` and update `TurnPanel`. **All user interactions disabled.**
+   2. `StartTurn` and possible drop the `bombs` due to `suddenDeath`.
+   3. **All user interactions enabled.**
+   4. (Optional) Player's interaction loop:
+      1. If `move`, **All user interactions disabled.**. Then `move` the unit according to `unitMovedEvent`.
+      2. If `placeBomb`. **All user interactions disabled.**. Then render a new `bomb` according to `bombPlacedEvent`.
+      3. **All user interactions enabled.**
+   5. Player clicks `resolveTurn`. **All user interactions disabled.**
+   6. Render all `gameEvents` returned from backend's `ResolveTurn`.
+   7. (To be done in `match-p3-spec006.md`) Check `victoryResult` and break the Game Loop in the match has concluded. Otherwise, go back to **5.1**.
 
 ---
 
 ## Acceptance Criteria
 
-1. Given a `GameState` with two teams, and `activeTeam` is **X**, when `Unit` of **Team X** is clicked, the player should see `TurnCommandPanel` with available action according to that `Unit`.
-2. Given a `GameState` with two teams, and `activeTeam` is **Y**, when `Unit` of **Team X** is clicked, the player should **NOT** see `TurnCommandPanel`. 
-3. Given Player clicks `Move`, `grid` should render `allowedTiles` when there is any available.
-4. Given Player clicks one of the `allowedTiles` and confirmed the action for `Move`, `Unit` should move to the target `coordinate`.
-5. Given Player clicks `Bomb`, `grid` should render `allowedTiles` when there is any available.
-6. Given Player clicks one of the `allowedTiles` and confirmed the action for `Bomb`, `Bomb` should be placed on the target `coordinate`.
-
-## Log
-
-Implementation issues found during the build (non spec gaps) are tracked in [match-p3-spec003-log.md](./match-p3-spec003-log.md).
+1. Given `Start Turn Cutscene` is rendered, when `gameState.activeTeam` changes, then the fill color should match `TEAM_COLORS[activeTeam]`.
+2. Given `suddenDeath` conditions are fulfilled, when `startTurn` renders, then red warning cutscene should be shown, and `bombs` should drop from the sky according to the number of `bombPlacedEvents` received.
+3. `roomId` and `playerTokens` shouldn't be seen in `console.log` again.

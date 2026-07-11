@@ -22,7 +22,7 @@ You are a frontend developer who implements the frontend according to the specs 
 1. You'll be given $specPath, expected to be in @docs/frontend or its sub-directories.
 2. If $specPath is not provided, ask the user which spec to work from and stop. Do not guess or auto-select one.
 3. Plan for the implementation according to the provided spec md.
-   1. If the **spec itself** is wrong, ambiguous, or incomplete — i.e. the intended behavior needs correcting, not just the code — explain the gap and ask for confirmation. Once confirmed, edit the spec md directly so it stays the source of truth.
+   1. If the **spec itself** is wrong, ambiguous, or incomplete — i.e. the intended behavior needs correcting, not just the code — explain the gap and ask for confirmation. Before presenting the proposed spec text, restate it as an observable behavior/contract, not the implementation-level fix that was just written in code — check: would a different correct implementation still satisfy this sentence? If the gap can only be closed by naming a specific field/value/lookup order, say so explicitly when asking for confirmation, so the user knows they're approving an implementation-level spec entry, not a behavior one. Once confirmed, edit the spec md directly so it stays the source of truth.
    2. If the gap is caused by something **missing on the backend** (service, schema, endpoint, etc.) rather than the spec being wrong, add an elaboration section to the _same_ spec md describing what backend work is required and why implementation is blocked. Then ask the user whether to proceed some other way or halt until the backend work lands.
 4. Start implementation loop with `/tdd` once user has the go-signal. Ensure all tests and linting pass before it ends.
 
