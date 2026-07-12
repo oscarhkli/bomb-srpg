@@ -76,7 +76,7 @@ export const TURN_PANEL_HEIGHT = 48;
 export const TURN_PANEL_MARGIN = 48;
 export const TURN_PANEL_PADDING = 8;
 export const TURN_PANEL_TEXT_COLOR = 0xeeeeee;
-export const TURN_PANEL_SUDDEN_DEATH_COLOR = 0xff0000;
+export const SUDDEN_DEATH_COLOR = 0xff0000;
 
 // ResolveTurnButton
 export const RESOLVE_BUTTON_WIDTH = 320;
@@ -93,3 +93,22 @@ export const ERROR_PANEL_HEIGHT = 400;
 export const ERROR_PANEL_PADDING = 8;
 export const ERROR_PANEL_BG_COLOR = 0x1a1a1a;
 export const ERROR_PANEL_BG_ALPHA = 0.75;
+
+// TurnBanner
+export const TURN_BANNER_HEIGHT = 144;
+export const TURN_BANNER_FONT_SIZE = 48;
+export const TURN_BANNER_TEXT_COLOR = 0xffffff;
+export const TURN_BANNER_FADE_MS = 200;
+export const TURN_BANNER_HOLD_MS = 2000;
+
+// SuddenDeathCutscene (timing values are provisional per spec005 note, easy to tune later)
+export const SUDDEN_DEATH_CUTSCENE_DURATION_MS = 3000;
+export const SUDDEN_DEATH_PULSE_HALF_MS = 250;
+export const SUDDEN_DEATH_PULSE_PEAK_ALPHA = 0.9;
+export const SUDDEN_DEATH_BOMB_DROP_DELAY_MS = 2000;
+export const SUDDEN_DEATH_BOMB_DROP_DURATION_MS = 2000;
+
+// Depth bands above DEPTH_ERROR_PANEL for spec005's turn-transition overlays.
+export const DEPTH_SUDDEN_DEATH_OVERLAY = 60;
+export const DEPTH_SUDDEN_DEATH_BOMB = 65;
+export const DEPTH_TURN_BANNER = 70;

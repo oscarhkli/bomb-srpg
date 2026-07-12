@@ -16,7 +16,15 @@ import {
   getVictoryResult,
   getAllowedTiles,
 } from './api';
-import type { Archetype, GameState, GameEvent, GameCfg, TurnCommand } from '../types/api';
+import { makeState, makeCfg, makeBombPlacedEvent } from '../test/fixtures';
+import type {
+  Archetype,
+  GameState,
+  GameEvent,
+  GameCfg,
+  TurnCommand,
+  StartTurnResponse,
+} from '../types/api';
 
 const mockFetch = vi.fn();
 
@@ -93,14 +101,12 @@ describe('api.ts', () => {
 
   describe('createMatch', () => {
     const req = {
-      gameCfg: {
+      gameCfg: makeCfg({
         stagePreset: 'MAP01',
-        p1Teams: ['Bomber'],
-        p2Teams: ['Bomber'],
+        p1Teams: ['King'],
+        p2Teams: ['King'],
         maxTurns: 10,
-        allowResetTurn: true,
-        suddenDeath: false,
-      },
+      }),
     };
 
     it('should POST game config and return player tokens', async () => {
@@ -127,15 +133,7 @@ describe('api.ts', () => {
   });
 
   describe('getMatchState', () => {
-    const fixture: GameState = {
-      turn: 1,
-      activeTeam: 0,
-      grid: [],
-      units: [],
-      bombs: [],
-      softBlocks: [],
-      turnCommands: [],
-    };
+    const fixture: GameState = makeState({ activeTeam: 0, grid: [] });
 
     it('should GET and return game state', async () => {
       mockOk(200, fixture);
@@ -159,11 +157,15 @@ describe('api.ts', () => {
   });
 
   describe('startTurn', () => {
-    const fixture: GameEvent[] = [
-      { type: 'bombPlaced', unitId: 0, position: { x: 1, y: 0 }, range: 1, countdown: 5 },
+    const gameEventFixture: GameEvent[] = [
+      makeBombPlacedEvent({ position: { x: 1, y: 0 }, range: 1, countdown: 5 }),
     ];
+    const fixture: StartTurnResponse = {
+      inSuddenDeath: false,
+      gameEvents: gameEventFixture,
+    };
 
-    it('should POST with Authorization header and return game events', async () => {
+    it('should POST with Authorization header and return startTurnResponse', async () => {
       mockOk(200, fixture);
 
       const result = await startTurn();
@@ -210,15 +212,7 @@ describe('api.ts', () => {
   });
 
   describe('resetTurn', () => {
-    const fixture: GameState = {
-      turn: 1,
-      activeTeam: 0,
-      grid: [],
-      units: [],
-      bombs: [],
-      softBlocks: [],
-      turnCommands: [],
-    };
+    const fixture: GameState = makeState({ activeTeam: 0, grid: [] });
 
     it('should POST with auth and return game state', async () => {
       mockOk(200, fixture);
@@ -283,14 +277,12 @@ describe('api.ts', () => {
   });
 
   describe('getMatchConfig', () => {
-    const fixture: GameCfg = {
+    const fixture: GameCfg = makeCfg({
       stagePreset: 'MAP01',
       p1Teams: ['Bomber'],
       p2Teams: ['Bomber'],
       maxTurns: 10,
-      allowResetTurn: true,
-      suddenDeath: false,
-    };
+    });
 
     it('should GET and return game config', async () => {
       mockOk(200, fixture);

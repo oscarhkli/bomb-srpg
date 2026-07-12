@@ -7,11 +7,14 @@ import {
   getAllowedTiles,
   submitTurnCommand,
   resolveTurn,
+  startTurn,
 } from '../engine/api';
 import TurnCommandPanel from '../ui/TurnCommandPanel';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import TurnPanel from '../ui/TurnPanel';
 import ErrorPanel from '../ui/ErrorPanel';
+import TurnBanner from '../ui/TurnBanner';
+import SuddenDeathCutscene from '../ui/SuddenDeathCutscene';
 import { drawPillButton } from '../ui/pillButton';
 import { destroyAll } from '../ui/gameObjectUtils';
 import { playResolveTurnEvents, type BombGraphics } from '../rendering/resolveTurnPlayer';
@@ -23,14 +26,18 @@ import {
 } from '../rendering/stateSync';
 import {
   renderBoard as drawBoard,
-  renderBomb as drawBomb,
+  renderBomb,
   tileCenter,
   type BoardRenderContext,
 } from '../rendering/boardRenderer';
 import {
   TILE_SIZE,
+  BOMB_SIZE,
   DEPTH_TURN_COMMAND_PANEL,
+  DEPTH_OCCUPANT,
+  DEPTH_SUDDEN_DEATH_BOMB,
   UNIT_MOVE_TWEEN_DURATION,
+  SUDDEN_DEATH_BOMB_DROP_DURATION_MS,
   PANEL_BUTTON_FILL_COLOR,
   PANEL_BUTTON_FILL_ALPHA,
   PANEL_BUTTON_BORDER_COLOR,
@@ -70,7 +77,11 @@ export default class MatchScene extends Phaser.Scene {
   private turnPanel!: TurnPanel;
   private resolveButtonObjects: Phaser.GameObjects.GameObject[] = [];
   private errorPanel!: ErrorPanel;
+  private turnBanner!: TurnBanner;
+  private suddenDeathCutscene!: SuddenDeathCutscene;
   private isSubmitting = false;
+  private interactionsEnabled = false;
+  private destroyed = false;
 
   constructor() {
     super('MatchScene');
@@ -79,11 +90,15 @@ export default class MatchScene extends Phaser.Scene {
   create(data: MatchSceneData): void {
     this.roomId = data.roomId;
     this.playerTokens = data.playerTokens;
-    console.log('roomId:', this.roomId, 'playerTokens:', this.playerTokens);
+    this.events.once('shutdown', () => {
+      this.destroyed = true;
+    });
     initRoom(data.roomId);
     this.confirmDialog = new ConfirmDialog(this);
     this.turnPanel = new TurnPanel(this);
     this.errorPanel = new ErrorPanel(this);
+    this.turnBanner = new TurnBanner(this);
+    this.suddenDeathCutscene = new SuddenDeathCutscene(this);
     this.turnCommandPanel = new TurnCommandPanel(this, {
       getAllowedTiles: (unitId, turnCmdType) => this.getAllowedTilesCached(unitId, turnCmdType),
       onError: message => this.showError(message),
@@ -99,6 +114,7 @@ export default class MatchScene extends Phaser.Scene {
         this.cameras.main.centerOn((cols * TILE_SIZE) / 2, (rows * TILE_SIZE) / 2);
         this.renderResolveButton();
         this.refreshTurnPanelIfReady();
+        void this.beginTurn();
       })
       .catch(() => {
         this.showError('Failed to load match state');
@@ -120,6 +136,100 @@ export default class MatchScene extends Phaser.Scene {
     if (this.gameState && this.gameCfg) {
       this.turnPanel.update(this.gameState.turn, this.gameCfg.maxTurns, this.gameState.activeTeam);
     }
+  }
+
+  // Per-turn startTurn() sequence (spec005 Game Loop 5.1-5.4): refresh state, init the active
+  // team's token, call startTurn(), play the sudden-death cutscene (if triggered) then the turn
+  // banner, all sequentially. All interactions are disabled for the duration so no click can
+  // race a turn transition (AC#5); re-enabled in `finally` so a failed startTurn() never
+  // deadlocks the scene.
+  private async beginTurn(): Promise<void> {
+    this.interactionsEnabled = false;
+    try {
+      const state = await getMatchState();
+      if (this.destroyed) {
+        return;
+      }
+      this.gameState = state;
+      initToken(this.playerTokens[state.activeTeam - 1]!);
+      this.refreshTurnPanelIfReady();
+
+      const resp = await startTurn();
+      if (this.destroyed) {
+        return;
+      }
+      if (resp.inSuddenDeath) {
+        // injectSuddenDeathHazards() has already committed the new bombs server-side by the
+        // time startTurn() resolves, so refetching now keeps gameState.bombs in sync with what
+        // dropSuddenDeathBomb() is about to render — otherwise a later resolveTurn() would
+        // reference a bombId this.gameState doesn't know about (spec005 gap).
+        this.gameState = await getMatchState();
+        if (this.destroyed) {
+          return;
+        }
+        const bombPlacedEvents = resp.gameEvents.filter(event => event.type === 'bombPlaced');
+        await this.suddenDeathCutscene.play(bombPlacedEvents, event =>
+          this.dropSuddenDeathBomb(event)
+        );
+        if (this.destroyed) {
+          return;
+        }
+      }
+      await this.turnBanner.play(state.activeTeam);
+    } catch (err) {
+      if (this.destroyed) {
+        return;
+      }
+      this.showError(err instanceof Error ? err.message : String(err));
+    } finally {
+      this.interactionsEnabled = true;
+    }
+  }
+
+  // Renders a sudden-death-injected bomb dropping in from off-screen, resting on its tile once
+  // the drop tween completes. Reuses renderBomb() so the bomb is registered in bombGraphicsById
+  // exactly like a normally-placed bomb.
+  private dropSuddenDeathBomb(event: GameEvent): Promise<void> {
+    const { unitId, bombId, position, countdown } = event;
+    if (bombId === undefined || !position || countdown === undefined || !this.inBounds(position)) {
+      this.showError('Invalid bombPlaced event received from server');
+      return Promise.resolve();
+    }
+
+    renderBomb(this.boardCtx(), {
+      id: bombId,
+      ownerId: unitId ?? 0,
+      position,
+      range: event.range ?? 0,
+      countdown,
+    });
+
+    const bomb = this.bombGraphicsById.get(bombId);
+    if (!bomb) {
+      this.showError('Invalid bombPlaced event received from server');
+      return Promise.resolve();
+    }
+
+    const restY = bomb.container.y;
+    // Offset relative to the bomb's own rest position (not a fixed camera-height offset) so the
+    // drop always starts fully off-screen with a BOMB_SIZE margin, regardless of which tile the
+    // bomb lands on.
+    const dropOffset = restY + BOMB_SIZE;
+    bomb.container.y -= dropOffset;
+    bomb.container.setDepth(DEPTH_SUDDEN_DEATH_BOMB);
+
+    return new Promise(resolve => {
+      this.tweens.add({
+        targets: bomb.container,
+        y: restY,
+        duration: SUDDEN_DEATH_BOMB_DROP_DURATION_MS,
+        ease: 'Linear',
+        onComplete: () => {
+          bomb.container.setDepth(DEPTH_OCCUPANT);
+          resolve();
+        },
+      });
+    });
   }
 
   private async getAllowedTilesCached(
@@ -219,7 +329,7 @@ export default class MatchScene extends Phaser.Scene {
       return false;
     }
 
-    drawBomb(this.boardCtx(), {
+    renderBomb(this.boardCtx(), {
       id: bombId,
       ownerId: unitId,
       position,
@@ -268,6 +378,9 @@ export default class MatchScene extends Phaser.Scene {
   }
 
   private onResolveButtonClicked(): void {
+    if (!this.interactionsEnabled) {
+      return;
+    }
     if (this.isSubmitting) {
       return;
     }
@@ -290,9 +403,11 @@ export default class MatchScene extends Phaser.Scene {
     this.isSubmitting = true;
     this.clearErrors();
     try {
-      initToken(this.playerTokens[this.gameState.activeTeam - 1]!);
       try {
         const events = await resolveTurn();
+        if (this.destroyed) {
+          return;
+        }
         const { ok, done } = playResolveTurnEvents(events, {
           scene: this,
           gameStateSnapshot: this.gameState,
@@ -303,11 +418,23 @@ export default class MatchScene extends Phaser.Scene {
         });
         if (ok) {
           await done;
+          if (this.destroyed) {
+            return;
+          }
         }
       } catch (err) {
+        if (this.destroyed) {
+          return;
+        }
         this.showError(err instanceof Error ? err.message : String(err));
       }
       await this.refreshFinalSanityCheckAfterResolve();
+      if (this.destroyed) {
+        return;
+      }
+      // Victory-check gating is spec006; for now every resolved turn loops back into the
+      // next turn's startTurn() sequence.
+      await this.beginTurn();
     } finally {
       this.isSubmitting = false;
     }
@@ -357,6 +484,9 @@ export default class MatchScene extends Phaser.Scene {
   }
 
   private onUnitClicked(unit: Unit): void {
+    if (!this.interactionsEnabled) {
+      return;
+    }
     if (this.confirmDialog.isOpen) {
       return;
     }
@@ -364,7 +494,6 @@ export default class MatchScene extends Phaser.Scene {
       console.log(`Unit ${unit.id} is clicked`, unit);
       return;
     }
-    initToken(this.playerTokens[this.gameState.activeTeam - 1]!);
     this.turnCommandPanel.openFor(unit);
   }
 

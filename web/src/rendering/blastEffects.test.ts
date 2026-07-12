@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mockScene } from '../test/setup';
+import { tweenConfigAt } from '../test/sceneHelpers';
 import {
   FIRE_ALPHA,
   FIRE_SHAPE_SIZE,
@@ -46,7 +47,7 @@ describe('drawGrowingBeam', () => {
     duration: number;
     onUpdate: () => void;
   } {
-    return mockScene.tweens.add.mock.calls[0]![0] as {
+    return tweenConfigAt(0) as {
       targets: { len: number };
       len: number;
       duration: number;

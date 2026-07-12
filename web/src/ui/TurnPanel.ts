@@ -6,7 +6,7 @@ import {
   TURN_PANEL_HEIGHT,
   TURN_PANEL_MARGIN,
   TURN_PANEL_PADDING,
-  TURN_PANEL_SUDDEN_DEATH_COLOR,
+  SUDDEN_DEATH_COLOR,
   TURN_PANEL_TEXT_COLOR,
   TURN_PANEL_WIDTH,
 } from '../constants';
@@ -72,7 +72,7 @@ export default class TurnPanel {
       String(turn),
       {
         fontFamily: GAME_FONT_FAMILY,
-        color: colorToCss(suddenDeath ? TURN_PANEL_SUDDEN_DEATH_COLOR : TURN_PANEL_TEXT_COLOR),
+        color: colorToCss(suddenDeath ? SUDDEN_DEATH_COLOR : TURN_PANEL_TEXT_COLOR),
       }
     );
     turnText.setOrigin(1, 0);

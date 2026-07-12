@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mockScene } from '../test/setup';
+import { allGraphics, allTexts, clickPointerdown } from '../test/sceneHelpers';
+import { makeUnit } from '../test/fixtures';
 import {
   PANEL_BUTTON_FILL_COLOR,
   PANEL_BUTTON_FILL_ALPHA,
@@ -12,36 +14,7 @@ import {
   ALLOWED_TILE_BOMB_COLOR,
 } from '../constants';
 import TurnCommandPanel from './TurnCommandPanel';
-import type { Coordinate, TurnCmdType, Unit } from '../types/api';
-
-function makeUnit(overrides: Partial<Unit> = {}): Unit {
-  return {
-    id: 1,
-    type: 'Fighter',
-    position: { x: 0, y: 0 },
-    speed: 2,
-    bombMaxRange: 2,
-    bombPower: 1,
-    maxBombCount: 3,
-    bombUsed: 0,
-    team: 1,
-    hp: 1,
-    skills: [],
-    hasMoved: false,
-    hasUsedSkill: false,
-    ...overrides,
-  };
-}
-
-function allGraphics(): ReturnType<typeof mockScene.add.graphics>[] {
-  return mockScene.add.graphics.mock.results.map(
-    r => r.value as ReturnType<typeof mockScene.add.graphics>
-  );
-}
-
-function allTexts(): ReturnType<typeof mockScene.add.text>[] {
-  return mockScene.add.text.mock.results.map(r => r.value as ReturnType<typeof mockScene.add.text>);
-}
+import type { Coordinate, TurnCmdType } from '../types/api';
 
 function makePanel(overrides: Partial<Record<string, unknown>> = {}) {
   const defaultGetAllowedTiles = vi.fn<
@@ -80,11 +53,6 @@ function latestConfirmCallbacks(showConfirm: ReturnType<typeof vi.fn>): {
 } {
   const lastCall = showConfirm.mock.calls.at(-1) as [() => void, () => void];
   return { onYes: lastCall[0], onNo: lastCall[1] };
-}
-
-function clickPointerdown(g: ReturnType<typeof mockScene.add.graphics>): void {
-  const onPointerDown = g.on.mock.calls.find(call => call[0] === 'pointerdown')?.[1] as () => void;
-  onPointerDown();
 }
 
 beforeEach(() => {

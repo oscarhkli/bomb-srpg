@@ -127,21 +127,40 @@ function renderSoftBlocks(ctx: BoardRenderContext, softBlocks: SoftBlock[]): voi
 }
 
 // Renders a single bomb; used both by renderBoard and by MatchScene's optimistic bomb placement.
+// The circle and countdown text are drawn at local (0,0) and parented in a Container placed at
+// the tile center, so the bomb is one positionable/tweenable unit (see dropSuddenDeathBomb in
+// MatchScene) instead of two independently-positioned objects that can drift apart.
 export function renderBomb(ctx: BoardRenderContext, bomb: Bomb): void {
   const { cx, cy } = tileCenter(bomb.position);
   const g = ctx.scene.add.graphics();
-  g.setDepth(DEPTH_OCCUPANT);
-  ctx.boardObjects.push(g);
   g.fillStyle(BOMB_COLOR);
-  g.fillCircle(cx, cy, BOMB_SIZE / 2);
-  const text = ctx.scene.add.text(cx, cy, String(bomb.countdown), {
+  g.fillCircle(0, 0, BOMB_SIZE / 2);
+  const text = ctx.scene.add.text(0, 0, String(bomb.countdown), {
     color: colorToCss(BOMB_COUNTDOWN_TEXT_COLOR),
   });
   text.setOrigin(0.5);
-  text.setDepth(DEPTH_OCCUPANT);
-  ctx.boardObjects.push(text);
-  attachClickLogger(g, bomb.position, `Bomb ${bomb.id}`, bomb);
-  ctx.bombGraphicsById.set(bomb.id, { circle: g, countdownText: text });
+
+  const container = ctx.scene.add.container(cx, cy, [g, text]);
+  container.setDepth(DEPTH_OCCUPANT);
+  ctx.boardObjects.push(container);
+
+  attachContainerClickLogger(container, `Bomb ${bomb.id}`, bomb);
+  ctx.bombGraphicsById.set(bomb.id, { container, circle: g, countdownText: text });
+}
+
+// Containers always have local origin (0,0) — unlike attachClickLogger's world-space tile rect
+// (valid only because the ungrouped Graphics it targets never moves from (0,0)), the hit area
+// here must be centered on the container's own origin instead.
+function attachContainerClickLogger(
+  container: Phaser.GameObjects.Container,
+  label: string,
+  details: unknown
+): void {
+  const hitArea = new Phaser.Geom.Rectangle(-TILE_SIZE / 2, -TILE_SIZE / 2, TILE_SIZE, TILE_SIZE);
+  container.setInteractive(hitArea, (shape: Phaser.Geom.Rectangle, x: number, y: number) =>
+    Phaser.Geom.Rectangle.Contains(shape, x, y)
+  );
+  container.on('pointerdown', () => console.log(`${label} is clicked`, details));
 }
 
 function attachClickLogger(

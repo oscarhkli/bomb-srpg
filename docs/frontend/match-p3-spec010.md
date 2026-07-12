@@ -1,16 +1,74 @@
 ---
-title: "Phase 3.x: Turn Lifecycle Wiring (startTurn)"
+title: "Phase 3.10: Render Camera Navigation"
 ---
 
-# Turn Lifecycle Wiring (startTurn)
+# Render Camera Navigation
+
+Ignore the below as it's only a copied template.
 
 ## Context
 
-`MatchScene` never calls `startTurn()` (`engine/api.ts`) today. Per `AGENTS.md`'s Turn Lifecycle rules, the client must explicitly call `POST /match/start-turn` for every turn, including Turn 1, to evaluate sudden-death / hazard injection — this has been a silent gap since spec001/002. `match-p3-spec003.md` (Move/PlaceBomb) works around it by re-deriving `initToken()` once per `TurnCommandPanel` open instead of once per turn boundary.
+Phase 3.1 renders the static `grid` tiles. This spec adds the dynamic layer: `units` and `bombs` drawn on top of the grid, plus pan and zoom so the player can navigate large grids (up to 15×15).
 
 ## Goal
 
-- Wire `startTurn()` into the turn flow at the correct point(s).
-- Move `initToken(playerTokens[activeTeam - 1])` to fire once per `startTurn()` resolution instead of once per panel-open, since `activeTeam` is stable between turns.
+- `MatchScene` renders each `Unit` and `Bomb` from `GameState` as procedural shapes on the correct `Tile`.
+- Player can pan the camera by click-dragging and zoom with scroll wheel.
 
-_Stub only — flesh out Non-Goal / Scene Entry / Visual Spec / Acceptance Criteria per SPEC_TEMPLATE.md when ready to build._
+## Non-Goal
+
+- Unit selection or command input (see spec003).
+- Animations or tweens.
+- HUD / status panel.
+- Rendering of `activeTeam`, `softBlocks`, or `turnCommands`.
+
+## Scene Entry
+
+_TODO: fill in_
+
+---
+
+## Layout
+
+| Interaction | Behaviour |
+|---|---|
+| Click + drag | Pan the world camera |
+| Scroll wheel | Zoom in / out (range: 0.5× – 2×) |
+
+Camera pan is bounded to the grid extents so the player cannot drag the grid fully off-screen.
+
+## Data Fetching
+
+No change from spec001 — `getMatchState()` is called once on `create()`. Units and bombs are drawn from the same `GameState` snapshot.
+
+## Visual Spec
+
+### Unit
+
+Each `Unit` is drawn as a **32×32px** shape centered on its `Tile`, using `team` as the color index.
+
+| `team` | Fill color |
+|---|---|
+| 0 | Blue |
+| 1 | Red |
+
+Archetype shape is drawn inside the fill (white stroke):
+
+| Archetype (by `type` string) | Shape |
+|---|---|
+| King | Circle |
+| Soldier | Triangle |
+| (fallback) | Square |
+
+### Bomb
+
+Each `Bomb` is drawn as a **16×16px** dark circle centered on its `Tile`.
+`countdown` is rendered as white text above the circle.
+
+---
+
+## Acceptance Criteria
+
+1. Given a `GameState` with two teams, each `Unit` renders on the correct tile with the correct team color and archetype shape.
+2. Each `Bomb` renders on the correct tile with a visible countdown number.
+3. On a 15×15 grid, the player can pan and zoom to reach any corner.

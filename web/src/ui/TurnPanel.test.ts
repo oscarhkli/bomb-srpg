@@ -1,15 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mockScene } from '../test/setup';
-import { TEAM_COLORS, TURN_PANEL_SUDDEN_DEATH_COLOR } from '../constants';
+import { firstGraphics as headerGraphics } from '../test/sceneHelpers';
+import { TEAM_COLORS, SUDDEN_DEATH_COLOR } from '../constants';
 import TurnPanel from './TurnPanel';
 
 beforeEach(() => {
   vi.clearAllMocks();
 });
-
-function headerGraphics(): ReturnType<typeof mockScene.add.graphics> {
-  return mockScene.add.graphics.mock.results[0]!.value as ReturnType<typeof mockScene.add.graphics>;
-}
 
 describe('TurnPanel', () => {
   it('fills the header with TEAM_COLORS[activeTeam]', () => {
@@ -40,7 +37,7 @@ describe('TurnPanel', () => {
       expect.any(Number),
       '31',
       expect.objectContaining({
-        color: `#${TURN_PANEL_SUDDEN_DEATH_COLOR.toString(16).padStart(6, '0')}`,
+        color: `#${SUDDEN_DEATH_COLOR.toString(16).padStart(6, '0')}`,
       })
     );
   });

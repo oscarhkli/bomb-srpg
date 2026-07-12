@@ -1,19 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mockScene } from '../test/setup';
+import { textCalls, textAt as textResult, firstGraphics } from '../test/sceneHelpers';
 import { ERROR_PANEL_PADDING } from '../constants';
 import ErrorPanel from './ErrorPanel';
 
 beforeEach(() => {
   vi.clearAllMocks();
 });
-
-function textCalls(): [number, number, string, ...unknown[]][] {
-  return mockScene.add.text.mock.calls as unknown as [number, number, string, ...unknown[]][];
-}
-
-function textResult(index: number): ReturnType<typeof mockScene.add.text> {
-  return mockScene.add.text.mock.results[index]!.value as ReturnType<typeof mockScene.add.text>;
-}
 
 describe('ErrorPanel', () => {
   it('lazily creates the background once and adds the message text on show', () => {
@@ -56,9 +49,7 @@ describe('ErrorPanel', () => {
 
     panel.show('first');
     const firstText = textResult(0);
-    const bg = mockScene.add.graphics.mock.results[0]!.value as ReturnType<
-      typeof mockScene.add.graphics
-    >;
+    const bg = firstGraphics();
 
     panel.clear();
 

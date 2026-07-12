@@ -10,6 +10,7 @@ import type {
   AllowedTilesRequest,
   AllowedTilesResponse,
   GameCfg,
+  StartTurnResponse,
 } from '../types/api';
 
 let roomId: string | undefined;
@@ -96,13 +97,13 @@ export async function getMatchState(): Promise<GameState> {
   return handleResponse<GameState>(res);
 }
 
-export async function startTurn(): Promise<GameEvent[]> {
+export async function startTurn(): Promise<StartTurnResponse> {
   const roomId = requireRoomId();
   const res = await fetch(buildUrl(`/api/match-rooms/${roomId}/match/start-turn`), {
     method: 'POST',
     headers: authHeaders(),
   });
-  return handleResponse<GameEvent[]>(res);
+  return handleResponse<StartTurnResponse>(res);
 }
 
 export async function submitTurnCommand(cmd: TurnCommand): Promise<GameEvent[]> {

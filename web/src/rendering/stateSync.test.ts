@@ -1,32 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { createMockGraphics, createMockText } from '../test/setup';
-import type { GameEvent, GameState, Tile, TurnCommand } from '../types/api';
-import type { BombGraphics } from './resolveTurnPlayer';
+import { createMockGraphics } from '../test/setup';
+import { makeBombGraphics as bombGraphics } from '../test/sceneHelpers';
+import { makeState as state } from '../test/fixtures';
+import type { GameEvent, TurnCommand } from '../types/api';
 import { extractAppliedTarget, turnCommandTargetMatches, occupantsMatch } from './stateSync';
-
-function tile(overrides: Partial<Tile> = {}): Tile {
-  return { type: 'TerrainPlain', occupantType: 'OccupantNone', occupantId: 0, ...overrides };
-}
-
-function state(overrides: Partial<GameState> = {}): GameState {
-  return {
-    turn: 1,
-    activeTeam: 1,
-    grid: [[tile()]],
-    units: [],
-    bombs: [],
-    softBlocks: [],
-    turnCommands: [],
-    ...overrides,
-  };
-}
-
-function bombGraphics(): BombGraphics {
-  return {
-    circle: createMockGraphics() as never,
-    countdownText: createMockText() as never,
-  };
-}
 
 describe('extractAppliedTarget', () => {
   it('returns the server-reported `to` for a move command, not the requested target', () => {
@@ -126,18 +103,12 @@ describe('occupantsMatch', () => {
     ).toBe(true);
   });
 
-  it('is false when a live unit has no graphics entry', () => {
-    const fresh = state({ units: [{ id: 1, hp: 1 } as never] });
-    expect(occupantsMatch(fresh, new Map(), new Map(), new Map())).toBe(false);
-  });
-
-  it('is false when a bomb has no graphics entry', () => {
-    const fresh = state({ bombs: [{ id: 10 } as never] });
-    expect(occupantsMatch(fresh, new Map(), new Map(), new Map())).toBe(false);
-  });
-
-  it('is false when a softBlock has no graphics entry', () => {
-    const fresh = state({ softBlocks: [{ id: 20 } as never] });
+  it.each([
+    ['unit', 'units'],
+    ['bomb', 'bombs'],
+    ['softBlock', 'softBlocks'],
+  ] as const)('is false when a %s has no graphics entry', (_label, collection) => {
+    const fresh = state({ [collection]: [{ id: 1, hp: 1 } as never] });
     expect(occupantsMatch(fresh, new Map(), new Map(), new Map())).toBe(false);
   });
 });

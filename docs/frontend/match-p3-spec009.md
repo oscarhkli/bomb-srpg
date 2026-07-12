@@ -1,74 +1,60 @@
 ---
-title: "Phase 3.x: Render Camera Navigation"
+title: "Phase 3.9: Render Occupant Information"
 ---
 
-# Render Camera Navigation
+# Render Occupant Information
 
 Ignore the below as it's only a copied template.
 
-## Context
-
-Phase 3.1 renders the static `grid` tiles. This spec adds the dynamic layer: `units` and `bombs` drawn on top of the grid, plus pan and zoom so the player can navigate large grids (up to 15×15).
-
-## Goal
-
-- `MatchScene` renders each `Unit` and `Bomb` from `GameState` as procedural shapes on the correct `Tile`.
-- Player can pan the camera by click-dragging and zoom with scroll wheel.
-
-## Non-Goal
-
-- Unit selection or command input (see spec003).
-- Animations or tweens.
-- HUD / status panel.
-- Rendering of `activeTeam`, `softBlocks`, or `turnCommands`.
-
 ## Scene Entry
 
-_TODO: fill in_
+Who launches this scene and what data it receives.
+
+### Data on arrival
+
+| Field   | Type   | Source              |
+| ------- | ------ | ------------------- |
+| `field` | `type` | Where it comes from |
+
+### Initialisation sequence
+
+Steps `create()` must perform, in order.
 
 ---
 
-## Layout
+<!-- OPTIONAL SECTIONS — remove if not applicable -->
 
-| Interaction | Behaviour |
-|---|---|
-| Click + drag | Pan the world camera |
-| Scroll wheel | Zoom in / out (range: 0.5× – 2×) |
+## Layout _(optional — scenes with a game world)_
 
-Camera pan is bounded to the grid extents so the player cannot drag the grid fully off-screen.
+Camera model, canvas resolution, coordinate system.
 
-## Data Fetching
+## Data Fetching _(optional — scenes that call the backend)_
 
-No change from spec001 — `getMatchState()` is called once on `create()`. Units and bombs are drawn from the same `GameState` snapshot.
+Which API functions are called, when, and how often.
 
-## Visual Spec
+## Visual Spec _(optional — scenes with custom rendering)_
 
-### Unit
+What each rendered element looks like (shape, color, size).
+Reference `constants.ts` for named values; avoid hardcoded hex here.
 
-Each `Unit` is drawn as a **32×32px** shape centered on its `Tile`, using `team` as the color index.
+## Scene Exit _(optional — scenes with multiple destinations)_
 
-| `team` | Fill color |
-|---|---|
-| 0 | Blue |
-| 1 | Red |
+| Trigger         | Destination |
+| --------------- | ----------- |
+| Event or action | Next scene  |
 
-Archetype shape is drawn inside the fill (white stroke):
+## Dev Bootstrap _(optional — prerequisite scene not yet built)_
 
-| Archetype (by `type` string) | Shape |
-|---|---|
-| King | Circle |
-| Soldier | Triangle |
-| (fallback) | Square |
-
-### Bomb
-
-Each `Bomb` is drawn as a **16×16px** dark circle centered on its `Tile`.
-`countdown` is rendered as white text above the circle.
+Temporary scaffolding to run this scene in isolation during development.
+Remove once the real predecessor scene is implemented.
 
 ---
 
 ## Acceptance Criteria
 
-1. Given a `GameState` with two teams, each `Unit` renders on the correct tile with the correct team color and archetype shape.
-2. Each `Bomb` renders on the correct tile with a visible countdown number.
-3. On a 15×15 grid, the player can pan and zoom to reach any corner.
+1. Given … When … Then …
+2. Given … When … Then …
+
+## Log _(optional - remove it if no implementatioun issue is found)_
+
+Implementation issues found during the build (non spec gaps) are tracked in [`match-p3-spec001-log.md`](./match-p3-spec001-log.md).

@@ -1,6 +1,18 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mockScene } from '../test/setup';
 import {
+  firstGraphics as gridGraphics,
+  occupantGraphics,
+  pointerDownOf,
+} from '../test/sceneHelpers';
+import {
+  tileOf,
+  plainTile,
+  makeUnit as unit,
+  makeSoftBlock as softBlock,
+  makeBomb as bomb,
+} from '../test/fixtures';
+import {
   TERRAIN_COLORS,
   TERRAIN_BORDER_COLOR,
   TEAM_COLORS,
@@ -29,47 +41,13 @@ function ctx(overrides: Partial<BoardRenderContext> = {}): BoardRenderContext {
   };
 }
 
-function tileOf(type: TerrainType): Tile {
-  return { type, occupantType: 'OccupantNone', occupantId: 0 };
-}
-
-function plainTile(): Tile {
-  return tileOf('TerrainPlain');
-}
-
-function unit(overrides: Partial<Unit> = {}): Unit {
-  return {
-    id: 1,
-    type: 'Fighter',
-    position: { x: 0, y: 0 },
-    speed: 2,
-    bombMaxRange: 2,
-    bombPower: 1,
-    maxBombCount: 3,
-    bombUsed: 0,
-    team: 1,
-    hp: 1,
-    skills: [],
-    hasMoved: false,
-    hasUsedSkill: false,
-    ...overrides,
-  };
-}
-
-function softBlock(overrides: Partial<SoftBlock> = {}): SoftBlock {
-  return { id: 1, position: { x: 0, y: 0 }, ...overrides };
-}
-
-function bomb(overrides: Partial<Bomb> = {}): Bomb {
-  return { id: 1, ownerId: 1, position: { x: 0, y: 0 }, range: 2, countdown: 3, ...overrides };
-}
-
 function state(
   grid: Tile[][],
   parts: { units?: Unit[]; softBlocks?: SoftBlock[]; bombs?: Bomb[] } = {}
 ) {
   return {
     turn: 1,
+    inSuddenDeath: false,
     activeTeam: 1,
     grid,
     units: parts.units ?? [],
@@ -77,21 +55,6 @@ function state(
     softBlocks: parts.softBlocks ?? [],
     turnCommands: [],
   };
-}
-
-// The grid is the first Graphics created; occupants follow in array order.
-function gridGraphics(): ReturnType<typeof mockScene.add.graphics> {
-  return mockScene.add.graphics.mock.results[0]!.value as ReturnType<typeof mockScene.add.graphics>;
-}
-
-function occupantGraphics(index: number): ReturnType<typeof mockScene.add.graphics> {
-  return mockScene.add.graphics.mock.results[index + 1]!.value as ReturnType<
-    typeof mockScene.add.graphics
-  >;
-}
-
-function pointerDownOf(g: ReturnType<typeof mockScene.add.graphics>): () => void {
-  return g.on.mock.calls.find(call => call[0] === 'pointerdown')?.[1] as () => void;
 }
 
 describe('tileCenter', () => {
@@ -254,7 +217,7 @@ describe('renderBoard — softBlocks & bombs', () => {
     consoleSpy.mockRestore();
   });
 
-  it('renders a bomb as a circle with countdown text and registers both in the map', () => {
+  it('renders a bomb as a circle with countdown text parented in a single container and registers both in the map', () => {
     const c = ctx();
     renderBoard(
       c,
@@ -265,8 +228,9 @@ describe('renderBoard — softBlocks & bombs', () => {
 
     const g = occupantGraphics(0);
     expect(g.fillStyle).toHaveBeenCalledWith(BOMB_COLOR);
-    expect(g.fillCircle).toHaveBeenCalledWith(72, 24, 12);
-    expect(mockScene.add.text).toHaveBeenCalledWith(72, 24, '5', expect.objectContaining({}));
+    expect(g.fillCircle).toHaveBeenCalledWith(0, 0, 12);
+    expect(mockScene.add.text).toHaveBeenCalledWith(0, 0, '5', expect.objectContaining({}));
+    expect(mockScene.add.container).toHaveBeenCalledWith(72, 24, [g, expect.anything()]);
     expect(c.bombGraphicsById.has(9)).toBe(true);
   });
 });
@@ -277,10 +241,9 @@ describe('renderBomb', () => {
     renderBomb(c, bomb({ id: 42, position: { x: 0, y: 0 }, countdown: 2 }));
 
     expect(mockScene.add.graphics).toHaveBeenCalledOnce();
-    const g = mockScene.add.graphics.mock.results[0]!.value as ReturnType<
-      typeof mockScene.add.graphics
-    >;
-    expect(g.fillCircle).toHaveBeenCalledWith(24, 24, 12);
+    const g = gridGraphics();
+    expect(g.fillCircle).toHaveBeenCalledWith(0, 0, 12);
+    expect(mockScene.add.container).toHaveBeenCalledWith(24, 24, [g, expect.anything()]);
     expect(c.bombGraphicsById.has(42)).toBe(true);
     expect(c.boardObjects.length).toBeGreaterThan(0);
   });
