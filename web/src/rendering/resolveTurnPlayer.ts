@@ -12,6 +12,7 @@ import { drawGrowingBeam, drawFireShape, type CardinalDirection } from './blastE
 import { colorToCss } from '../ui/gameObjectUtils';
 
 export interface BombGraphics {
+  container: Phaser.GameObjects.Container;
   circle: Phaser.GameObjects.Graphics;
   countdownText: Phaser.GameObjects.Text;
 }
@@ -208,8 +209,7 @@ export function playResolveTurnEvents(
 
     deps.scene.time.delayedCall(offset, () => {
       const bg = deps.bombGraphicsById.get(bombId);
-      bg?.circle.destroy();
-      bg?.countdownText.destroy();
+      bg?.container.destroy();
       deps.bombGraphicsById.delete(bombId);
 
       for (const [dir, maxDist] of byDirection) {

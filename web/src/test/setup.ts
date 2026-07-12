@@ -47,12 +47,26 @@ export function createMockText() {
   };
 }
 
+// Like Graphics/Text above: a fresh instance per add.container() call, seeded with the real
+// x/y constructor args so drop-tween tests can assert against the container's actual position.
+export function createMockContainer(x = 0, y = 0) {
+  return {
+    x,
+    y,
+    setDepth: vi.fn().mockReturnThis(),
+    setInteractive: vi.fn().mockReturnThis(),
+    on: vi.fn().mockReturnThis(),
+    off: vi.fn().mockReturnThis(),
+    destroy: vi.fn(),
+  };
+}
+
 // Mock Phaser globals for unit tests (no real canvas/WebGL)
 const mockGameObjectFactory = {
   sprite: vi.fn(),
   graphics: vi.fn(() => createMockGraphics()),
   text: vi.fn(() => createMockText()),
-  container: vi.fn(),
+  container: vi.fn((x?: number, y?: number) => createMockContainer(x, y)),
   renderTexture: vi.fn(),
   tileSprite: vi.fn(),
   bitmapText: vi.fn(),
@@ -75,7 +89,7 @@ export const mockScene = {
   },
   tweens: { add: vi.fn() },
   time: { addEvent: vi.fn(), delayedCall: vi.fn() },
-  events: { on: vi.fn(), off: vi.fn(), emit: vi.fn() },
+  events: { on: vi.fn(), once: vi.fn(), off: vi.fn(), emit: vi.fn() },
   input: {
     on: vi.fn(),
     off: vi.fn(),

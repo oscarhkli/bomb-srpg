@@ -49,7 +49,9 @@ Additionally, `MatchScene` no longer needs to `console.log` the `roomId` and `pl
 
 In this game, `suddenDeath` is triggered when `startTurnResponse.inSuddenDeath` is true, which is from the response of `startTurn()`.
 
-In `StartTurn()`, backend calls `injectSuddenDeathHazards()`. As of Phase 3.5, 0-2 `bombPlacedEvents` will be returned. It's possible not to have any `bombPlacedEvents` received from the backend. As always, the frontend should trust what the backend provides.
+In `StartTurn()`, backend calls `injectSuddenDeathHazards()`. As of Phase 3.5, 0-2 `bombPlaced`-typed entries in `startTurnResponse.gameEvents` (referred to below as `bombPlacedEvents`) will be returned — from `startTurn()`, all `gameEvents` are `bombPlaced`. It's possible not to have any `bombPlacedEvents` received from the backend. As always, the frontend should trust what the backend provides.
+
+Because `injectSuddenDeathHazards()` has already committed these bombs server-side by the time `startTurn()`'s response returns, `MatchScene` must also refresh its tracked `GameState` via `getMatchState()` when `inSuddenDeath` is true — **before** rendering the cutscene/bomb-drop — so `gameState.bombs` includes them. This isn't just for rendering: a later `resolveTurn()` may report `bombCountdownUpdated`/`bombExploded` events referencing these bomb ids, and the client-side event validation checks those ids against the tracked `gameState.bombs`. Skipping this refresh leaves `gameState.bombs` stale and causes resolveTurn event validation to fail with an "unknown bombId" error.
 
 ### Visual Effect of Sudden Death
 
@@ -85,7 +87,7 @@ The section states the whole game loop as of Phase 3.5. `MatchScene` may have to
 5. Start the Game Loop:
     1.  **All user interactions disabled.**
     2. `getMatchState()`, `initToken()` and update `TurnPanel`. This is a per-turn **refresh** — whether it re-renders the board or only refreshes the interaction maps is the spec011 question noted above.
-    3. `startTurn()`: render the `TurnBanner`, and possibly the `SuddenDeathCutscene` + dropped `bombs` due to `suddenDeath`.
+    3. `startTurn()`: render the `TurnBanner`, and — if `inSuddenDeath` — refresh `gameState` via `getMatchState()` (see [Sudden Death](#sudden-death)) before rendering the `SuddenDeathCutscene` + dropped `bombs`.
     4. **All user interactions enabled.**
     5. (Optional) Player's interaction loop:
       1. If `move`, **All user interactions disabled.**. Then `move` the unit according to `unitMovedEvent`.
@@ -100,7 +102,7 @@ The section states the whole game loop as of Phase 3.5. `MatchScene` may have to
 ## Acceptance Criteria
 
 1. Given the `TurnBanner` is rendered, when `gameState.activeTeam` changes, then the fill color should match `TEAM_COLORS[activeTeam]`.
-2. Given `startTurnResponse.inSuddenDeath` is true, when `startTurn` renders, then the `SuddenDeathCutscene` should be shown, and `bombs` should drop from the sky according to the number of `bombPlacedEvents` received.
+2. Given `startTurnResponse.inSuddenDeath` is true, when `startTurn` renders, then the `SuddenDeathCutscene` should be shown, and `bombs` should drop from the sky according to the number of `bombPlaced`-typed entries in `startTurnResponse.gameEvents` (`bombPlacedEvents`) received.
 3. `roomId` and `playerTokens` shouldn't be seen in `console.log` again.
 4. Given a unit is moved in consecutive turns with no intervening grid change, when each turn's `unitMoved` renders, then the unit graphic ends centered on the tile reported by `gameState` for that turn.
 5. Given `startTurn` is in progress (the `TurnBanner`/`SuddenDeathCutscene` or bomb-drop playing), when the player clicks a unit or tile, then no handler fires; interactions re-enable only after the sequence completes.

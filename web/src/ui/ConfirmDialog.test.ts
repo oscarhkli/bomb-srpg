@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mockScene } from '../test/setup';
+import { allGraphics, clickPointerdown, firstText } from '../test/sceneHelpers';
 import {
   CONFIRM_DIALOG_DIM_ALPHA,
   CONFIRM_DIALOG_DIM_COLOR,
@@ -7,17 +8,6 @@ import {
   CONFIRM_DIALOG_HEIGHT,
 } from '../constants';
 import ConfirmDialog from './ConfirmDialog';
-
-function allGraphics(): ReturnType<typeof mockScene.add.graphics>[] {
-  return mockScene.add.graphics.mock.results.map(
-    r => r.value as ReturnType<typeof mockScene.add.graphics>
-  );
-}
-
-function clickPointerdown(g: ReturnType<typeof mockScene.add.graphics>): void {
-  const onPointerDown = g.on.mock.calls.find(call => call[0] === 'pointerdown')?.[1] as () => void;
-  onPointerDown();
-}
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -66,10 +56,7 @@ describe('ConfirmDialog', () => {
     dialog.show(vi.fn(), vi.fn(), 'Confirm?');
 
     allGraphics().forEach(g => expect(g.setScrollFactor).toHaveBeenCalledWith(0));
-    const promptText = mockScene.add.text.mock.results[0]!.value as ReturnType<
-      typeof mockScene.add.text
-    >;
-    expect(promptText.setScrollFactor).toHaveBeenCalledWith(0);
+    expect(firstText().setScrollFactor).toHaveBeenCalledWith(0);
   });
 
   it('invokes onYes and hides when the Yes button is clicked', () => {
