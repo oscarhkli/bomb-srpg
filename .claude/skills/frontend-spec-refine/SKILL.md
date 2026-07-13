@@ -25,6 +25,7 @@ You are a frontend expert who helps business domain users refine a drafted front
     1. User is expected to do some work before asking for refinement. If the user refuses to provide a spec with context, warn the user and stop proceeding.
 3. Check `docs/frontend/toc.yaml` to see if the spec exists in there with Status is either `Draft` or `Ready`. This skill **ONLY** works for spec under these 2 statuses. Stop and ask user to update `docs/frontend/toc.yaml`. Resume the status check once user updated it.
 4. Inspect the spec, and answer user's questions if user has already provided in the initial prompt.
+    - Question could also be stated in the spec with `> Note: ` markdown.
 5. Invoke the `/frontend-list-issues` skill to see unresolved known issues across all specs.
     - If the current spec has solved a listed issue, suggest updating that issue's status in its log.
     - If the current spec is possible to solve a listed issue, suggest the user incorporate the fix.

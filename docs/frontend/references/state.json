@@ -2,6 +2,7 @@
 {
   "turn": 1,
   "activeTeam": 1,
+  "inSuddenDeath": false,
   "grid": [
     [
       {
