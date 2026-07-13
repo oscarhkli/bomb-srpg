@@ -13,7 +13,6 @@ import {
   resolveTurn,
   surrender,
   getMatchConfig,
-  getVictoryResult,
   getAllowedTiles,
 } from './api';
 import { makeState, makeCfg, makeBombPlacedEvent } from '../test/fixtures';
@@ -299,29 +298,6 @@ describe('api.ts', () => {
       mockErr(404, 'match not found');
 
       await expect(getMatchConfig()).rejects.toThrow(ApiError);
-    });
-  });
-
-  describe('getVictoryResult', () => {
-    it('should GET and return events', async () => {
-      const fixture: GameEvent[] = [{ type: 'matchEnded', winnerTeamId: 1 }];
-      mockOk(200, fixture);
-
-      const result = await getVictoryResult();
-
-      expect(result).toEqual(fixture);
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/match-rooms/test-room-123/match/victory')
-      );
-    });
-
-    it('should throw ApiError with status 501 (not yet implemented)', async () => {
-      mockErr(501, 'not yet implemented');
-
-      const error = await getVictoryResult().catch((e: unknown) => e);
-      expect(error).toBeInstanceOf(ApiError);
-      expect((error as ApiError).status).toBe(501);
-      expect((error as ApiError).message).toContain('not yet implemented');
     });
   });
 

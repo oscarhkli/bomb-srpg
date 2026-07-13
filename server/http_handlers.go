@@ -361,13 +361,6 @@ func (h *Handler) HandleGetMatchConfig(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// HandleGetMatchVictoryResult gets the VictoryResult of the current Match in a given MatchRoom
-// TODO: Phase 3 frontend will determine what to provide
-func (h *Handler) HandleGetMatchVictoryResult(w http.ResponseWriter, r *http.Request) {
-	//roomID := r.PathValue("roomID")
-	http.Error(w, "not yet implemented", http.StatusNotImplemented)
-}
-
 // HandlesGetAllowedTiles gets the hints for Player to identify which tiles are available according to the TurnCmdAction
 func (h *Handler) HandleGetAllowedTiles(w http.ResponseWriter, r *http.Request) {
 	roomID := r.PathValue("roomID")

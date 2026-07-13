@@ -150,12 +150,6 @@ export async function getMatchConfig(): Promise<GameCfg> {
   return handleResponse<GameCfg>(res);
 }
 
-export async function getVictoryResult(): Promise<GameEvent[]> {
-  const roomId = requireRoomId();
-  const res = await fetch(buildUrl(`/api/match-rooms/${roomId}/match/victory`));
-  return handleResponse<GameEvent[]>(res);
-}
-
 export async function getAllowedTiles(req: AllowedTilesRequest): Promise<AllowedTilesResponse> {
   const roomId = requireRoomId();
   const query = {

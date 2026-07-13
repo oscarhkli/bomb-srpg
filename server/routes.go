@@ -14,6 +14,5 @@ func RegisterRoutes(mux *http.ServeMux, h *Handler) {
 	mux.HandleFunc("POST /api/match-rooms/{roomID}/match/resolve", h.HandleResolveTurn)
 	mux.HandleFunc("POST /api/match-rooms/{roomID}/match/surrender", h.HandleSurrender)
 	mux.HandleFunc("GET /api/match-rooms/{roomID}/match/config", h.HandleGetMatchConfig)
-	mux.HandleFunc("GET /api/match-rooms/{roomID}/match/victory", h.HandleGetMatchVictoryResult)
 	mux.HandleFunc("GET /api/match-rooms/{roomID}/match/allowed-tiles", h.HandleGetAllowedTiles)
 }
