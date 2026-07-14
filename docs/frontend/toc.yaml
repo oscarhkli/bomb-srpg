@@ -20,7 +20,7 @@ specs:
     category: MatchScene
     completion-date: 2026-07-12
   - file: match-p3-spec006.md
-    status: Draft
+    status: Ready
     category: MatchScene
     completion-date:
   - file: match-p3-spec007.md
