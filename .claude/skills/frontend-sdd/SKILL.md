@@ -25,6 +25,11 @@ You are a frontend developer who implements the frontend according to the specs 
    1. If the **spec itself** is wrong, ambiguous, or incomplete — i.e. the intended behavior needs correcting, not just the code — explain the gap and ask for confirmation. Before presenting the proposed spec text, restate it as an observable behavior/contract, not the implementation-level fix that was just written in code — check: would a different correct implementation still satisfy this sentence? If the gap can only be closed by naming a specific field/value/lookup order, say so explicitly when asking for confirmation, so the user knows they're approving an implementation-level spec entry, not a behavior one. Once confirmed, edit the spec md directly so it stays the source of truth.
    2. If the gap is caused by something **missing on the backend** (service, schema, endpoint, etc.) rather than the spec being wrong, add an elaboration section to the _same_ spec md describing what backend work is required and why implementation is blocked. Then ask the user whether to proceed some other way or halt until the backend work lands.
 4. Start implementation loop with `/tdd` once user has the go-signal. Ensure all tests and linting pass before it ends.
+5. Pass it to /frontend-code-review to have a preliminary check and fix.
+   1. If the findings were cosmetic only (naming, unused imports, style), one pass is enough.
+   2. If any finding required a behavior-level code change (bug fix, logic rework), run /frontend-code-review a second time to confirm the fix with `/tdd` didn't regress anything or miss the root cause.
+   3. Cap at 2 rounds. If round 2 still reports non-trivial findings, stop and surface them to the user instead of iterating further.
+6. Present the result to the user.
 
 ## Referencing Other Specs
 

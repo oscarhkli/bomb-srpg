@@ -1,12 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mockScene } from '../test/setup';
 import { firstGraphics as bannerGraphics, firstText as bannerText } from '../test/sceneHelpers';
-import {
-  TEAM_COLORS,
-  TURN_BANNER_FADE_MS,
-  TURN_BANNER_HOLD_MS,
-  DEPTH_TURN_BANNER,
-} from '../constants';
+import { TEAM_COLORS, FADE_MS, TURN_BANNER_HOLD_MS, DEPTH_TURN_BANNER } from '../constants';
 import TurnBanner from './TurnBanner';
 
 beforeEach(() => {
@@ -69,7 +64,7 @@ describe('TurnBanner', () => {
     void banner.play(1);
 
     expect(mockScene.tweens.add).toHaveBeenCalledWith(
-      expect.objectContaining({ duration: TURN_BANNER_FADE_MS, alpha: 1 })
+      expect.objectContaining({ duration: FADE_MS, alpha: 1 })
     );
 
     const fadeInCall = mockScene.tweens.add.mock.calls[0]![0] as { onComplete?: () => void };
@@ -84,7 +79,7 @@ describe('TurnBanner', () => {
     (holdCall[1] as () => void)();
 
     expect(mockScene.tweens.add).toHaveBeenCalledWith(
-      expect.objectContaining({ duration: TURN_BANNER_FADE_MS, alpha: 0 })
+      expect.objectContaining({ duration: FADE_MS, alpha: 0 })
     );
   });
 

@@ -15,6 +15,7 @@ import {
 import {
   TERRAIN_COLORS,
   TERRAIN_BORDER_COLOR,
+  TEAM_COLOR_FALLBACK,
   TEAM_COLORS,
   OCCUPANT_STROKE_COLOR,
   SOFTBLOCK_COLOR,
@@ -127,12 +128,12 @@ describe('renderBoard — units', () => {
     expect(mockScene.add.graphics).toHaveBeenCalledTimes(1);
   });
 
-  it('warns and falls back to white for an unconfigured team color', () => {
+  it('warns and falls back to TEAM_COLOR_FALLBACK for an unconfigured team color', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     renderBoard(ctx(), state([[plainTile()]], { units: [unit({ team: 99 })] }));
 
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('99'));
-    expect(occupantGraphics(0).fillStyle).toHaveBeenCalledWith(0xffffff);
+    expect(occupantGraphics(0).fillStyle).toHaveBeenCalledWith(TEAM_COLOR_FALLBACK);
     warnSpy.mockRestore();
   });
 

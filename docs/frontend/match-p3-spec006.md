@@ -89,7 +89,7 @@ Create a `MatchSettingScene` with a title `Match Settings`. This is just a stub 
 
 `MatchScene` fades out in **200ms**, and transits to `MatchSettingScene`.
 
-While `MatchScene` is fading out, the frontend should call `deleteMatch()` to perform the final cleanup. `MatchSettingScene` should lands on the canvas no matter if it's successful or not. Log the error in `console.log`.
+The 200ms fade-out and `deleteMatch()` start at the same time. The transition to `MatchSettingScene` waits for **both** to finish — the fade-out completing and the `deleteMatch()` request settling (success or failure) — so the fade is never cut short and `MatchSettingScene` never appears before the delete attempt has run its course. A failing `deleteMatch()` delays the transition until it settles, but never blocks it permanently: log the error (and its reason) via `console.error` and proceed to `MatchSettingScene` regardless of outcome.
 
 ---
 

@@ -8,6 +8,8 @@ import {
   submitTurnCommand,
   resolveTurn,
   startTurn,
+  rematch,
+  deleteMatch,
 } from '../engine/api';
 import TurnCommandPanel from '../ui/TurnCommandPanel';
 import ConfirmDialog from '../ui/ConfirmDialog';
@@ -15,6 +17,7 @@ import TurnPanel from '../ui/TurnPanel';
 import ErrorPanel from '../ui/ErrorPanel';
 import TurnBanner from '../ui/TurnBanner';
 import SuddenDeathCutscene from '../ui/SuddenDeathCutscene';
+import VictoryCutscene from '../ui/VictoryCutscene';
 import { drawPillButton } from '../ui/pillButton';
 import { destroyAll } from '../ui/gameObjectUtils';
 import { playResolveTurnEvents, type BombGraphics } from '../rendering/resolveTurnPlayer';
@@ -46,6 +49,7 @@ import {
   RESOLVE_BUTTON_HEIGHT,
   RESOLVE_BUTTON_MARGIN_TOP,
   RESOLVE_BUTTON_LABEL,
+  FADE_MS,
 } from '../constants';
 import type {
   Coordinate,
@@ -60,6 +64,9 @@ import type {
 export interface MatchSceneData {
   roomId: string;
   playerTokens: [string, string];
+  // Set when re-entering via Rematch: create() calls rematch() (same room, same gameCfg)
+  // before its usual getMatchState() bootstrap, and fades the scene back in.
+  isRematch?: boolean;
 }
 
 export default class MatchScene extends Phaser.Scene {
@@ -79,19 +86,34 @@ export default class MatchScene extends Phaser.Scene {
   private errorPanel!: ErrorPanel;
   private turnBanner!: TurnBanner;
   private suddenDeathCutscene!: SuddenDeathCutscene;
+  private victoryCutscene!: VictoryCutscene;
   private isSubmitting = false;
   private interactionsEnabled = false;
-  private destroyed = false;
+  // Guards VictoryCutscene's Rematch/Return buttons, which (unlike every other button in this
+  // scene) never destroy themselves after use — without this, a double-click would queue two
+  // scene.restart() calls or two deleteMatch()+scene.start() calls back-to-back.
+  private victoryActionTaken = false;
+  // Bumped by the 'shutdown' listener below every time the scene tears down. Async callbacks
+  // capture this value at their own start and compare it before touching scene state — a plain
+  // boolean can't tell "torn down, not yet recreated" apart from "torn down and recreated again",
+  // which is exactly what scene.restart() does for the rematch flow: it would reset a boolean
+  // back to false in the new create(), silently un-guarding the OLD create()'s still-pending
+  // fetch.
+  private generation = 0;
 
   constructor() {
     super('MatchScene');
   }
 
   create(data: MatchSceneData): void {
+    const gen = this.generation;
     this.roomId = data.roomId;
     this.playerTokens = data.playerTokens;
+    this.victoryActionTaken = false;
+    this.isSubmitting = false;
+    this.interactionsEnabled = false;
     this.events.once('shutdown', () => {
-      this.destroyed = true;
+      this.generation++;
     });
     initRoom(data.roomId);
     this.confirmDialog = new ConfirmDialog(this);
@@ -99,6 +121,7 @@ export default class MatchScene extends Phaser.Scene {
     this.errorPanel = new ErrorPanel(this);
     this.turnBanner = new TurnBanner(this);
     this.suddenDeathCutscene = new SuddenDeathCutscene(this);
+    this.victoryCutscene = new VictoryCutscene(this);
     this.turnCommandPanel = new TurnCommandPanel(this, {
       getAllowedTiles: (unitId, turnCmdType) => this.getAllowedTilesCached(unitId, turnCmdType),
       onError: message => this.showError(message),
@@ -108,8 +131,14 @@ export default class MatchScene extends Phaser.Scene {
       isConfirmOpen: () => this.confirmDialog.isOpen,
     });
 
-    getMatchState()
+    const bootstrap = data.isRematch ? rematch().then(() => undefined) : Promise.resolve();
+
+    bootstrap
+      .then(() => getMatchState())
       .then(state => {
+        if (gen !== this.generation) {
+          return;
+        }
         const { cols, rows } = this.renderBoard(state);
         this.cameras.main.centerOn((cols * TILE_SIZE) / 2, (rows * TILE_SIZE) / 2);
         this.renderResolveButton();
@@ -117,17 +146,30 @@ export default class MatchScene extends Phaser.Scene {
         void this.beginTurn();
       })
       .catch(() => {
+        if (gen !== this.generation) {
+          return;
+        }
         this.showError('Failed to load match state');
       });
 
     getMatchConfig()
       .then(cfg => {
+        if (gen !== this.generation) {
+          return;
+        }
         this.gameCfg = cfg;
         this.refreshTurnPanelIfReady();
       })
       .catch(() => {
+        if (gen !== this.generation) {
+          return;
+        }
         this.showError('Failed to load match config');
       });
+
+    if (data.isRematch) {
+      this.cameras.main.fadeIn(FADE_MS);
+    }
   }
 
   // gameState and gameCfg are fetched via two independent promise chains (kept separate so
@@ -138,16 +180,16 @@ export default class MatchScene extends Phaser.Scene {
     }
   }
 
-  // Per-turn startTurn() sequence (spec005 Game Loop 5.1-5.4): refresh state, init the active
-  // team's token, call startTurn(), play the sudden-death cutscene (if triggered) then the turn
-  // banner, all sequentially. All interactions are disabled for the duration so no click can
-  // race a turn transition (AC#5); re-enabled in `finally` so a failed startTurn() never
-  // deadlocks the scene.
+  // Per-turn startTurn() sequence: refresh state, init the active team's token, call startTurn(),
+  // play the sudden-death cutscene (if triggered) then the turn banner, all sequentially. All
+  // interactions are disabled for the duration so no click can race a turn transition; re-enabled
+  // in `finally` so a failed startTurn() never deadlocks the scene.
   private async beginTurn(): Promise<void> {
+    const gen = this.generation;
     this.interactionsEnabled = false;
     try {
       const state = await getMatchState();
-      if (this.destroyed) {
+      if (gen !== this.generation) {
         return;
       }
       this.gameState = state;
@@ -155,34 +197,36 @@ export default class MatchScene extends Phaser.Scene {
       this.refreshTurnPanelIfReady();
 
       const resp = await startTurn();
-      if (this.destroyed) {
+      if (gen !== this.generation) {
         return;
       }
       if (resp.inSuddenDeath) {
         // injectSuddenDeathHazards() has already committed the new bombs server-side by the
         // time startTurn() resolves, so refetching now keeps gameState.bombs in sync with what
         // dropSuddenDeathBomb() is about to render — otherwise a later resolveTurn() would
-        // reference a bombId this.gameState doesn't know about (spec005 gap).
+        // reference a bombId this.gameState doesn't know about.
         this.gameState = await getMatchState();
-        if (this.destroyed) {
+        if (gen !== this.generation) {
           return;
         }
         const bombPlacedEvents = resp.gameEvents.filter(event => event.type === 'bombPlaced');
         await this.suddenDeathCutscene.play(bombPlacedEvents, event =>
           this.dropSuddenDeathBomb(event)
         );
-        if (this.destroyed) {
+        if (gen !== this.generation) {
           return;
         }
       }
       await this.turnBanner.play(state.activeTeam);
     } catch (err) {
-      if (this.destroyed) {
+      if (gen !== this.generation) {
         return;
       }
       this.showError(err instanceof Error ? err.message : String(err));
     } finally {
-      this.interactionsEnabled = true;
+      if (gen === this.generation) {
+        this.interactionsEnabled = true;
+      }
     }
   }
 
@@ -250,12 +294,16 @@ export default class MatchScene extends Phaser.Scene {
     if (this.isSubmitting) {
       return;
     }
+    const gen = this.generation;
     this.isSubmitting = true;
     this.clearErrors();
     try {
       let applied: AppliedTurnResult | undefined;
       try {
         const gameEvents = await submitTurnCommand(cmd);
+        if (gen !== this.generation) {
+          return;
+        }
         this.allowedTilesCache.clear();
         this.turnCommandPanel.closeImmediately();
         for (const event of gameEvents) {
@@ -266,13 +314,21 @@ export default class MatchScene extends Phaser.Scene {
         }
         applied = extractAppliedTarget(cmd, gameEvents);
       } catch (err) {
+        if (gen !== this.generation) {
+          return;
+        }
         this.showError(err instanceof Error ? err.message : String(err));
         this.turnCommandPanel.closeImmediately();
       }
 
-      await this.refreshFinalSanityCheck(applied);
+      await this.refreshFinalSanityCheck(gen, applied);
+      if (gen !== this.generation) {
+        return;
+      }
     } finally {
-      this.isSubmitting = false;
+      if (gen === this.generation) {
+        this.isSubmitting = false;
+      }
     }
   }
 
@@ -340,9 +396,15 @@ export default class MatchScene extends Phaser.Scene {
     return true;
   }
 
-  private async refreshFinalSanityCheck(applied: AppliedTurnResult | undefined): Promise<void> {
+  private async refreshFinalSanityCheck(
+    gen: number,
+    applied: AppliedTurnResult | undefined
+  ): Promise<void> {
     try {
       const freshState = await getMatchState();
+      if (gen !== this.generation) {
+        return;
+      }
       if (!applied || !turnCommandTargetMatches(freshState, applied)) {
         this.showError('Match state is out of sync with the server');
         this.renderBoard(freshState);
@@ -350,6 +412,9 @@ export default class MatchScene extends Phaser.Scene {
         this.gameState = freshState;
       }
     } catch {
+      if (gen !== this.generation) {
+        return;
+      }
       this.showError('Failed to refresh match state');
     }
   }
@@ -400,12 +465,14 @@ export default class MatchScene extends Phaser.Scene {
     if (this.isSubmitting) {
       return;
     }
+    const gen = this.generation;
     this.isSubmitting = true;
     this.clearErrors();
+    let events: GameEvent[] = [];
     try {
       try {
-        const events = await resolveTurn();
-        if (this.destroyed) {
+        events = await resolveTurn();
+        if (gen !== this.generation) {
           return;
         }
         const { ok, done } = playResolveTurnEvents(events, {
@@ -418,31 +485,90 @@ export default class MatchScene extends Phaser.Scene {
         });
         if (ok) {
           await done;
-          if (this.destroyed) {
+          if (gen !== this.generation) {
             return;
           }
         }
       } catch (err) {
-        if (this.destroyed) {
+        if (gen !== this.generation) {
           return;
         }
         this.showError(err instanceof Error ? err.message : String(err));
       }
-      await this.refreshFinalSanityCheckAfterResolve();
-      if (this.destroyed) {
+      await this.refreshFinalSanityCheckAfterResolve(gen);
+      if (gen !== this.generation) {
         return;
       }
-      // Victory-check gating is spec006; for now every resolved turn loops back into the
-      // next turn's startTurn() sequence.
-      await this.beginTurn();
+      const matchEndedEvent = events.find(event => event.type === 'matchEnded');
+      if (matchEndedEvent) {
+        this.handleMatchEnded(matchEndedEvent);
+      } else {
+        await this.beginTurn();
+      }
     } finally {
-      this.isSubmitting = false;
+      if (gen === this.generation) {
+        this.isSubmitting = false;
+      }
     }
   }
 
-  private async refreshFinalSanityCheckAfterResolve(): Promise<void> {
+  // A missing/out-of-range winnerTeamId is a client-side integration bug: the match is over
+  // server-side regardless, so there's nothing safe to resume — show the error and stop.
+  private handleMatchEnded(event: GameEvent): void {
+    const { winnerTeamId } = event;
+    if (
+      winnerTeamId === undefined ||
+      (winnerTeamId !== -1 && (winnerTeamId < 1 || winnerTeamId > 2))
+    ) {
+      this.showError('Invalid matchEnded event received from server');
+      return;
+    }
+    // Permanently locked: the match is over, so interactions never need to re-enable.
+    this.interactionsEnabled = false;
+    this.victoryCutscene.play(winnerTeamId, {
+      onRematch: () => this.handleRematchClicked(),
+      onReturnToSettings: () => this.handleReturnToSettingsClicked(),
+    });
+  }
+
+  private handleRematchClicked(): void {
+    if (this.victoryActionTaken) {
+      return;
+    }
+    this.victoryActionTaken = true;
+    this.cameras.main.fadeOut(FADE_MS, 0, 0, 0);
+    this.cameras.main.once('camerafadeoutcomplete', () => {
+      this.scene.restart({
+        roomId: this.roomId,
+        playerTokens: this.playerTokens,
+        isRematch: true,
+      } satisfies MatchSceneData);
+    });
+  }
+
+  private handleReturnToSettingsClicked(): void {
+    if (this.victoryActionTaken) {
+      return;
+    }
+    this.victoryActionTaken = true;
+    const fadeDone = new Promise<void>(resolve => {
+      this.cameras.main.fadeOut(FADE_MS, 0, 0, 0);
+      this.cameras.main.once('camerafadeoutcomplete', () => resolve());
+    });
+    const deleteDone = deleteMatch().catch(err =>
+      console.error('Failed to delete match:', err instanceof Error ? err.message : err)
+    );
+    void Promise.all([fadeDone, deleteDone]).then(() => {
+      this.scene.start('MatchSettingScene');
+    });
+  }
+
+  private async refreshFinalSanityCheckAfterResolve(gen: number): Promise<void> {
     try {
       const freshState = await getMatchState();
+      if (gen !== this.generation) {
+        return;
+      }
       if (
         !occupantsMatch(
           freshState,
@@ -457,6 +583,9 @@ export default class MatchScene extends Phaser.Scene {
       this.turnPanel.update(freshState.turn, this.gameCfg.maxTurns, freshState.activeTeam);
       this.renderResolveButton();
     } catch {
+      if (gen !== this.generation) {
+        return;
+      }
       this.showError('Failed to refresh match state');
     }
   }

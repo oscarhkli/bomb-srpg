@@ -1,5 +1,15 @@
 import type { TerrainType } from './types/api';
 
+// Shared across multiple components (not scoped to any single one below).
+// Fallback color whenever a team ID isn't in TEAM_COLORS — used both for a genuine
+// "unconfigured team" bug guard (TurnBanner, TurnPanel, boardRenderer) and for VictoryCutscene's
+// draw case (winnerTeamId -1, which is never a TEAM_COLORS key by construction).
+export const TEAM_COLOR_FALLBACK = 0x4c4c4c;
+// Duration for every fade in/out in this UI (TurnBanner, VictoryCutscene, MatchScene's
+// rematch/return-to-settings camera transitions) — 200ms unless a specific effect calls for
+// something else.
+export const FADE_MS = 200;
+
 export const TILE_SIZE = 48;
 
 export const TERRAIN_COLORS: Record<TerrainType, number> = {
@@ -29,7 +39,7 @@ export const OCCUPANT_ICON_RADIUS = 10;
 export const OCCUPANT_ICON_STROKE_WIDTH = 2;
 
 // Depth (z-order) bands — explicit rather than relying on Phaser's creation-order default,
-// since spec003 introduces overlays/panels/dialogs that must render above the board contents.
+// since overlays/panels/dialogs must render above the board contents.
 export const DEPTH_GRID = 0;
 export const DEPTH_OCCUPANT = 10;
 export const DEPTH_ALLOWED_TILE_OVERLAY = 20;
@@ -98,17 +108,31 @@ export const ERROR_PANEL_BG_ALPHA = 0.75;
 export const TURN_BANNER_HEIGHT = 144;
 export const TURN_BANNER_FONT_SIZE = 48;
 export const TURN_BANNER_TEXT_COLOR = 0xffffff;
-export const TURN_BANNER_FADE_MS = 200;
 export const TURN_BANNER_HOLD_MS = 2000;
 
-// SuddenDeathCutscene (timing values are provisional per spec005 note, easy to tune later)
+// SuddenDeathCutscene
 export const SUDDEN_DEATH_CUTSCENE_DURATION_MS = 3000;
 export const SUDDEN_DEATH_PULSE_HALF_MS = 250;
 export const SUDDEN_DEATH_PULSE_PEAK_ALPHA = 0.9;
 export const SUDDEN_DEATH_BOMB_DROP_DELAY_MS = 2000;
 export const SUDDEN_DEATH_BOMB_DROP_DURATION_MS = 2000;
 
-// Depth bands above DEPTH_ERROR_PANEL for spec005's turn-transition overlays.
+// Depth bands above DEPTH_ERROR_PANEL
 export const DEPTH_SUDDEN_DEATH_OVERLAY = 60;
 export const DEPTH_SUDDEN_DEATH_BOMB = 65;
 export const DEPTH_TURN_BANNER = 70;
+
+// VictoryCutscene — above every other overlay, since it's the terminal screen.
+export const DEPTH_VICTORY_CUTSCENE = 80;
+// Named by size tier, not line position: the draw case's single "Draw Game" line uses the
+// TITLE size, matching the non-draw case's 2nd (bigger) line, not a literal "line 2".
+export const VICTORY_SUBTITLE_FONT_SIZE = 36;
+export const VICTORY_TITLE_FONT_SIZE = 48;
+// Vertical offset of each text line's center from the banner's own vertical center.
+export const VICTORY_SUBTITLE_OFFSET_Y = -24;
+export const VICTORY_TITLE_OFFSET_Y = 24;
+// "Winner..." sits slightly left of dead-center, as a fraction of the canvas width;
+// "Player {X}!" stays fully centered.
+export const VICTORY_SUBTITLE_X_SHIFT_RATIO = 0.05;
+export const VICTORY_BUTTON_DELAY_MS = 2000;
+export const VICTORY_BUTTON_GAP = 16;

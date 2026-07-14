@@ -6,6 +6,7 @@ import {
   TILE_SIZE,
   TERRAIN_COLORS,
   TERRAIN_BORDER_COLOR,
+  TEAM_COLOR_FALLBACK,
   TEAM_COLORS,
   UNIT_SIZE,
   OCCUPANT_STROKE_COLOR,
@@ -89,9 +90,11 @@ function renderUnits(ctx: BoardRenderContext, units: Unit[]): void {
       ctx.unitGraphicsById.set(unit.id, g);
       const teamColor = TEAM_COLORS[unit.team];
       if (teamColor === undefined) {
-        console.warn(`Unit ${unit.id} has unconfigured team ${unit.team}, rendering as white`);
+        console.warn(
+          `Unit ${unit.id} has unconfigured team ${unit.team}, rendering as fallback grey`
+        );
       }
-      g.fillStyle(teamColor ?? 0xffffff);
+      g.fillStyle(teamColor ?? TEAM_COLOR_FALLBACK);
       g.fillRect(cx - UNIT_SIZE / 2, cy - UNIT_SIZE / 2, UNIT_SIZE, UNIT_SIZE);
       drawArchetypeIcon(g, unit.type, cx, cy);
       attachUnitClickHandler(ctx, g, unit);

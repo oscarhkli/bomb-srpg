@@ -7,6 +7,7 @@ import {
   flush,
   tweenConfigAt,
   fireShutdown,
+  fireCameraFadeOutComplete,
 } from '../test/sceneHelpers';
 import { makeCfg, makeState, plainTile, tileOf, makeUnit, makeBomb } from '../test/fixtures';
 import {
@@ -18,10 +19,13 @@ import {
   submitTurnCommand,
   resolveTurn,
   startTurn,
+  rematch,
+  deleteMatch,
 } from '../engine/api';
 import { playResolveTurnEvents } from '../rendering/resolveTurnPlayer';
 import TurnBanner from '../ui/TurnBanner';
 import SuddenDeathCutscene from '../ui/SuddenDeathCutscene';
+import VictoryCutscene from '../ui/VictoryCutscene';
 import MatchScene, { type MatchSceneData } from './MatchScene';
 import type { Coordinate, GameCfg, GameEvent, GameState, Tile } from '../types/api';
 import {
@@ -34,6 +38,7 @@ vi.mock('../engine/api');
 vi.mock('../rendering/resolveTurnPlayer');
 vi.mock('../ui/TurnBanner');
 vi.mock('../ui/SuddenDeathCutscene');
+vi.mock('../ui/VictoryCutscene');
 
 // Queues getMatchState() resolutions across the whole per-turn lifecycle: call 1 is the
 // initial board render in create(), call 2 is beginTurn()'s own per-turn refresh (fires
@@ -97,9 +102,10 @@ async function submitViaUI(
 
 // vi.spyOn(Class.prototype, 'method') avoids referencing `Class.prototype.method` as a bare
 // value (which trips @typescript-eslint/unbound-method) while still giving a MockInstance for
-// assertions/call-order checks on the automocked TurnBanner/SuddenDeathCutscene.
+// assertions/call-order checks on the automocked TurnBanner/SuddenDeathCutscene/VictoryCutscene.
 let turnBannerPlay: MockInstance<TurnBanner['play']>;
 let suddenDeathCutscenePlay: MockInstance<SuddenDeathCutscene['play']>;
+let victoryCutscenePlay: MockInstance<VictoryCutscene['play']>;
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -110,6 +116,7 @@ beforeEach(() => {
   suddenDeathCutscenePlay = vi
     .spyOn(SuddenDeathCutscene.prototype, 'play')
     .mockResolvedValue(undefined);
+  victoryCutscenePlay = vi.spyOn(VictoryCutscene.prototype, 'play').mockReturnValue(undefined);
 });
 
 describe('MatchScene', () => {
@@ -123,7 +130,7 @@ describe('MatchScene', () => {
     expect(getMatchState).toHaveBeenCalledTimes(2);
   });
 
-  it('never logs roomId or playerTokens to the console (AC#3)', async () => {
+  it('never logs roomId or playerTokens to the console', async () => {
     const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
     queueMatchStates(makeState({ grid: [[plainTile()]] }));
 
@@ -895,7 +902,7 @@ describe('MatchScene', () => {
     expect(staleErrorText.destroy).toHaveBeenCalled();
   });
 
-  describe('startTurn sequence (spec005)', () => {
+  describe('startTurn sequence', () => {
     it('calls getMatchState -> initToken -> startTurn -> TurnBanner.play in order for a normal turn', async () => {
       queueMatchStates(makeState({ grid: [[plainTile()]], activeTeam: 1 }));
 
@@ -1093,6 +1100,204 @@ describe('MatchScene', () => {
       await flush();
 
       expect(turnBannerPlay).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('victory cutscene and rematch', () => {
+    // winnerTeamId omitted entirely simulates the server sending a matchEnded event with no
+    // winnerTeamId field at all (missing, not just out-of-range).
+    async function resolveWithMatchEnded(winnerTeamId?: number): Promise<void> {
+      await setUpEmptyBoardAndClickResolve();
+      const event: GameEvent =
+        winnerTeamId === undefined ? { type: 'matchEnded' } : { type: 'matchEnded', winnerTeamId };
+      vi.mocked(resolveTurn).mockResolvedValue([event]);
+
+      const [, yesButtonGraphics] = mockScene.add.graphics.mock.results
+        .slice(-3)
+        .map(r => r.value as ReturnType<typeof mockScene.add.graphics>);
+      pointerDownOf(yesButtonGraphics!)();
+      await flush();
+    }
+
+    it.each([1, 2, -1])(
+      'renders VictoryCutscene(%i) instead of looping into another beginTurn when resolveTurn reports matchEnded',
+      async winnerTeamId => {
+        await resolveWithMatchEnded(winnerTeamId);
+
+        expect(victoryCutscenePlay).toHaveBeenCalledWith(winnerTeamId, expect.any(Object));
+        // Only one startTurn() call (the very first turn) — no second beginTurn() ran.
+        expect(startTurn).toHaveBeenCalledTimes(1);
+      }
+    );
+
+    it.each([
+      ['out of range', 3],
+      ['missing', undefined],
+    ])(
+      'shows an error and does not render VictoryCutscene when winnerTeamId is %s',
+      async (_label, winnerTeamId) => {
+        await resolveWithMatchEnded(winnerTeamId);
+
+        expect(victoryCutscenePlay).not.toHaveBeenCalled();
+        expect(mockScene.add.text).toHaveBeenCalledWith(
+          expect.any(Number),
+          expect.any(Number),
+          'Invalid matchEnded event received from server',
+          expect.objectContaining({})
+        );
+      }
+    );
+
+    it('permanently disables unit-click and resolve-button interactions once the match has ended', async () => {
+      const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
+      queueMatchStates(makeState({ grid: [[plainTile()]], activeTeam: 1, units: [unit] }));
+      await bootScene();
+      vi.mocked(resolveTurn).mockResolvedValue([{ type: 'matchEnded', winnerTeamId: 1 }]);
+
+      pointerDownOf(resolveButtonGraphics(1))();
+      const [, yesButtonGraphics] = mockScene.add.graphics.mock.results
+        .slice(-3)
+        .map(r => r.value as ReturnType<typeof mockScene.add.graphics>);
+      pointerDownOf(yesButtonGraphics!)();
+      await flush();
+
+      const graphicsBefore = mockScene.add.graphics.mock.calls.length;
+      pointerDownOf(occupantGraphics(0))();
+      expect(mockScene.add.graphics.mock.calls.length).toBe(graphicsBefore);
+    });
+
+    it('rematch: fades out, then restarts the scene with the same roomId/playerTokens and isRematch=true', async () => {
+      await resolveWithMatchEnded(1);
+
+      const onRematch = victoryCutscenePlay.mock.calls[0]![1].onRematch;
+      onRematch();
+
+      expect(mockScene.cameras.main.fadeOut).toHaveBeenCalledWith(200, 0, 0, 0);
+      expect(mockScene.scene.restart).not.toHaveBeenCalled();
+
+      fireCameraFadeOutComplete();
+
+      expect(mockScene.scene.restart).toHaveBeenCalledWith({
+        roomId: 'room-abc',
+        playerTokens: ['team1-token', 'team2-token'],
+        isRematch: true,
+      });
+    });
+
+    it('create() calls rematch() before getMatchState() and fades back in when isRematch is true', async () => {
+      queueMatchStates(makeState({ grid: [[plainTile()]] }));
+      vi.mocked(rematch).mockResolvedValue({ success: true, playerTokens: ['t1', 't2'] });
+
+      await bootScene({ isRematch: true });
+
+      expect(rematch).toHaveBeenCalledOnce();
+      expect(getMatchState).toHaveBeenCalled();
+      expect(mockScene.cameras.main.fadeIn).toHaveBeenCalledWith(200);
+    });
+
+    it('does not call rematch() on a normal (non-rematch) create()', async () => {
+      queueMatchStates(makeState({ grid: [[plainTile()]] }));
+
+      await bootScene();
+
+      expect(rematch).not.toHaveBeenCalled();
+      expect(mockScene.cameras.main.fadeIn).not.toHaveBeenCalled();
+    });
+
+    it('return to settings: fades out and calls deleteMatch() concurrently, then starts MatchSettingScene once both settle', async () => {
+      let resolveDelete: () => void = () => undefined;
+      vi.mocked(deleteMatch).mockReturnValue(
+        new Promise<void>(resolve => {
+          resolveDelete = resolve;
+        })
+      );
+      await resolveWithMatchEnded(1);
+
+      const onReturnToSettings = victoryCutscenePlay.mock.calls[0]![1].onReturnToSettings;
+      onReturnToSettings();
+
+      expect(mockScene.cameras.main.fadeOut).toHaveBeenCalledWith(200, 0, 0, 0);
+      expect(deleteMatch).toHaveBeenCalledOnce();
+      expect(mockScene.scene.start).not.toHaveBeenCalled();
+
+      fireCameraFadeOutComplete();
+      await flush();
+      expect(mockScene.scene.start).not.toHaveBeenCalled(); // fade done, but deleteMatch() hasn't settled yet
+
+      resolveDelete();
+      await flush();
+
+      expect(mockScene.scene.start).toHaveBeenCalledWith('MatchSettingScene');
+    });
+
+    it('logs the failure reason via console.error and still starts MatchSettingScene when deleteMatch() rejects', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      vi.mocked(deleteMatch).mockRejectedValue(new Error('delete failed'));
+      await resolveWithMatchEnded(1);
+
+      const onReturnToSettings = victoryCutscenePlay.mock.calls[0]![1].onReturnToSettings;
+      onReturnToSettings();
+      fireCameraFadeOutComplete();
+      await flush();
+
+      expect(consoleSpy).toHaveBeenCalledWith('Failed to delete match:', 'delete failed');
+      expect(mockScene.scene.start).toHaveBeenCalledWith('MatchSettingScene');
+      consoleSpy.mockRestore();
+    });
+
+    it('ignores a second Rematch click while the first fade-out/restart is already in progress', async () => {
+      await resolveWithMatchEnded(1);
+
+      const onRematch = victoryCutscenePlay.mock.calls[0]![1].onRematch;
+      onRematch();
+      onRematch();
+
+      expect(mockScene.cameras.main.fadeOut).toHaveBeenCalledTimes(1);
+      fireCameraFadeOutComplete();
+      expect(mockScene.scene.restart).toHaveBeenCalledTimes(1);
+    });
+
+    it('ignores a second Return-to-Settings click while the first fade-out/delete is already in progress', async () => {
+      await resolveWithMatchEnded(1);
+
+      const onReturnToSettings = victoryCutscenePlay.mock.calls[0]![1].onReturnToSettings;
+      onReturnToSettings();
+      onReturnToSettings();
+
+      expect(mockScene.cameras.main.fadeOut).toHaveBeenCalledTimes(1);
+      expect(deleteMatch).toHaveBeenCalledTimes(1);
+      fireCameraFadeOutComplete();
+      await flush();
+      expect(mockScene.scene.start).toHaveBeenCalledTimes(1);
+    });
+
+    it('a stale getMatchState() fetch from before a rematch restart does not touch the new scene once it resolves', async () => {
+      let resolveStaleState: (state: GameState) => void = () => undefined;
+      vi.mocked(getMatchState).mockReturnValueOnce(
+        new Promise<GameState>(resolve => {
+          resolveStaleState = resolve;
+        })
+      );
+
+      const scene = new MatchScene();
+      scene.create({ roomId: 'room-abc', playerTokens: ['t1', 't2'] });
+      await flush();
+
+      // Simulate scene.restart(): shutdown fires (bumping generation), then create() runs again.
+      fireShutdown();
+      queueMatchStates(makeState({ grid: [[plainTile()]] }));
+      scene.create({ roomId: 'room-abc', playerTokens: ['t1', 't2'], isRematch: true });
+      await flush();
+
+      const centerOnCallsBeforeStaleResolve = mockScene.cameras.main.centerOn.mock.calls.length;
+      resolveStaleState(makeState({ grid: [[plainTile(), plainTile()]] }));
+      await flush();
+
+      // The stale fetch's own board dimensions (2 cols) never reach centerOn — no new call at all
+      // from it, since it bails out on the generation mismatch.
+      expect(mockScene.cameras.main.centerOn.mock.calls.length).toBe(
+        centerOnCallsBeforeStaleResolve
+      );
     });
   });
 });

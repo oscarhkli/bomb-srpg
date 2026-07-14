@@ -87,6 +87,13 @@ export function fireShutdown(): void {
   (call?.[1] as (() => void) | undefined)?.();
 }
 
+// Finds and invokes the camera's 'camerafadeoutcomplete' listener registered via
+// this.cameras.main.once(...), simulating a fadeOut() finishing.
+export function fireCameraFadeOutComplete(): void {
+  const call = mockScene.cameras.main.once.mock.calls.find(c => c[0] === 'camerafadeoutcomplete');
+  (call?.[1] as (() => void) | undefined)?.();
+}
+
 export function makeBombGraphics(): BombGraphics {
   return {
     container: createMockContainer() as never,
