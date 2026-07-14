@@ -2,9 +2,9 @@ import Phaser from 'phaser';
 import { GAME_FONT_FAMILY } from '../constants';
 
 // Stub scene: a rough landing page for scene entry. A concrete version will replace it later.
-export default class MatchSettingScene extends Phaser.Scene {
+export default class MatchSettingsScene extends Phaser.Scene {
   constructor() {
-    super('MatchSettingScene');
+    super('MatchSettingsScene');
   }
 
   create(): void {

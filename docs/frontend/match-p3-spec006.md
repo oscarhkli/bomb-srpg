@@ -12,14 +12,14 @@ Phase 3.5 implements the full game cycle of a match, but when the match conclude
 
 - Render `VictoryCutscene` when the match ends.
 - Add `rematchButton` to restart a match.
-- Initiate a plain `MatchSettingScene`.
-- Add `returnMatchSettingsButton` to return to `MatchSettingScene`.
+- Initiate a plain `MatchSettingsScene`.
+- Add `returnMatchSettingsButton` to return to `MatchSettingsScene`.
 
 ## Non-Goal
 
 - Polished animations or tweens (easing curves, squash/stretch, particle effects, etc.).
 - HUD / status panel.
-- Detailed implementation of `MatchSettingScene` - a rough page for scene entry is acceptable.
+- Detailed implementation of `MatchSettingsScene` - a rough page for scene entry is acceptable.
 
 ## Scene Entry
 
@@ -85,11 +85,11 @@ The buttons should be rendered **2s** after the rest of `VictoryCutscene` is ren
 
 ## Return to Match Settings
 
-Create a `MatchSettingScene` with a title `Match Settings`. This is just a stub scene. The concrete one will be implement in `stage-p3-spec001.md`.
+Create a `MatchSettingsScene` with a title `Match Settings`. This is just a stub scene. The concrete one will be implement in `stage-p3-spec001.md`.
 
-`MatchScene` fades out in **200ms**, and transits to `MatchSettingScene`.
+`MatchScene` fades out in **200ms**, and transits to `MatchSettingsScene`.
 
-The 200ms fade-out and `deleteMatch()` start at the same time. The transition to `MatchSettingScene` waits for **both** to finish — the fade-out completing and the `deleteMatch()` request settling (success or failure) — so the fade is never cut short and `MatchSettingScene` never appears before the delete attempt has run its course. A failing `deleteMatch()` delays the transition until it settles, but never blocks it permanently: log the error (and its reason) via `console.error` and proceed to `MatchSettingScene` regardless of outcome.
+The 200ms fade-out and `deleteMatch()` start at the same time. The transition to `MatchSettingsScene` waits for **both** to finish — the fade-out completing and the `deleteMatch()` request settling (success or failure) — so the fade is never cut short and `MatchSettingsScene` never appears before the delete attempt has run its course. A failing `deleteMatch()` delays the transition until it settles, but never blocks it permanently: log the error (and its reason) via `console.error` and proceed to `MatchSettingsScene` regardless of outcome.
 
 ---
 
@@ -100,6 +100,6 @@ The 200ms fade-out and `deleteMatch()` start at the same time. The transition to
 3. Given `resolveTurn()` contains `matchEndedEvent` with `winnerTeamId == -1`, `VictoryCutscene` should be render in grey and display the information that the game is draw.
 4. Given `VictoryCutscene` appears, Player cannot click anything except the buttons in `VictoryCutscene`.
 5. When Player clicks `rematchButton`, the match should be restarted, with the same `gameCfg`.
-6. When Player clicks `returnMatchSettingsButton`, the match should be deleted, with a smooth transition to `MatchSettingScene`.
+6. When Player clicks `returnMatchSettingsButton`, the match should be deleted, with a smooth transition to `MatchSettingsScene`.
 7. Given `resolveTurn()` contains `matchEndedEvent` with a missing or out-of-range `winnerTeamId` (i.e. not `-1` and not `1 <= winnerTeamId <= 2`), `ErrorPanel` should show the error and `VictoryCutscene` should not be rendered.
-8. Given `deleteMatch()` rejects while transitioning to `MatchSettingScene`, the error should be logged and `MatchSettingScene` should still load.
+8. Given `deleteMatch()` rejects while transitioning to `MatchSettingsScene`, the error should be logged and `MatchSettingsScene` should still load.

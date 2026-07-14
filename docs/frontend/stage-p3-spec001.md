@@ -1,8 +1,8 @@
 ---
-title: "Phase 3.6: Victory Cutscene"
+title: "Phase 3.8: Match Settings Scene"
 ---
 
-# Victory Cutscene
+# Match Settings Scene
 
 ## Context
 

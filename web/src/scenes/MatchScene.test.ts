@@ -1204,7 +1204,7 @@ describe('MatchScene', () => {
       expect(mockScene.cameras.main.fadeIn).not.toHaveBeenCalled();
     });
 
-    it('return to settings: fades out and calls deleteMatch() concurrently, then starts MatchSettingScene once both settle', async () => {
+    it('return to settings: fades out and calls deleteMatch() concurrently, then starts MatchSettingsScene once both settle', async () => {
       let resolveDelete: () => void = () => undefined;
       vi.mocked(deleteMatch).mockReturnValue(
         new Promise<void>(resolve => {
@@ -1227,10 +1227,10 @@ describe('MatchScene', () => {
       resolveDelete();
       await flush();
 
-      expect(mockScene.scene.start).toHaveBeenCalledWith('MatchSettingScene');
+      expect(mockScene.scene.start).toHaveBeenCalledWith('MatchSettingsScene');
     });
 
-    it('logs the failure reason via console.error and still starts MatchSettingScene when deleteMatch() rejects', async () => {
+    it('logs the failure reason via console.error and still starts MatchSettingsScene when deleteMatch() rejects', async () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
       vi.mocked(deleteMatch).mockRejectedValue(new Error('delete failed'));
       await resolveWithMatchEnded(1);
@@ -1241,7 +1241,7 @@ describe('MatchScene', () => {
       await flush();
 
       expect(consoleSpy).toHaveBeenCalledWith('Failed to delete match:', 'delete failed');
-      expect(mockScene.scene.start).toHaveBeenCalledWith('MatchSettingScene');
+      expect(mockScene.scene.start).toHaveBeenCalledWith('MatchSettingsScene');
       consoleSpy.mockRestore();
     });
 

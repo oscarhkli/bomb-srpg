@@ -142,7 +142,7 @@ Surrender: `POST /surrender` (either team, any time).
   - **Tiles**: Colored rectangles with borders.
   - **Units**: Geometric shapes (circles, triangles, pentagons, stars) tinted by team color.
   - **Bombs**: Filled circles with countdown text overlay.
-  - **Soft Walls**: Rounded rectangles.
+  - **Soft Blocks**: Rounded rectangles.
   - **Explosions**: Tile color flash effect (simple visual feedback).
 
 

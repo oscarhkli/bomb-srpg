@@ -559,7 +559,7 @@ export default class MatchScene extends Phaser.Scene {
       console.error('Failed to delete match:', err instanceof Error ? err.message : err)
     );
     void Promise.all([fadeDone, deleteDone]).then(() => {
-      this.scene.start('MatchSettingScene');
+      this.scene.start('MatchSettingsScene');
     });
   }
 

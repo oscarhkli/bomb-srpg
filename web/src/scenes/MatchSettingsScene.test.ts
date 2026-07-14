@@ -1,15 +1,15 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mockScene } from '../test/setup';
 import { firstText } from '../test/sceneHelpers';
-import MatchSettingScene from './MatchSettingScene';
+import MatchSettingsScene from './MatchSettingsScene';
 
 beforeEach(() => {
   vi.clearAllMocks();
 });
 
-describe('MatchSettingScene', () => {
+describe('MatchSettingsScene', () => {
   it('renders a centered "Match Settings" title', () => {
-    const scene = new MatchSettingScene();
+    const scene = new MatchSettingsScene();
 
     scene.create();
 
