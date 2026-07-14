@@ -235,7 +235,7 @@ func TestTerminalView_RenderGameEvents(t *testing.T) {
 
 		events := []engine.GameEvent{
 			engine.NewUnitMovedEvent(16, engine.Coordinate{X: 1, Y: 2}, engine.Coordinate{X: 2, Y: 2}),
-			engine.NewMatchEndedEvent(1, false),
+			engine.NewMatchEndedEvent(1),
 		}
 
 		err := view.RenderGameEvents(events)

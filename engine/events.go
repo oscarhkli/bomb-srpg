@@ -38,7 +38,6 @@ type GameEvent struct {
 	Countdown         int          `json:"countdown"`
 	AffectedPositions []Coordinate `json:"affectedPositions,omitempty"`
 	WinnerTeamID      int          `json:"winnerTeamId,omitempty"`
-	IsDraw            bool         `json:"isDraw,omitempty"`
 }
 
 // NewUnitMovedEvent creates a unit moved event.
@@ -77,6 +76,6 @@ func NewSoftBlockDestroyedEvent(id int, pos Coordinate) GameEvent {
 }
 
 // NewMatchEndedEvent creates a match ended event.
-func NewMatchEndedEvent(winnerTeamID int, isDraw bool) GameEvent {
-	return GameEvent{Type: GameEvtMatchEnded, WinnerTeamID: winnerTeamID, IsDraw: isDraw}
+func NewMatchEndedEvent(winnerTeamID int) GameEvent {
+	return GameEvent{Type: GameEvtMatchEnded, WinnerTeamID: winnerTeamID}
 }

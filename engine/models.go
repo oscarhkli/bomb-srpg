@@ -299,13 +299,9 @@ type Match struct {
 	WinnerTeamID int         // 0 = in progress, 1/2 = winner, -1 = draw
 }
 
-// VictoryResult represents the outcome of a victory check.
-type VictoryResult int
-
 const (
-	MatchInProgress VictoryResult = iota
-	MatchWin
-	MatchDraw
+	MatchInProgress = 0
+	MatchDrawn      = -1
 )
 
 // StepPattern defines the movement topology.

@@ -118,8 +118,8 @@ func TestMatch_Surrender(t *testing.T) {
 			for _, event := range events {
 				if event.Type == GameEvtMatchEnded {
 					foundEndedEvent = true
-					if event.WinnerTeamID != tt.winnerTeamID || event.IsDraw {
-						t.Errorf("Malformed MatchEndedEvent! Got winner %d, draw %t", event.WinnerTeamID, event.IsDraw)
+					if event.WinnerTeamID != tt.winnerTeamID {
+						t.Errorf("Malformed MatchEndedEvent! Got winner %d", event.WinnerTeamID)
 					}
 				}
 			}
@@ -1427,7 +1427,6 @@ func TestMatch_Resolve_VictoryCondition_Suite(t *testing.T) {
 		p1NonKings          [4]bool
 		p2King              bool
 		p2NonKings          [4]bool
-		expectedResult      VictoryResult
 		expectedWinningTeam int
 	}{
 		{
@@ -1436,8 +1435,7 @@ func TestMatch_Resolve_VictoryCondition_Suite(t *testing.T) {
 			p1NonKings:          [4]bool{true, true, false, true},
 			p2King:              true,
 			p2NonKings:          [4]bool{true, true, false, false},
-			expectedResult:      MatchInProgress,
-			expectedWinningTeam: 0,
+			expectedWinningTeam: MatchInProgress,
 		},
 		// P1 Wins
 		{
@@ -1446,7 +1444,6 @@ func TestMatch_Resolve_VictoryCondition_Suite(t *testing.T) {
 			p1NonKings:          [4]bool{true, true, false, true},
 			p2King:              true,
 			p2NonKings:          [4]bool{false, false, false, false},
-			expectedResult:      MatchWin,
 			expectedWinningTeam: 1,
 		},
 		{
@@ -1455,7 +1452,6 @@ func TestMatch_Resolve_VictoryCondition_Suite(t *testing.T) {
 			p1NonKings:          [4]bool{true, true, false, true},
 			p2King:              false,
 			p2NonKings:          [4]bool{true, false, false, false},
-			expectedResult:      MatchWin,
 			expectedWinningTeam: 1,
 		},
 		{
@@ -1464,7 +1460,6 @@ func TestMatch_Resolve_VictoryCondition_Suite(t *testing.T) {
 			p1NonKings:          [4]bool{true, true, false, true},
 			p2King:              false,
 			p2NonKings:          [4]bool{false, false, false, false},
-			expectedResult:      MatchWin,
 			expectedWinningTeam: 1,
 		},
 		{
@@ -1473,7 +1468,6 @@ func TestMatch_Resolve_VictoryCondition_Suite(t *testing.T) {
 			p1NonKings:          [4]bool{false, false, false, false},
 			p2King:              false,
 			p2NonKings:          [4]bool{false, false, false, false},
-			expectedResult:      MatchWin,
 			expectedWinningTeam: 1,
 		},
 		// P2 Wins
@@ -1483,7 +1477,6 @@ func TestMatch_Resolve_VictoryCondition_Suite(t *testing.T) {
 			p1NonKings:          [4]bool{false, false, false, false},
 			p2King:              true,
 			p2NonKings:          [4]bool{true, true, false, true},
-			expectedResult:      MatchWin,
 			expectedWinningTeam: 2,
 		},
 		{
@@ -1492,7 +1485,6 @@ func TestMatch_Resolve_VictoryCondition_Suite(t *testing.T) {
 			p1NonKings:          [4]bool{true, true, false, true},
 			p2King:              true,
 			p2NonKings:          [4]bool{true, false, false, false},
-			expectedResult:      MatchWin,
 			expectedWinningTeam: 2,
 		},
 		{
@@ -1501,7 +1493,6 @@ func TestMatch_Resolve_VictoryCondition_Suite(t *testing.T) {
 			p1NonKings:          [4]bool{false, false, false, false},
 			p2King:              true,
 			p2NonKings:          [4]bool{true, true, false, true},
-			expectedResult:      MatchWin,
 			expectedWinningTeam: 2,
 		},
 		{
@@ -1510,7 +1501,6 @@ func TestMatch_Resolve_VictoryCondition_Suite(t *testing.T) {
 			p1NonKings:          [4]bool{false, false, false, false},
 			p2King:              true,
 			p2NonKings:          [4]bool{false, false, false, false},
-			expectedResult:      MatchWin,
 			expectedWinningTeam: 2,
 		},
 		// Draw Conditions
@@ -1520,8 +1510,7 @@ func TestMatch_Resolve_VictoryCondition_Suite(t *testing.T) {
 			p1NonKings:          [4]bool{false, true, false, false},
 			p2King:              false,
 			p2NonKings:          [4]bool{false, false, true, false},
-			expectedResult:      MatchDraw,
-			expectedWinningTeam: -1,
+			expectedWinningTeam: MatchDrawn,
 		},
 		{
 			name:                "Draw: Both Kings dead, P2 wiped out",
@@ -1529,8 +1518,7 @@ func TestMatch_Resolve_VictoryCondition_Suite(t *testing.T) {
 			p1NonKings:          [4]bool{false, true, false, false},
 			p2King:              false,
 			p2NonKings:          [4]bool{false, false, false, false},
-			expectedResult:      MatchDraw,
-			expectedWinningTeam: -1,
+			expectedWinningTeam: MatchDrawn,
 		},
 		{
 			name:                "Draw: Both Kings dead, P1 wiped out",
@@ -1538,8 +1526,7 @@ func TestMatch_Resolve_VictoryCondition_Suite(t *testing.T) {
 			p1NonKings:          [4]bool{false, false, false, false},
 			p2King:              false,
 			p2NonKings:          [4]bool{false, false, true, false},
-			expectedResult:      MatchDraw,
-			expectedWinningTeam: -1,
+			expectedWinningTeam: MatchDrawn,
 		},
 		{
 			name:                "Draw: Everyone dead",
@@ -1547,8 +1534,7 @@ func TestMatch_Resolve_VictoryCondition_Suite(t *testing.T) {
 			p1NonKings:          [4]bool{false, false, false, false},
 			p2King:              false,
 			p2NonKings:          [4]bool{false, false, false, false},
-			expectedResult:      MatchDraw,
-			expectedWinningTeam: -1,
+			expectedWinningTeam: MatchDrawn,
 		},
 		{
 			name:                "Draw: Both Lone Kings dead",
@@ -1556,8 +1542,7 @@ func TestMatch_Resolve_VictoryCondition_Suite(t *testing.T) {
 			p1NonKings:          [4]bool{false, false, false, false},
 			p2King:              true,
 			p2NonKings:          [4]bool{false, false, false, false},
-			expectedResult:      MatchDraw,
-			expectedWinningTeam: -1,
+			expectedWinningTeam: MatchDrawn,
 		},
 	}
 
@@ -1578,14 +1563,10 @@ func TestMatch_Resolve_VictoryCondition_Suite(t *testing.T) {
 					if event.WinnerTeamID != tt.expectedWinningTeam {
 						t.Errorf("Malformed MatchEndedEvent.WinnerTeam, got winner %d", event.WinnerTeamID)
 					}
-
-					if (tt.expectedResult == MatchInProgress && !event.IsDraw) || (tt.expectedResult == MatchWin && event.IsDraw) {
-						t.Errorf("Malformed MatchEndedEvent.IsDraw for result %#v, got winner %d", tt.expectedResult, event.WinnerTeamID)
-					}
 				}
 			}
 
-			if tt.expectedResult == MatchInProgress {
+			if tt.expectedWinningTeam == MatchInProgress {
 				if foundEndedEvent {
 					t.Errorf("MatchEndedEvent should not be captured, but got one")
 				}
