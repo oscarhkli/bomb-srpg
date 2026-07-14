@@ -509,6 +509,165 @@ func TestHandleCreateNewMatch(t *testing.T) {
 	})
 }
 
+func TestHandleRematch(t *testing.T) {
+	t.Run("Success: wipes existing Match and creates a new one", func(t *testing.T) {
+		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
+
+		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/rematch", nil)
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+		req.Header.Set("Authorization", "Bearer "+playerTokens[0])
+
+		rr := httptest.NewRecorder()
+		testMux("POST /api/match-rooms/{roomID}/rematch", h.HandleRematch).ServeHTTP(rr, req)
+
+		if status := rr.Code; status != http.StatusCreated {
+			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusCreated)
+		}
+		if contentType := rr.Header().Get("Content-Type"); contentType != "application/json" {
+			t.Errorf("Handler returned wrong content type: got %v want %v", contentType, "application/json")
+		}
+
+		var response CreateMatchResponse
+		if err := json.NewDecoder(rr.Body).Decode(&response); err != nil {
+			t.Fatalf("Failed to decode response JSON payload: %v", err)
+		}
+		if !response.Success {
+			t.Error("Expected success=true in response, got false")
+		}
+
+		// Verify match was actually recreated in the server state manager
+		roomVal, ok := s.Rooms.Load(roomID)
+		if !ok {
+			t.Error("Room not found in server state manager")
+		}
+		room := roomVal.(*MatchRoom)
+		if room.Match == nil {
+			t.Error("Match was not created in the server state manager")
+		}
+
+		if len(response.PlayerTokens) != 2 || response.PlayerTokens[0] == "" || response.PlayerTokens[1] == "" || response.PlayerTokens[0] == response.PlayerTokens[1] {
+			t.Errorf("Expected 2 unique non-empty PlayerToken, got %v", response.PlayerTokens)
+		}
+		if response.PlayerTokens != room.PlayerTokens {
+			t.Errorf("Expected response and MatchRoom shareTokens, response %v vs MatchRoom %v", response.PlayerTokens, room.PlayerTokens)
+		}
+		if response.PlayerTokens != playerTokens {
+			t.Errorf("Expected Rematch to reuse existing PlayerTokens, got %v want %v", response.PlayerTokens, playerTokens)
+		}
+	})
+
+	t.Run("Failure: room not found", func(t *testing.T) {
+		s := NewServerStateManager()
+		h := NewHandler(s)
+
+		req, err := http.NewRequest("POST", "/api/match-rooms/NONEXISTENT/rematch", nil)
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+		req.Header.Set("Authorization", "Bearer dummy-token")
+
+		rr := httptest.NewRecorder()
+		testMux("POST /api/match-rooms/{roomID}/rematch", h.HandleRematch).ServeHTTP(rr, req)
+
+		if status := rr.Code; status != http.StatusNotFound {
+			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusNotFound)
+		}
+		if !strings.Contains(rr.Body.String(), "room not found") {
+			t.Errorf("Expected error message 'room not found', got: %s", rr.Body.String())
+		}
+	})
+
+	t.Run("Failure: match not found", func(t *testing.T) {
+		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
+		roomVal, _ := s.Rooms.Load(roomID)
+		room := roomVal.(*MatchRoom)
+		room.GameCfg = nil
+
+		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/rematch", nil)
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+		req.Header.Set("Authorization", "Bearer "+playerTokens[0])
+
+		rr := httptest.NewRecorder()
+		testMux("POST /api/match-rooms/{roomID}/rematch", h.HandleRematch).ServeHTTP(rr, req)
+
+		if status := rr.Code; status != http.StatusNotFound {
+			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusNotFound)
+		}
+		if !strings.Contains(rr.Body.String(), "match not found") {
+			t.Errorf("Expected error message 'match not found', got: %s", rr.Body.String())
+		}
+	})
+
+	t.Run("Failure: missing Authorization header", func(t *testing.T) {
+		roomID, _, _, h := createTestRoomWithMatch(t)
+
+		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/rematch", nil)
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+
+		rr := httptest.NewRecorder()
+		testMux("POST /api/match-rooms/{roomID}/rematch", h.HandleRematch).ServeHTTP(rr, req)
+
+		if status := rr.Code; status != http.StatusUnauthorized {
+			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusUnauthorized)
+		}
+		if !strings.Contains(rr.Body.String(), "invalid player token") {
+			t.Errorf("Expected error message 'invalid player token', got: %s", rr.Body.String())
+		}
+	})
+
+	t.Run("Failure: invalid token", func(t *testing.T) {
+		roomID, _, _, h := createTestRoomWithMatch(t)
+
+		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/rematch", nil)
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+		req.Header.Set("Authorization", "Bearer invalid-token")
+
+		rr := httptest.NewRecorder()
+		testMux("POST /api/match-rooms/{roomID}/rematch", h.HandleRematch).ServeHTTP(rr, req)
+
+		if status := rr.Code; status != http.StatusUnauthorized {
+			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusUnauthorized)
+		}
+		if !strings.Contains(rr.Body.String(), "invalid player token") {
+			t.Errorf("Expected error message 'invalid player token', got: %s", rr.Body.String())
+		}
+	})
+
+	t.Run("Failure: failed to Encode response", func(t *testing.T) {
+		roomID, playerTokens, _, h := createTestRoomWithMatch(t)
+
+		testEncodeFailure(t, testMux("POST /api/match-rooms/{roomID}/rematch", h.HandleRematch),
+			func() *http.Request {
+				req, _ := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/rematch", nil)
+				req.Header.Set("Authorization", "Bearer "+playerTokens[0])
+				return req
+			}, http.StatusCreated)
+	})
+
+	t.Run("Test Contract", func(t *testing.T) {
+		roomID, playerTokens, _, h := createTestRoomWithMatch(t)
+
+		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/rematch", nil)
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+		req.Header.Set("Authorization", "Bearer "+playerTokens[0])
+
+		rr := httptest.NewRecorder()
+		testMux("POST /api/match-rooms/{roomID}/rematch", h.HandleRematch).ServeHTTP(rr, req)
+
+		assertObjectContract(t, rr.Body.Bytes(), []string{"success", "playerTokens"}, nil)
+	})
+}
+
 // ClientUnit mimics the client's view of Unit in GetMatchState response
 type ClientUnit struct {
 	ID           engine.UnitID     `json:"id"`

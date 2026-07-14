@@ -14,6 +14,7 @@ import {
   surrender,
   getMatchConfig,
   getAllowedTiles,
+  rematch,
 } from './api';
 import { makeState, makeCfg, makeBombPlacedEvent } from '../test/fixtures';
 import type {
@@ -128,6 +129,29 @@ describe('api.ts', () => {
       expect(error).toBeInstanceOf(ApiError);
       expect((error as ApiError).status).toBe(400);
       expect((error as ApiError).message).toContain('invalid game config');
+    });
+  });
+
+  describe('rematch', () => {
+    it('should POST game config and return player tokens', async () => {
+      const resp = { success: true, playerTokens: ['token1', 'token2'] };
+      mockOk(201, resp);
+
+      const result = await rematch();
+
+      expect(result).toEqual(resp);
+      const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
+      expect(url).toContain('/api/match-rooms/test-room-123/rematch');
+      expect(options.method).toBe('POST');
+    });
+
+    it('should throw ApiError on invalid config', async () => {
+      mockErr(401, 'invalid token');
+
+      const error = await rematch().catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(ApiError);
+      expect((error as ApiError).status).toBe(401);
+      expect((error as ApiError).message).toContain('invalid token');
     });
   });
 

@@ -78,6 +78,7 @@ type MatchRoom struct {
 	mu           sync.RWMutex
 	ID           string
 	Match        *engine.Match
+	GameCfg      *engine.GameCfg // record for rematch use
 	LastActivity time.Time
 	PlayerTokens [2]string // [0]=Team1, [1]=Team2
 	Logger       *slog.Logger
@@ -150,6 +151,18 @@ func generatePlayerToken() (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
+func generatePlayerTokens() ([2]string, error) {
+	var tokens [2]string
+	for i := range 2 {
+		token, err := generatePlayerToken()
+		if err != nil {
+			return [2]string{}, fmt.Errorf("failed to generate playerToken for Player %d: %w", i, err)
+		}
+		tokens[i] = token
+	}
+	return tokens, nil
+}
+
 // CreateMatch initialize the game in a given MatchRoom.
 // Returns an error if any setup rule is violated.
 func (s *ServerStateManager) CreateMatch(roomID string, gameCfg engine.GameCfg) ([2]string, error) {
@@ -163,30 +176,19 @@ func (s *ServerStateManager) CreateMatch(roomID string, gameCfg engine.GameCfg) 
 	room.mu.Lock()
 	defer room.mu.Unlock()
 
-	if room.Match != nil {
-		room.Logger.Warn("match already exists", "roomID", roomID)
-		return [2]string{}, fmt.Errorf("%w: roomID=%s", ErrMatchExists, roomID)
-	}
-
-	match, err := engine.InitGame(gameCfg)
-
+	match, err := s.createMatchLocked(room, gameCfg)
 	if err != nil {
-		room.Logger.Error("invalid game config", "roomID", roomID, "error", err)
-		return [2]string{}, fmt.Errorf("%w: gameCfg=%+v: %v", ErrInvalidConfig, gameCfg, err)
+		return [2]string{}, err
 	}
 
-	var tokens [2]string
-	for i := range 2 {
-		token, err := generatePlayerToken()
-		if err != nil {
-			room.Logger.Warn("failed to generate player token", "roomID", roomID, "player", i)
-			return [2]string{}, fmt.Errorf("failed to generate playerToken for Player %d in MatchRoom %v", i, roomID)
-		}
-
-		tokens[i] = token
+	tokens, err := generatePlayerTokens()
+	if err != nil {
+		room.Logger.Warn("failed to generate player tokens", "roomID", roomID, "error", err)
+		return [2]string{}, err
 	}
 
 	room.Match = match
+	room.GameCfg = &gameCfg
 	room.PlayerTokens = tokens
 	room.LastActivity = time.Now()
 
@@ -222,6 +224,56 @@ func (s *ServerStateManager) roomReadyForMatch(roomID string) (*MatchRoom, error
 	}
 
 	return room, nil
+}
+
+func (s *ServerStateManager) createMatchLocked(room *MatchRoom, gameCfg engine.GameCfg) (*engine.Match, error) {
+	roomID := room.ID
+	if room.Match != nil {
+		room.Logger.Warn("match already exists", "roomID", roomID)
+		return nil, fmt.Errorf("%w: roomID=%s", ErrMatchExists, roomID)
+	}
+
+	match, err := engine.InitGame(gameCfg)
+	if err != nil {
+		room.Logger.Error("invalid game config", "roomID", roomID, "error", err)
+		return nil, fmt.Errorf("%w: gameCfg=%+v: %v", ErrInvalidConfig, gameCfg, err)
+	}
+
+	return match, nil
+}
+
+// Rematch wipes the existing Match in a given MatchRoom and recreate one using GameCfg.
+func (s *ServerStateManager) Rematch(roomID string, token string) ([2]string, error) {
+	roomVal, ok := s.Rooms.Load(roomID)
+	if !ok {
+		s.Logger.Warn("match room not found", "roomID", roomID)
+		return [2]string{}, fmt.Errorf("%w: roomID=%s", ErrRoomNotFound, roomID)
+	}
+	room := roomVal.(*MatchRoom)
+
+	room.mu.Lock()
+	defer room.mu.Unlock()
+
+	if room.PlayerTokens[0] != token && room.PlayerTokens[1] != token {
+		return [2]string{}, ErrInvalidToken
+	}
+
+	if room.GameCfg == nil {
+		room.Logger.Warn("previous match not found", "roomID", roomID)
+		return [2]string{}, fmt.Errorf("%w: roomID=%s", ErrMatchNotFound, roomID)
+	}
+
+	room.Match = nil
+
+	match, err := s.createMatchLocked(room, *room.GameCfg)
+	if err != nil {
+		return [2]string{}, err
+	}
+
+	room.Match = match
+	room.LastActivity = time.Now()
+
+	return room.PlayerTokens, nil
 }
 
 // GetMatchState gets the WorkingState of the Match in a given MatchRoom.

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -270,6 +271,16 @@ func validGameCfg() engine.GameCfg {
 	}
 }
 
+func assertGameCfgSynced(t *testing.T, room *MatchRoom) {
+	t.Helper()
+	if room.GameCfg == nil {
+		t.Fatal("Expected room.GameCfg to be set")
+	}
+	if !reflect.DeepEqual(*room.GameCfg, room.Match.GameCfg) {
+		t.Errorf("Expected MatchRoom and Match to have equal GameCfg values, MatchRoom %+v vs Match %+v", *room.GameCfg, room.Match.GameCfg)
+	}
+}
+
 func createTestRoom(t *testing.T) (string, [2]string, *ServerStateManager) {
 	t.Helper()
 	s := NewServerStateManager()
@@ -415,6 +426,107 @@ func TestServerStateManager_CreateMatch(t *testing.T) {
 				}
 				roomVal, _ := s.Rooms.Load(roomID)
 				room := roomVal.(*MatchRoom)
+				assertGameCfgSynced(t, room)
+				if playerTokens != room.PlayerTokens {
+					t.Errorf("Expected response and MatchRoom share the same PlayerTokens, response %v vs MatchRoom %v", playerTokens, room.PlayerTokens)
+				}
+			}
+		})
+	}
+}
+
+func TestServerStateManager_Rematch(t *testing.T) {
+	tests := []struct {
+		name     string
+		setup    func(t *testing.T) (string, *ServerStateManager, [2]string)
+		wantErr  error
+		validate func(t *testing.T, s *ServerStateManager, roomID string)
+	}{
+		{
+			name: "Success - Match not exist but with previous gameCfg",
+			setup: func(t *testing.T) (string, *ServerStateManager, [2]string) {
+				s := NewServerStateManager()
+				roomID, _ := s.CreateMatchRoom()
+				tokens, _ := s.CreateMatch(roomID, validGameCfg())
+				roomVal, _ := s.Rooms.Load(roomID)
+				room := roomVal.(*MatchRoom)
+				room.Match = nil // kill the match
+				gameCfg := validGameCfg()
+				room.GameCfg = &gameCfg
+				return roomID, s, tokens
+			},
+			wantErr: nil,
+		},
+		{
+			name: "Success - Wipe existing Match",
+			setup: func(t *testing.T) (string, *ServerStateManager, [2]string) {
+				s := NewServerStateManager()
+				roomID, _ := s.CreateMatchRoom()
+				tokens, _ := s.CreateMatch(roomID, validGameCfg())
+				roomVal, _ := s.Rooms.Load(roomID)
+				room := roomVal.(*MatchRoom)
+				gameCfg := validGameCfg()
+				room.GameCfg = &gameCfg
+				return roomID, s, tokens
+			},
+			wantErr: nil,
+		},
+		{
+			name: "Invalid token",
+			setup: func(t *testing.T) (string, *ServerStateManager, [2]string) {
+				s := NewServerStateManager()
+				roomID, _ := s.CreateMatchRoom()
+				s.CreateMatch(roomID, validGameCfg())
+				roomVal, _ := s.Rooms.Load(roomID)
+				room := roomVal.(*MatchRoom)
+				gameCfg := validGameCfg()
+				room.GameCfg = &gameCfg
+				return roomID, s, [2]string{"INVALID_TOKEN", ""}
+			},
+			wantErr: ErrInvalidToken,
+		},
+		{
+			name: "Room Not Found",
+			setup: func(t *testing.T) (string, *ServerStateManager, [2]string) {
+				s := NewServerStateManager()
+				return "NONEXISTENT", s, [2]string{}
+			},
+			wantErr: ErrRoomNotFound,
+		},
+		{
+			name: "Failure - No previous match",
+			setup: func(t *testing.T) (string, *ServerStateManager, [2]string) {
+				s := NewServerStateManager()
+				roomID, _ := s.CreateMatchRoom()
+				return roomID, s, [2]string{}
+			},
+			wantErr: ErrMatchNotFound,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			roomID, s, tokens := tt.setup(t)
+			playerTokens, err := s.Rematch(roomID, tokens[0])
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("Rematch() error = %v, want %v", err, tt.wantErr)
+			}
+			if err == nil {
+				roomVal, ok := s.Rooms.Load(roomID)
+				if !ok {
+					t.Fatal("Room not found")
+				}
+				room := roomVal.(*MatchRoom)
+				if room.Match == nil {
+					t.Fatal("Expected Match to be created, got nil")
+				}
+				if room.Match.GameCfg.StagePreset != "MAP01" {
+					t.Errorf("Expected StagePreset 'MAP01', got '%s'", room.Match.GameCfg.StagePreset)
+				}
+				if len(playerTokens) != 2 || playerTokens[0] == "" || playerTokens[1] == "" || playerTokens[0] == playerTokens[1] {
+					t.Errorf("Expected 2 unique non-empty PlayerToken, got %v", playerTokens)
+				}
+				assertGameCfgSynced(t, room)
 				if playerTokens != room.PlayerTokens {
 					t.Errorf("Expected response and MatchRoom share the same PlayerTokens, response %v vs MatchRoom %v", playerTokens, room.PlayerTokens)
 				}

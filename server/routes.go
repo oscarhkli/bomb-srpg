@@ -7,6 +7,7 @@ func RegisterRoutes(mux *http.ServeMux, h *Handler) {
 	mux.HandleFunc("GET /api/archetypes", h.HandleGetAllArchetypes)
 	mux.HandleFunc("POST /api/match-rooms", h.HandleCreateMatchRoom)
 	mux.HandleFunc("POST /api/match-rooms/{roomID}/match", h.HandleCreateMatch)
+	mux.HandleFunc("POST /api/match-rooms/{roomID}/rematch", h.HandleRematch)
 	mux.HandleFunc("GET /api/match-rooms/{roomID}/match/state", h.HandleGetMatchState)
 	mux.HandleFunc("POST /api/match-rooms/{roomID}/match/turn-commands", h.HandleSubmitTurnCommand)
 	mux.HandleFunc("POST /api/match-rooms/{roomID}/match/start-turn", h.HandleStartTurn)

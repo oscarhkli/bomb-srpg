@@ -91,6 +91,14 @@ export async function createMatch(req: CreateMatchRequest): Promise<CreateMatchR
   return handleResponse<CreateMatchResponse>(res);
 }
 
+export async function rematch(): Promise<CreateMatchResponse> {
+  const roomId = requireRoomId();
+  const res = await fetch(buildUrl(`/api/match-rooms/${roomId}/rematch`), {
+    method: 'POST',
+  });
+  return handleResponse<CreateMatchResponse>(res);
+}
+
 export async function getMatchState(): Promise<GameState> {
   const roomId = requireRoomId();
   const res = await fetch(buildUrl(`/api/match-rooms/${roomId}/match/state`));

@@ -119,11 +119,19 @@ func (h *Handler) HandleCreateMatch(w http.ResponseWriter, r *http.Request) {
 
 	tokens, err := h.Manager.CreateMatch(roomID, req.GameCfg)
 
+	if !h.handleCreateMatch(tokens, err, roomID, w) {
+		return
+	}
+
+	h.Logger.Info("match created", "roomID", roomID)
+}
+
+func (h *Handler) handleCreateMatch(tokens [2]string, err error, roomID string, w http.ResponseWriter) bool {
 	if err != nil {
 		code, msg := mapError(err)
 		h.Logger.Warn("create match failed", "roomID", roomID, "error", err)
 		http.Error(w, msg, code)
-		return
+		return false
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -133,10 +141,30 @@ func (h *Handler) HandleCreateMatch(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(res); err != nil {
 		h.Logger.Error("encode match response failed", "roomID", roomID, "error", err)
 		http.Error(w, "Failed to encode success indicator", http.StatusInternalServerError)
+		return false
+	}
+
+	return true
+}
+
+// HandleRematch wipes the existing Match in a given MatchRoom and recreate one using GameCfg
+func (h *Handler) HandleRematch(w http.ResponseWriter, r *http.Request) {
+	roomID := r.PathValue("roomID")
+
+	token, err := h.extractBearerToken(r)
+	if err != nil {
+		code, msg := mapError(err)
+		http.Error(w, msg, code)
 		return
 	}
 
-	h.Logger.Info("match created", "roomID", roomID)
+	tokens, err := h.Manager.Rematch(roomID, token)
+
+	if !h.handleCreateMatch(tokens, err, roomID, w) {
+		return
+	}
+
+	h.Logger.Info("rematch created", "roomID", roomID)
 }
 
 // GetMatchState gets the WorkingState of the Match in a given MatchRoom.
