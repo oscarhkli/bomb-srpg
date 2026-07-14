@@ -19,8 +19,8 @@ import (
 const (
 	roomIDLength          = 5
 	crockfordAlphabet     = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
-	RoomInactivityTimeout = 5 * time.Minute
-	CleanupInterval       = 1 * time.Minute
+	RoomInactivityTimeout = 10 * time.Minute
+	CleanupInterval       = 10 * time.Minute
 )
 
 var (
@@ -437,11 +437,9 @@ func (s *ServerStateManager) Surrender(roomID string, teamID int, token string) 
 	}
 
 	events := room.Match.Surrender(teamID)
-	room.Match = nil
 	room.LastActivity = time.Now()
 	room.mu.Unlock()
 
-	s.Rooms.Delete(roomID)
 	return events, nil
 }
 
@@ -488,20 +486,18 @@ func (s *ServerStateManager) StartCleanupLoop(ctx context.Context, interval time
 	}()
 }
 
-// cleanupInactiveRooms removes rooms inactive > RoomInactivityTimeout OR already ended.
+// cleanupInactiveRooms removes rooms inactive > RoomInactivityTimeout.
 func (s *ServerStateManager) cleanupInactiveRooms() {
 	now := time.Now()
 	s.Rooms.Range(func(key, value any) bool {
 		room := value.(*MatchRoom)
 		room.mu.Lock()
 		inactive := now.Sub(room.LastActivity) > RoomInactivityTimeout
-		ended := room.Match != nil && room.Match.WinnerTeamID != 0
-		shouldDelete := inactive || ended
 		room.mu.Unlock()
 
-		if shouldDelete {
+		if inactive {
 			s.Rooms.Delete(key)
-			s.Logger.Info("removed room", "roomID", key, "inactive", inactive, "ended", ended)
+			s.Logger.Info("removed room", "roomID", key, "inactive", inactive)
 		}
 		return true
 	})

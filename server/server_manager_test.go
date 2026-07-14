@@ -206,9 +206,9 @@ func TestServerStateManager_LastActivityUpdated(t *testing.T) {
 				s.Surrender(roomID, 1, tokens[0])
 			},
 			validate: func(t *testing.T, s *ServerStateManager, roomID string) {
-				// Surrender deletes the room, verify it's gone
-				if _, ok := s.Rooms.Load(roomID); ok {
-					t.Error("Expected room to be deleted after surrender")
+				// Surrender doesn't delete the room, verify it's still here
+				if _, ok := s.Rooms.Load(roomID); !ok {
+					t.Error("Expected room not to be deleted after surrender")
 				}
 			},
 		},
@@ -957,9 +957,9 @@ func TestServerStateManager_Surrender(t *testing.T) {
 				if got, want := gameEvents[0].WinnerTeamID, 2; got != want {
 					t.Errorf("Expected gameEvent WinnerTeamID = %v, got %v", want, got)
 				}
-				// Room is deleted after surrender
-				if _, ok := s.Rooms.Load(roomID); ok {
-					t.Error("Expected room to be deleted after surrender")
+				// Room should not be deleted after surrender
+				if _, ok := s.Rooms.Load(roomID); !ok {
+					t.Error("Expected room not to be deleted after surrender")
 				}
 			},
 		},
@@ -1186,7 +1186,7 @@ func TestServerStateManager_cleanupInactiveRooms(t *testing.T) {
 	roomVal, _ := s.Rooms.Load(roomID2)
 	room := roomVal.(*MatchRoom)
 	room.mu.Lock()
-	room.LastActivity = time.Now().Add(-6 * time.Minute)
+	room.LastActivity = time.Now().Add(-12 * time.Minute)
 	room.mu.Unlock()
 
 	// Room 3: ended match
@@ -1212,8 +1212,8 @@ func TestServerStateManager_cleanupInactiveRooms(t *testing.T) {
 	if ok2 {
 		t.Error("inactive room should be cleaned")
 	}
-	if ok3 {
-		t.Error("ended match room should be cleaned")
+	if !ok3 {
+		t.Error("ended but still active match room should not be cleaned")
 	}
 }
 

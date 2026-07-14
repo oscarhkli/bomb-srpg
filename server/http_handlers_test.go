@@ -1758,9 +1758,9 @@ func TestHandleSurrender(t *testing.T) {
 		if got, want := response[0].WinnerTeamID, 2; got != want {
 			t.Errorf("Expected gameEvent WinnerTeamID = %v, got %v", want, got)
 		}
-		// Room is deleted after surrender, verify it's gone
-		if _, ok := s.Rooms.Load(roomID); ok {
-			t.Error("Expected room to be deleted after surrender")
+		// Room should not be deleted after surrender, verify it's still here
+		if _, ok := s.Rooms.Load(roomID); !ok {
+			t.Error("Expected room not to be deleted after surrender")
 		}
 	})
 
