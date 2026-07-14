@@ -17,7 +17,7 @@ Specs will be written prior to development—partly handcrafted, and partly gene
 | [Phase 3.3: Render Move and PlaceBomb](match-p3-spec003.md) | MatchScene | Done | 2026-07-07 |
 | [Phase 3.4: Render Resolve Turn](match-p3-spec004.md) | MatchScene | Done | 2026-07-10 |
 | [Phase 3.5: Turn Lifecycle Wiring (startTurn)](match-p3-spec005.md) | MatchScene | Done | 2026-07-12 |
-| [Phase 3.6: Victory Cutscene and Rematch](match-p3-spec006.md) | MatchScene | Ready | — |
+| [Phase 3.6: Victory Cutscene and Rematch](match-p3-spec006.md) | MatchScene | Done | 2026-07-14 |
 | [Phase 3.7: Reset Turn and Options Panel](match-p3-spec007.md) | MatchScene | Parked Draft | — |
 | [Phase 3.8: Surrender](match-p3-spec008.md) | MatchScene | Parked Draft | — |
 | [Phase 3.9: Render Occupant Information](match-p3-spec009.md) | MatchScene | Parked Draft | — |
@@ -26,7 +26,7 @@ Specs will be written prior to development—partly handcrafted, and partly gene
 | [Phase 5.1: 2.5D Isometric Grid](match-p5-spec001.md) | MatchScene | Parked Draft | — |
 | [Phase 3.TBD: Lounge Scene](lounge-p3-spec001.md) | LoungeScene | Parked Draft | — |
 | [Phase 3.TBD: Title Scene](title-p3-spec001.md) | TitleScene | Parked Draft | — |
-| [Phase 3.6: Victory Cutscene](stage-p3-spec001.md) | StageSetupScene | Parked Draft | — |
+| [Phase 3.8: Match Settings Scene](stage-p3-spec001.md) | StageSetupScene | Parked Draft | — |
 <!-- END SPEC TABLE -->
 
 ## Workflow
