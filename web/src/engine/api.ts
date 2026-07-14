@@ -95,8 +95,21 @@ export async function rematch(): Promise<CreateMatchResponse> {
   const roomId = requireRoomId();
   const res = await fetch(buildUrl(`/api/match-rooms/${roomId}/rematch`), {
     method: 'POST',
+    headers: authHeaders(),
   });
   return handleResponse<CreateMatchResponse>(res);
+}
+
+export async function deleteMatch(): Promise<void> {
+  const roomId = requireRoomId();
+  const res = await fetch(buildUrl(`/api/match-rooms/${roomId}/match`), {
+    method: 'DELETE',
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    const message = await res.text();
+    throw new ApiError(res.status, message);
+  }
 }
 
 export async function getMatchState(): Promise<GameState> {

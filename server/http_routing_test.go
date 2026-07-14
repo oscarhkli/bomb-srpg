@@ -52,6 +52,42 @@ func TestHTTPRouting(t *testing.T) {
 			wantStatus: http.StatusMethodNotAllowed,
 		},
 		{
+			name:       "PUT /api/match-rooms/{roomID}/match (405)",
+			method:     "PUT",
+			path:       "/api/match-rooms/DUMMY/match",
+			wantStatus: http.StatusMethodNotAllowed,
+		},
+		{
+			name:       "DELETE /api/match-rooms/{roomID}/match (404 - no room)",
+			method:     "DELETE",
+			path:       "/api/match-rooms/DUMMY/match",
+			wantStatus: http.StatusNotFound,
+		},
+		{
+			name:       "POST /api/match-rooms/{roomID}/rematch (404 - no room)",
+			method:     "POST",
+			path:       "/api/match-rooms/DUMMY/rematch",
+			wantStatus: http.StatusNotFound,
+		},
+		{
+			name:       "GET /api/match-rooms/{roomID}/rematch (405)",
+			method:     "GET",
+			path:       "/api/match-rooms/DUMMY/rematch",
+			wantStatus: http.StatusMethodNotAllowed,
+		},
+		{
+			name:       "PUT /api/match-rooms/{roomID}/rematch (405)",
+			method:     "PUT",
+			path:       "/api/match-rooms/DUMMY/rematch",
+			wantStatus: http.StatusMethodNotAllowed,
+		},
+		{
+			name:       "DELETE /api/match-rooms/{roomID}/rematch (405)",
+			method:     "DELETE",
+			path:       "/api/match-rooms/DUMMY/rematch",
+			wantStatus: http.StatusMethodNotAllowed,
+		},
+		{
 			name:       "POST /api/archetypes (405)",
 			method:     "POST",
 			path:       "/api/archetypes",
@@ -295,7 +331,8 @@ func TestHTTPRouting(t *testing.T) {
 			// Add dummy token for mutating endpoints that require auth
 			if strings.Contains(tt.name, "turn-commands") || strings.Contains(tt.name, "start-turn") ||
 				strings.Contains(tt.name, "reset") || strings.Contains(tt.name, "resolve") ||
-				strings.Contains(tt.name, "surrender") {
+				strings.Contains(tt.name, "surrender") || strings.Contains(tt.name, "rematch") ||
+				(tt.method == http.MethodDelete && strings.HasSuffix(tt.path, "/match")) {
 				req.Header.Set("Authorization", "Bearer dummy-token")
 			}
 

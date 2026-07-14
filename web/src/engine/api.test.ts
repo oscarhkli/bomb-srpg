@@ -15,6 +15,7 @@ import {
   getMatchConfig,
   getAllowedTiles,
   rematch,
+  deleteMatch,
 } from './api';
 import { makeState, makeCfg, makeBombPlacedEvent } from '../test/fixtures';
 import type {
@@ -143,6 +144,7 @@ describe('api.ts', () => {
       const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
       expect(url).toContain('/api/match-rooms/test-room-123/rematch');
       expect(options.method).toBe('POST');
+      expect(options.headers).toHaveProperty('Authorization', 'Bearer test-token-abc');
     });
 
     it('should throw ApiError on invalid config', async () => {
@@ -152,6 +154,28 @@ describe('api.ts', () => {
       expect(error).toBeInstanceOf(ApiError);
       expect((error as ApiError).status).toBe(401);
       expect((error as ApiError).message).toContain('invalid token');
+    });
+  });
+
+  describe('deleteMatch', () => {
+    it('should DELETE with auth and resolve with no content', async () => {
+      mockOk(204, undefined);
+
+      await expect(deleteMatch()).resolves.toBeUndefined();
+
+      const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
+      expect(url).toContain('/api/match-rooms/test-room-123/match');
+      expect(options.method).toBe('DELETE');
+      expect(options.headers).toHaveProperty('Authorization', 'Bearer test-token-abc');
+    });
+
+    it('should throw ApiError when match still in progress', async () => {
+      mockErr(409, 'match still in progress');
+
+      const error = await deleteMatch().catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(ApiError);
+      expect((error as ApiError).status).toBe(409);
+      expect((error as ApiError).message).toBe('match still in progress');
     });
   });
 

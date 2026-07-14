@@ -535,6 +535,94 @@ func TestServerStateManager_Rematch(t *testing.T) {
 	}
 }
 
+func TestServerStateManager_DeleteMatch(t *testing.T) {
+	tests := []struct {
+		name     string
+		setup    func(t *testing.T) (string, *ServerStateManager, [2]string)
+		wantErr  error
+		validate func(t *testing.T, s *ServerStateManager, roomID string)
+	}{
+		{
+			name: "Success - Without existing Match",
+			setup: func(t *testing.T) (string, *ServerStateManager, [2]string) {
+				s := NewServerStateManager()
+				roomID, _ := s.CreateMatchRoom()
+				tokens, _ := s.CreateMatch(roomID, validGameCfg())
+				roomVal, _ := s.Rooms.Load(roomID)
+				room := roomVal.(*MatchRoom)
+				room.Match = nil // kill the match
+				return roomID, s, tokens
+			},
+			wantErr: nil,
+		},
+		{
+			name: "Success - Existing Match",
+			setup: func(t *testing.T) (string, *ServerStateManager, [2]string) {
+				s := NewServerStateManager()
+				roomID, _ := s.CreateMatchRoom()
+				tokens, _ := s.CreateMatch(roomID, validGameCfg())
+				roomVal, _ := s.Rooms.Load(roomID)
+				room := roomVal.(*MatchRoom)
+				room.Match.WinnerTeamID = 1 // conclude the match
+				return roomID, s, tokens
+			},
+			wantErr: nil,
+		},
+		{
+			name: "Failure - Match still in progress",
+			setup: func(t *testing.T) (string, *ServerStateManager, [2]string) {
+				s := NewServerStateManager()
+				roomID, _ := s.CreateMatchRoom()
+				tokens, _ := s.CreateMatch(roomID, validGameCfg())
+				return roomID, s, tokens
+			},
+			wantErr: ErrMatchInProgress,
+		},
+		{
+			name: "Invalid token",
+			setup: func(t *testing.T) (string, *ServerStateManager, [2]string) {
+				s := NewServerStateManager()
+				roomID, _ := s.CreateMatchRoom()
+				s.CreateMatch(roomID, validGameCfg())
+				roomVal, _ := s.Rooms.Load(roomID)
+				room := roomVal.(*MatchRoom)
+				gameCfg := validGameCfg()
+				room.GameCfg = &gameCfg
+				return roomID, s, [2]string{"INVALID_TOKEN", ""}
+			},
+			wantErr: ErrInvalidToken,
+		},
+		{
+			name: "Room Not Found",
+			setup: func(t *testing.T) (string, *ServerStateManager, [2]string) {
+				s := NewServerStateManager()
+				return "NONEXISTENT", s, [2]string{}
+			},
+			wantErr: ErrRoomNotFound,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			roomID, s, tokens := tt.setup(t)
+			err := s.DeleteMatch(roomID, tokens[0])
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("Rematch() error = %v, want %v", err, tt.wantErr)
+			}
+			if err == nil {
+				roomVal, ok := s.Rooms.Load(roomID)
+				if !ok {
+					t.Fatal("Room not found")
+				}
+				room := roomVal.(*MatchRoom)
+				if room.Match != nil {
+					t.Fatalf("Expected Match to be deleted, got %p", room.Match)
+				}
+			}
+		})
+	}
+}
+
 func TestServerStateManager_GetMatchState(t *testing.T) {
 	tests := []struct {
 		name     string

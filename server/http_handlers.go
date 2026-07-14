@@ -167,6 +167,29 @@ func (h *Handler) HandleRematch(w http.ResponseWriter, r *http.Request) {
 	h.Logger.Info("rematch created", "roomID", roomID)
 }
 
+// HandleDeleteMatch removes the existing concluded Match in a given MatchRoom.
+func (h *Handler) HandleDeleteMatch(w http.ResponseWriter, r *http.Request) {
+	roomID := r.PathValue("roomID")
+
+	token, err := h.extractBearerToken(r)
+	if err != nil {
+		code, msg := mapError(err)
+		http.Error(w, msg, code)
+		return
+	}
+
+	if err := h.Manager.DeleteMatch(roomID, token); err != nil {
+		code, msg := mapError(err)
+		h.Logger.Warn("delete match failed", "roomID", roomID, "error", err)
+		http.Error(w, msg, code)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+
+	h.Logger.Info("match deleted", "roomID", roomID)
+}
+
 // GetMatchState gets the WorkingState of the Match in a given MatchRoom.
 // It encodes the gameState as JSON and writes them to the response.
 func (h *Handler) HandleGetMatchState(w http.ResponseWriter, r *http.Request) {

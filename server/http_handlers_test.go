@@ -668,6 +668,131 @@ func TestHandleRematch(t *testing.T) {
 	})
 }
 
+func TestHandleDeleteMatch(t *testing.T) {
+	t.Run("Success: deletes an existing concluded Match", func(t *testing.T) {
+		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
+		roomVal, _ := s.Rooms.Load(roomID)
+		room := roomVal.(*MatchRoom)
+		room.Match.WinnerTeamID = 1 // conclude the match
+
+		req, err := http.NewRequest("DELETE", "/api/match-rooms/"+roomID+"/match", nil)
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+		req.Header.Set("Authorization", "Bearer "+playerTokens[0])
+
+		rr := httptest.NewRecorder()
+		testMux("DELETE /api/match-rooms/{roomID}/match", h.HandleDeleteMatch).ServeHTTP(rr, req)
+
+		if status := rr.Code; status != http.StatusNoContent {
+			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusNoContent)
+		}
+		if room.Match != nil {
+			t.Errorf("Expected Match to be deleted, got %p", room.Match)
+		}
+	})
+
+	t.Run("Success: no-op when Match already cleared", func(t *testing.T) {
+		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
+		roomVal, _ := s.Rooms.Load(roomID)
+		room := roomVal.(*MatchRoom)
+		room.Match = nil
+
+		req, err := http.NewRequest("DELETE", "/api/match-rooms/"+roomID+"/match", nil)
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+		req.Header.Set("Authorization", "Bearer "+playerTokens[0])
+
+		rr := httptest.NewRecorder()
+		testMux("DELETE /api/match-rooms/{roomID}/match", h.HandleDeleteMatch).ServeHTTP(rr, req)
+
+		if status := rr.Code; status != http.StatusNoContent {
+			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusNoContent)
+		}
+	})
+
+	t.Run("Failure: match still in progress", func(t *testing.T) {
+		roomID, playerTokens, _, h := createTestRoomWithMatch(t)
+
+		req, err := http.NewRequest("DELETE", "/api/match-rooms/"+roomID+"/match", nil)
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+		req.Header.Set("Authorization", "Bearer "+playerTokens[0])
+
+		rr := httptest.NewRecorder()
+		testMux("DELETE /api/match-rooms/{roomID}/match", h.HandleDeleteMatch).ServeHTTP(rr, req)
+
+		if status := rr.Code; status != http.StatusConflict {
+			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusConflict)
+		}
+		if !strings.Contains(rr.Body.String(), "match still in progress") {
+			t.Errorf("Expected error message 'match still in progress', got: %s", rr.Body.String())
+		}
+	})
+
+	t.Run("Failure: room not found", func(t *testing.T) {
+		s := NewServerStateManager()
+		h := NewHandler(s)
+
+		req, err := http.NewRequest("DELETE", "/api/match-rooms/NONEXISTENT/match", nil)
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+		req.Header.Set("Authorization", "Bearer dummy-token")
+
+		rr := httptest.NewRecorder()
+		testMux("DELETE /api/match-rooms/{roomID}/match", h.HandleDeleteMatch).ServeHTTP(rr, req)
+
+		if status := rr.Code; status != http.StatusNotFound {
+			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusNotFound)
+		}
+		if !strings.Contains(rr.Body.String(), "room not found") {
+			t.Errorf("Expected error message 'room not found', got: %s", rr.Body.String())
+		}
+	})
+
+	t.Run("Failure: invalid token", func(t *testing.T) {
+		roomID, _, _, h := createTestRoomWithMatch(t)
+
+		req, err := http.NewRequest("DELETE", "/api/match-rooms/"+roomID+"/match", nil)
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+		req.Header.Set("Authorization", "Bearer invalid-token")
+
+		rr := httptest.NewRecorder()
+		testMux("DELETE /api/match-rooms/{roomID}/match", h.HandleDeleteMatch).ServeHTTP(rr, req)
+
+		if status := rr.Code; status != http.StatusUnauthorized {
+			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusUnauthorized)
+		}
+		if !strings.Contains(rr.Body.String(), "invalid player token") {
+			t.Errorf("Expected error message 'invalid player token', got: %s", rr.Body.String())
+		}
+	})
+
+	t.Run("Failure: missing Authorization header", func(t *testing.T) {
+		roomID, _, _, h := createTestRoomWithMatch(t)
+
+		req, err := http.NewRequest("DELETE", "/api/match-rooms/"+roomID+"/match", nil)
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+
+		rr := httptest.NewRecorder()
+		testMux("DELETE /api/match-rooms/{roomID}/match", h.HandleDeleteMatch).ServeHTTP(rr, req)
+
+		if status := rr.Code; status != http.StatusUnauthorized {
+			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusUnauthorized)
+		}
+		if !strings.Contains(rr.Body.String(), "invalid player token") {
+			t.Errorf("Expected error message 'invalid player token', got: %s", rr.Body.String())
+		}
+	})
+}
+
 // ClientUnit mimics the client's view of Unit in GetMatchState response
 type ClientUnit struct {
 	ID           engine.UnitID     `json:"id"`

@@ -24,13 +24,14 @@ const (
 )
 
 var (
-	ErrRoomNotFound   = errors.New("room not found")
-	ErrMatchEnded     = errors.New("match already ended")
-	ErrMatchExists    = errors.New("match already exists")
-	ErrMatchNotFound  = errors.New("match not found")
-	ErrInvalidConfig  = errors.New("invalid game config")
-	ErrInvalidTurnCmd = errors.New("invalid turn command")
-	ErrInvalidToken   = errors.New("invalid player token")
+	ErrRoomNotFound    = errors.New("room not found")
+	ErrMatchEnded      = errors.New("match already ended")
+	ErrMatchInProgress = errors.New("match still in progress")
+	ErrMatchExists     = errors.New("match already exists")
+	ErrMatchNotFound   = errors.New("match not found")
+	ErrInvalidConfig   = errors.New("invalid game config")
+	ErrInvalidTurnCmd  = errors.New("invalid turn command")
+	ErrInvalidToken    = errors.New("invalid player token")
 )
 
 // mapError converts an error to an HTTP status code and message.
@@ -66,7 +67,8 @@ func mapError(err error) (int, string) {
 		errors.Is(err, engine.ErrInvalidLanding),
 		errors.Is(err, engine.ErrDesynced),
 		errors.Is(err, engine.ErrOutOfBounds),
-		errors.Is(err, ErrMatchEnded):
+		errors.Is(err, ErrMatchEnded),
+		errors.Is(err, ErrMatchInProgress):
 		return http.StatusConflict, err.Error()
 	default:
 		return http.StatusInternalServerError, "internal error"
@@ -207,6 +209,13 @@ func (mr *MatchRoom) validatePlayerToken(teamID int, token string) error {
 	return nil
 }
 
+func (mr *MatchRoom) validateAnyMatchPlayerToken(token string) error {
+	if mr.PlayerTokens[0] != token && mr.PlayerTokens[1] != token {
+		return ErrInvalidToken
+	}
+	return nil
+}
+
 func (s *ServerStateManager) roomReadyForMatch(roomID string) (*MatchRoom, error) {
 	roomVal, ok := s.Rooms.Load(roomID)
 	if !ok {
@@ -219,7 +228,7 @@ func (s *ServerStateManager) roomReadyForMatch(roomID string) (*MatchRoom, error
 	defer room.mu.RUnlock()
 
 	if room.Match == nil {
-		room.Logger.Warn("match not found", "roomID", roomID)
+		room.Logger.Warn("match not found")
 		return nil, fmt.Errorf("%w: roomID=%s", ErrMatchNotFound, roomID)
 	}
 
@@ -229,13 +238,13 @@ func (s *ServerStateManager) roomReadyForMatch(roomID string) (*MatchRoom, error
 func (s *ServerStateManager) createMatchLocked(room *MatchRoom, gameCfg engine.GameCfg) (*engine.Match, error) {
 	roomID := room.ID
 	if room.Match != nil {
-		room.Logger.Warn("match already exists", "roomID", roomID)
+		room.Logger.Warn("match already exists")
 		return nil, fmt.Errorf("%w: roomID=%s", ErrMatchExists, roomID)
 	}
 
 	match, err := engine.InitGame(gameCfg)
 	if err != nil {
-		room.Logger.Error("invalid game config", "roomID", roomID, "error", err)
+		room.Logger.Error("invalid game config", "error", err)
 		return nil, fmt.Errorf("%w: gameCfg=%+v: %v", ErrInvalidConfig, gameCfg, err)
 	}
 
@@ -254,12 +263,12 @@ func (s *ServerStateManager) Rematch(roomID string, token string) ([2]string, er
 	room.mu.Lock()
 	defer room.mu.Unlock()
 
-	if room.PlayerTokens[0] != token && room.PlayerTokens[1] != token {
-		return [2]string{}, ErrInvalidToken
+	if err := room.validateAnyMatchPlayerToken(token); err != nil {
+		return [2]string{}, err
 	}
 
 	if room.GameCfg == nil {
-		room.Logger.Warn("previous match not found", "roomID", roomID)
+		room.Logger.Warn("previous match not found")
 		return [2]string{}, fmt.Errorf("%w: roomID=%s", ErrMatchNotFound, roomID)
 	}
 
@@ -274,6 +283,38 @@ func (s *ServerStateManager) Rematch(roomID string, token string) ([2]string, er
 	room.LastActivity = time.Now()
 
 	return room.PlayerTokens, nil
+}
+
+// DeleteMatch removes the existing concluded Match in a given MatchRoom.
+// Returns an error if any pre-check is violated.
+func (s *ServerStateManager) DeleteMatch(roomID string, token string) error {
+	roomVal, ok := s.Rooms.Load(roomID)
+	if !ok {
+		s.Logger.Warn("match room not found", "roomID", roomID)
+		return fmt.Errorf("%w: roomID=%s", ErrRoomNotFound, roomID)
+	}
+	room := roomVal.(*MatchRoom)
+
+	room.mu.Lock()
+	defer room.mu.Unlock()
+
+	if err := room.validateAnyMatchPlayerToken(token); err != nil {
+		return err
+	}
+
+	if room.Match == nil {
+		room.Logger.Info("match not found, no-op")
+		return nil
+	}
+
+	if room.Match.WinnerTeamID == 0 {
+		room.Logger.Warn("match still in progress")
+		return fmt.Errorf("%w: roomID=%s", ErrMatchInProgress, roomID)
+	}
+
+	room.Match = nil
+
+	return nil
 }
 
 // GetMatchState gets the WorkingState of the Match in a given MatchRoom.
@@ -334,7 +375,7 @@ func (s *ServerStateManager) StartTurn(roomID string, token string) (bool, []eng
 	defer room.mu.Unlock()
 
 	if room.Match == nil {
-		room.Logger.Warn("match not found", "roomID", roomID)
+		room.Logger.Warn("match not found")
 		return false, nil, fmt.Errorf("%w: roomID=%s", ErrMatchNotFound, roomID)
 	}
 
@@ -367,7 +408,7 @@ func (s *ServerStateManager) ResetTurn(roomID string, token string) (*engine.Gam
 	defer room.mu.Unlock()
 
 	if room.Match == nil {
-		room.Logger.Warn("match not found", "roomID", roomID)
+		room.Logger.Warn("match not found")
 		return nil, fmt.Errorf("%w: roomID=%s", ErrMatchNotFound, roomID)
 	}
 
@@ -396,7 +437,7 @@ func (s *ServerStateManager) ResolveTurn(roomID string, token string) ([]engine.
 	defer room.mu.Unlock()
 
 	if room.Match == nil {
-		room.Logger.Warn("match not found", "roomID", roomID)
+		room.Logger.Warn("match not found")
 		return nil, fmt.Errorf("%w: roomID=%s", ErrMatchNotFound, roomID)
 	}
 
@@ -427,7 +468,7 @@ func (s *ServerStateManager) Surrender(roomID string, teamID int, token string) 
 	room.mu.Lock()
 	if room.Match == nil {
 		room.mu.Unlock()
-		room.Logger.Warn("match not found", "roomID", roomID)
+		room.Logger.Warn("match not found")
 		return nil, fmt.Errorf("%w: roomID=%s", ErrMatchNotFound, roomID)
 	}
 
