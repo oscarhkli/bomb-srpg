@@ -37,7 +37,7 @@ func (m *Match) Surrender(teamID int) []GameEvent {
 
 	// broadcast it
 	return []GameEvent{
-		NewMatchEndedEvent(m.WinnerTeamID, false),
+		NewMatchEndedEvent(m.WinnerTeamID),
 	}
 }
 
@@ -187,8 +187,8 @@ func (gs GameState) IsLandingLegal(target Coordinate, occupantType OccupantType)
 // StartTurn sets up the environmental boundaries for the upcoming round.
 // Returns GameEvents when the match enters SuddenDeath
 func (m *Match) StartTurn() []GameEvent {
-	victoryResult, _ := m.evaluateVictoryConditions()
-	if victoryResult != MatchInProgress {
+	winner := m.evaluateVictoryConditions()
+	if winner != MatchInProgress {
 		return []GameEvent{} // Match has reached a conclusion; abort round initialization
 	}
 
@@ -243,24 +243,19 @@ func (m *Match) ResolveTurn() []GameEvent {
 	m.resolveBombExplosionAndDamage()
 
 	if m.WinnerTeamID == 0 {
-		result, winner := m.evaluateVictoryConditions()
+		winner := m.evaluateVictoryConditions()
 
-		switch result {
-		case MatchDraw:
-			m.WinnerTeamID = -1
-			m.PlaybackLog = append(m.PlaybackLog, NewMatchEndedEvent(-1, true))
-
-		case MatchWin:
-			m.WinnerTeamID = winner
-			m.PlaybackLog = append(m.PlaybackLog, NewMatchEndedEvent(winner, false))
-
-		case MatchInProgress:
+		if winner == 0 {
 			m.WorkingState.Turn++
 			m.WorkingState.ActiveTeam = ((m.WorkingState.Turn - 1) & 1) + 1
 			for _, unit := range m.WorkingState.Units {
 				unit.HasMoved = false
 				unit.HasUsedSkill = false
 			}
+		} else {
+			// Concluded with win/draw
+			m.WinnerTeamID = winner
+			m.PlaybackLog = append(m.PlaybackLog, NewMatchEndedEvent(winner))
 		}
 	}
 
@@ -426,30 +421,30 @@ func (m *Match) handleDelayedBatchDamage(
 //
 // ------------------------------------------------------
 //
-//	T    |   T    |    T    |   T    | MatchInProgress, 0
+//	T    |   T    |    T    |   T    | 0
 //
 // ------------------------------------------------------
 //
-//	T    |   T    |    T    |   F    | MatchWin, 1 (P2 misses non-king)
-//	T    |   T    |    F    |   T    | MatchWin, 1 (P2 King dead)
-//	T    |   T    |    F    |   F    | MatchWin, 1 (P2 wiped out)
-//	T    |   F    |    F    |   F    | MatchWin, 1 (P1 lone king)
+//	T    |   T    |    T    |   F    | 1 (P2 misses non-king)
+//	T    |   T    |    F    |   T    | 1 (P2 King dead)
+//	T    |   T    |    F    |   F    | 1 (P2 wiped out)
+//	T    |   F    |    F    |   F    | 1 (P1 lone king)
 //
 // ------------------------------------------------------
 //
-//	F    |   T    |    T    |   T    | MatchWin, 2 (P1 King dead)
-//	F    |   F    |    T    |   T    | MatchWin, 2 (P1 wiped out)
-//	F    |   F    |    T    |   F    | MatchWin, 2 (P2 lone King)
-//	T    |   F    |    T    |   T    | MatchWin, 2 (P1 misses non-king)
+//	F    |   T    |    T    |   T    | 2 (P1 King dead)
+//	F    |   F    |    T    |   T    | 2 (P1 wiped out)
+//	F    |   F    |    T    |   F    | 2 (P2 lone King)
+//	T    |   F    |    T    |   T    | 2 (P1 misses non-king)
 //
 // ------------------------------------------------------
 //
-//	F    |   T    |    F    |   T    | MatchDraw, -1 (Both Kings dead)
-//	F    |   T    |    F    |   F    | MatchDraw, -1 (Both Kings dead)
-//	F    |   F    |    F    |   T    | MatchDraw, -1 (Both Kings dead)
-//	F    |   F    |    F    |   F    | MatchDraw, -1 (Everyone dead)
-//	T    |   F    |    T    |   F    | MatchDraw, -1 (Mutual lone Kings)*
-func (m *Match) evaluateVictoryConditions() (VictoryResult, int) {
+//	F    |   T    |    F    |   T    | -1 (Both Kings dead)
+//	F    |   T    |    F    |   F    | -1 (Both Kings dead)
+//	F    |   F    |    F    |   T    | -1 (Both Kings dead)
+//	F    |   F    |    F    |   F    | -1 (Everyone dead)
+//	T    |   F    |    T    |   F    | -1 (Mutual lone Kings)*
+func (m *Match) evaluateVictoryConditions() int {
 	p1King, p1NonKing := false, false
 	p2King, p2NonKing := false, false
 
@@ -482,23 +477,23 @@ func (m *Match) evaluateVictoryConditions() (VictoryResult, int) {
 
 	// 1. Both teams are still strong -> The fight continues
 	if p1Goal && p2Goal {
-		return MatchInProgress, 0
+		return MatchInProgress
 	}
 
 	// 2. P1 wins if they meet their goal, OR if they have a King and P2 is wiped
 	if p1Goal || (p1King && p2Wiped) {
 		// Double check mutual wipe out edge case
 		if p2Goal || (p2King && p1Wiped) {
-			return MatchDraw, -1
+			return MatchDrawn
 		}
-		return MatchWin, 1
+		return 1
 	}
 
 	// 3. P2 wins if they meet their goal, OR if they have a King and P1 is wiped
 	if p2Goal || (p2King && p1Wiped) {
-		return MatchWin, 2
+		return 2
 	}
 
 	// 4. Anything else is a Draw
-	return MatchDraw, -1
+	return MatchDrawn
 }

@@ -7,11 +7,11 @@ import {
   SUDDEN_DEATH_PULSE_PEAK_ALPHA,
   SUDDEN_DEATH_COLOR,
 } from '../constants';
+import { createFilledRect } from './gameObjectUtils';
 import type { GameEvent } from '../types/api';
 
-// Sudden-death turn-transition effect: a full-canvas pulsing overlay, with bombs dropping from
-// the sky partway through. play() resolves after the LATER of the pulse duration and the last
-// bomb landing, so MatchScene's beginTurn() can await the whole sequence before continuing.
+// play() resolves after the LATER of the pulse duration and the last bomb landing, so
+// MatchScene's beginTurn() can await the whole sequence before continuing.
 export default class SuddenDeathCutscene {
   constructor(private readonly scene: Phaser.Scene) {}
 
@@ -21,11 +21,15 @@ export default class SuddenDeathCutscene {
   ): Promise<void> {
     const { width, height } = this.scene.cameras.main;
 
-    const overlay = this.scene.add.graphics();
-    overlay.setDepth(DEPTH_SUDDEN_DEATH_OVERLAY);
-    overlay.setScrollFactor(0);
-    overlay.fillStyle(SUDDEN_DEATH_COLOR);
-    overlay.fillRect(0, 0, width, height);
+    const overlay = createFilledRect(
+      this.scene,
+      0,
+      0,
+      width,
+      height,
+      SUDDEN_DEATH_COLOR,
+      DEPTH_SUDDEN_DEATH_OVERLAY
+    );
     overlay.alpha = 0;
 
     this.scene.tweens.add({

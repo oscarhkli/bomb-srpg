@@ -75,8 +75,18 @@ const mockGameObjectFactory = {
 export const mockScene = {
   add: mockGameObjectFactory,
   make: mockGameObjectFactory,
-  cameras: { main: { width: 1280, height: 720, centerOn: vi.fn() } },
+  cameras: {
+    main: {
+      width: 1280,
+      height: 720,
+      centerOn: vi.fn(),
+      fadeOut: vi.fn(),
+      fadeIn: vi.fn(),
+      once: vi.fn(),
+    },
+  },
   scale: { width: 1280, height: 720 },
+  scene: { restart: vi.fn(), start: vi.fn() },
   sys: { game: { config: { width: 1280, height: 720 } } },
   load: {
     image: vi.fn(),

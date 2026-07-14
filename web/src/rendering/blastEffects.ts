@@ -24,7 +24,7 @@ function tileCenter(position: Coordinate): { cx: number; cy: number } {
   };
 }
 
-// A mild flame shape (two overlapping triangles) — polish is explicitly a non-goal for spec004.
+// A mild flame shape (two overlapping triangles) — polish is explicitly out of scope here.
 export function drawFireShape(
   scene: Phaser.Scene,
   position: Coordinate
@@ -110,7 +110,7 @@ function drawSegmentRect(
 }
 
 // Renders one cardinal ray of a bomb's blast as a beam that elongates outward over time —
-// a single tween drives redraws rather than per-tile flashes, per spec004's blast dimensions.
+// a single tween drives redraws rather than per-tile flashes.
 export function drawGrowingBeam(
   scene: Phaser.Scene,
   origin: Coordinate,

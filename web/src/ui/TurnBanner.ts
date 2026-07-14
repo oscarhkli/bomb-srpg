@@ -1,15 +1,16 @@
 import type Phaser from 'phaser';
 import {
   DEPTH_TURN_BANNER,
+  FADE_MS,
   GAME_FONT_FAMILY,
+  TEAM_COLOR_FALLBACK,
   TEAM_COLORS,
-  TURN_BANNER_FADE_MS,
   TURN_BANNER_FONT_SIZE,
   TURN_BANNER_HEIGHT,
   TURN_BANNER_HOLD_MS,
   TURN_BANNER_TEXT_COLOR,
 } from '../constants';
-import { colorToCss } from './gameObjectUtils';
+import { colorToCss, createFilledRect, fadeInTargets } from './gameObjectUtils';
 
 // Full-width turn-transition banner: fades in, holds, fades out, then destroys itself.
 // play() resolves once the whole sequence (and the destroy) is complete, so MatchScene's
@@ -22,12 +23,15 @@ export default class TurnBanner {
       const { width, height } = this.scene.cameras.main;
       const y = height / 2 - TURN_BANNER_HEIGHT / 2;
 
-      const bg = this.scene.add.graphics();
-      bg.setDepth(DEPTH_TURN_BANNER);
-      bg.setScrollFactor(0);
-      bg.fillStyle(TEAM_COLORS[activeTeam] ?? 0xffffff);
-      bg.fillRect(0, y, width, TURN_BANNER_HEIGHT);
-      bg.alpha = 0;
+      const bg = createFilledRect(
+        this.scene,
+        0,
+        y,
+        width,
+        TURN_BANNER_HEIGHT,
+        TEAM_COLORS[activeTeam] ?? TEAM_COLOR_FALLBACK,
+        DEPTH_TURN_BANNER
+      );
 
       const text = this.scene.add.text(
         width / 2,
@@ -42,7 +46,6 @@ export default class TurnBanner {
       text.setOrigin(0.5);
       text.setDepth(DEPTH_TURN_BANNER);
       text.setScrollFactor(0);
-      text.alpha = 0;
 
       const targets = [bg, text];
 
@@ -56,7 +59,7 @@ export default class TurnBanner {
         this.scene.tweens.add({
           targets,
           alpha: 0,
-          duration: TURN_BANNER_FADE_MS,
+          duration: FADE_MS,
           onComplete: destroyAndResolve,
         });
       };
@@ -65,12 +68,7 @@ export default class TurnBanner {
         this.scene.time.delayedCall(TURN_BANNER_HOLD_MS, fadeOut);
       };
 
-      this.scene.tweens.add({
-        targets,
-        alpha: 1,
-        duration: TURN_BANNER_FADE_MS,
-        onComplete: hold,
-      });
+      fadeInTargets(this.scene, targets, FADE_MS, hold);
     });
   }
 }

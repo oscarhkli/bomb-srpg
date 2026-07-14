@@ -13,8 +13,9 @@ import {
   resolveTurn,
   surrender,
   getMatchConfig,
-  getVictoryResult,
   getAllowedTiles,
+  rematch,
+  deleteMatch,
 } from './api';
 import { makeState, makeCfg, makeBombPlacedEvent } from '../test/fixtures';
 import type {
@@ -129,6 +130,52 @@ describe('api.ts', () => {
       expect(error).toBeInstanceOf(ApiError);
       expect((error as ApiError).status).toBe(400);
       expect((error as ApiError).message).toContain('invalid game config');
+    });
+  });
+
+  describe('rematch', () => {
+    it('should POST game config and return player tokens', async () => {
+      const resp = { success: true, playerTokens: ['token1', 'token2'] };
+      mockOk(201, resp);
+
+      const result = await rematch();
+
+      expect(result).toEqual(resp);
+      const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
+      expect(url).toContain('/api/match-rooms/test-room-123/rematch');
+      expect(options.method).toBe('POST');
+      expect(options.headers).toHaveProperty('Authorization', 'Bearer test-token-abc');
+    });
+
+    it('should throw ApiError on invalid config', async () => {
+      mockErr(401, 'invalid token');
+
+      const error = await rematch().catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(ApiError);
+      expect((error as ApiError).status).toBe(401);
+      expect((error as ApiError).message).toContain('invalid token');
+    });
+  });
+
+  describe('deleteMatch', () => {
+    it('should DELETE with auth and resolve with no content', async () => {
+      mockOk(204, undefined);
+
+      await expect(deleteMatch()).resolves.toBeUndefined();
+
+      const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
+      expect(url).toContain('/api/match-rooms/test-room-123/match');
+      expect(options.method).toBe('DELETE');
+      expect(options.headers).toHaveProperty('Authorization', 'Bearer test-token-abc');
+    });
+
+    it('should throw ApiError when match still in progress', async () => {
+      mockErr(409, 'match still in progress');
+
+      const error = await deleteMatch().catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(ApiError);
+      expect((error as ApiError).status).toBe(409);
+      expect((error as ApiError).message).toBe('match still in progress');
     });
   });
 
@@ -299,29 +346,6 @@ describe('api.ts', () => {
       mockErr(404, 'match not found');
 
       await expect(getMatchConfig()).rejects.toThrow(ApiError);
-    });
-  });
-
-  describe('getVictoryResult', () => {
-    it('should GET and return events', async () => {
-      const fixture: GameEvent[] = [{ type: 'matchEnded', winnerTeamId: 1 }];
-      mockOk(200, fixture);
-
-      const result = await getVictoryResult();
-
-      expect(result).toEqual(fixture);
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/match-rooms/test-room-123/match/victory')
-      );
-    });
-
-    it('should throw ApiError with status 501 (not yet implemented)', async () => {
-      mockErr(501, 'not yet implemented');
-
-      const error = await getVictoryResult().catch((e: unknown) => e);
-      expect(error).toBeInstanceOf(ApiError);
-      expect((error as ApiError).status).toBe(501);
-      expect((error as ApiError).message).toContain('not yet implemented');
     });
   });
 

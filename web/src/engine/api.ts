@@ -91,6 +91,27 @@ export async function createMatch(req: CreateMatchRequest): Promise<CreateMatchR
   return handleResponse<CreateMatchResponse>(res);
 }
 
+export async function rematch(): Promise<CreateMatchResponse> {
+  const roomId = requireRoomId();
+  const res = await fetch(buildUrl(`/api/match-rooms/${roomId}/rematch`), {
+    method: 'POST',
+    headers: authHeaders(),
+  });
+  return handleResponse<CreateMatchResponse>(res);
+}
+
+export async function deleteMatch(): Promise<void> {
+  const roomId = requireRoomId();
+  const res = await fetch(buildUrl(`/api/match-rooms/${roomId}/match`), {
+    method: 'DELETE',
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    const message = await res.text();
+    throw new ApiError(res.status, message);
+  }
+}
+
 export async function getMatchState(): Promise<GameState> {
   const roomId = requireRoomId();
   const res = await fetch(buildUrl(`/api/match-rooms/${roomId}/match/state`));
@@ -148,12 +169,6 @@ export async function getMatchConfig(): Promise<GameCfg> {
   const roomId = requireRoomId();
   const res = await fetch(buildUrl(`/api/match-rooms/${roomId}/match/config`));
   return handleResponse<GameCfg>(res);
-}
-
-export async function getVictoryResult(): Promise<GameEvent[]> {
-  const roomId = requireRoomId();
-  const res = await fetch(buildUrl(`/api/match-rooms/${roomId}/match/victory`));
-  return handleResponse<GameEvent[]>(res);
 }
 
 export async function getAllowedTiles(req: AllowedTilesRequest): Promise<AllowedTilesResponse> {

@@ -20,9 +20,9 @@ specs:
     category: MatchScene
     completion-date: 2026-07-12
   - file: match-p3-spec006.md
-    status: Draft
+    status: Done
     category: MatchScene
-    completion-date:
+    completion-date: 2026-07-14
   - file: match-p3-spec007.md
     status: Parked Draft
     category: MatchScene
@@ -55,3 +55,7 @@ specs:
     status: Parked Draft
     category: TitleScene
     completion-date:
+  - file: stage-p3-spec001.md
+    status: Parked Draft
+    category: StageSetupScene
+    completion-date: 

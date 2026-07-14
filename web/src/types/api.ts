@@ -115,7 +115,6 @@ export interface GameEvent {
   countdown?: number;
   affectedPositions?: Coordinate[];
   winnerTeamId?: number;
-  isDraw?: boolean;
 }
 
 export interface GameCfg {

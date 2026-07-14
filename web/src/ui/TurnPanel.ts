@@ -2,6 +2,7 @@ import type Phaser from 'phaser';
 import {
   DEPTH_TURN_COMMAND_PANEL,
   GAME_FONT_FAMILY,
+  TEAM_COLOR_FALLBACK,
   TEAM_COLORS,
   TURN_PANEL_HEIGHT,
   TURN_PANEL_MARGIN,
@@ -32,7 +33,7 @@ export default class TurnPanel {
     const header = this.scene.add.graphics();
     header.setDepth(DEPTH_TURN_COMMAND_PANEL);
     header.setScrollFactor(0);
-    header.fillStyle(TEAM_COLORS[activeTeam] ?? 0xffffff);
+    header.fillStyle(TEAM_COLORS[activeTeam] ?? TEAM_COLOR_FALLBACK);
     header.fillRoundedRect(x, y, TURN_PANEL_WIDTH, HEADER_HEIGHT, 4);
     this.objects.push(header);
 
