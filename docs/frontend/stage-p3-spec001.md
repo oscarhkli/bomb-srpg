@@ -1,5 +1,5 @@
 ---
-title: "Phase 3.8: Match Settings Scene"
+title: "Phase 3.x: Match Settings Scene"
 ---
 
 # Match Settings Scene

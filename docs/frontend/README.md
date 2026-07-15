@@ -23,9 +23,9 @@ Specs will be written prior to development—partly handcrafted, and partly gene
 | [Phase 3.9: Render Occupant Information](match-p3-spec009.md) | MatchScene | Parked Draft | — |
 | [Phase 3.10: Render Camera Navigation](match-p3-spec010.md) | MatchScene | Parked Draft | — |
 | [Phase 5.1: 2.5D Isometric Grid](match-p5-spec001.md) | MatchScene | Parked Draft | — |
-| [Phase 3.TBD: Lounge Scene](lounge-p3-spec001.md) | LoungeScene | Parked Draft | — |
-| [Phase 3.TBD: Title Scene](title-p3-spec001.md) | TitleScene | Parked Draft | — |
-| [Phase 3.8: Match Settings Scene](stage-p3-spec001.md) | StageSetupScene | Parked Draft | — |
+| [Phase 3.x: Lounge Scene](lounge-p3-spec001.md) | LoungeScene | Parked Draft | — |
+| [Phase 3.x: Title Scene](title-p3-spec001.md) | TitleScene | Parked Draft | — |
+| [Phase 3.x: Match Settings Scene](stage-p3-spec001.md) | StageSetupScene | Parked Draft | — |
 <!-- END SPEC TABLE -->
 
 ## Workflow

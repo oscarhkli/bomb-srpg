@@ -8,7 +8,7 @@ As of Phase 3.6, the Players have to play the whole game to go back to `MatchSet
 
 ## Goal
 
-- Add `surrenderButton` to restart a match.
+- Add `SurrenderButton` to restart a match.
 - Add `ResetTurnButton` to reset the `WorkingState`.
 - Render `MatchSummaryPanel` to keep all 3 `TurnLifeCycleButtons`
 
@@ -24,13 +24,15 @@ No change from spec006.
 
 There are 3 Turn Life-cycle operations in the game, `ResolveTurn`, `ResetTurn` and `Surrender`. Unlike `TurnCommand` which manipulate the `WorkingState`, Turn Life-cycle operations manipulate the whole turn data.
 
+**Interaction lock contract (applies project-wide):** Any action that triggers a server call — including `ResolveTurnButton`, `ResetTurnButton`, `SurrenderButton` here, and `ConfirmDialog`'s `yesButton` for `moveButton`/`placeBombButton` (`TurnCommandPanel`, see `match-p3-spec003.md`) — must disable all user interactions the instant the call is triggered, and only re-enable them once the server has responded (success or error). Re-rendering/animation is a parallel concern and must not gate when interactions re-enable.
+
 ## MatchSummary Panel
 
 `MatchSummaryPanel` is a panel rendered on top of `MatchScene`.
 
 ## MatchSummary Button
 
-`MatchScene` renders a **48x48px** rounded square at the top right hand corner, which should mirror the position of `TurnPanel`, leaving 48px space from the top and right edges. Its depth is same as `TurnCommandPanel`. The button contains a menu symbol `≡` in font colo `0xffffff` and font size and  **48px**
+`MatchScene` renders a **48x48px** rounded square at the top right hand corner, which should mirror the position of `TurnPanel`, leaving 48px space from the top and right edges. Its depth is same as `TurnCommandPanel`. The button contains a menu symbol `≡` in font color `0xffffff` and font size **48px**
 
 When the Player clicks `MatchSummaryButton`, `MatchSummaryPanel` will be rendered as the below section. 
 
@@ -39,18 +41,18 @@ When the Player clicks `MatchSummaryButton`, `MatchSummaryPanel` will be rendere
 The `MatchSummaryPanel` fades in in **200ms**, stays on `MatchScene` until the Player closes it and fades out in **200ms**. **All user interactions disabled except the buttons in `MatchSummaryPanel` until this panel is closed.**
 
 - A dim background layer (semi-transparent scrim, consistent with `ConfirmDialog`'s dim background) covering **100% width, 100% height**.
-- A transparent panel should be placed in the center of `MatchSummaryPanel` in **640Wx640Hpx** and leave **48px** margins on 4 sides. This panel is for rendering alignment. If `MatchSummaryPanel` itself can achieve that, drop this transparent panel.
-  - Font color and size are `0xffffff` and **48x**. The components are center-aligned within their own column.
-  - The top **15%** of the panel is for displaying `gameCfg.stagePreset` and `gameCfg.maxTurns`. Render these in a 2-columm style.
+- The panel's content area is centered on screen, **640Wx640Hpx**, with **48px** margin from the screen edges on all sides.
+  - Font color and size are `0xffffff` and **48px**. The components are center-aligned within their own column.
+  - The top **15%** of the panel is for displaying `gameCfg.stagePreset` and `gameCfg.maxTurns`. Render these in a 2-column style.
   - The next **35%** of the panel is for displaying the match data. Render these in a 3-column style.
     - Living Units can be counted by `units` with `HP > 0` per Team.
     - Available Bombs can be counted by `unit.maxBombCount - unit.bombUsed` for each `unit` with `HP > 0` per Team.
-  - The buttom half of this panel is for 3 `TurnLifeCycleButtons` and  `MatchSummaryPanelBackButton`
+  - The bottom half of this panel is for 3 `TurnLifeCycleButtons` and  `MatchSummaryPanelBackButton`
     - Move `ResolveTurnButton` originally in `MatchScene` to `MatchSummaryPanel`.
     - Render `ResetTurnButton`, `SurrenderButton` and `MatchSummaryPanelBackButton` below `ResolveTurnButton`. Each button should leave **12px** gap at the bottom.
-    - All `Yes` handlers in `ConfirmDialog` triggered by 3 `TurnLifeCycleButtons` should start with closing `MatchSummaryPanel`, followed by their correspondings actions.
+    - All `Yes` handlers in `ConfirmDialog` triggered by 3 `TurnLifeCycleButtons` should start with closing `MatchSummaryPanel`, followed by their corresponding actions.
 
-Sample representation for the transpoarent panel:
+Sample representation for the transparent panel:
   ```text
   +-------------------------------------+
   |                                     |
@@ -83,10 +85,17 @@ The only 3 differences are:
 
 ### Click Handler of Surrender Button
 
+- Interactions lock on click, per the [Interaction lock contract](#turnlifecycle-buttons), and stay locked until `surrender()` responds.
 - Call surrender(). `matchEndedEvent` should be returned from the backend.
 - Render `VictoryCutscene` just as when match is concluded during `resolveTurn`.
 
 ## Reset Button
+
+> Note: `ResetTurn` is a **user-initiated** turn rollback only. It is **not** the client's
+> error-recovery path — a rejected/failed command resyncs via `getMatchState()` per
+> `match-p3-spec008.md` (Render-Path Contract, caller (c)), which must not route through Reset (that
+> would discard the turn's other planned actions). Reset's masked re-render is caller (b) of that
+> same contract.
 
 Same visual effect as `SurrenderButton`, except:
 
@@ -98,11 +107,12 @@ Same visual effect as `SurrenderButton`, except:
 
 After clicking this button, a series of actions will be executed:
 
-- Dim the whole canvas in **200ms**, just like fading out.
+- Interactions lock on click, per the [Interaction lock contract](#turnlifecycle-buttons), and stay locked through `resetTurn()`'s response.
+- In parallel, dim the whole canvas in **200ms**, just like fading out, to mask the re-render.
 - While dimming the screen, call `resetTurn()` to notify the backend to `ResetTurn()`.
 - If the response is not **HTTP 200**, log the error in `ErrorPanel`.
 - If the response is **HTTP 200**, re-fetch and re-render from `getMatchState()`. After that, go back to [Game Loop #5.4](match-p3-spec005.md#game-loop).
-- After the re-rendering completes, undim the whole canvas in **200ms**, just like fading in.
+- After the re-rendering completes, undim the whole canvas in **200ms**, just like fading in. Interactions re-enable once `resetTurn()` has responded — this is independent of when the dim/undim/re-render visuals finish.
 > Note: ResetTurn() rollback to the state **after** Sudden Death hazard being injected. There is no need to re-render Sudden Death related animations.
 
 ## MatchSummaryPanelBack Button

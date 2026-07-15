@@ -78,24 +78,24 @@ The `TurnBanner` fades in in **200ms**, stays on `MatchScene` for **2sec** and f
 
 The section states the whole game loop as of Phase 3.5. `MatchScene` may have to adjust accordingly.
 
-> Render-path performance (render grid once, drop redundant re-render / sanity checks) is out of scope — tracked in `match-p3-spec011.md`.
+> Render-path performance (render grid once, drop redundant re-render / sanity checks) is out of scope — tracked in `match-p3-spec008.md`.
 
 1. `MatchScene` is launched by `LoungeScene` after a successful `createMatch()`. **All user interactions disabled.**
 2. `roomId` and `playerTokens` are stored in `MatchScene`.
 3. Render the environment, i.e., `grid`.
 4. `getMatchState()` to render the `occupants` and `TurnPanel` — the initial full-board render.
 5. Start the Game Loop:
-    1.  **All user interactions disabled.**
-    2. `getMatchState()`, `initToken()` and update `TurnPanel`. This is a per-turn **refresh** — whether it re-renders the board or only refreshes the interaction maps is the spec011 question noted above.
-    3. `startTurn()`: render the `TurnBanner`, and — if `inSuddenDeath` — refresh `gameState` via `getMatchState()` (see [Sudden Death](#sudden-death)) before rendering the `SuddenDeathCutscene` + dropped `bombs`.
-    4. **All user interactions enabled.**
-    5. (Optional) Player's interaction loop:
-      1. If `move`, **All user interactions disabled.**. Then `move` the unit according to `unitMovedEvent`.
-      2. If `placeBomb`. **All user interactions disabled.**. Then render a new `bomb` according to `bombPlacedEvent`.
-      3. **All user interactions enabled.**
-    6. Player clicks `resolveTurn`. **All user interactions disabled.**
-    7. Render all `gameEvents` returned from backend's `ResolveTurn`.
-    8. (To be done in `match-p3-spec006.md`) Check `victoryResult` and break the Game Loop in the match has concluded. Otherwise, go back to **5.1**.
+   1. **All user interactions disabled.**
+   2. `getMatchState()`, `initToken()` and update `TurnPanel`. This is a per-turn **refresh** — whether it re-renders the board or only refreshes the interaction maps is the spec011 question noted above.
+   3. `startTurn()`: render the `TurnBanner`, and — if `inSuddenDeath` — refresh `gameState` via `getMatchState()` (see [Sudden Death](#sudden-death)) before rendering the `SuddenDeathCutscene` + dropped `bombs`.
+   4. **All user interactions enabled.**
+   5. (Optional) Player's interaction loop:
+   6. If `move`, **All user interactions disabled.**. Then `move` the unit according to `unitMovedEvent`.
+   7. If `placeBomb`. **All user interactions disabled.**. Then render a new `bomb` according to `bombPlacedEvent`.
+   8. **All user interactions enabled.**
+   9. Player clicks `resolveTurn`. **All user interactions disabled.**
+   10. Render all `gameEvents` returned from backend's `ResolveTurn`.
+   11. (To be done in `match-p3-spec006.md`) Check `victoryResult` and break the Game Loop in the match has concluded. Otherwise, go back to **5.1**.
 
 ---
 

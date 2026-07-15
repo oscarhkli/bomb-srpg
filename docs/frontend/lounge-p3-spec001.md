@@ -1,5 +1,5 @@
 ---
-title: "Phase 3.TBD: Lounge Scene"
+title: "Phase 3.x: Lounge Scene"
 ---
 
 # Lounge Scene
