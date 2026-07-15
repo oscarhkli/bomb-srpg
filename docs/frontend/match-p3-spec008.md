@@ -1,60 +1,27 @@
 ---
-title: "Phase 3.8: Surrender"
+title: "Phase 3.8: MatchScene Render-Path Cleanup"
 ---
 
-# Surrender
+# MatchScene Render-Path Cleanup
 
-Ignore the below as it's only a copied template.
+## Context
 
-## Scene Entry
+Deferred out of `match-p3-spec005.md` so the full game cycle lands first, regardless of
+performance. Open questions carried over from that spec's Game Loop section:
 
-Who launches this scene and what data it receives.
+1. Since we have no plan to change tileType in the mid-game, should we render the grid in the beginning instead re-rendering everytime in `renderBoard()`? The current flow does redundant rendering.
+2. Since we trust what the backend provides, the frontend mostly only do the rendering and player's interaction, is current sanity check really necessary, or YAGNI?
+3. If sanity check isn't necessary, do we really need to re-render every time when we refresh `gameState`?
 
-### Data on arrival
+### Why the Game Loop calls `getMatchState()` twice
 
-| Field   | Type   | Source              |
-| ------- | ------ | ------------------- |
-| `field` | `type` | Where it comes from |
+The two calls have different jobs, which is the concrete ground for Q1/Q3:
 
-### Initialisation sequence
+- The **initial** call (before the loop) is the *only* full-board paint — it renders `grid` + `occupants` so there is something on screen before the loop begins. Without it, nothing is drawn.
+- Every **per-turn** call inside the loop is a *refresh* — it repopulates the interaction maps for the player's turn and hands a fresh `gameState` snapshot to the subsequent `resolveTurn` events.
 
-Steps `create()` must perform, in order.
+So if per-turn re-render is dropped, only the initial call paints the board wholesale; the per-turn calls just refresh the maps and feed the event handlers. That is the tradeoff Q1/Q3 are weighing.
 
----
+## Non-Goal
 
-<!-- OPTIONAL SECTIONS — remove if not applicable -->
-
-## Layout _(optional — scenes with a game world)_
-
-Camera model, canvas resolution, coordinate system.
-
-## Data Fetching _(optional — scenes that call the backend)_
-
-Which API functions are called, when, and how often.
-
-## Visual Spec _(optional — scenes with custom rendering)_
-
-What each rendered element looks like (shape, color, size).
-Reference `constants.ts` for named values; avoid hardcoded hex here.
-
-## Scene Exit _(optional — scenes with multiple destinations)_
-
-| Trigger         | Destination |
-| --------------- | ----------- |
-| Event or action | Next scene  |
-
-## Dev Bootstrap _(optional — prerequisite scene not yet built)_
-
-Temporary scaffolding to run this scene in isolation during development.
-Remove once the real predecessor scene is implemented.
-
----
-
-## Acceptance Criteria
-
-1. Given … When … Then …
-2. Given … When … Then …
-
-## Log _(optional - remove it if no implementatioun issue is found)_
-
-Implementation issues found during the build (non spec gaps) are tracked in [`match-p3-spec001-log.md`](./match-p3-spec001-log.md).
+- Any gameplay or turn-lifecycle behavior change.
