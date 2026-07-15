@@ -78,7 +78,7 @@ The `TurnBanner` fades in in **200ms**, stays on `MatchScene` for **2sec** and f
 
 The section states the whole game loop as of Phase 3.5. `MatchScene` may have to adjust accordingly.
 
-> Render-path performance (render grid once, drop redundant re-render / sanity checks) is out of scope — tracked in `match-p3-spec008.md`.
+> Render-path performance (render grid once, drop redundant re-render / sanity checks) is out of scope — tracked in `match-p3-spec007.md`.
 
 1. `MatchScene` is launched by `LoungeScene` after a successful `createMatch()`. **All user interactions disabled.**
 2. `roomId` and `playerTokens` are stored in `MatchScene`.

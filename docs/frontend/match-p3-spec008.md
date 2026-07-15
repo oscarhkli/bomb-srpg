@@ -1,157 +1,133 @@
 ---
-title: "Phase 3.8: MatchScene Render-Path Cleanup"
+title: "Phase 3.8 Surrender, Reset, and MatchSummaryPanel"
 ---
 
-# MatchScene Render-Path Cleanup
+# Surrender
 
-## Context
-
-Deferred out of `match-p3-spec005.md` so the full game cycle landed first, regardless of
-performance. spec005's "Game Loop" framing (and its "why `getMatchState()` is called twice"
-reasoning) has since drifted from the code: `MatchScene` is now event-driven
-(`beginTurn` / `handleTurnCommand` / `handleResolveTurn`), and the per-turn-start refresh already
-avoids a wholesale redraw.
-
-Re-grounded against the current code, a small set of redundant, animation-hostile pieces survive
-after the initial paint — they are the target of this cleanup:
-
-- **One unconditional wholesale redraw:** post-resolve (`refreshFinalSanityCheckAfterResolve`,
-  `MatchScene.ts:582`). It fully destroys and repaints the board *after* `resolveTurnPlayer` has
-  already animated everything to its end-state — a redraw that snaps sprites to rest state (a
-  visible frame-skip once sprites animate).
-- **A proactive happy-path diff:** after every *successful* command/resolve, `stateSync.ts`
-  (`turnCommandTargetMatches`, `occupantsMatch`, `extractAppliedTarget`) refetches state and
-  compares it against the server's own just-applied events — i.e. it compares the server to
-  itself.
-
-### Why the proactive diff earns nothing (and what actually does)
-
-The client applies the server's *own* returned events optimistically (tween move, `renderBomb`,
-`resolveTurnPlayer`); `submitTurnCommand` even persists to server-side `WorkingState` first, so the
-render is an echo of an authoritative mutation, not a speculative guess. A post-*success* diff can
-therefore only diverge through a client apply-*code* bug — deterministic, and a test's job, not a
-runtime one.
-
-The one class of divergence that is *not* a code bug is **network non-determinism** (a lost,
-duplicated, or reordered response): the server advanced but the client did not observe it, so its
-`gameState`/graphics lag reality. This is real, and the correct cure is a **reactive** resync — but
-only on the *error/ambiguous* path, never on the happy path. Two mechanisms already handle it and
-are **kept**: (1) the per-op `getMatchState()` refetch overwrites `gameState` with truth after each
-operation; (2) the existing error-path `renderBoard()` resyncs the graphics after a rejected/failed
-command. This spec keeps the reactive layer and removes only the worthless proactive diff.
+As of Phase 3.6, the Players have to play the whole game to go back to `MatchSettingsScene`. Phase 3.8 provides a way to end the match prematurely. This phase also allows Players to reset the sandbox (GameState.WorkingState) back to original (GameState.TrueState) for rollback, and groups all 3 `TurnLifeCycleButtons` into `MatchSummaryPanel` instead of leaving on `MatchScene` randomly.
 
 ## Goal
 
-Establish a single render-path contract (below) and remove the redundant / animation-hostile
-pieces:
-
-1. **Grid rendered once, in its own persistent layer.** `tileType` is immutable for a match, so the
-   grid is painted at scene entry into a **separate terrain layer** that is never destroyed —
-   distinct from the occupant graphics. No wholesale swap (entry aside), including Reset and
-   error recovery, rebuilds it. *(This terrain layer is also the natural seam for a future
-   mutable-`tileType` feature: a tile change would arrive as a server event and update that one
-   tile in place — the same event-driven pattern as occupants — rather than forcing a full rebuild.
-   Building that is out of scope; see Non-Goal.)*
-2. **`renderBoard()` becomes a masked / entry / error-recovery wholesale *occupant* swap** — it
-   rebuilds the occupant layer from truth and leaves the terrain layer untouched; never an unmasked
-   *happy-path* reconciliation tool (see Contract).
-3. **Happy-path visuals are in-place.** On a *successful* move (tween), bomb placement
-   (`renderBomb`), or resolve (`resolveTurnPlayer`), the occupant graphics maps mutate in place; no
-   wholesale redraw follows.
-4. **Drop the proactive diff; keep the reactive recovery.** Remove `turnCommandTargetMatches`,
-   `extractAppliedTarget`, and the happy-path `renderBoard()` + "out of sync" error. Retain the
-   error-path refetch + `renderBoard()` (network recovery) and the per-op `gameState` refetch.
-5. **Relocate `occupantsMatch` to a test oracle.** Its "graphics maps contain exactly the occupants
-   truth says exist" invariant is the assertion for `resolveTurnPlayer` / render-fidelity tests —
-   the right place to catch the apply-code bugs a runtime diff cannot justify guarding. Keep the
-   logic test-side; remove it from the production render path.
-
-## Render-Path Contract
-
-> A full `renderBoard()` (destroy-and-repaint the **occupant** layer from server truth) is a
-> **deliberate wholesale occupant swap**. It runs only at scene entry, behind a screen mask, or on
-> the error/recovery path — never on the *happy* path, because a destroy-and-repaint snaps sprites
-> to rest state (a visible frame-skip mid-animation). The **terrain layer is never in scope** of a
-> swap: it is painted once at entry and persists.
-
-Sanctioned wholesale-redraw callers. **At spec008 implementation time only (a) and (c) are live —
-(b) is a future caller that lands with spec007** (which this spec is sequenced before), so the
-implementer should not expect a Reset path to exist yet:
-
-- **(a) `create()` initial paint** — the one time the **terrain layer** is painted, plus the initial
-  occupant paint, at scene entry. **Resume-from-reload** (a browser refresh that wipes in-memory
-  state and re-runs `create()`) is the *same* path: it rehydrates `roomId`/tokens, calls
-  `getMatchState()`, and full-paints whatever truth the server returns. No new render mechanism.
-- **(b) Reset (spec007, future)** — its flow dims the canvas, refetches `getMatchState()`, rebuilds
-  occupants, then undims (spec007 §"Reset Button"). The redraw is hidden by the fade, so it is
-  animation-safe. *(Forward-declared here; implemented in spec007. spec008 only defines the
-  contract Reset uses.)*
-- **(c) Error-path recovery** — when a command or resolve is **rejected or its response fails**, the
-  client refetches `getMatchState()` and rebuilds occupants to resync (recovers network
-  non-determinism, e.g. a lost/duplicated response). This is an interrupt, not the happy path, so a
-  snap is acceptable.
-
-Between wholesale redraws:
-
-- **The terrain layer persists** (painted once at entry); no operation rebuilds it.
-- **The occupant graphics maps (`unitGraphicsById` / `bombGraphicsById` / `softBlockGraphicsById`)
-  are the live on-screen truth**, mutated in place by tweens / `renderBomb` / `resolveTurnPlayer`.
-- **`this.gameState` is kept current** via the existing per-op `getMatchState()` refetch (the
-  resolve snapshot and next turn depend on it). This refetch is *retained*; only the proactive diff
-  and the happy-path redraw layered on top of it are removed.
+- Add `SurrenderButton` to restart a match.
+- Add `ResetTurnButton` to reset the `WorkingState`.
+- Render `MatchSummaryPanel` to keep all 3 `TurnLifeCycleButtons`
 
 ## Non-Goal
 
-- Any gameplay or turn-lifecycle behavior change. In particular, the post-resolve
-  `turnPanel.update()` and `renderResolveButton()` are turn-advance UI, **not** reconciliation —
-  they stay.
-- Implementing spec007's Reset itself (this spec only defines the contract Reset will use).
-- Session resume / reconnection (persisting `roomId`/tokens, `startTurn()` idempotency on a mid-turn
-  reload). Resume *uses* caller (a) but its lifecycle plumbing is a separate spec — and a
-  turn-lifecycle concern this spec explicitly leaves untouched.
-- Sudden-death, victory, and rematch flows are untouched.
+- HUD.
+
+## Scene Entry
+
+No change from spec006.
+
+## TurnLifeCycle Buttons
+
+There are 3 Turn Life-cycle operations in the game, `ResolveTurn`, `ResetTurn` and `Surrender`. Unlike `TurnCommand` which manipulate the `WorkingState`, Turn Life-cycle operations manipulate the whole turn data.
+
+**Interaction lock contract (applies project-wide):** Any action that triggers a server call — including `ResolveTurnButton`, `ResetTurnButton`, `SurrenderButton` here, and `ConfirmDialog`'s `yesButton` for `moveButton`/`placeBombButton` (`TurnCommandPanel`, see `match-p3-spec003.md`) — must disable all user interactions the instant the call is triggered, and only re-enable them once the server has responded (success or error). Re-rendering/animation is a parallel concern and must not gate when interactions re-enable.
+
+## MatchSummary Panel
+
+`MatchSummaryPanel` is a panel rendered on top of `MatchScene`.
+
+## MatchSummary Button
+
+`MatchScene` renders a **48x48px** rounded square at the top right hand corner, which should mirror the position of `TurnPanel`, leaving 48px space from the top and right edges. Its depth is same as `TurnCommandPanel`. The button contains a menu symbol `≡` in font color `0xffffff` and font size **48px**
+
+When the Player clicks `MatchSummaryButton`, `MatchSummaryPanel` will be rendered as the below section. 
+
+### Visual Effect of MatchSummary Panel
+
+The `MatchSummaryPanel` fades in in **200ms**, stays on `MatchScene` until the Player closes it and fades out in **200ms**. **All user interactions disabled except the buttons in `MatchSummaryPanel` until this panel is closed.**
+
+- A dim background layer (semi-transparent scrim, consistent with `ConfirmDialog`'s dim background) covering **100% width, 100% height**.
+- The panel's content area is centered on screen, **640Wx640Hpx**, with **48px** margin from the screen edges on all sides.
+  - Font color and size are `0xffffff` and **48px**. The components are center-aligned within their own column.
+  - The top **15%** of the panel is for displaying `gameCfg.stagePreset` and `gameCfg.maxTurns`. Render these in a 2-column style.
+  - The next **35%** of the panel is for displaying the match data. Render these in a 3-column style.
+    - Living Units can be counted by `units` with `HP > 0` per Team.
+    - Available Bombs can be counted by `unit.maxBombCount - unit.bombUsed` for each `unit` with `HP > 0` per Team.
+  - The bottom half of this panel is for 3 `TurnLifeCycleButtons` and  `MatchSummaryPanelBackButton`
+    - Move `ResolveTurnButton` originally in `MatchScene` to `MatchSummaryPanel`.
+    - Render `ResetTurnButton`, `SurrenderButton` and `MatchSummaryPanelBackButton` below `ResolveTurnButton`. Each button should leave **12px** gap at the bottom.
+    - All `Yes` handlers in `ConfirmDialog` triggered by 3 `TurnLifeCycleButtons` should start with closing `MatchSummaryPanel`, followed by their corresponding actions.
+
+Sample representation for the transparent panel:
+  ```text
+  +-------------------------------------+
+  |                                     |
+  |      Stage                MAP01     |
+  |    Max Turns               30       |
+  |                                     |
+  |                                     |
+  |   P1                          P2    |
+  |    5       Living Units        3    |
+  |    2      Available Bombs      4    |
+  |                                     |
+  |                                     | 
+  |         [ResolveTurnButton]         |
+  |          [ResetTurnButton]          |
+  |          [SurrenderButton]          |
+  |     [MatchSummaryPanelBackButton]   |
+  |                                     |
+  +-------------------------------------+
+```
+
+## Surrender Button
+
+`SurrenderButton` is one the Game Lifecycle Command buttons, which falls in the same category of `ResolveTurnButton`. Therefore, the rendering spec (fill, border, font) should stay consistent. [Follow how `ResolveTurnButton` is rendered, and how Player interacts with `ResolveTurnButton`](match-p3-spec004.md#resolveturn-button).
+
+The only 3 differences are:
+
+- `SurrenderButton` contains text `Surrender`.
+- `ConfirmDialog` shows `Confirm to surrender?`
+- After the Player chooses `Yes`, move on to [Surrender handling](#surrender-visual-effect-and-interaction)
+
+### Click Handler of Surrender Button
+
+- Interactions lock on click, per the [Interaction lock contract](#turnlifecycle-buttons), and stay locked until `surrender()` responds.
+- Call surrender(). `matchEndedEvent` should be returned from the backend.
+- Render `VictoryCutscene` just as when match is concluded during `resolveTurn`.
+
+## Reset Button
+
+> Note: `ResetTurn` is a **user-initiated** turn rollback only. It is **not** the client's
+> error-recovery path — a rejected/failed command resyncs via `getMatchState()` per
+> `match-p3-spec007.md` (Render-Path Contract, caller (c)), which must not route through Reset (that
+> would discard the turn's other planned actions). Reset's masked re-render is caller (b) of that
+> same contract.
+
+Same visual effect as `SurrenderButton`, except:
+
+- `Surrender` -> `Reset this turn`
+- `Confirm to surrender?` -> `All the actions made during this turn will be reset. Confirm?`
+- If `gameCfg.allowResetTurn = false`, `ResetTurnButton` is disabled, change all the color to `0x4c4c4c`.
+
+### Click Handler and Visual Effect of Reset Button
+
+After clicking this button, a series of actions will be executed:
+
+- Interactions lock on click, per the [Interaction lock contract](#turnlifecycle-buttons), and stay locked through `resetTurn()`'s response.
+- In parallel, dim the whole canvas in **200ms**, just like fading out, to mask the re-render.
+- While dimming the screen, call `resetTurn()` to notify the backend to `ResetTurn()`.
+- If the response is not **HTTP 200**, log the error in `ErrorPanel`.
+- If the response is **HTTP 200**, re-fetch and re-render from `getMatchState()`. After that, go back to [Game Loop #5.4](match-p3-spec005.md#game-loop).
+- After the re-rendering completes, undim the whole canvas in **200ms**, just like fading in. Interactions re-enable once `resetTurn()` has responded — this is independent of when the dim/undim/re-render visuals finish.
+> Note: ResetTurn() rollback to the state **after** Sudden Death hazard being injected. There is no need to re-render Sudden Death related animations.
+
+## MatchSummaryPanelBack Button
+
+The visual effect is as same as the 3 `TurnLifeCycleButton`. Unlike those buttons, there is no `ConfirmDialog` handling.
+
+`MatchSummaryPanelBackButton` contains text `Back`. If the Player clicks this button, it closes `MatchSummaryPanel` as the way stated in [above](#visual-effect-of-matchsummary-panel), so that Player can resume the gameplay.
 
 ---
 
 ## Acceptance Criteria
 
-1. Terrain (grid) graphics live in a separate layer, created once per scene entry, and survive
-   **every** wholesale occupant swap (entry aside — Reset, error recovery); no move, bomb, or
-   resolve destroys / recreates them.
-2. After a **successful** move or bomb command, the board updates only via the in-place tween /
-   `renderBomb`; no wholesale `renderBoard()` and no "out of sync" message. The `gameState` refetch
-   is retained.
-3. After a **successful** `resolveTurn`, the animated end-state left by `resolveTurnPlayer` stands;
-   no wholesale `renderBoard()` follows. `turnPanel` and the resolve button still refresh.
-4. When a command or resolve is **rejected or fails** (or playback reports failure), the client
-   surfaces the actual error and resyncs via `getMatchState()` + occupant rebuild. *Design note for
-   spec007:* once Reset exists, error recovery must **not** route through `ResetTurn` — Reset is a
-   user-initiated rollback that would discard the turn's other planned actions.
-5. `stateSync.ts` is **deleted** — the proactive helpers (`turnCommandTargetMatches`,
-   `extractAppliedTarget`, and the `AppliedTurnResult` type) leave with it. `occupantsMatch`'s
-   invariant is relocated **test-side** (its own test helper) and survives as the **test oracle**
-   for `resolveTurnPlayer` / render-fidelity tests. `make web-test` and `make web-lint` pass.
-6. No change to turn lifecycle, sudden-death, victory, or rematch behavior.
-
-## Testing
-
-Harness is Vitest + jsdom with `../engine/api` mocked, so tests assert **behavior** (spy on
-renderer calls, tween creation, error surfacing), not pixels. Each AC maps to a test:
-
-| AC | Test approach (mocked API, spy-based) |
-|---|---|
-| 1 — grid once | Capture terrain-layer refs after the initial paint → run a move / bomb / resolve → assert those refs are still alive and the terrain render ran exactly once. (Reset/error swaps are spec007/interrupt paths; assert there too once available that the swap rebuilds occupants but leaves terrain refs alive.) |
-| 2 — success is in-place | Mock a successful move → assert `renderBoard`/`drawBoard` **not** called beyond init, a tween **was** created, `showError` **not** called, and the `getMatchState` refetch **did** run |
-| 3 — resolve success | Mock a successful resolve → assert no `renderBoard` after playback, but `turnPanel.update` + `renderResolveButton` **were** called |
-| 4 — error recovery | Mock `submitTurnCommand` / `resolveTurn` to **reject** → assert `showError(actual error)` and an occupant rebuild **was** triggered (resync). (The "never route through `ResetTurn`" guard is a spec007-time assertion — `resetTurn` isn't wired yet.) |
-| 5 — oracle | Removal verified by compile + no lingering imports. `occupantsMatch` is exercised as the **oracle** in a table-driven `resolveTurnPlayer` test: given `(initialState, eventStream)`, play the events, then `assert occupantsMatch(expectedState, maps)` |
-| 6 — no lifecycle change | Existing `MatchScene.test.ts` lifecycle tests stay green |
-
-### Limits (do not over-trust green tests)
-
-- **Animation-safety is not unit-testable.** "No visible frame-skip on the happy path" is a visual
-  property; jsdom renders nothing. Confirm it manually via `make web-dev` click-through.
-- **Contract drift stays uncovered.** Mocked fixtures are self-authored, so if the Go server's real
-  JSON diverges from `types/api.ts`, every test above stays green while production drifts (the
-  deferred spec001 known issue #4). Closing it needs a real-server contract/integration test, not
-  more unit tests.
+1. Given `MatchSummaryButton`, When Player clicks it, Then `MatchSummaryPanel` should appear with `gameCfg`, current match state, 4 buttons.
+2. Given Player 1 clicks `SurrenderButton`, `VictoryCutscene` should be shown with Player 2 as the winner.
+3. Given Player 2 clicks `SurrenderButton`, `VictoryCutscene` should be shown with Player 1 as the winner.
+4. Given Player 1 clicks `ResetTurnButton`, `MatchScene` should revert to the state the Player 1 started, with SuddenDeath already injected if it's in Sudden Death state.
+5. Given Player 2 clicks `ResetTurnButton`, `MatchScene` should revert to the state the Player 2 started, with SuddenDeath already injected if it's in Sudden Death state.
+6. Given Player clicks `MatchSummaryPanelBackButton`, `MatchSummaryPanel` should be closed and Player should be able to continue to navigate the occupants.
