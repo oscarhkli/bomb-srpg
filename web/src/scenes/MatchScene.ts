@@ -22,13 +22,8 @@ import { drawPillButton } from '../ui/pillButton';
 import { destroyAll } from '../ui/gameObjectUtils';
 import { playResolveTurnEvents, type BombGraphics } from '../rendering/resolveTurnPlayer';
 import {
-  extractAppliedTarget,
-  turnCommandTargetMatches,
-  occupantsMatch,
-  type AppliedTurnResult,
-} from '../rendering/stateSync';
-import {
-  renderBoard as drawBoard,
+  renderTerrain,
+  renderOccupants,
   renderBomb,
   tileCenter,
   type BoardRenderContext,
@@ -74,7 +69,10 @@ export default class MatchScene extends Phaser.Scene {
   private playerTokens!: [string, string];
   private gameState!: GameState;
   private gameCfg!: GameCfg;
-  private boardObjects: Phaser.GameObjects.GameObject[] = [];
+  // The terrain (grid) is painted once per scene entry into this persistent layer; tileType is
+  // immutable for a match, so no operation rebuilds it. occupantObjects is the swappable layer.
+  private terrainObjects: Phaser.GameObjects.GameObject[] = [];
+  private occupantObjects: Phaser.GameObjects.GameObject[] = [];
   private unitGraphicsById = new Map<number, Phaser.GameObjects.Graphics>();
   private bombGraphicsById = new Map<number, BombGraphics>();
   private softBlockGraphicsById = new Map<number, Phaser.GameObjects.Graphics>();
@@ -139,7 +137,11 @@ export default class MatchScene extends Phaser.Scene {
         if (gen !== this.generation) {
           return;
         }
-        const { cols, rows } = this.renderBoard(state);
+        // Paint the immutable terrain layer once, then the occupants. Grid bounds are set here
+        // (grid is immutable, so no later swap re-sets them).
+        const { cols, rows } = renderTerrain(this.boardCtx(), state.grid);
+        this.turnCommandPanel.setGridBounds(cols * TILE_SIZE, rows * TILE_SIZE);
+        this.renderBoard(state);
         this.cameras.main.centerOn((cols * TILE_SIZE) / 2, (rows * TILE_SIZE) / 2);
         this.renderResolveButton();
         this.refreshTurnPanelIfReady();
@@ -298,7 +300,7 @@ export default class MatchScene extends Phaser.Scene {
     this.isSubmitting = true;
     this.clearErrors();
     try {
-      let applied: AppliedTurnResult | undefined;
+      let succeeded = false;
       try {
         const gameEvents = await submitTurnCommand(cmd);
         if (gen !== this.generation) {
@@ -306,13 +308,14 @@ export default class MatchScene extends Phaser.Scene {
         }
         this.allowedTilesCache.clear();
         this.turnCommandPanel.closeImmediately();
+        succeeded = true;
         for (const event of gameEvents) {
-          const ok = this.applyGameEvent(event);
-          if (!ok) {
+          if (!this.applyGameEvent(event)) {
+            // applyGameEvent already surfaced the specific "Invalid …" error.
+            succeeded = false;
             break;
           }
         }
-        applied = extractAppliedTarget(cmd, gameEvents);
       } catch (err) {
         if (gen !== this.generation) {
           return;
@@ -321,7 +324,7 @@ export default class MatchScene extends Phaser.Scene {
         this.turnCommandPanel.closeImmediately();
       }
 
-      await this.refreshFinalSanityCheck(gen, applied);
+      await this.resyncGameState(gen, succeeded);
       if (gen !== this.generation) {
         return;
       }
@@ -396,20 +399,21 @@ export default class MatchScene extends Phaser.Scene {
     return true;
   }
 
-  private async refreshFinalSanityCheck(
-    gen: number,
-    applied: AppliedTurnResult | undefined
-  ): Promise<void> {
+  // Per-op refetch that keeps gameState current (the resolve snapshot and next turn depend on it).
+  // On success the optimistic in-place visuals (tween / renderBomb) already reflect the server's
+  // own returned events, so we only adopt the fresh state — no redraw. On failure this is the
+  // reactive recovery path: rebuild the occupant layer from truth to resync (covers network
+  // non-determinism, e.g. a lost/duplicated response). The terrain layer is never rebuilt.
+  private async resyncGameState(gen: number, succeeded: boolean): Promise<void> {
     try {
       const freshState = await getMatchState();
       if (gen !== this.generation) {
         return;
       }
-      if (!applied || !turnCommandTargetMatches(freshState, applied)) {
-        this.showError('Match state is out of sync with the server');
-        this.renderBoard(freshState);
-      } else {
+      if (succeeded) {
         this.gameState = freshState;
+      } else {
+        this.renderBoard(freshState);
       }
     } catch {
       if (gen !== this.generation) {
@@ -469,6 +473,7 @@ export default class MatchScene extends Phaser.Scene {
     this.isSubmitting = true;
     this.clearErrors();
     let events: GameEvent[] = [];
+    let succeeded = false;
     try {
       try {
         events = await resolveTurn();
@@ -488,6 +493,7 @@ export default class MatchScene extends Phaser.Scene {
           if (gen !== this.generation) {
             return;
           }
+          succeeded = true;
         }
       } catch (err) {
         if (gen !== this.generation) {
@@ -495,7 +501,7 @@ export default class MatchScene extends Phaser.Scene {
         }
         this.showError(err instanceof Error ? err.message : String(err));
       }
-      await this.refreshFinalSanityCheckAfterResolve(gen);
+      await this.refreshAfterResolve(gen, succeeded);
       if (gen !== this.generation) {
         return;
       }
@@ -563,23 +569,22 @@ export default class MatchScene extends Phaser.Scene {
     });
   }
 
-  private async refreshFinalSanityCheckAfterResolve(gen: number): Promise<void> {
+  // Per-op refetch after a resolve. On success the animated end-state left by playResolveTurnEvents
+  // already reflects the server, so we only adopt the fresh state — no redraw (a wholesale repaint
+  // here would snap sprites out of their just-finished animation). On failure this is the reactive
+  // recovery path: rebuild the occupant layer from truth. turnPanel + the resolve button are
+  // turn-advance UI, not reconciliation, so they refresh regardless.
+  private async refreshAfterResolve(gen: number, succeeded: boolean): Promise<void> {
     try {
       const freshState = await getMatchState();
       if (gen !== this.generation) {
         return;
       }
-      if (
-        !occupantsMatch(
-          freshState,
-          this.unitGraphicsById,
-          this.bombGraphicsById,
-          this.softBlockGraphicsById
-        )
-      ) {
-        this.showError('Match state is out of sync with the server');
+      if (succeeded) {
+        this.gameState = freshState;
+      } else {
+        this.renderBoard(freshState);
       }
-      this.renderBoard(freshState);
       this.turnPanel.update(freshState.turn, this.gameCfg.maxTurns, freshState.activeTeam);
       this.renderResolveButton();
     } catch {
@@ -590,13 +595,13 @@ export default class MatchScene extends Phaser.Scene {
     }
   }
 
-  // Redraws the whole board and keeps the scene's grid-dependent state in sync. Returns the
-  // grid dimensions so create() can center the camera from the same source.
-  private renderBoard(state: GameState): { cols: number; rows: number } {
+  // Wholesale occupant swap: destroy-and-repaint the occupant layer from server truth and keep
+  // gameState in sync. The terrain layer is never in scope. Runs only at scene entry (after the
+  // one-time terrain paint) and on the error/recovery path — never on the happy path, where a
+  // destroy-and-repaint would snap sprites to rest state mid-animation.
+  private renderBoard(state: GameState): void {
     this.gameState = state;
-    const dims = drawBoard(this.boardCtx(), state);
-    this.turnCommandPanel.setGridBounds(dims.cols * TILE_SIZE, dims.rows * TILE_SIZE);
-    return dims;
+    renderOccupants(this.boardCtx(), state);
   }
 
   // The renderer draws occupants and wires their clicks; the scene keeps ownership of state and
@@ -604,7 +609,8 @@ export default class MatchScene extends Phaser.Scene {
   private boardCtx(): BoardRenderContext {
     return {
       scene: this,
-      boardObjects: this.boardObjects,
+      terrainObjects: this.terrainObjects,
+      occupantObjects: this.occupantObjects,
       unitGraphicsById: this.unitGraphicsById,
       bombGraphicsById: this.bombGraphicsById,
       softBlockGraphicsById: this.softBlockGraphicsById,

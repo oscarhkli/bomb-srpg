@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi, type MockInstance } from 'vitest';
 import { mockScene } from '../test/setup';
 import {
+  firstGraphics as terrainGraphics,
   occupantGraphics,
   pointerDownOf,
   errorTextByMessage,
@@ -312,12 +313,6 @@ describe('MatchScene', () => {
     expect(mockScene.tweens.add).toHaveBeenCalledWith(
       expect.objectContaining({ targets: unitGraphics, x: 48, y: 0, ease: 'Linear' })
     );
-    expect(mockScene.add.text).not.toHaveBeenCalledWith(
-      expect.any(Number),
-      expect.any(Number),
-      expect.stringContaining('out of sync'),
-      expect.objectContaining({})
-    );
   });
 
   it('handles a confirmed PlaceBomb: submits the command and renders the new bomb', async () => {
@@ -353,15 +348,15 @@ describe('MatchScene', () => {
     await flush();
 
     expect(submitTurnCommand).toHaveBeenCalledWith({ type: 'placeBomb', unitId: 7, target });
-    expect(mockScene.add.text).not.toHaveBeenCalledWith(
-      expect.any(Number),
-      expect.any(Number),
-      expect.stringContaining('out of sync'),
-      expect.objectContaining({})
-    );
+    // In-place render (renderBomb), not a wholesale swap: a bomb container is drawn at the
+    // target tile center (tileCenter of {x:1,y:0} = 72,24) and the initial unit graphics survives.
+    expect(mockScene.add.container).toHaveBeenCalledWith(72, 24, expect.any(Array));
+    expect(unitGraphics.destroy).not.toHaveBeenCalled();
   });
 
-  it('shows an error and still refreshes state when submitTurnCommand rejects', async () => {
+  // AC4: a rejected command surfaces the *actual* server error and resyncs by rebuilding the
+  // occupant layer from truth, while the terrain layer survives the swap.
+  it('shows the actual error and resyncs by rebuilding occupants (terrain untouched) when submitTurnCommand rejects', async () => {
     const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
     const initialGrid: Tile[][] = [[plainTile(), plainTile()]];
     const target: Coordinate = { x: 1, y: 0 };
@@ -372,6 +367,7 @@ describe('MatchScene', () => {
 
     await bootScene();
 
+    const gridGraphics = terrainGraphics();
     const unitGraphics = occupantGraphics(0);
     await submitViaUI(unitGraphics, 0);
     await flush();
@@ -382,6 +378,10 @@ describe('MatchScene', () => {
       'stale token',
       expect.objectContaining({})
     );
+    // Occupant layer rebuilt from the recovery refetch (old unit graphics destroyed)...
+    expect(unitGraphics.destroy).toHaveBeenCalled();
+    // ...but the terrain layer is never in scope of an occupant swap.
+    expect(gridGraphics.destroy).not.toHaveBeenCalled();
   });
 
   it('shows an error and stops processing when the unitMoved event is malformed (out-of-bounds target)', async () => {
@@ -450,7 +450,7 @@ describe('MatchScene', () => {
     );
   });
 
-  it('does not flag a mismatch when the server lands the unit on a different tile than requested (e.g. a future push/swap move)', async () => {
+  it('tweens the unit to the server-reported tile, not the requested one, when they differ (e.g. a future push/swap move)', async () => {
     const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
     const initialGrid: Tile[][] = [[plainTile(), plainTile(), plainTile()]];
     const requestedTarget: Coordinate = { x: 1, y: 0 };
@@ -474,11 +474,10 @@ describe('MatchScene', () => {
     await submitViaUI(unitGraphics, 0);
     await flush();
 
-    expect(mockScene.add.text).not.toHaveBeenCalledWith(
-      expect.any(Number),
-      expect.any(Number),
-      expect.stringContaining('out of sync'),
-      expect.objectContaining({})
+    // The tween follows the server's `to` (x:2 → 96px), not the requested x:1 (48px), and no
+    // error is raised — the client renders the server's authoritative event verbatim.
+    expect(mockScene.tweens.add).toHaveBeenCalledWith(
+      expect.objectContaining({ targets: unitGraphics, x: 96, y: 0, ease: 'Linear' })
     );
     expect(mockScene.add.text).not.toHaveBeenCalledWith(
       expect.any(Number),
@@ -488,37 +487,39 @@ describe('MatchScene', () => {
     );
   });
 
-  it('flags a mismatch when the post-move refreshed state has the moved unit at the wrong position', async () => {
+  // AC1 + AC2: a successful move updates the board in place — no wholesale occupant swap follows,
+  // the terrain layer survives, and the per-op gameState refetch still runs. (The former
+  // proactive-diff "out of sync" flag on the happy path was removed in spec007.)
+  it('updates in place on a successful move: no occupant rebuild, terrain survives, state refetched', async () => {
     const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
-    const initialGrid: Tile[][] = [
-      [{ type: 'TerrainPlain', occupantType: 'OccupantUnit', occupantId: 7 }, plainTile()],
-    ];
+    const initialGrid: Tile[][] = [[plainTile(), plainTile()]];
     const target: Coordinate = { x: 1, y: 0 };
-    // Refresh returns the actor unit still at its pre-move position (0,0), not the event's `to`.
-    const staleUnit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
+    const movedUnit = makeUnit({ id: 7, team: 1, position: target });
 
     queueMatchStates(
       makeState({ grid: initialGrid, activeTeam: 1, units: [unit] }),
-      makeState({ grid: initialGrid, activeTeam: 1, units: [staleUnit] })
+      makeState({ grid: initialGrid, activeTeam: 2, units: [movedUnit] })
     );
     vi.mocked(getAllowedTiles).mockResolvedValue([target]);
-    const events: GameEvent[] = [
+    vi.mocked(submitTurnCommand).mockResolvedValue([
       { type: 'unitMoved', unitId: 7, from: { x: 0, y: 0 }, to: target },
-    ];
-    vi.mocked(submitTurnCommand).mockResolvedValue(events);
+    ]);
 
     await bootScene();
 
+    const gridGraphics = terrainGraphics(); // painted once at scene entry
     const unitGraphics = occupantGraphics(0);
+    const refetchesBefore = vi.mocked(getMatchState).mock.calls.length;
+
     await submitViaUI(unitGraphics, 0);
     await flush();
 
-    expect(mockScene.add.text).toHaveBeenCalledWith(
-      expect.any(Number),
-      expect.any(Number),
-      'Match state is out of sync with the server',
-      expect.objectContaining({})
-    );
+    // In-place tween — the initial unit graphics is never destroyed (no occupant rebuild)...
+    expect(unitGraphics.destroy).not.toHaveBeenCalled();
+    // ...and the terrain layer is untouched by the happy path.
+    expect(gridGraphics.destroy).not.toHaveBeenCalled();
+    // The per-op gameState refetch still ran.
+    expect(vi.mocked(getMatchState).mock.calls.length).toBeGreaterThan(refetchesBefore);
   });
 
   it('ignores a unit click while a confirm dialog is already open', async () => {
@@ -847,25 +848,42 @@ describe('MatchScene', () => {
     expect(playResolveTurnEvents).not.toHaveBeenCalled();
   });
 
-  it('flags a mismatch when the post-resolve state has a bomb the client no longer tracks', async () => {
-    await setUpEmptyBoardAndClickResolve();
-    vi.mocked(resolveTurn).mockResolvedValue([]);
-    vi.mocked(getMatchState).mockResolvedValue(
-      makeState({ grid: [[plainTile()]], bombs: [makeBomb({ id: 1 })] })
+  // AC3: after a successful resolve, the animated end-state left by playResolveTurnEvents stands —
+  // no wholesale occupant swap follows (which would snap sprites out of their finished animation).
+  // The turn-advance UI (turnPanel + resolve button) still refreshes. (The former runtime
+  // occupantsMatch "out of sync" check was removed in spec007 and relocated to a test oracle.)
+  it('keeps the animated end-state on a successful resolve (no occupant rebuild) but refreshes turnPanel and the resolve button', async () => {
+    const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
+    queueMatchStates(
+      makeState({ grid: [[plainTile()]], activeTeam: 1, units: [unit] }),
+      // The post-resolve refetch reports a new turn number so turnPanel.update is observable.
+      makeState({ grid: [[plainTile()]], turn: 5, activeTeam: 2, units: [unit] })
     );
+    vi.mocked(resolveTurn).mockResolvedValue([]);
 
+    await bootScene({ playerTokens: ['team1-token', 'team2-token'] });
+
+    const unitGraphics = occupantGraphics(0);
+    const resolveButton = resolveButtonGraphics(1); // grid + 1 unit + resolve button
+
+    pointerDownOf(resolveButtonGraphics(1))();
     const [, yesButtonGraphics] = mockScene.add.graphics.mock.results
       .slice(-3)
       .map(r => r.value as ReturnType<typeof mockScene.add.graphics>);
     pointerDownOf(yesButtonGraphics!)();
     await flush();
 
+    // No wholesale occupant swap after playback — the unit graphics is never destroyed.
+    expect(unitGraphics.destroy).not.toHaveBeenCalled();
+    // turnPanel refreshed with the post-resolve turn number...
     expect(mockScene.add.text).toHaveBeenCalledWith(
       expect.any(Number),
       expect.any(Number),
-      'Match state is out of sync with the server',
+      '5',
       expect.objectContaining({})
     );
+    // ...and the resolve button was re-rendered (old button graphics destroyed).
+    expect(resolveButton.destroy).toHaveBeenCalled();
   });
 
   it('clears previous error messages once a new turn command begins, so they do not accumulate across turns', async () => {
