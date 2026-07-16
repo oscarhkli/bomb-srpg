@@ -107,7 +107,7 @@ Same visual effect as `SurrenderButton`, except:
 
 - `Surrender` -> `Reset this turn`
 - `Confirm to surrender?` -> `All the actions made during this turn will be reset. Confirm?`
-- If `gameCfg.allowResetTurn = false`, `ResetTurnButton` is disabled, change all the color to `0x4c4c4c`.
+- If `gameCfg.allowResetTurn = false`, `ResetTurnButton` is disabled, change all the color to `DISABLED_BUTTON_COLOR`.
 
 ### Click Handler and Visual Effect of Reset Button
 
@@ -116,8 +116,8 @@ After clicking this button, a series of actions will be executed:
 - Interactions lock on click, per the [Interaction lock contract](#turnlifecycle-buttons), and stay locked through `resetTurn()`'s response.
 - In parallel, dim the whole canvas in **200ms**, just like fading out, to mask the re-render.
 - While dimming the screen, call `resetTurn()` to notify the backend to `ResetTurn()`.
-- If the response is not **HTTP 200**, log the error in `ErrorPanel`.
-- If the response is **HTTP 200**, re-fetch via `getMatchState()` and rebuild the **occupant layer only** — the occupant-only wholesale swap defined by `p3-spec007-match.md`'s Render-Path Contract (caller (b)). The terrain layer is not rebuilt. After that, go back to [Game Loop #5.4](p3-spec005-match.md#game-loop).
+- If the response is not **HTTP 2xx**, log the error in `ErrorPanel`.
+- If the response is **HTTP 2xx**, re-fetch via `getMatchState()` and rebuild the **occupant layer only** — the occupant-only wholesale swap defined by `p3-spec007-match.md`'s Render-Path Contract (caller (b)). The terrain layer is not rebuilt. After that, go back to [Game Loop #5.4](p3-spec005-match.md#game-loop).
 - After the re-rendering completes, undim the whole canvas in **200ms**, just like fading in. Interactions re-enable once `resetTurn()` has responded — this is independent of when the dim/undim/re-render visuals finish.
 > Note: ResetTurn() rollback to the state **after** Sudden Death hazard being injected. There is no need to re-render Sudden Death related animations.
 
