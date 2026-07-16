@@ -324,7 +324,7 @@ export default class MatchScene extends Phaser.Scene {
         this.turnCommandPanel.closeImmediately();
       }
 
-      await this.resyncGameState(gen, succeeded);
+      await this.resyncFromServer(gen, succeeded);
       if (gen !== this.generation) {
         return;
       }
@@ -400,11 +400,18 @@ export default class MatchScene extends Phaser.Scene {
   }
 
   // Per-op refetch that keeps gameState current (the resolve snapshot and next turn depend on it).
-  // On success the optimistic in-place visuals (tween / renderBomb) already reflect the server's
-  // own returned events, so we only adopt the fresh state — no redraw. On failure this is the
-  // reactive recovery path: rebuild the occupant layer from truth to resync (covers network
-  // non-determinism, e.g. a lost/duplicated response). The terrain layer is never rebuilt.
-  private async resyncGameState(gen: number, succeeded: boolean): Promise<void> {
+  // On success the optimistic in-place visuals (a command's tween / renderBomb, or a resolve's
+  // playResolveTurnEvents end-state) already reflect the server's own returned events, so we only
+  // adopt the fresh state — no redraw (a wholesale repaint would snap sprites out of their finished
+  // animation). On failure this is the reactive recovery path: rebuild the occupant layer from truth
+  // to resync (covers network non-determinism, e.g. a lost/duplicated response). The terrain layer is
+  // never rebuilt. `afterAdopt` runs post-reconciliation for callers with turn-advance UI to refresh
+  // (turnPanel / resolve button) regardless of success — that's not reconciliation.
+  private async resyncFromServer(
+    gen: number,
+    succeeded: boolean,
+    afterAdopt?: (freshState: GameState) => void
+  ): Promise<void> {
     try {
       const freshState = await getMatchState();
       if (gen !== this.generation) {
@@ -415,6 +422,7 @@ export default class MatchScene extends Phaser.Scene {
       } else {
         this.renderBoard(freshState);
       }
+      afterAdopt?.(freshState);
     } catch {
       if (gen !== this.generation) {
         return;
@@ -501,7 +509,12 @@ export default class MatchScene extends Phaser.Scene {
         }
         this.showError(err instanceof Error ? err.message : String(err));
       }
-      await this.refreshAfterResolve(gen, succeeded);
+      // turnPanel + the resolve button are turn-advance UI, not reconciliation, so they refresh
+      // regardless of success.
+      await this.resyncFromServer(gen, succeeded, freshState => {
+        this.turnPanel.update(freshState.turn, this.gameCfg.maxTurns, freshState.activeTeam);
+        this.renderResolveButton();
+      });
       if (gen !== this.generation) {
         return;
       }
@@ -567,32 +580,6 @@ export default class MatchScene extends Phaser.Scene {
     void Promise.all([fadeDone, deleteDone]).then(() => {
       this.scene.start('MatchSettingsScene');
     });
-  }
-
-  // Per-op refetch after a resolve. On success the animated end-state left by playResolveTurnEvents
-  // already reflects the server, so we only adopt the fresh state — no redraw (a wholesale repaint
-  // here would snap sprites out of their just-finished animation). On failure this is the reactive
-  // recovery path: rebuild the occupant layer from truth. turnPanel + the resolve button are
-  // turn-advance UI, not reconciliation, so they refresh regardless.
-  private async refreshAfterResolve(gen: number, succeeded: boolean): Promise<void> {
-    try {
-      const freshState = await getMatchState();
-      if (gen !== this.generation) {
-        return;
-      }
-      if (succeeded) {
-        this.gameState = freshState;
-      } else {
-        this.renderBoard(freshState);
-      }
-      this.turnPanel.update(freshState.turn, this.gameCfg.maxTurns, freshState.activeTeam);
-      this.renderResolveButton();
-    } catch {
-      if (gen !== this.generation) {
-        return;
-      }
-      this.showError('Failed to refresh match state');
-    }
   }
 
   // Wholesale occupant swap: destroy-and-repaint the occupant layer from server truth and keep

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mockScene } from '../test/setup';
 import {
-  firstGraphics as gridGraphics,
+  firstGraphics as terrainGraphics,
   occupantGraphics,
   pointerDownOf,
 } from '../test/sceneHelpers';
@@ -93,7 +93,7 @@ describe('renderTerrain', () => {
       [plainTile(), plainTile(), plainTile()],
     ]);
 
-    const grid = gridGraphics();
+    const grid = terrainGraphics();
     expect(grid.lineStyle).toHaveBeenCalledWith(1, TERRAIN_BORDER_COLOR);
     expect(grid.fillRect).toHaveBeenCalledTimes(6);
     expect(grid.fillRect).toHaveBeenNthCalledWith(1, 0, 0, 48, 48);
@@ -111,7 +111,7 @@ describe('renderTerrain', () => {
     ];
     renderTerrain(ctx(), [types.map(tileOf)]);
 
-    const grid = gridGraphics();
+    const grid = terrainGraphics();
     types.forEach((type, i) => {
       expect(grid.fillStyle).toHaveBeenNthCalledWith(i + 1, TERRAIN_COLORS[type]);
     });
@@ -122,14 +122,14 @@ describe('renderTerrain', () => {
     renderTerrain(c, [[plainTile()]]);
 
     expect(c.terrainObjects).toHaveLength(1);
-    expect(c.terrainObjects[0]).toBe(gridGraphics());
+    expect(c.terrainObjects[0]).toBe(terrainGraphics());
     expect(c.occupantObjects).toHaveLength(0);
   });
 
   it('destroys the prior terrain on a repeat entry so re-running create() does not leak grids', () => {
     const c = ctx();
     renderTerrain(c, [[plainTile()]]);
-    const firstGrid = gridGraphics();
+    const firstGrid = terrainGraphics();
 
     renderTerrain(c, [[plainTile()]]);
 
@@ -270,7 +270,7 @@ describe('renderBomb', () => {
     renderBomb(c, bomb({ id: 42, position: { x: 0, y: 0 }, countdown: 2 }));
 
     expect(mockScene.add.graphics).toHaveBeenCalledOnce();
-    const g = gridGraphics();
+    const g = terrainGraphics();
     expect(g.fillCircle).toHaveBeenCalledWith(0, 0, 12);
     expect(mockScene.add.container).toHaveBeenCalledWith(24, 24, [g, expect.anything()]);
     expect(c.bombGraphicsById.has(42)).toBe(true);
@@ -294,7 +294,7 @@ describe('renderOccupants — teardown', () => {
   it('leaves the terrain layer untouched on an occupant swap', () => {
     const c = ctx();
     renderTerrain(c, [[plainTile()]]);
-    const grid = gridGraphics();
+    const grid = terrainGraphics();
     renderOccupants(c, state([[plainTile()]], { units: [unit({ id: 7 })] }));
 
     // Swap the occupants again — the grid must survive both rebuilds.
