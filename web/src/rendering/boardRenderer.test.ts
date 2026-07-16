@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mockScene } from '../test/setup';
 import {
-  firstGraphics as gridGraphics,
+  firstGraphics as terrainGraphics,
   occupantGraphics,
   pointerDownOf,
 } from '../test/sceneHelpers';
@@ -22,9 +22,15 @@ import {
   SOFTBLOCK_CORNER_RADIUS,
   BOMB_COLOR,
 } from '../constants';
-import type { Bomb, SoftBlock, Tile, TerrainType, Unit } from '../types/api';
+import type { Bomb, GameState, SoftBlock, Tile, TerrainType, Unit } from '../types/api';
 import type { BombGraphics } from './resolveTurnPlayer';
-import { renderBoard, renderBomb, tileCenter, type BoardRenderContext } from './boardRenderer';
+import {
+  renderTerrain,
+  renderOccupants,
+  renderBomb,
+  tileCenter,
+  type BoardRenderContext,
+} from './boardRenderer';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -33,7 +39,8 @@ beforeEach(() => {
 function ctx(overrides: Partial<BoardRenderContext> = {}): BoardRenderContext {
   return {
     scene: mockScene as never,
-    boardObjects: [],
+    terrainObjects: [],
+    occupantObjects: [],
     unitGraphicsById: new Map(),
     bombGraphicsById: new Map<number, BombGraphics>(),
     softBlockGraphicsById: new Map(),
@@ -45,7 +52,7 @@ function ctx(overrides: Partial<BoardRenderContext> = {}): BoardRenderContext {
 function state(
   grid: Tile[][],
   parts: { units?: Unit[]; softBlocks?: SoftBlock[]; bombs?: Bomb[] } = {}
-) {
+): GameState {
   return {
     turn: 1,
     inSuddenDeath: false,
@@ -58,34 +65,35 @@ function state(
   };
 }
 
+// Entry-order paint: terrain (grid = first Graphics) then occupants, matching create()'s sequence
+// so the occupantGraphics(i) = graphicsAt(i+1) indexing holds for the occupant assertions below.
+function renderAll(c: BoardRenderContext, s: GameState): void {
+  renderTerrain(c, s.grid);
+  renderOccupants(c, s);
+}
+
 describe('tileCenter', () => {
   it('returns the pixel center of a tile', () => {
     expect(tileCenter({ x: 1, y: 0 })).toEqual({ cx: 72, cy: 24 });
   });
 });
 
-describe('renderBoard — grid', () => {
+describe('renderTerrain', () => {
   it('returns the grid dimensions', () => {
-    const dims = renderBoard(
-      ctx(),
-      state([
-        [plainTile(), plainTile(), plainTile()],
-        [plainTile(), plainTile(), plainTile()],
-      ])
-    );
+    const dims = renderTerrain(ctx(), [
+      [plainTile(), plainTile(), plainTile()],
+      [plainTile(), plainTile(), plainTile()],
+    ]);
     expect(dims).toEqual({ cols: 3, rows: 2 });
   });
 
   it('draws every tile at its world position with terrain fill and a border', () => {
-    renderBoard(
-      ctx(),
-      state([
-        [plainTile(), plainTile(), plainTile()],
-        [plainTile(), plainTile(), plainTile()],
-      ])
-    );
+    renderTerrain(ctx(), [
+      [plainTile(), plainTile(), plainTile()],
+      [plainTile(), plainTile(), plainTile()],
+    ]);
 
-    const grid = gridGraphics();
+    const grid = terrainGraphics();
     expect(grid.lineStyle).toHaveBeenCalledWith(1, TERRAIN_BORDER_COLOR);
     expect(grid.fillRect).toHaveBeenCalledTimes(6);
     expect(grid.fillRect).toHaveBeenNthCalledWith(1, 0, 0, 48, 48);
@@ -101,18 +109,38 @@ describe('renderBoard — grid', () => {
       'TerrainWater',
       'TerrainLava',
     ];
-    renderBoard(ctx(), state([types.map(tileOf)]));
+    renderTerrain(ctx(), [types.map(tileOf)]);
 
-    const grid = gridGraphics();
+    const grid = terrainGraphics();
     types.forEach((type, i) => {
       expect(grid.fillStyle).toHaveBeenNthCalledWith(i + 1, TERRAIN_COLORS[type]);
     });
   });
+
+  it('tracks the grid graphics in terrainObjects, not occupantObjects', () => {
+    const c = ctx();
+    renderTerrain(c, [[plainTile()]]);
+
+    expect(c.terrainObjects).toHaveLength(1);
+    expect(c.terrainObjects[0]).toBe(terrainGraphics());
+    expect(c.occupantObjects).toHaveLength(0);
+  });
+
+  it('destroys the prior terrain on a repeat entry so re-running create() does not leak grids', () => {
+    const c = ctx();
+    renderTerrain(c, [[plainTile()]]);
+    const firstGrid = terrainGraphics();
+
+    renderTerrain(c, [[plainTile()]]);
+
+    expect(firstGrid.destroy).toHaveBeenCalled();
+    expect(c.terrainObjects).toHaveLength(1);
+  });
 });
 
-describe('renderBoard — units', () => {
+describe('renderOccupants — units', () => {
   it('renders a live unit as a team-colored 32x32 square centered on its tile', () => {
-    renderBoard(
+    renderAll(
       ctx(),
       state([[plainTile(), plainTile()]], { units: [unit({ position: { x: 1, y: 0 }, team: 1 })] })
     );
@@ -123,14 +151,14 @@ describe('renderBoard — units', () => {
   });
 
   it('does not render a dead unit (hp 0)', () => {
-    renderBoard(ctx(), state([[plainTile()]], { units: [unit({ hp: 0 })] }));
+    renderAll(ctx(), state([[plainTile()]], { units: [unit({ hp: 0 })] }));
     // Only the grid Graphics was created.
     expect(mockScene.add.graphics).toHaveBeenCalledTimes(1);
   });
 
   it('warns and falls back to TEAM_COLOR_FALLBACK for an unconfigured team color', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-    renderBoard(ctx(), state([[plainTile()]], { units: [unit({ team: 99 })] }));
+    renderAll(ctx(), state([[plainTile()]], { units: [unit({ team: 99 })] }));
 
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('99'));
     expect(occupantGraphics(0).fillStyle).toHaveBeenCalledWith(TEAM_COLOR_FALLBACK);
@@ -139,19 +167,19 @@ describe('renderBoard — units', () => {
 
   it('registers the unit graphics in the map', () => {
     const c = ctx();
-    renderBoard(c, state([[plainTile()]], { units: [unit({ id: 7 })] }));
+    renderAll(c, state([[plainTile()]], { units: [unit({ id: 7 })] }));
     expect(c.unitGraphicsById.has(7)).toBe(true);
   });
 
   it('draws a circle icon for Bandit', () => {
-    renderBoard(ctx(), state([[plainTile()]], { units: [unit({ type: 'Bandit' })] }));
+    renderAll(ctx(), state([[plainTile()]], { units: [unit({ type: 'Bandit' })] }));
     const g = occupantGraphics(0);
     expect(g.lineStyle).toHaveBeenCalledWith(2, OCCUPANT_STROKE_COLOR);
     expect(g.strokeCircle).toHaveBeenCalledWith(24, 24, 10);
   });
 
   it('draws an apex-centered 3-point polygon for Witch', () => {
-    renderBoard(ctx(), state([[plainTile()]], { units: [unit({ type: 'Witch' })] }));
+    renderAll(ctx(), state([[plainTile()]], { units: [unit({ type: 'Witch' })] }));
     const [points, closed] = occupantGraphics(0).strokePoints.mock.calls[0] as [
       { x: number; y: number }[],
       boolean,
@@ -162,14 +190,14 @@ describe('renderBoard — units', () => {
   });
 
   it('draws a 10-vertex star for King', () => {
-    renderBoard(ctx(), state([[plainTile()]], { units: [unit({ type: 'King' })] }));
+    renderAll(ctx(), state([[plainTile()]], { units: [unit({ type: 'King' })] }));
     const [points] = occupantGraphics(0).strokePoints.mock.calls[0] as [{ x: number; y: number }[]];
     expect(points).toHaveLength(10);
   });
 
   it('warns and draws no icon for an unrecognized archetype', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-    renderBoard(ctx(), state([[plainTile()]], { units: [unit({ type: 'Mystic' })] }));
+    renderAll(ctx(), state([[plainTile()]], { units: [unit({ type: 'Mystic' })] }));
 
     const g = occupantGraphics(0);
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Mystic'));
@@ -181,7 +209,7 @@ describe('renderBoard — units', () => {
   it('makes a unit clickable over its full tile and invokes onUnitClicked on pointerdown', () => {
     const onUnitClicked = vi.fn();
     const u = unit({ id: 7, position: { x: 1, y: 0 } });
-    renderBoard(ctx({ onUnitClicked }), state([[plainTile(), plainTile()]], { units: [u] }));
+    renderAll(ctx({ onUnitClicked }), state([[plainTile(), plainTile()]], { units: [u] }));
 
     const g = occupantGraphics(0);
     expect(g.setInteractive).toHaveBeenCalledWith(
@@ -193,10 +221,10 @@ describe('renderBoard — units', () => {
   });
 });
 
-describe('renderBoard — softBlocks & bombs', () => {
+describe('renderOccupants — softBlocks & bombs', () => {
   it('renders a softBlock as a rounded rect and registers it in the map', () => {
     const c = ctx();
-    renderBoard(
+    renderAll(
       c,
       state([[plainTile(), plainTile()]], {
         softBlocks: [softBlock({ id: 3, position: { x: 1, y: 0 } })],
@@ -212,7 +240,7 @@ describe('renderBoard — softBlocks & bombs', () => {
   it('logs on softBlock click', () => {
     const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
     const block = softBlock({ id: 3 });
-    renderBoard(ctx(), state([[plainTile()]], { softBlocks: [block] }));
+    renderAll(ctx(), state([[plainTile()]], { softBlocks: [block] }));
     pointerDownOf(occupantGraphics(0))();
     expect(consoleSpy).toHaveBeenCalledWith('SoftBlock 3 is clicked', block);
     consoleSpy.mockRestore();
@@ -220,7 +248,7 @@ describe('renderBoard — softBlocks & bombs', () => {
 
   it('renders a bomb as a circle with countdown text parented in a single container and registers both in the map', () => {
     const c = ctx();
-    renderBoard(
+    renderAll(
       c,
       state([[plainTile(), plainTile()]], {
         bombs: [bomb({ id: 9, position: { x: 1, y: 0 }, countdown: 5 })],
@@ -242,24 +270,37 @@ describe('renderBomb', () => {
     renderBomb(c, bomb({ id: 42, position: { x: 0, y: 0 }, countdown: 2 }));
 
     expect(mockScene.add.graphics).toHaveBeenCalledOnce();
-    const g = gridGraphics();
+    const g = terrainGraphics();
     expect(g.fillCircle).toHaveBeenCalledWith(0, 0, 12);
     expect(mockScene.add.container).toHaveBeenCalledWith(24, 24, [g, expect.anything()]);
     expect(c.bombGraphicsById.has(42)).toBe(true);
-    expect(c.boardObjects.length).toBeGreaterThan(0);
+    expect(c.occupantObjects.length).toBeGreaterThan(0);
   });
 });
 
-describe('renderBoard — teardown', () => {
-  it('destroys prior board objects and clears the graphics maps on re-render', () => {
+describe('renderOccupants — teardown', () => {
+  it('destroys prior occupant objects and clears the graphics maps on re-render', () => {
     const c = ctx();
-    renderBoard(c, state([[plainTile()]], { units: [unit({ id: 7 })] }));
+    renderAll(c, state([[plainTile()]], { units: [unit({ id: 7 })] }));
     const firstUnitGraphics = occupantGraphics(0);
     expect(c.unitGraphicsById.has(7)).toBe(true);
 
-    renderBoard(c, state([[plainTile()]]));
+    renderOccupants(c, state([[plainTile()]]));
 
     expect(firstUnitGraphics.destroy).toHaveBeenCalled();
     expect(c.unitGraphicsById.has(7)).toBe(false);
+  });
+
+  it('leaves the terrain layer untouched on an occupant swap', () => {
+    const c = ctx();
+    renderTerrain(c, [[plainTile()]]);
+    const grid = terrainGraphics();
+    renderOccupants(c, state([[plainTile()]], { units: [unit({ id: 7 })] }));
+
+    // Swap the occupants again — the grid must survive both rebuilds.
+    renderOccupants(c, state([[plainTile()]]));
+
+    expect(grid.destroy).not.toHaveBeenCalled();
+    expect(c.terrainObjects).toEqual([grid]);
   });
 });

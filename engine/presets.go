@@ -32,7 +32,7 @@ var archetypesRegistry = map[string]Archetype{
 	"Witch": {
 		Name:         "Witch",
 		BaseSpeed:    1,
-		BombMaxRange: 2,
+		BombMaxRange: 3,
 		BombMinRange: 1,
 		BombPower:    2,
 		MaxBombCount: 2,

@@ -46,8 +46,8 @@ If this happens:
 
 1. Derive the log filename from `$specPath`: strip the `.md` extension from the spec's filename, then append `-log.md`, in the same directory as the spec.
 
-- Example: spec `docs/frontend/match-p3-spec001.md` → log `docs/frontend/match-p3-spec001-log.md`.
-- (Not `match-p3-spec001.md-log.md` — strip the extension first.)
+- Example: spec `docs/frontend/p3-spec001-match.md` → log `docs/frontend/p3-spec001-match-log.md`.
+- (Not `p3-spec001-match.md-log.md` — strip the extension first.)
 
 2. Log the known issue in that log file. Discuss with the user whether we should solve it now or defer to future.
 3. Include `Status: Solved/Deferred` with a remark if one exists.

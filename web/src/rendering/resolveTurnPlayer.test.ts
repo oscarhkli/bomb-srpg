@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mockScene, createMockGraphics, createMockText, createMockContainer } from '../test/setup';
 import { delayedCallAt, makeBombGraphics } from '../test/sceneHelpers';
-import { makeState, makeUnit, plainGrid } from '../test/fixtures';
-import type { GameState } from '../types/api';
+import { makeState, makeUnit, makeSoftBlock, plainGrid } from '../test/fixtures';
+import { occupantsMatch } from '../test/occupantsMatch';
+import type { GameEvent, GameState } from '../types/api';
 import { BLAST_SPEED_MS_PER_TILE, BLAST_DURATION_MS, FIRE_DURATION_MS } from './constants';
 import { TILE_SIZE } from '../constants';
 import { playResolveTurnEvents, type BombGraphics } from './resolveTurnPlayer';
@@ -501,6 +502,127 @@ describe('playResolveTurnEvents — occupant events', () => {
     // unitDied is scheduled at offset(0) + FIRE_DURATION_MS.
     delayedCallAt(FIRE_DURATION_MS)();
     expect(unitGraphics.destroy).toHaveBeenCalled();
+  });
+});
+
+// Drains every scheduled delayedCall in insertion order, including ones appended by callbacks
+// while draining (unitDied/softBlockDestroyed schedule nested removals). The index cursor keeps
+// each callback firing exactly once.
+function fireAllDelayedCalls(): void {
+  let i = 0;
+  while (i < mockScene.time.delayedCall.mock.calls.length) {
+    const cb = mockScene.time.delayedCall.mock.calls[i]![1] as () => void;
+    i++;
+    cb();
+  }
+}
+
+// Render-fidelity oracle: play the event stream to completion against the graphics maps, then
+// assert the maps hold exactly the occupants the expected end-state says survived. occupantsMatch
+// is the independent source of truth here — it catches the apply-code bugs a runtime diff can't
+// justify guarding (spec007), which is why it lives test-side.
+describe('playResolveTurnEvents — render fidelity oracle', () => {
+  interface FidelityCase {
+    name: string;
+    initial: GameState;
+    events: GameEvent[];
+    // The occupants that must remain after playback (live units, surviving bombs/softBlocks).
+    expected: GameState;
+  }
+
+  const grid = plainGrid(1, 5);
+  const cases: FidelityCase[] = [
+    {
+      name: 'a bomb explosion that kills a unit and destroys a softBlock leaves all three maps empty',
+      initial: makeState({
+        grid,
+        units: [makeUnit({ id: 0x21, position: { x: 1, y: 0 }, team: 2, hp: 1 })],
+        bombs: [{ id: 1, ownerId: 0x11, position: { x: 0, y: 0 }, range: 3, countdown: 0 }],
+        softBlocks: [makeSoftBlock({ id: 20, position: { x: 2, y: 0 } })],
+      }),
+      events: [
+        {
+          type: 'bombExploded',
+          bombId: 1,
+          affectedPositions: [
+            { x: 1, y: 0 },
+            { x: 2, y: 0 },
+          ],
+        },
+        { type: 'unitDamaged', unitId: 0x21, newHp: 0 },
+        { type: 'unitDied', unitId: 0x21 },
+        { type: 'softBlockDestroyed', softBlockId: 20 },
+      ],
+      expected: makeState({
+        grid,
+        units: [makeUnit({ id: 0x21, position: { x: 1, y: 0 }, team: 2, hp: 0 })],
+        bombs: [],
+        softBlocks: [],
+      }),
+    },
+    {
+      name: 'a unit that only takes damage survives in the map while the spent bomb is removed',
+      initial: makeState({
+        grid,
+        units: [makeUnit({ id: 0x21, position: { x: 1, y: 0 }, team: 2, hp: 2 })],
+        bombs: [{ id: 1, ownerId: 0x11, position: { x: 0, y: 0 }, range: 3, countdown: 0 }],
+      }),
+      events: [
+        { type: 'bombExploded', bombId: 1, affectedPositions: [{ x: 1, y: 0 }] },
+        { type: 'unitDamaged', unitId: 0x21, newHp: 1 },
+      ],
+      expected: makeState({
+        grid,
+        units: [makeUnit({ id: 0x21, position: { x: 1, y: 0 }, team: 2, hp: 1 })],
+        bombs: [],
+      }),
+    },
+  ];
+
+  it.each(cases)('$name', ({ initial, events, expected }) => {
+    const unitGraphicsById = new Map(initial.units.map(u => [u.id, createMockGraphics() as never]));
+    const bombGraphicsById = new Map<number, BombGraphics>(
+      initial.bombs.map(b => [b.id, makeBombGraphics()])
+    );
+    const softBlockGraphicsById = new Map(
+      initial.softBlocks.map(s => [s.id, createMockGraphics() as never])
+    );
+
+    const result = playResolveTurnEvents(events, {
+      scene: mockScene as never,
+      gameStateSnapshot: initial,
+      unitGraphicsById,
+      bombGraphicsById,
+      softBlockGraphicsById,
+      onError: vi.fn(),
+    });
+    expect(result.ok).toBe(true);
+
+    fireAllDelayedCalls();
+
+    expect(
+      occupantsMatch(expected, unitGraphicsById, bombGraphicsById, softBlockGraphicsById)
+    ).toBe(true);
+  });
+
+  it('discriminates: a leftover graphics entry that truth no longer has fails the oracle', () => {
+    const initial = makeState({
+      grid,
+      bombs: [{ id: 1, ownerId: 0x11, position: { x: 0, y: 0 }, range: 1, countdown: 0 }],
+    });
+    const bombGraphicsById = new Map<number, BombGraphics>([[1, makeBombGraphics()]]);
+
+    // Play NO events, so the bomb graphics linger — but expected end-state has no bombs.
+    playResolveTurnEvents([], {
+      scene: mockScene as never,
+      gameStateSnapshot: initial,
+      unitGraphicsById: new Map(),
+      bombGraphicsById,
+      softBlockGraphicsById: new Map(),
+      onError: vi.fn(),
+    });
+
+    expect(occupantsMatch(makeState({ grid }), new Map(), bombGraphicsById, new Map())).toBe(false);
   });
 });
 

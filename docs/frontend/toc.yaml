@@ -1,61 +1,57 @@
 specs:
-  - file: match-p3-spec001.md
+  - file: p3-spec001-match.md
     status: Done
     category: MatchScene
     completion-date: 2026-07-01
-  - file: match-p3-spec002.md
+  - file: p3-spec002-match.md
     status: Done
     category: MatchScene
     completion-date: 2026-07-03
-  - file: match-p3-spec003.md
+  - file: p3-spec003-match.md
     status: Done
     category: MatchScene
     completion-date: 2026-07-07
-  - file: match-p3-spec004.md
-    status: Done 
+  - file: p3-spec004-match.md
+    status: Done
     category: MatchScene
     completion-date: 2026-07-10
-  - file: match-p3-spec005.md
+  - file: p3-spec005-match.md
     status: Done
     category: MatchScene
     completion-date: 2026-07-12
-  - file: match-p3-spec006.md
+  - file: p3-spec006-match.md
     status: Done
     category: MatchScene
     completion-date: 2026-07-14
-  - file: match-p3-spec007.md
+  - file: p3-spec007-match.md
+    status: Done
+    category: MatchScene
+    completion-date: 2026-07-16
+  - file: p3-spec008-match.md
+    status: Draft
+    category: MatchScene
+    completion-date:
+  - file: p3-spec009-match.md
     status: Parked Draft
     category: MatchScene
     completion-date:
-  - file: match-p3-spec008.md
+  - file: p3-spec010-match.md
     status: Parked Draft
     category: MatchScene
     completion-date:
-  - file: match-p3-spec009.md
+  - file: p3-spec011-stage.md
     status: Parked Draft
-    category: MatchScene
+    category: StageSetupScene
     completion-date:
-  - file: match-p3-spec010.md
-    status: Parked Draft
-    category: MatchScene
-    completion-date:
-  - file: match-p3-spec011.md
-    status: Parked Draft
-    category: MatchScene
-    completion-date:
-  - file: match-p5-spec001.md
-    status: Parked Draft
-    category: MatchScene
-    completion-date:
-  - file: lounge-p3-spec001.md
-    status: Parked Draft
-    category: LoungeScene
-    completion-date:
-  - file: title-p3-spec001.md
+  - file: p3-spec012-title.md
     status: Parked Draft
     category: TitleScene
     completion-date:
-  - file: stage-p3-spec001.md
+  - file: p3-spec013-lounge.md
     status: Parked Draft
-    category: StageSetupScene
-    completion-date: 
+    category: LoungeScene
+    completion-date:
+  - file: p5-spec001-match.md
+    status: Parked Draft
+    category: MatchScene
+    completion-date:

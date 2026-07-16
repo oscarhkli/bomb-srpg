@@ -27,38 +27,51 @@ import type { Bomb, Coordinate, GameState, SoftBlock, Tile, Unit } from '../type
 // resolveTurnPlayer's animated playback — the maps are the shared contract between them.
 // The scene owns the state and the click semantics; the renderer only wires each occupant's
 // pointerdown to the provided callbacks.
+//
+// Two layers, two lifetimes: `terrainObjects` holds the immutable grid, painted once per scene
+// entry (renderTerrain) and never swapped; `occupantObjects` holds units/softBlocks/bombs, which
+// renderOccupants destroys-and-rebuilds on a wholesale swap. Keeping them apart lets an occupant
+// swap (error recovery, future Reset) leave the terrain untouched.
 export interface BoardRenderContext {
   scene: Phaser.Scene;
-  boardObjects: Phaser.GameObjects.GameObject[];
+  terrainObjects: Phaser.GameObjects.GameObject[];
+  occupantObjects: Phaser.GameObjects.GameObject[];
   unitGraphicsById: Map<number, Phaser.GameObjects.Graphics>;
   bombGraphicsById: Map<number, BombGraphics>;
   softBlockGraphicsById: Map<number, Phaser.GameObjects.Graphics>;
   onUnitClicked: (unit: Unit) => void;
 }
 
-// Redraws the whole board from scratch and returns the grid dimensions so the caller can size
-// dependent UI (grid bounds, camera centering) from a single source.
-export function renderBoard(
+// Paints the immutable terrain (grid) layer and returns the grid dimensions so the caller can
+// size dependent UI (grid bounds, camera centering) from a single source. Called once per scene
+// entry. Idempotent: destroys any prior terrain first, so a scene re-entry (rematch) that re-runs
+// create() replaces the grid instead of leaking stale graphics.
+export function renderTerrain(
   ctx: BoardRenderContext,
-  state: GameState
+  grid: Tile[][]
 ): { cols: number; rows: number } {
-  destroyAll(ctx.boardObjects);
+  destroyAll(ctx.terrainObjects);
+  renderGrid(ctx, grid);
+  return { cols: grid[0]?.length ?? 0, rows: grid.length };
+}
+
+// Destroy-and-rebuild the occupant layer (units, softBlocks, bombs) from truth. This is the
+// wholesale occupant swap; it leaves the terrain layer untouched.
+export function renderOccupants(ctx: BoardRenderContext, state: GameState): void {
+  destroyAll(ctx.occupantObjects);
   ctx.unitGraphicsById.clear();
   ctx.bombGraphicsById.clear();
   ctx.softBlockGraphicsById.clear();
 
-  renderGrid(ctx, state.grid);
   renderUnits(ctx, state.units);
   renderSoftBlocks(ctx, state.softBlocks);
   state.bombs.forEach(bomb => renderBomb(ctx, bomb));
-
-  return { cols: state.grid[0]?.length ?? 0, rows: state.grid.length };
 }
 
 function renderGrid(ctx: BoardRenderContext, grid: Tile[][]): void {
   const g = ctx.scene.add.graphics();
   g.setDepth(DEPTH_GRID);
-  ctx.boardObjects.push(g);
+  ctx.terrainObjects.push(g);
   g.lineStyle(1, TERRAIN_BORDER_COLOR);
   for (let row = 0; row < grid.length; row++) {
     const rowTiles = grid[row];
@@ -86,7 +99,7 @@ function renderUnits(ctx: BoardRenderContext, units: Unit[]): void {
       const { cx, cy } = tileCenter(unit.position);
       const g = ctx.scene.add.graphics();
       g.setDepth(DEPTH_OCCUPANT);
-      ctx.boardObjects.push(g);
+      ctx.occupantObjects.push(g);
       ctx.unitGraphicsById.set(unit.id, g);
       const teamColor = TEAM_COLORS[unit.team];
       if (teamColor === undefined) {
@@ -115,7 +128,7 @@ function renderSoftBlocks(ctx: BoardRenderContext, softBlocks: SoftBlock[]): voi
     const { cx, cy } = tileCenter(block.position);
     const g = ctx.scene.add.graphics();
     g.setDepth(DEPTH_OCCUPANT);
-    ctx.boardObjects.push(g);
+    ctx.occupantObjects.push(g);
     g.fillStyle(SOFTBLOCK_COLOR);
     g.fillRoundedRect(
       cx - SOFTBLOCK_SIZE / 2,
@@ -129,7 +142,7 @@ function renderSoftBlocks(ctx: BoardRenderContext, softBlocks: SoftBlock[]): voi
   });
 }
 
-// Renders a single bomb; used both by renderBoard and by MatchScene's optimistic bomb placement.
+// Renders a single bomb; used both by renderOccupants and by MatchScene's optimistic bomb placement.
 // The circle and countdown text are drawn at local (0,0) and parented in a Container placed at
 // the tile center, so the bomb is one positionable/tweenable unit (see dropSuddenDeathBomb in
 // MatchScene) instead of two independently-positioned objects that can drift apart.
@@ -145,7 +158,7 @@ export function renderBomb(ctx: BoardRenderContext, bomb: Bomb): void {
 
   const container = ctx.scene.add.container(cx, cy, [g, text]);
   container.setDepth(DEPTH_OCCUPANT);
-  ctx.boardObjects.push(container);
+  ctx.occupantObjects.push(container);
 
   attachContainerClickLogger(container, `Bomb ${bomb.id}`, bomb);
   ctx.bombGraphicsById.set(bomb.id, { container, circle: g, countdownText: text });
