@@ -88,10 +88,11 @@ export const TURN_PANEL_PADDING = 8;
 export const TURN_PANEL_TEXT_COLOR = 0xeeeeee;
 export const SUDDEN_DEATH_COLOR = 0xff0000;
 
-// ResolveTurnButton
-export const RESOLVE_BUTTON_WIDTH = 320;
-export const RESOLVE_BUTTON_HEIGHT = 72;
-export const RESOLVE_BUTTON_MARGIN_TOP = 48;
+// Shared pill-button size for the "big" lifecycle-style buttons: ResolveTurnButton,
+// ResetTurnButton, SurrenderButton, MatchSummaryPanelBackButton, and VictoryCutscene's
+// Rematch/Return-to-Settings — distinct from TurnCommandPanel's smaller PANEL_BUTTON_* size.
+export const LIFECYCLE_BUTTON_WIDTH = 320;
+export const LIFECYCLE_BUTTON_HEIGHT = 72;
 export const RESOLVE_BUTTON_LABEL = 'End this turn';
 
 // Error panel — fixed left-side panel so error text is always legible instead of overlapping
@@ -121,6 +122,38 @@ export const SUDDEN_DEATH_BOMB_DROP_DURATION_MS = 2000;
 export const DEPTH_SUDDEN_DEATH_OVERLAY = 60;
 export const DEPTH_SUDDEN_DEATH_BOMB = 65;
 export const DEPTH_TURN_BANNER = 70;
+
+// MatchSummaryButton / MatchSummaryPanel
+export const DEPTH_MATCH_SUMMARY_PANEL = 35; // above DEPTH_TURN_COMMAND_PANEL, below DEPTH_CONFIRM_DIALOG
+export const MATCH_SUMMARY_BUTTON_SIZE = 48;
+export const MATCH_SUMMARY_BUTTON_LABEL = '≡';
+export const MATCH_SUMMARY_BUTTON_TEXT_COLOR = 0xffffff;
+export const MATCH_SUMMARY_BUTTON_ICON_FONT_SIZE = 48;
+export const MATCH_SUMMARY_PANEL_WIDTH = 720;
+export const MATCH_SUMMARY_PANEL_HEIGHT = 640;
+export const MATCH_SUMMARY_TEXT_FONT_SIZE = 36;
+export const MATCH_SUMMARY_TEXT_COLOR = 0xffffff;
+export const MATCH_SUMMARY_TOP_SECTION_RATIO = 0.15;
+export const MATCH_SUMMARY_MID_SECTION_RATIO = 0.35;
+// Vertical breathing room between the top (Stage/Max Turns) and mid (team stats) sections.
+export const MATCH_SUMMARY_SECTION_GAP = 24;
+// Smaller pill-button height shared by MatchSummaryPanel's TurnLifeCycleButtons and
+// VictoryCutscene's Rematch/Return-to-Settings buttons — down from the full LIFECYCLE_BUTTON_HEIGHT
+// (72px), same width, unscaled font.
+export const LIFECYCLE_BUTTON_HEIGHT_SMALL = 44;
+// P1/P2 badge behind the mid-section's team headers, filled with that team's TEAM_COLORS entry.
+export const MATCH_SUMMARY_TEAM_BADGE_WIDTH = 96;
+export const MATCH_SUMMARY_TEAM_BADGE_HEIGHT = 48;
+export const MATCH_SUMMARY_TEAM_BADGE_CORNER_RADIUS = 8;
+// Button label/prompt text, following RESOLVE_BUTTON_LABEL's un-prefixed naming — these describe
+// the ResetTurnButton/SurrenderButton/BackButton concepts themselves, not MatchSummaryPanel's own
+// layout (which is what the MATCH_SUMMARY_ prefix above is reserved for).
+export const RESET_BUTTON_LABEL = 'Reset this turn';
+export const SURRENDER_BUTTON_LABEL = 'Surrender';
+export const BACK_BUTTON_LABEL = 'Back';
+export const CONFIRM_TEXT_RESOLVE = 'Confirm to end this turn?';
+export const CONFIRM_TEXT_RESET = 'All turn actions will reset. Confirm?';
+export const CONFIRM_TEXT_SURRENDER = 'Confirm to surrender?';
 
 // VictoryCutscene — above every other overlay, since it's the terminal screen.
 export const DEPTH_VICTORY_CUTSCENE = 80;

@@ -7,6 +7,8 @@ import {
   getAllowedTiles,
   submitTurnCommand,
   resolveTurn,
+  resetTurn,
+  surrender,
   startTurn,
   rematch,
   deleteMatch,
@@ -14,12 +16,11 @@ import {
 import TurnCommandPanel from '../ui/TurnCommandPanel';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import TurnPanel from '../ui/TurnPanel';
+import MatchSummaryPanel from '../ui/MatchSummaryPanel';
 import ErrorPanel from '../ui/ErrorPanel';
 import TurnBanner from '../ui/TurnBanner';
 import SuddenDeathCutscene from '../ui/SuddenDeathCutscene';
 import VictoryCutscene from '../ui/VictoryCutscene';
-import { drawPillButton } from '../ui/pillButton';
-import { destroyAll } from '../ui/gameObjectUtils';
 import { playResolveTurnEvents, type BombGraphics } from '../rendering/resolveTurnPlayer';
 import {
   renderTerrain,
@@ -31,19 +32,13 @@ import {
 import {
   TILE_SIZE,
   BOMB_SIZE,
-  DEPTH_TURN_COMMAND_PANEL,
   DEPTH_OCCUPANT,
   DEPTH_SUDDEN_DEATH_BOMB,
   UNIT_MOVE_TWEEN_DURATION,
   SUDDEN_DEATH_BOMB_DROP_DURATION_MS,
-  PANEL_BUTTON_FILL_COLOR,
-  PANEL_BUTTON_FILL_ALPHA,
-  PANEL_BUTTON_BORDER_COLOR,
-  PANEL_BUTTON_BORDER_WIDTH,
-  RESOLVE_BUTTON_WIDTH,
-  RESOLVE_BUTTON_HEIGHT,
-  RESOLVE_BUTTON_MARGIN_TOP,
-  RESOLVE_BUTTON_LABEL,
+  CONFIRM_TEXT_RESOLVE,
+  CONFIRM_TEXT_RESET,
+  CONFIRM_TEXT_SURRENDER,
   FADE_MS,
 } from '../constants';
 import type {
@@ -80,13 +75,21 @@ export default class MatchScene extends Phaser.Scene {
   private turnCommandPanel!: TurnCommandPanel;
   private confirmDialog!: ConfirmDialog;
   private turnPanel!: TurnPanel;
-  private resolveButtonObjects: Phaser.GameObjects.GameObject[] = [];
+  private matchSummaryPanel!: MatchSummaryPanel;
   private errorPanel!: ErrorPanel;
   private turnBanner!: TurnBanner;
   private suddenDeathCutscene!: SuddenDeathCutscene;
   private victoryCutscene!: VictoryCutscene;
   private isSubmitting = false;
   private interactionsEnabled = false;
+  // Whether MatchSummaryPanel is currently open. Folded into isLocked() so unit clicks and
+  // TurnCommandPanel are blocked while it's open — the panel's own buttons call MatchScene's
+  // handlers directly (not through isLocked()), since they're only reachable while it IS open.
+  private summaryPanelOpen = false;
+  // Whether a lifecycle button's (Resolve/Reset/Surrender) own ConfirmDialog is currently
+  // pending Yes/No — distinct from confirmDialog.isOpen, since a stale TurnCommandPanel confirm
+  // must NOT count here (see isLifecycleButtonBusy()).
+  private lifecycleConfirmOpen = false;
   // Guards VictoryCutscene's Rematch/Return buttons, which (unlike every other button in this
   // scene) never destroy themselves after use — without this, a double-click would queue two
   // scene.restart() calls or two deleteMatch()+scene.start() calls back-to-back.
@@ -110,6 +113,8 @@ export default class MatchScene extends Phaser.Scene {
     this.victoryActionTaken = false;
     this.isSubmitting = false;
     this.interactionsEnabled = false;
+    this.summaryPanelOpen = false;
+    this.lifecycleConfirmOpen = false;
     this.events.once('shutdown', () => {
       this.generation++;
     });
@@ -120,6 +125,14 @@ export default class MatchScene extends Phaser.Scene {
     this.turnBanner = new TurnBanner(this);
     this.suddenDeathCutscene = new SuddenDeathCutscene(this);
     this.victoryCutscene = new VictoryCutscene(this);
+    this.matchSummaryPanel = new MatchSummaryPanel(this, {
+      isLocked: () => this.isLocked(),
+      onButtonClicked: () => this.openMatchSummaryPanel(),
+      onBackButtonClicked: () => this.closeMatchSummaryPanel(),
+      onResolveButtonClicked: () => this.onResolveButtonClicked(),
+      onResetButtonClicked: () => this.onResetButtonClicked(),
+      onSurrenderButtonClicked: () => this.onSurrenderButtonClicked(),
+    });
     this.turnCommandPanel = new TurnCommandPanel(this, {
       getAllowedTiles: (unitId, turnCmdType) => this.getAllowedTilesCached(unitId, turnCmdType),
       onError: message => this.showError(message),
@@ -127,6 +140,7 @@ export default class MatchScene extends Phaser.Scene {
       showConfirm: (onYes, onNo) => this.confirmDialog.show(onYes, onNo, 'Confirm?'),
       hideConfirm: () => this.confirmDialog.hide(),
       isConfirmOpen: () => this.confirmDialog.isOpen,
+      isLocked: () => this.isLocked(),
     });
 
     const bootstrap = data.isRematch ? rematch().then(() => undefined) : Promise.resolve();
@@ -143,7 +157,7 @@ export default class MatchScene extends Phaser.Scene {
         this.turnCommandPanel.setGridBounds(cols * TILE_SIZE, rows * TILE_SIZE);
         this.renderBoard(state);
         this.cameras.main.centerOn((cols * TILE_SIZE) / 2, (rows * TILE_SIZE) / 2);
-        this.renderResolveButton();
+        this.matchSummaryPanel.renderButton();
         this.refreshTurnPanelIfReady();
         void this.beginTurn();
       })
@@ -431,46 +445,153 @@ export default class MatchScene extends Phaser.Scene {
     }
   }
 
-  private renderResolveButton(): void {
-    destroyAll(this.resolveButtonObjects);
-    const { width } = this.cameras.main;
-    const x = width / 2 - RESOLVE_BUTTON_WIDTH / 2;
-    this.resolveButtonObjects = drawPillButton(
-      this,
-      x,
-      RESOLVE_BUTTON_MARGIN_TOP,
-      RESOLVE_BUTTON_WIDTH,
-      RESOLVE_BUTTON_HEIGHT,
-      RESOLVE_BUTTON_LABEL,
-      {
-        fillColor: PANEL_BUTTON_FILL_COLOR,
-        fillAlpha: PANEL_BUTTON_FILL_ALPHA,
-        borderColor: PANEL_BUTTON_BORDER_COLOR,
-        borderWidth: PANEL_BUTTON_BORDER_WIDTH,
-      },
-      DEPTH_TURN_COMMAND_PANEL,
-      () => this.onResolveButtonClicked(),
-      0
-    );
+  // Shared base for isLocked()/isLifecycleButtonBusy(): true while a server call is in flight or
+  // a fresh render hasn't finished yet. Both methods add their own extra condition on top of
+  // this — keep them in sync if a third shared condition is ever needed.
+  private isBusy(): boolean {
+    return this.isSubmitting || !this.interactionsEnabled;
   }
 
-  private onResolveButtonClicked(): void {
-    if (!this.interactionsEnabled) {
-      return;
-    }
-    if (this.isSubmitting) {
-      return;
-    }
+  // Gates unit clicks, TurnCommandPanel, and MatchSummaryButton — NOT the lifecycle buttons
+  // inside MatchSummaryPanel itself (Resolve/Reset/Surrender/Back), which are only reachable
+  // while the panel is open and so must not be blocked by summaryPanelOpen.
+  private isLocked(): boolean {
+    return this.isBusy() || this.summaryPanelOpen;
+  }
+
+  private openMatchSummaryPanel(): void {
     if (!this.gameCfg) {
       this.showError('Match config is still loading, please try again shortly');
       return;
     }
+    this.summaryPanelOpen = true;
+    this.matchSummaryPanel.open(this.gameState, this.gameCfg);
+  }
+
+  private closeMatchSummaryPanel(): void {
+    this.summaryPanelOpen = false;
+    this.matchSummaryPanel.close();
+  }
+
+  // Deliberately narrower than isLocked(): these 3 handlers are only reachable via
+  // MatchSummaryPanel's own buttons, which are only clickable while the panel IS open — so
+  // isLocked()'s summaryPanelOpen check would always block them.
+  //
+  // Guards on lifecycleConfirmOpen rather than confirmDialog.isOpen: a stale TurnCommandPanel
+  // confirm (from an in-progress Move/Bomb) must NOT block a lifecycle button — it gets
+  // force-closed and superseded instead (see the "opens the resolve confirm even when a
+  // TurnCommandPanel confirm is already open" test). Only a still-pending confirm opened by
+  // ANOTHER lifecycle button click should block a second one from silently discarding it.
+  private isLifecycleButtonBusy(): boolean {
+    return this.isBusy() || this.lifecycleConfirmOpen;
+  }
+
+  private showLifecycleConfirm(onYes: () => void, text: string): void {
     this.turnCommandPanel.closeImmediately();
+    this.lifecycleConfirmOpen = true;
     this.confirmDialog.show(
-      () => void this.handleResolveTurn(),
-      () => this.confirmDialog.hide(),
-      'Confirm to end this turn?'
+      () => {
+        this.lifecycleConfirmOpen = false;
+        this.closeMatchSummaryPanel();
+        onYes();
+      },
+      () => {
+        this.lifecycleConfirmOpen = false;
+        this.confirmDialog.hide();
+      },
+      text
     );
+  }
+
+  // None of these 3 handlers reads gameCfg today, but if one ever needs to: it's already
+  // guaranteed loaded here, since they're only reachable via MatchSummaryPanel's buttons, and
+  // openMatchSummaryPanel() guards on gameCfg before the panel opens.
+  private onResolveButtonClicked(): void {
+    if (this.isLifecycleButtonBusy()) {
+      return;
+    }
+    this.showLifecycleConfirm(() => void this.handleResolveTurn(), CONFIRM_TEXT_RESOLVE);
+  }
+
+  private onResetButtonClicked(): void {
+    if (this.isLifecycleButtonBusy()) {
+      return;
+    }
+    this.showLifecycleConfirm(() => void this.handleResetTurn(), CONFIRM_TEXT_RESET);
+  }
+
+  private onSurrenderButtonClicked(): void {
+    if (this.isLifecycleButtonBusy()) {
+      return;
+    }
+    this.showLifecycleConfirm(() => void this.handleSurrender(), CONFIRM_TEXT_SURRENDER);
+  }
+
+  // Masks the reset's occupant-only rebuild behind the same camera fade-out/fade-in Rematch
+  // uses (this.cameras.main.fadeOut/fadeIn), per spec008's Reset Button flow. Interactions
+  // re-enable as soon as resetTurn()/getMatchState() settle (the `finally` below), independent
+  // of when the fade-out/fade-in itself finishes.
+  private async handleResetTurn(): Promise<void> {
+    if (this.isSubmitting) {
+      return;
+    }
+    const gen = this.generation;
+    this.isSubmitting = true;
+    this.clearErrors();
+    this.cameras.main.fadeOut(FADE_MS, 0, 0, 0);
+    try {
+      await resetTurn(); // 204 No Content — no body to adopt
+      if (gen !== this.generation) {
+        return;
+      }
+      const freshState = await getMatchState();
+      if (gen !== this.generation) {
+        return;
+      }
+      this.renderBoard(freshState); // occupant-only rebuild — terrain untouched
+    } catch (err) {
+      if (gen !== this.generation) {
+        return;
+      }
+      this.showError(err instanceof Error ? err.message : String(err));
+    } finally {
+      if (gen === this.generation) {
+        this.isSubmitting = false;
+      }
+      this.cameras.main.fadeIn(FADE_MS);
+    }
+  }
+
+  // Reuses handleMatchEnded()'s existing VictoryCutscene rendering as-is (winner derivation is
+  // identical to resolveTurn's matchEnded path) — surrender only differs in how the event arrives.
+  private async handleSurrender(): Promise<void> {
+    if (this.isSubmitting) {
+      return;
+    }
+    const gen = this.generation;
+    this.isSubmitting = true;
+    this.clearErrors();
+    try {
+      const events = await surrender({ teamId: this.gameState.activeTeam });
+      if (gen !== this.generation) {
+        return;
+      }
+      const matchEndedEvent = events.find(event => event.type === 'matchEnded');
+      if (matchEndedEvent) {
+        this.handleMatchEnded(matchEndedEvent);
+      } else {
+        this.showError('Invalid response from surrender');
+      }
+    } catch (err) {
+      if (gen !== this.generation) {
+        return;
+      }
+      this.showError(err instanceof Error ? err.message : String(err));
+    } finally {
+      if (gen === this.generation) {
+        this.isSubmitting = false;
+      }
+    }
   }
 
   private async handleResolveTurn(): Promise<void> {
@@ -509,11 +630,9 @@ export default class MatchScene extends Phaser.Scene {
         }
         this.showError(err instanceof Error ? err.message : String(err));
       }
-      // turnPanel + the resolve button are turn-advance UI, not reconciliation, so they refresh
-      // regardless of success.
+      // turnPanel is turn-advance UI, not reconciliation, so it refreshes regardless of success.
       await this.resyncFromServer(gen, succeeded, freshState => {
         this.turnPanel.update(freshState.turn, this.gameCfg.maxTurns, freshState.activeTeam);
-        this.renderResolveButton();
       });
       if (gen !== this.generation) {
         return;
@@ -605,13 +724,19 @@ export default class MatchScene extends Phaser.Scene {
     };
   }
 
-  private onUnitClicked(unit: Unit): void {
-    if (!this.interactionsEnabled) {
+  // `clickedUnit` may be a stale snapshot: attachUnitClickHandler (boardRenderer.ts) binds
+  // pointerdown to whichever `unit` object existed at the last occupant rebuild, and a
+  // successful command never triggers one (AC3/spec007) — so its hasMoved/hasUsedSkill can be
+  // out of date even though this.gameState.units was already refreshed. Always resolve the
+  // live copy by id before handing it to TurnCommandPanel.
+  private onUnitClicked(clickedUnit: Unit): void {
+    if (this.isLocked()) {
       return;
     }
     if (this.confirmDialog.isOpen) {
       return;
     }
+    const unit = this.gameState.units.find(u => u.id === clickedUnit.id) ?? clickedUnit;
     if (unit.team !== this.gameState.activeTeam) {
       console.log(`Unit ${unit.id} is clicked`, unit);
       return;

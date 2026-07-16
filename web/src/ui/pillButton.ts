@@ -9,6 +9,35 @@ export interface PillButtonStyle {
   borderWidth: number;
 }
 
+// Shared by any clickable Graphics rect (pill buttons here, and MatchSummaryPanel's square
+// "≡" icon button) so the hit-area/interactive wiring only lives in one place.
+export function attachRectClickHandler(
+  target: Phaser.GameObjects.Graphics,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  onClick: () => void
+): void {
+  const hitArea = new Phaser.Geom.Rectangle(x, y, width, height);
+  target.setInteractive(hitArea, (shape: Phaser.Geom.Rectangle, px: number, py: number) =>
+    Phaser.Geom.Rectangle.Contains(shape, px, py)
+  );
+  target.on('pointerdown', onClick);
+}
+
+// Y position of the i-th button in a vertical stack starting at startY, each buttonHeight tall
+// with spacing between them. Shared by MatchSummaryPanel (bottom-anchored block) and
+// VictoryCutscene (top-anchored pair) so their spacing math can't silently drift apart.
+export function verticalButtonY(
+  startY: number,
+  index: number,
+  buttonHeight: number,
+  spacing: number
+): number {
+  return startY + index * (buttonHeight + spacing);
+}
+
 // Draws a pill-shape button (rounded rect + border + centered label) per the shared styling
 // used by TurnCommandPanel's Move/Bomb/Back buttons and ConfirmDialog's Yes/No buttons.
 // Returns the created GameObjects so the caller can track them for later destroy().
@@ -23,7 +52,7 @@ export function drawPillButton(
   depth: number,
   onClick?: () => void,
   scrollFactor?: number
-): Phaser.GameObjects.GameObject[] {
+): (Phaser.GameObjects.Graphics | Phaser.GameObjects.Text)[] {
   const g = scene.add.graphics();
   g.setDepth(depth);
   g.fillStyle(style.fillColor, style.fillAlpha);
@@ -44,11 +73,7 @@ export function drawPillButton(
   }
 
   if (onClick) {
-    const hitArea = new Phaser.Geom.Rectangle(x, y, width, height);
-    g.setInteractive(hitArea, (shape: Phaser.Geom.Rectangle, px: number, py: number) =>
-      Phaser.Geom.Rectangle.Contains(shape, px, py)
-    );
-    g.on('pointerdown', onClick);
+    attachRectClickHandler(g, x, y, width, height, onClick);
   }
 
   return [g, text];

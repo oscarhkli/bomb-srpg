@@ -9,8 +9,8 @@ import {
   PANEL_BUTTON_BORDER_WIDTH,
   PANEL_BUTTON_FILL_ALPHA,
   PANEL_BUTTON_FILL_COLOR,
-  RESOLVE_BUTTON_HEIGHT,
-  RESOLVE_BUTTON_WIDTH,
+  LIFECYCLE_BUTTON_HEIGHT_SMALL,
+  LIFECYCLE_BUTTON_WIDTH,
   TEAM_COLOR_FALLBACK,
   TEAM_COLORS,
   TURN_BANNER_HEIGHT,
@@ -24,7 +24,7 @@ import {
   VICTORY_TITLE_OFFSET_Y,
 } from '../constants';
 import { colorToCss, createFilledRect, fadeInTargets } from './gameObjectUtils';
-import { drawPillButton } from './pillButton';
+import { drawPillButton, verticalButtonY } from './pillButton';
 
 export interface VictoryCutsceneCallbacks {
   onRematch: () => void;
@@ -108,16 +108,16 @@ export default class VictoryCutscene {
   }
 
   private renderButtons(width: number, bannerY: number, callbacks: VictoryCutsceneCallbacks): void {
-    const x = width / 2 - RESOLVE_BUTTON_WIDTH / 2;
+    const x = width / 2 - LIFECYCLE_BUTTON_WIDTH / 2;
     const rematchY = bannerY + TURN_BANNER_HEIGHT + VICTORY_BUTTON_GAP;
-    const returnY = rematchY + RESOLVE_BUTTON_HEIGHT + VICTORY_BUTTON_GAP;
+    const returnY = verticalButtonY(rematchY, 1, LIFECYCLE_BUTTON_HEIGHT_SMALL, VICTORY_BUTTON_GAP);
 
     drawPillButton(
       this.scene,
       x,
       rematchY,
-      RESOLVE_BUTTON_WIDTH,
-      RESOLVE_BUTTON_HEIGHT,
+      LIFECYCLE_BUTTON_WIDTH,
+      LIFECYCLE_BUTTON_HEIGHT_SMALL,
       'Rematch',
       BUTTON_STYLE,
       DEPTH_VICTORY_CUTSCENE,
@@ -129,8 +129,8 @@ export default class VictoryCutscene {
       this.scene,
       x,
       returnY,
-      RESOLVE_BUTTON_WIDTH,
-      RESOLVE_BUTTON_HEIGHT,
+      LIFECYCLE_BUTTON_WIDTH,
+      LIFECYCLE_BUTTON_HEIGHT_SMALL,
       'Return to Match Settings',
       BUTTON_STYLE,
       DEPTH_VICTORY_CUTSCENE,

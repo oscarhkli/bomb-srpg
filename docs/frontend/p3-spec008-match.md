@@ -45,30 +45,36 @@ When the Player clicks `MatchSummaryButton`, `MatchSummaryPanel` will be rendere
 The `MatchSummaryPanel` fades in in **200ms**, stays on `MatchScene` until the Player closes it and fades out in **200ms**. **All user interactions disabled except the buttons in `MatchSummaryPanel` until this panel is closed.**
 
 - A dim background layer (semi-transparent scrim, consistent with `ConfirmDialog`'s dim background) covering **100% width, 100% height**.
-- The panel's content area is centered on screen, **640Wx640Hpx**, with **48px** margin from the screen edges on all sides.
-  - Font color and size are `0xffffff` and **48px**. The components are center-aligned within their own column.
+- The panel's content area is centered on screen, **720Wx640Hpx**.
+  - Font color is `0xffffff` and size is **36px**. Row spacing must give each line comfortable breathing room rather than packing rows tightly — the components are center-aligned within their own column.
   - The top **15%** of the panel is for displaying `gameCfg.stagePreset` and `gameCfg.maxTurns`. Render these in a 2-column style.
   - The next **35%** of the panel is for displaying the match data. Render these in a 3-column style.
     - Living Units can be counted by `units` with `HP > 0` per Team.
     - Available Bombs can be counted by `unit.maxBombCount - unit.bombUsed` for each `unit` with `HP > 0` per Team.
-  - The bottom half of this panel is for 3 `TurnLifeCycleButtons` and  `MatchSummaryPanelBackButton`
+    - `P1` and `P2` are each wrapped in a rounded rectangle (**96x48px**) filled with that team's `TEAM_COLORS` entry (team 1's color behind `P1`, team 2's color behind `P2`) — the same color used elsewhere for that team (e.g. `TurnPanel`'s header).
+  - The bottom half of this panel is for 3 `TurnLifeCycleButtons` and `MatchSummaryPanelBackButton`.
+    - These 4 buttons are **44px** tall (down from `ResolveTurnButton`'s original **72px**, `p3-spec004-match.md#resolveturn-button`), width unchanged. Font size is unchanged (not scaled down with the button). `VictoryCutscene`'s `rematchButton`/`returnMatchSettingsButton` (`p3-spec006-match.md`) are resized to this same **44px** height for visual consistency — width and font unchanged there too.
+    - The 4-button block is bottom-aligned within the panel — flush against the content box's bottom edge, preserving a **12px** gap after the last button.
     - Move `ResolveTurnButton` originally in `MatchScene` to `MatchSummaryPanel`, keeping its existing click behavior unchanged (`p3-spec004-match.md#resolveturn-button`) — including force-closing any open `TurnCommandPanel` action before showing its `ConfirmDialog`.
-    - Render `ResetTurnButton`, `SurrenderButton` and `MatchSummaryPanelBackButton` below `ResolveTurnButton`. Each button should leave **12px** gap at the bottom.
+    - Render `ResetTurnButton`, `SurrenderButton` and `MatchSummaryPanelBackButton` below `ResolveTurnButton`, each leaving **12px** gap from the one above it.
     - All `Yes` handlers in `ConfirmDialog` triggered by 3 `TurnLifeCycleButtons` should start with closing `MatchSummaryPanel`, followed by their corresponding actions.
 
 Sample representation for the transparent panel:
   ```text
   +-------------------------------------+
   |                                     |
-  |      Stage                MAP01     |
-  |    Max Turns               30       |
+  |      Stage                MAP03     |
+  |                                     |
+  |    Max Turns                 6      |
+  |                                     |
+  |  [P1]                       [P2]    |
+  |                                     |
+  |    5        Living Units      5     |
+  |                                     |
+  |   12       Available Bombs   12     |
   |                                     |
   |                                     |
-  |   P1                          P2    |
-  |    5       Living Units        3    |
-  |    2      Available Bombs      4    |
   |                                     |
-  |                                     | 
   |         [ResolveTurnButton]         |
   |          [ResetTurnButton]          |
   |          [SurrenderButton]          |
@@ -106,7 +112,7 @@ The only 3 differences are:
 Same visual effect as `SurrenderButton`, except:
 
 - `Surrender` -> `Reset this turn`
-- `Confirm to surrender?` -> `All the actions made during this turn will be reset. Confirm?`
+- `Confirm to surrender?` -> `All turn actions will reset. Confirm?`
 - If `gameCfg.allowResetTurn = false`, `ResetTurnButton` is disabled, change all the color to `DISABLED_BUTTON_COLOR`.
 
 ### Click Handler and Visual Effect of Reset Button
@@ -140,3 +146,7 @@ The visual effect is as same as the 3 `TurnLifeCycleButton`. Unlike those button
 7. Given a `TurnCommandPanel` button or unit click occurs while a turn-command or turn-lifecycle server call is in flight, then the click is a no-op until the response arrives.
 8. Given `MatchSummaryButton` is clicked while interactions are locked, then the click is a no-op.
 9. Given `ResetTurnButton` succeeds, then only occupant graphics are rebuilt from the fresh state — the terrain layer is untouched.
+
+## Log
+
+Implementation issues found during the build (non spec gaps) are tracked in [p3-spec008-match-log.md](./p3-spec008-match-log.md).

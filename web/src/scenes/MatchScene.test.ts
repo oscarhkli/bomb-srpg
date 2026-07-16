@@ -3,6 +3,7 @@ import { mockScene } from '../test/setup';
 import {
   firstGraphics as terrainGraphics,
   occupantGraphics,
+  lastGraphics,
   pointerDownOf,
   errorTextByMessage,
   flush,
@@ -19,6 +20,8 @@ import {
   getAllowedTiles,
   submitTurnCommand,
   resolveTurn,
+  resetTurn,
+  surrender,
   startTurn,
   rematch,
   deleteMatch,
@@ -33,6 +36,7 @@ import {
   DEPTH_SUDDEN_DEATH_BOMB,
   DEPTH_OCCUPANT,
   SUDDEN_DEATH_BOMB_DROP_DURATION_MS,
+  CONFIRM_TEXT_RESET,
 } from '../constants';
 
 vi.mock('../engine/api');
@@ -74,9 +78,44 @@ async function bootScene(overrides: Partial<MatchSceneData> = {}): Promise<Match
 
 // Also created synchronously within create()'s initial .then(), right after the grid/occupants
 // — same index formula as occupantGraphics (results[i+1]), kept as a distinctly-named alias here
-// since "resolve button" reads clearer than "occupant" at its call sites.
-function resolveButtonGraphics(unitCount: number): ReturnType<typeof mockScene.add.graphics> {
+// since spec008 moved ResolveTurnButton off MatchScene into MatchSummaryPanel, leaving this fixed
+// position occupied by the "≡" MatchSummaryButton instead.
+function matchSummaryButtonGraphics(unitCount: number): ReturnType<typeof mockScene.add.graphics> {
   return occupantGraphics(unitCount);
+}
+
+// Opens MatchSummaryPanel (clicking its "≡" button) then clicks one of its 4 lifecycle buttons.
+// Graphics call order on open is [scrim, P1 badge, P2 badge, Resolve, Reset, Surrender, Back]
+// (7 total) — see MatchSummaryPanel.test.ts. Slicing the last 5 conveniently drops scrim/P1
+// badge, so offset 0 below lands on P2 badge (unused) and offsets 1-4 land on the 4 buttons.
+function clickSummaryPanelButton(
+  unitCount: number,
+  button: 'resolve' | 'reset' | 'surrender' | 'back'
+): void {
+  pointerDownOf(matchSummaryButtonGraphics(unitCount))();
+  const offset = { resolve: 1, reset: 2, surrender: 3, back: 4 }[button];
+  const buttonGraphics = lastGraphics(5)[offset]!;
+  pointerDownOf(buttonGraphics)();
+}
+
+// Shared by the resolve/reset/surrender "clears the TurnCommandPanel action stack" tests: opens
+// a unit's TurnCommandPanel, then clicks the given MatchSummaryPanel button and asserts the
+// panel's Move button was torn down (treating the in-progress action as nothing selected).
+async function expectActionStackClearedBy(
+  button: 'resolve' | 'reset' | 'surrender'
+): Promise<void> {
+  const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
+  queueMatchStates(makeState({ grid: [[plainTile()]], activeTeam: 1, units: [unit] }));
+  vi.mocked(getAllowedTiles).mockResolvedValue([{ x: 0, y: 0 }]);
+
+  await bootScene();
+
+  pointerDownOf(occupantGraphics(0))();
+  const [moveButtonGraphics] = lastGraphics(3);
+
+  clickSummaryPanelButton(1, button);
+
+  expect(moveButtonGraphics!.destroy).toHaveBeenCalled();
 }
 
 // Drives the full UI path (click unit -> click Move/Bomb -> click allowed tile -> click Yes)
@@ -86,18 +125,12 @@ async function submitViaUI(
   buttonIndex: 0 | 1 // 0 = Move, 1 = Bomb
 ): Promise<void> {
   pointerDownOf(unitGraphics)(); // opens TurnCommandPanel
-  const actionButtonGraphics = mockScene.add.graphics.mock.results
-    .slice(-3)
-    .map(r => r.value as ReturnType<typeof mockScene.add.graphics>)[buttonIndex];
+  const actionButtonGraphics = lastGraphics(3)[buttonIndex];
   pointerDownOf(actionButtonGraphics!)();
   await flush();
-  const [overlayTileGraphics] = mockScene.add.graphics.mock.results
-    .slice(-1)
-    .map(r => r.value as ReturnType<typeof mockScene.add.graphics>);
+  const [overlayTileGraphics] = lastGraphics(1);
   pointerDownOf(overlayTileGraphics!)();
-  const [, yesButtonGraphics] = mockScene.add.graphics.mock.results
-    .slice(-3)
-    .map(r => r.value as ReturnType<typeof mockScene.add.graphics>);
+  const [, yesButtonGraphics] = lastGraphics(3);
   pointerDownOf(yesButtonGraphics!)();
 }
 
@@ -209,9 +242,7 @@ describe('MatchScene', () => {
 
     // Open the panel, click Move, close it, reopen, click Move again.
     onUnitPointerDown();
-    const [moveButtonGraphics] = mockScene.add.graphics.mock.results
-      .slice(-3)
-      .map(r => r.value as ReturnType<typeof mockScene.add.graphics>);
+    const [moveButtonGraphics] = lastGraphics(3);
     const clickMove = (): void => pointerDownOf(moveButtonGraphics!)();
     clickMove();
     await flush();
@@ -235,9 +266,7 @@ describe('MatchScene', () => {
     const onUnitPointerDown = pointerDownOf(occupantGraphics(0));
     onUnitPointerDown();
 
-    const [moveButtonGraphics] = mockScene.add.graphics.mock.results
-      .slice(-3)
-      .map(r => r.value as ReturnType<typeof mockScene.add.graphics>);
+    const [moveButtonGraphics] = lastGraphics(3);
     pointerDownOf(moveButtonGraphics!)();
     await flush();
 
@@ -255,7 +284,7 @@ describe('MatchScene', () => {
 
     await bootScene();
 
-    // No occupant Graphics exists for the dead unit: only the grid, ResolveTurnButton, and
+    // No occupant Graphics exists for the dead unit: only the grid, MatchSummaryButton, and
     // TurnPanel header(s) — TurnPanel renders once when gameCfg resolves and again inside
     // beginTurn()'s per-turn refresh, so exactly 2 "header" graphics beyond grid+button.
     expect(mockScene.add.graphics).toHaveBeenCalledTimes(4);
@@ -352,6 +381,57 @@ describe('MatchScene', () => {
     // target tile center (tileCenter of {x:1,y:0} = 72,24) and the initial unit graphics survives.
     expect(mockScene.add.container).toHaveBeenCalledWith(72, 24, expect.any(Array));
     expect(unitGraphics.destroy).not.toHaveBeenCalled();
+  });
+
+  // A successful command never rebuilds the occupant layer (AC3/spec007), so the unit's
+  // Graphics object — and the `unit` closure attachUnitClickHandler bound its pointerdown to —
+  // survives untouched. A second click on that same Graphics must still reflect the unit's
+  // fresh hasUsedSkill from the post-command gameState refetch, not the stale pre-command
+  // snapshot captured at the last occupant rebuild.
+  it('disables the Bomb button on a second click after a successful bomb placement, even without an occupant rebuild', async () => {
+    const unit = makeUnit({
+      id: 7,
+      team: 1,
+      position: { x: 0, y: 0 },
+      maxBombCount: 2,
+      hasUsedSkill: false,
+    });
+    const updatedUnit = makeUnit({
+      id: 7,
+      team: 1,
+      position: { x: 0, y: 0 },
+      maxBombCount: 2,
+      bombUsed: 1,
+      hasUsedSkill: true,
+    });
+    const initialGrid: Tile[][] = [[plainTile(), plainTile()]];
+    const target: Coordinate = { x: 1, y: 0 };
+
+    queueMatchStates(
+      makeState({ grid: initialGrid, activeTeam: 1, units: [unit] }),
+      makeState({
+        grid: initialGrid,
+        activeTeam: 1,
+        units: [updatedUnit],
+        bombs: [makeBomb({ id: 42, ownerId: 7, position: target, countdown: 3 })],
+      })
+    );
+    vi.mocked(getAllowedTiles).mockResolvedValue([target]);
+    vi.mocked(submitTurnCommand).mockResolvedValue([
+      { type: 'bombPlaced', unitId: 7, bombId: 42, position: target, range: 2, countdown: 3 },
+    ]);
+
+    await bootScene();
+
+    const unitGraphics = occupantGraphics(0);
+    await submitViaUI(unitGraphics, 1); // clicks Bomb (index 1)
+    await flush();
+
+    // Same Graphics object, no rebuild — click it again for a second look at the panel.
+    pointerDownOf(unitGraphics)();
+    const [, placeBombButtonGraphics] = lastGraphics(3);
+
+    expect(placeBombButtonGraphics!.setInteractive).not.toHaveBeenCalled();
   });
 
   // AC4: a rejected command surfaces the *actual* server error and resyncs by rebuilding the
@@ -536,19 +616,13 @@ describe('MatchScene', () => {
 
     const unitGraphics = occupantGraphics(0);
     pointerDownOf(unitGraphics)();
-    const [moveButtonGraphics] = mockScene.add.graphics.mock.results
-      .slice(-3)
-      .map(r => r.value as ReturnType<typeof mockScene.add.graphics>);
+    const [moveButtonGraphics] = lastGraphics(3);
     pointerDownOf(moveButtonGraphics!)();
     await flush();
-    const [overlayTileGraphics] = mockScene.add.graphics.mock.results
-      .slice(-1)
-      .map(r => r.value as ReturnType<typeof mockScene.add.graphics>);
+    const [overlayTileGraphics] = lastGraphics(1);
     pointerDownOf(overlayTileGraphics!)();
 
-    const [, yesButtonGraphics] = mockScene.add.graphics.mock.results
-      .slice(-3)
-      .map(r => r.value as ReturnType<typeof mockScene.add.graphics>);
+    const [, yesButtonGraphics] = lastGraphics(3);
     const graphicsCallCountBeforeClick = mockScene.add.graphics.mock.calls.length;
 
     pointerDownOf(unitGraphics)(); // clicking a unit while confirm is pending must be a no-op
@@ -572,24 +646,16 @@ describe('MatchScene', () => {
 
     const unitGraphics = occupantGraphics(0);
     pointerDownOf(unitGraphics)();
-    const [moveButtonGraphics] = mockScene.add.graphics.mock.results
-      .slice(-3)
-      .map(r => r.value as ReturnType<typeof mockScene.add.graphics>);
+    const [moveButtonGraphics] = lastGraphics(3);
     pointerDownOf(moveButtonGraphics!)();
     await flush();
-    const [overlayTileGraphics] = mockScene.add.graphics.mock.results
-      .slice(-1)
-      .map(r => r.value as ReturnType<typeof mockScene.add.graphics>);
+    const [overlayTileGraphics] = lastGraphics(1);
     pointerDownOf(overlayTileGraphics!)();
-    const [, firstYesButtonGraphics] = mockScene.add.graphics.mock.results
-      .slice(-3)
-      .map(r => r.value as ReturnType<typeof mockScene.add.graphics>);
+    const [, firstYesButtonGraphics] = lastGraphics(3);
 
     pointerDownOf(firstYesButtonGraphics!)(); // submitTurnCommand now pending, never resolves in this test
     pointerDownOf(overlayTileGraphics!)(); // re-click the still-visible tile
-    const [, secondYesButtonGraphics] = mockScene.add.graphics.mock.results
-      .slice(-3)
-      .map(r => r.value as ReturnType<typeof mockScene.add.graphics>);
+    const [, secondYesButtonGraphics] = lastGraphics(3);
     pointerDownOf(secondYesButtonGraphics!)(); // second Yes click while the first is still in flight
 
     expect(submitTurnCommand).toHaveBeenCalledTimes(1);
@@ -658,18 +724,12 @@ describe('MatchScene', () => {
     unitGraphics.y = 0;
 
     pointerDownOf(unitGraphics)();
-    const [moveButtonGraphics] = mockScene.add.graphics.mock.results
-      .slice(-3)
-      .map(r => r.value as ReturnType<typeof mockScene.add.graphics>);
+    const [moveButtonGraphics] = lastGraphics(3);
     pointerDownOf(moveButtonGraphics!)();
     await flush();
-    const [overlayTileGraphics] = mockScene.add.graphics.mock.results
-      .slice(-1)
-      .map(r => r.value as ReturnType<typeof mockScene.add.graphics>);
+    const [overlayTileGraphics] = lastGraphics(1);
     pointerDownOf(overlayTileGraphics!)();
-    const [, yesButtonGraphics] = mockScene.add.graphics.mock.results
-      .slice(-3)
-      .map(r => r.value as ReturnType<typeof mockScene.add.graphics>);
+    const [, yesButtonGraphics] = lastGraphics(3);
     pointerDownOf(yesButtonGraphics!)();
     await flush();
 
@@ -711,24 +771,24 @@ describe('MatchScene', () => {
 
     await bootScene({ playerTokens: ['team1-token', 'team2-token'] });
 
-    pointerDownOf(resolveButtonGraphics(0))();
+    clickSummaryPanelButton(0, 'resolve');
   }
 
-  it('pins ResolveTurnButton to the camera viewport (scrollFactor 0) instead of the grid/world', async () => {
+  it('pins MatchSummaryButton to the camera viewport (scrollFactor 0) instead of the grid/world', async () => {
     queueMatchStates(makeState({ grid: [[plainTile()]], activeTeam: 1 }));
 
     await bootScene();
 
-    expect(resolveButtonGraphics(0).setScrollFactor).toHaveBeenCalledWith(0);
+    expect(matchSummaryButtonGraphics(0).setScrollFactor).toHaveBeenCalledWith(0);
   });
 
-  it('shows an error instead of crashing when ResolveTurnButton is clicked before match config has loaded', async () => {
+  it('shows an error instead of crashing when MatchSummaryButton is clicked before match config has loaded', async () => {
     queueMatchStates(makeState({ grid: [[plainTile()]], activeTeam: 1 }));
     vi.mocked(getMatchConfig).mockReturnValue(new Promise<GameCfg>(() => undefined));
 
     await bootScene();
 
-    expect(() => pointerDownOf(resolveButtonGraphics(0))()).not.toThrow();
+    expect(() => pointerDownOf(matchSummaryButtonGraphics(0))()).not.toThrow();
     expect(mockScene.add.text).toHaveBeenCalledWith(
       expect.any(Number),
       expect.any(Number),
@@ -739,21 +799,7 @@ describe('MatchScene', () => {
   });
 
   it('clears the TurnCommandPanel action stack (treating it as nothing selected) when ResolveTurnButton opens the confirm dialog', async () => {
-    const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
-    queueMatchStates(makeState({ grid: [[plainTile()]], activeTeam: 1, units: [unit] }));
-    vi.mocked(getAllowedTiles).mockResolvedValue([{ x: 0, y: 0 }]);
-
-    await bootScene();
-
-    // Open the unit's TurnCommandPanel (draws Move/Bomb/Back as the next 3 Graphics).
-    pointerDownOf(occupantGraphics(0))();
-    const [moveButtonGraphics] = mockScene.add.graphics.mock.results
-      .slice(-3)
-      .map(r => r.value as ReturnType<typeof mockScene.add.graphics>);
-
-    pointerDownOf(resolveButtonGraphics(1))();
-
-    expect(moveButtonGraphics!.destroy).toHaveBeenCalled();
+    await expectActionStackClearedBy('resolve');
   });
 
   it('opens the resolve confirm even when a TurnCommandPanel confirm is already open, so a stale action never blocks it', async () => {
@@ -769,19 +815,15 @@ describe('MatchScene', () => {
     // Drive the Move flow until the shared ConfirmDialog is open (click unit -> Move ->
     // allowed tile). At this point confirmDialog.isOpen is true.
     pointerDownOf(occupantGraphics(0))();
-    const [moveButtonGraphics] = mockScene.add.graphics.mock.results
-      .slice(-3)
-      .map(r => r.value as ReturnType<typeof mockScene.add.graphics>);
+    const [moveButtonGraphics] = lastGraphics(3);
     pointerDownOf(moveButtonGraphics!)();
     await flush();
-    const [overlayTile] = mockScene.add.graphics.mock.results
-      .slice(-1)
-      .map(r => r.value as ReturnType<typeof mockScene.add.graphics>);
+    const [overlayTile] = lastGraphics(1);
     pointerDownOf(overlayTile!)();
 
     // Clicking Resolve must still surface the resolve prompt (previously the open confirm
     // caused an early return and nothing happened).
-    pointerDownOf(resolveButtonGraphics(1))();
+    clickSummaryPanelButton(1, 'resolve');
 
     expect(mockScene.add.text).toHaveBeenCalledWith(
       expect.any(Number),
@@ -810,9 +852,7 @@ describe('MatchScene', () => {
     vi.mocked(resolveTurn).mockResolvedValue(events);
 
     // ConfirmDialog's Yes button is the most-recently-created graphics among the last 3.
-    const [, yesButtonGraphics] = mockScene.add.graphics.mock.results
-      .slice(-3)
-      .map(r => r.value as ReturnType<typeof mockScene.add.graphics>);
+    const [, yesButtonGraphics] = lastGraphics(3);
     pointerDownOf(yesButtonGraphics!)();
     await flush();
 
@@ -833,9 +873,7 @@ describe('MatchScene', () => {
     await setUpEmptyBoardAndClickResolve();
     vi.mocked(resolveTurn).mockRejectedValue(new Error('resolve failed'));
 
-    const [, yesButtonGraphics] = mockScene.add.graphics.mock.results
-      .slice(-3)
-      .map(r => r.value as ReturnType<typeof mockScene.add.graphics>);
+    const [, yesButtonGraphics] = lastGraphics(3);
     pointerDownOf(yesButtonGraphics!)();
     await flush();
 
@@ -850,9 +888,8 @@ describe('MatchScene', () => {
 
   // AC3: after a successful resolve, the animated end-state left by playResolveTurnEvents stands —
   // no wholesale occupant swap follows (which would snap sprites out of their finished animation).
-  // The turn-advance UI (turnPanel + resolve button) still refreshes. (The former runtime
-  // occupantsMatch "out of sync" check was removed in spec007 and relocated to a test oracle.)
-  it('keeps the animated end-state on a successful resolve (no occupant rebuild) but refreshes turnPanel and the resolve button', async () => {
+  // turnPanel still refreshes. MatchSummaryButton itself is static and isn't re-rendered per turn.
+  it('keeps the animated end-state on a successful resolve (no occupant rebuild) but refreshes turnPanel', async () => {
     const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
     queueMatchStates(
       makeState({ grid: [[plainTile()]], activeTeam: 1, units: [unit] }),
@@ -864,12 +901,9 @@ describe('MatchScene', () => {
     await bootScene({ playerTokens: ['team1-token', 'team2-token'] });
 
     const unitGraphics = occupantGraphics(0);
-    const resolveButton = resolveButtonGraphics(1); // grid + 1 unit + resolve button
 
-    pointerDownOf(resolveButtonGraphics(1))();
-    const [, yesButtonGraphics] = mockScene.add.graphics.mock.results
-      .slice(-3)
-      .map(r => r.value as ReturnType<typeof mockScene.add.graphics>);
+    clickSummaryPanelButton(1, 'resolve');
+    const [, yesButtonGraphics] = lastGraphics(3);
     pointerDownOf(yesButtonGraphics!)();
     await flush();
 
@@ -882,8 +916,6 @@ describe('MatchScene', () => {
       '5',
       expect.objectContaining({})
     );
-    // ...and the resolve button was re-rendered (old button graphics destroyed).
-    expect(resolveButton.destroy).toHaveBeenCalled();
   });
 
   it('clears previous error messages once a new turn command begins, so they do not accumulate across turns', async () => {
@@ -900,9 +932,7 @@ describe('MatchScene', () => {
 
     const unitGraphics = occupantGraphics(0);
     pointerDownOf(unitGraphics)();
-    const [moveButtonGraphics] = mockScene.add.graphics.mock.results
-      .slice(-3)
-      .map(r => r.value as ReturnType<typeof mockScene.add.graphics>);
+    const [moveButtonGraphics] = lastGraphics(3);
     pointerDownOf(moveButtonGraphics!)();
     await flush();
 
@@ -1059,10 +1089,8 @@ describe('MatchScene', () => {
       vi.mocked(resolveTurn).mockResolvedValue([
         { type: 'bombCountdownUpdated', bombId: 999, countdown: 2 },
       ]);
-      pointerDownOf(resolveButtonGraphics(0))();
-      const [, yesButtonGraphics] = mockScene.add.graphics.mock.results
-        .slice(-3)
-        .map(r => r.value as ReturnType<typeof mockScene.add.graphics>);
+      clickSummaryPanelButton(0, 'resolve');
+      const [, yesButtonGraphics] = lastGraphics(3);
       pointerDownOf(yesButtonGraphics!)();
       await flush();
 
@@ -1087,7 +1115,7 @@ describe('MatchScene', () => {
 
       const graphicsBefore = mockScene.add.graphics.mock.calls.length;
       pointerDownOf(occupantGraphics(0))();
-      pointerDownOf(resolveButtonGraphics(1))();
+      pointerDownOf(matchSummaryButtonGraphics(1))();
       expect(mockScene.add.graphics.mock.calls.length).toBe(graphicsBefore);
 
       resolveBanner();
@@ -1130,9 +1158,7 @@ describe('MatchScene', () => {
         winnerTeamId === undefined ? { type: 'matchEnded' } : { type: 'matchEnded', winnerTeamId };
       vi.mocked(resolveTurn).mockResolvedValue([event]);
 
-      const [, yesButtonGraphics] = mockScene.add.graphics.mock.results
-        .slice(-3)
-        .map(r => r.value as ReturnType<typeof mockScene.add.graphics>);
+      const [, yesButtonGraphics] = lastGraphics(3);
       pointerDownOf(yesButtonGraphics!)();
       await flush();
     }
@@ -1172,10 +1198,8 @@ describe('MatchScene', () => {
       await bootScene();
       vi.mocked(resolveTurn).mockResolvedValue([{ type: 'matchEnded', winnerTeamId: 1 }]);
 
-      pointerDownOf(resolveButtonGraphics(1))();
-      const [, yesButtonGraphics] = mockScene.add.graphics.mock.results
-        .slice(-3)
-        .map(r => r.value as ReturnType<typeof mockScene.add.graphics>);
+      clickSummaryPanelButton(1, 'resolve');
+      const [, yesButtonGraphics] = lastGraphics(3);
       pointerDownOf(yesButtonGraphics!)();
       await flush();
 
@@ -1315,6 +1339,219 @@ describe('MatchScene', () => {
       // from it, since it bails out on the generation mismatch.
       expect(mockScene.cameras.main.centerOn.mock.calls.length).toBe(
         centerOnCallsBeforeStaleResolve
+      );
+    });
+  });
+
+  describe('Reset flow (ResetTurnButton)', () => {
+    it('fades the camera out then in (like Rematch), calls resetTurn() then getMatchState(), and rebuilds only the occupant layer', async () => {
+      const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
+      queueMatchStates(makeState({ grid: [[plainTile()]], activeTeam: 1, units: [unit] }));
+      vi.mocked(resetTurn).mockResolvedValue(undefined);
+
+      await bootScene({ playerTokens: ['team1-token', 'team2-token'] });
+
+      const unitGraphics = occupantGraphics(0);
+      const grid = terrainGraphics();
+
+      clickSummaryPanelButton(1, 'reset');
+      const [, yesButtonGraphics] = lastGraphics(3);
+      pointerDownOf(yesButtonGraphics!)();
+
+      // fadeOut() runs synchronously before the first await.
+      expect(mockScene.cameras.main.fadeOut).toHaveBeenCalledWith(200, 0, 0, 0);
+      expect(mockScene.cameras.main.fadeIn).not.toHaveBeenCalled();
+
+      await flush();
+
+      expect(resetTurn).toHaveBeenCalledOnce();
+      // initial board render + beginTurn()'s per-turn refresh + Reset's own post-resetTurn() refetch.
+      expect(getMatchState).toHaveBeenCalledTimes(3);
+      expect(grid.destroy).not.toHaveBeenCalled();
+      // Unlike a successful Resolve (no rebuild), Reset always rebuilds the occupant layer.
+      expect(unitGraphics.destroy).toHaveBeenCalled();
+      expect(mockScene.cameras.main.fadeIn).toHaveBeenCalledWith(200);
+    });
+
+    it('re-enables interactions once resetTurn()+getMatchState() settle, independent of the undim tween finishing', async () => {
+      const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
+      queueMatchStates(makeState({ grid: [[plainTile()]], activeTeam: 1, units: [unit] }));
+      vi.mocked(resetTurn).mockResolvedValue(undefined);
+
+      await bootScene();
+
+      clickSummaryPanelButton(1, 'reset');
+      const [, yesButtonGraphics] = lastGraphics(3);
+      pointerDownOf(yesButtonGraphics!)();
+      await flush();
+
+      // The undim tween's onComplete was never fired — yet a unit click on the freshly rebuilt
+      // occupant graphics still opens TurnCommandPanel, proving interactions already re-enabled.
+      const freshUnitGraphics = mockScene.add.graphics.mock.results.at(-1)!.value as ReturnType<
+        typeof mockScene.add.graphics
+      >;
+      const graphicsBefore = mockScene.add.graphics.mock.calls.length;
+      pointerDownOf(freshUnitGraphics)();
+
+      expect(mockScene.add.graphics.mock.calls.length).toBeGreaterThan(graphicsBefore);
+    });
+
+    it('shows an error and still re-enables interactions when resetTurn() rejects', async () => {
+      const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
+      queueMatchStates(makeState({ grid: [[plainTile()]], activeTeam: 1, units: [unit] }));
+      vi.mocked(resetTurn).mockRejectedValue(new Error('reset failed'));
+
+      await bootScene();
+
+      clickSummaryPanelButton(1, 'reset');
+      const [, yesButtonGraphics] = lastGraphics(3);
+      pointerDownOf(yesButtonGraphics!)();
+      await flush();
+
+      expect(mockScene.add.text).toHaveBeenCalledWith(
+        expect.any(Number),
+        expect.any(Number),
+        'reset failed',
+        expect.objectContaining({})
+      );
+      // resetTurn() itself rejected, so there's no post-reset getMatchState() refetch.
+      expect(getMatchState).toHaveBeenCalledTimes(2);
+
+      const graphicsBefore = mockScene.add.graphics.mock.calls.length;
+      pointerDownOf(occupantGraphics(0))();
+      expect(mockScene.add.graphics.mock.calls.length).toBeGreaterThan(graphicsBefore);
+    });
+
+    it('still schedules the dim overlay to fade out and destroy itself if the scene is shut down while resetTurn() is in flight', async () => {
+      const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
+      queueMatchStates(makeState({ grid: [[plainTile()]], activeTeam: 1, units: [unit] }));
+      let resolveReset: () => void = () => undefined;
+      vi.mocked(resetTurn).mockReturnValue(
+        new Promise<void>(resolve => {
+          resolveReset = resolve;
+        })
+      );
+
+      await bootScene();
+
+      clickSummaryPanelButton(1, 'reset');
+      const [, yesButtonGraphics] = lastGraphics(3);
+      pointerDownOf(yesButtonGraphics!)();
+
+      fireShutdown(); // bumps generation while resetTurn() is still pending
+      resolveReset();
+      await flush();
+
+      // Even though the generation mismatch short-circuits renderBoard()/getMatchState(), the
+      // camera must still fade back in — otherwise the screen would stay faded to black forever.
+      expect(mockScene.cameras.main.fadeIn).toHaveBeenCalledWith(200);
+    });
+
+    it('clears the TurnCommandPanel action stack when ResetTurnButton opens the confirm dialog', async () => {
+      await expectActionStackClearedBy('reset');
+    });
+  });
+
+  describe('Surrender flow (SurrenderButton)', () => {
+    it("calls surrender() with the currently active team's id and renders VictoryCutscene when matchEnded is returned", async () => {
+      queueMatchStates(makeState({ grid: [[plainTile()]], activeTeam: 2 }));
+      vi.mocked(surrender).mockResolvedValue([{ type: 'matchEnded', winnerTeamId: 1 }]);
+
+      await bootScene();
+      clickSummaryPanelButton(0, 'surrender');
+      const [, yesButtonGraphics] = lastGraphics(3);
+      pointerDownOf(yesButtonGraphics!)();
+      await flush();
+
+      expect(surrender).toHaveBeenCalledWith({ teamId: 2 });
+      expect(victoryCutscenePlay).toHaveBeenCalledWith(1, expect.any(Object));
+    });
+
+    it('shows an error and does not render VictoryCutscene when the surrender response has no matchEnded event', async () => {
+      queueMatchStates(makeState({ grid: [[plainTile()]], activeTeam: 1 }));
+      vi.mocked(surrender).mockResolvedValue([]);
+
+      await bootScene();
+      clickSummaryPanelButton(0, 'surrender');
+      const [, yesButtonGraphics] = lastGraphics(3);
+      pointerDownOf(yesButtonGraphics!)();
+      await flush();
+
+      expect(victoryCutscenePlay).not.toHaveBeenCalled();
+      expect(mockScene.add.text).toHaveBeenCalledWith(
+        expect.any(Number),
+        expect.any(Number),
+        'Invalid response from surrender',
+        expect.objectContaining({})
+      );
+    });
+
+    it('shows an error and does not render VictoryCutscene when surrender() rejects', async () => {
+      queueMatchStates(makeState({ grid: [[plainTile()]], activeTeam: 1 }));
+      vi.mocked(surrender).mockRejectedValue(new Error('network down'));
+
+      await bootScene();
+      clickSummaryPanelButton(0, 'surrender');
+      const [, yesButtonGraphics] = lastGraphics(3);
+      pointerDownOf(yesButtonGraphics!)();
+      await flush();
+
+      expect(mockScene.add.text).toHaveBeenCalledWith(
+        expect.any(Number),
+        expect.any(Number),
+        'network down',
+        expect.objectContaining({})
+      );
+      expect(victoryCutscenePlay).not.toHaveBeenCalled();
+    });
+
+    it('clears the TurnCommandPanel action stack when SurrenderButton opens the confirm dialog', async () => {
+      await expectActionStackClearedBy('surrender');
+    });
+  });
+
+  describe('lifecycle-button confirm re-entrancy (MatchSummaryPanel)', () => {
+    it('ignores a second lifecycle button click while another lifecycle confirm is already pending', async () => {
+      queueMatchStates(makeState({ grid: [[plainTile()]], activeTeam: 1 }));
+      await bootScene();
+
+      pointerDownOf(matchSummaryButtonGraphics(0))(); // opens MatchSummaryPanel
+      const [, , resetGraphics, surrenderGraphics] = lastGraphics(5);
+      pointerDownOf(resetGraphics!)(); // opens Reset's own confirm — still pending, no Yes/No yet
+
+      const textCallsBefore = mockScene.add.text.mock.calls.length;
+      pointerDownOf(surrenderGraphics!)(); // must be a no-op: Reset's confirm hasn't resolved
+
+      expect(mockScene.add.text.mock.calls.length).toBe(textCallsBefore);
+    });
+
+    it('does not block a lifecycle button click caused only by a stale TurnCommandPanel confirm', async () => {
+      const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
+      const initialGrid: Tile[][] = [
+        [{ type: 'TerrainPlain', occupantType: 'OccupantUnit', occupantId: 7 }, plainTile()],
+      ];
+      queueMatchStates(makeState({ grid: initialGrid, activeTeam: 1, units: [unit] }));
+      vi.mocked(getAllowedTiles).mockResolvedValue([{ x: 1, y: 0 }]);
+
+      await bootScene();
+
+      // Drive the Move flow until TurnCommandPanel's own ConfirmDialog is open.
+      pointerDownOf(occupantGraphics(0))();
+      const [moveButtonGraphics] = lastGraphics(3);
+      pointerDownOf(moveButtonGraphics!)();
+      await flush();
+      const [overlayTile] = lastGraphics(1);
+      pointerDownOf(overlayTile!)();
+
+      // Reset must still surface its own prompt — a stale TurnCommandPanel confirm is superseded,
+      // not treated as an already-pending lifecycle confirm.
+      clickSummaryPanelButton(1, 'reset');
+
+      expect(mockScene.add.text).toHaveBeenCalledWith(
+        expect.any(Number),
+        expect.any(Number),
+        CONFIRM_TEXT_RESET,
+        expect.objectContaining({})
       );
     });
   });
