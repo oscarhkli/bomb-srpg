@@ -10,7 +10,7 @@ As of Phase 3.6, the Players have to play the whole game to go back to `MatchSet
 
 - Add `SurrenderButton` to restart a match.
 - Add `ResetTurnButton` to reset the `WorkingState`.
-- Render `MatchSummaryPanel` to keep all 3 `TurnLifeCycleButtons`
+- Render `MatchSummaryPanel` to keep all 3 `TurnLifeCycleButtons`.
 
 ## Non-Goal
 
@@ -24,7 +24,9 @@ No change from spec006.
 
 There are 3 Turn Life-cycle operations in the game, `ResolveTurn`, `ResetTurn` and `Surrender`. Unlike `TurnCommand` which manipulate the `WorkingState`, Turn Life-cycle operations manipulate the whole turn data.
 
-**Interaction lock contract (applies project-wide):** Any action that triggers a server call — including `ResolveTurnButton`, `ResetTurnButton`, `SurrenderButton` here, and `ConfirmDialog`'s `yesButton` for `moveButton`/`placeBombButton` (`TurnCommandPanel`, see `p3-spec003-match.md`) — must disable all user interactions the instant the call is triggered, and only re-enable them once the server has responded (success or error). Re-rendering/animation is a parallel concern and must not gate when interactions re-enable.
+**Interaction lock contract (applies project-wide):** Any action that triggers a server call — including `ResolveTurnButton`, `ResetTurnButton`, `SurrenderButton`, `MatchSummaryButton` here, and `ConfirmDialog`'s `yesButton` for `moveButton`/`placeBombButton` (`TurnCommandPanel`, see `p3-spec003-match.md`) — must disable all user interactions the instant the call is triggered, and only re-enable them once the server has responded (success or error). Re-rendering/animation is a parallel concern and must not gate when interactions re-enable.
+
+"All user interactions" explicitly includes `TurnCommandPanel`'s own buttons (Move/Bomb/Back) and board unit-click handling, not just the 4 buttons named above — a unit click or a `TurnCommandPanel` button press during an in-flight `moveButton`/`placeBombButton` submission must be a no-op until that submission's response arrives. (This closes the gap tracked in `p3-spec003-match-log.md` issue #4, which was deferred here pending spec008.)
 
 ## MatchSummary Panel
 
@@ -34,7 +36,9 @@ There are 3 Turn Life-cycle operations in the game, `ResolveTurn`, `ResetTurn` a
 
 `MatchScene` renders a **48x48px** rounded square at the top right hand corner, which should mirror the position of `TurnPanel`, leaving 48px space from the top and right edges. Its depth is same as `TurnCommandPanel`. The button contains a menu symbol `≡` in font color `0xffffff` and font size **48px**
 
-When the Player clicks `MatchSummaryButton`, `MatchSummaryPanel` will be rendered as the below section. 
+`MatchSummaryPanel`'s own depth sits above `TurnPanel`/`TurnCommandPanel` (so it blocks board interaction underneath) but below `ConfirmDialog` (so the `Yes`/`No` prompt from a `TurnLifeCycleButton` click still renders on top of the panel).
+
+When the Player clicks `MatchSummaryButton`, `MatchSummaryPanel` will be rendered as shown below.
 
 ### Visual Effect of MatchSummary Panel
 
@@ -48,7 +52,7 @@ The `MatchSummaryPanel` fades in in **200ms**, stays on `MatchScene` until the P
     - Living Units can be counted by `units` with `HP > 0` per Team.
     - Available Bombs can be counted by `unit.maxBombCount - unit.bombUsed` for each `unit` with `HP > 0` per Team.
   - The bottom half of this panel is for 3 `TurnLifeCycleButtons` and  `MatchSummaryPanelBackButton`
-    - Move `ResolveTurnButton` originally in `MatchScene` to `MatchSummaryPanel`.
+    - Move `ResolveTurnButton` originally in `MatchScene` to `MatchSummaryPanel`, keeping its existing click behavior unchanged (`p3-spec004-match.md#resolveturn-button`) — including force-closing any open `TurnCommandPanel` action before showing its `ConfirmDialog`.
     - Render `ResetTurnButton`, `SurrenderButton` and `MatchSummaryPanelBackButton` below `ResolveTurnButton`. Each button should leave **12px** gap at the bottom.
     - All `Yes` handlers in `ConfirmDialog` triggered by 3 `TurnLifeCycleButtons` should start with closing `MatchSummaryPanel`, followed by their corresponding actions.
 
@@ -81,12 +85,14 @@ The only 3 differences are:
 
 - `SurrenderButton` contains text `Surrender`.
 - `ConfirmDialog` shows `Confirm to surrender?`
-- After the Player chooses `Yes`, move on to [Surrender handling](#surrender-visual-effect-and-interaction)
+- After the Player chooses `Yes`, move on to [Surrender handling](#click-handler-of-surrender-button)
 
 ### Click Handler of Surrender Button
 
 - Interactions lock on click, per the [Interaction lock contract](#turnlifecycle-buttons), and stay locked until `surrender()` responds.
-- Call surrender(). `matchEndedEvent` should be returned from the backend.
+- Call `surrender()` with the currently **active team**'s `teamId` (`gameState.activeTeam`) — under today's pass-and-play mode, both Players share one client, so "who clicked" is derived from whose turn it currently is, not a separate per-Player session.
+  > Note: This is a pass-and-play placeholder. Once online multiplayer exists, this must instead resolve to the client's own registered team (from its `playerToken`/session), regardless of which team is currently active — a future spec's concern, not this one's.
+- `matchEndedEvent` should be returned from the backend.
 - Render `VictoryCutscene` just as when match is concluded during `resolveTurn`.
 
 ## Reset Button
@@ -111,7 +117,7 @@ After clicking this button, a series of actions will be executed:
 - In parallel, dim the whole canvas in **200ms**, just like fading out, to mask the re-render.
 - While dimming the screen, call `resetTurn()` to notify the backend to `ResetTurn()`.
 - If the response is not **HTTP 200**, log the error in `ErrorPanel`.
-- If the response is **HTTP 200**, re-fetch and re-render from `getMatchState()`. After that, go back to [Game Loop #5.4](p3-spec005-match.md#game-loop).
+- If the response is **HTTP 200**, re-fetch via `getMatchState()` and rebuild the **occupant layer only** — the occupant-only wholesale swap defined by `p3-spec007-match.md`'s Render-Path Contract (caller (b)). The terrain layer is not rebuilt. After that, go back to [Game Loop #5.4](p3-spec005-match.md#game-loop).
 - After the re-rendering completes, undim the whole canvas in **200ms**, just like fading in. Interactions re-enable once `resetTurn()` has responded — this is independent of when the dim/undim/re-render visuals finish.
 > Note: ResetTurn() rollback to the state **after** Sudden Death hazard being injected. There is no need to re-render Sudden Death related animations.
 
@@ -131,3 +137,6 @@ The visual effect is as same as the 3 `TurnLifeCycleButton`. Unlike those button
 4. Given Player 1 clicks `ResetTurnButton`, `MatchScene` should revert to the state the Player 1 started, with SuddenDeath already injected if it's in Sudden Death state.
 5. Given Player 2 clicks `ResetTurnButton`, `MatchScene` should revert to the state the Player 2 started, with SuddenDeath already injected if it's in Sudden Death state.
 6. Given Player clicks `MatchSummaryPanelBackButton`, `MatchSummaryPanel` should be closed and Player should be able to continue to navigate the occupants.
+7. Given a `TurnCommandPanel` button or unit click occurs while a turn-command or turn-lifecycle server call is in flight, then the click is a no-op until the response arrives.
+8. Given `MatchSummaryButton` is clicked while interactions are locked, then the click is a no-op.
+9. Given `ResetTurnButton` succeeds, then only occupant graphics are rebuilt from the fresh state — the terrain layer is untouched.
