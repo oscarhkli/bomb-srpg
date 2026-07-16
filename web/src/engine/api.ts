@@ -137,13 +137,16 @@ export async function submitTurnCommand(cmd: TurnCommand): Promise<GameEvent[]> 
   return handleResponse<GameEvent[]>(res);
 }
 
-export async function resetTurn(): Promise<GameState> {
+export async function resetTurn(): Promise<void> {
   const roomId = requireRoomId();
   const res = await fetch(buildUrl(`/api/match-rooms/${roomId}/match/reset`), {
     method: 'POST',
     headers: authHeaders(),
   });
-  return handleResponse<GameState>(res);
+  if (!res.ok) {
+    const message = await res.text();
+    throw new ApiError(res.status, message);
+  }
 }
 
 export async function resolveTurn(): Promise<GameEvent[]> {

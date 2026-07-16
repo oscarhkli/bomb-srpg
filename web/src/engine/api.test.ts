@@ -259,16 +259,15 @@ describe('api.ts', () => {
   });
 
   describe('resetTurn', () => {
-    const fixture: GameState = makeState({ activeTeam: 0, grid: [] });
+    it('should POST with auth and resolve with no content', async () => {
+      mockOk(204, undefined);
 
-    it('should POST with auth and return game state', async () => {
-      mockOk(200, fixture);
+      await expect(resetTurn()).resolves.toBeUndefined();
 
-      const result = await resetTurn();
-
-      expect(result).toEqual(fixture);
-      const [, options] = mockFetch.mock.calls[0] as [string, RequestInit];
-      expect(options.headers).toHaveProperty('Authorization');
+      const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
+      expect(url).toContain('/api/match-rooms/test-room-123/match/reset');
+      expect(options.method).toBe('POST');
+      expect(options.headers).toHaveProperty('Authorization', 'Bearer test-token-abc');
     });
 
     it('should throw ApiError on failure', async () => {
