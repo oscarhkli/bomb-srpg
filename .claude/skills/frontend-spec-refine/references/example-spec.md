@@ -4,7 +4,7 @@ title: "Phase 3.1: Initialize Match Grid"
 
 # Initialize Match Grid
 
-> This is a template example from a past spec (`match-p3-spec001`), kept for illustration only.
+> This is a template example from a past spec (`p3-spec001-match`), kept for illustration only.
 > It is **not** the spec you're currently working on — create a fresh
 
 ## Context
@@ -35,7 +35,7 @@ At `TILE_SIZE = 48px`, all supported grid sizes fit within the 1280×720 canvas 
 | 11×11 | 528×528px  | Yes           |
 | 15×15 | 720×720px  | Yes           |
 
-For Phase 3.1 the camera is **static** — no pan or zoom. Camera pan via drag is introduced in `match-p3-spec002.md`. Zoom is deferred to a later spec.
+For Phase 3.1 the camera is **static** — no pan or zoom. Camera pan via drag is introduced in `p3-spec002-match.md`. Zoom is deferred to a later spec.
 
 ### Tile size
 
@@ -145,4 +145,4 @@ Replace `src/main.ts` with the Phaser game bootstrap (registered scenes, canvas 
 
 ## Log
 
-Implementation issues found during the build (non spec gaps) are tracked in [`match-p3-spec001-log.md`](./match-p3-spec001-log.md).
+Implementation issues found during the build (non spec gaps) are tracked in [`p3-spec001-match-log.md`](./p3-spec001-match-log.md).

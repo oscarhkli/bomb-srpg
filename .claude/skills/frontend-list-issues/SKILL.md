@@ -1,6 +1,6 @@
 ---
 name: frontend-list-issues
-description: Scan docs/frontend/*-log.md files for open (non-Solved) known issues and report them grouped by spec, without reading the full body of any log file. Use when the user asks what known issues are still open across frontend specs, or when another frontend-* skill needs a cross-spec issue summary before proceeding.
+description: Scan docs/frontend/*-log.md files for open (non-Solved) known issues and report them grouped by spec, without reading the full body of any log file. Use when the user asks what known issues are still open across frontend specs, check the known issues, find any potentially solveable issues, or when another frontend-* skill needs a cross-spec issue summary before proceeding.
 allowed-tools: Bash
 model: "haiku"
 ---
@@ -32,15 +32,15 @@ Log entries end with a line like `**Status: Solved.**` or `**Status: Deferred.**
    - The first `grep` grabs every `**Status: ...**` line plus the line right before it (the numbered issue title, e.g. `3. **Bombs don't chain-explode diagonally.** ...`).
    - The second `grep -v` drops any pair whose status line contains a terminal status. Today that's just `Solved` — extend this filter only if a new terminal status is deliberately introduced, not for new open statuses.
 
-3. Group the remaining lines by source file. Derive each spec's name from its log filename by stripping the `-log.md` suffix (e.g. `docs/frontend/match-p3-spec002-log.md` → `match-p3-spec002`).
+3. Group the remaining lines by source file. Derive each spec's name from its log filename by stripping the `-log.md` suffix (e.g. `docs/frontend/p3-spec002-match-log.md` → `p3-spec002-match`).
 
 4. Report, grouped by spec, something like:
    ```
-   ## match-p3-spec002 (docs/frontend/match-p3-spec002-log.md)
+   ## p3-spec002-match (docs/frontend/p3-spec002-match-log.md)
    - Bombs don't chain-explode diagonally. — Status: Deferred. No test changes made yet...
    - ...
 
-   ## match-p3-spec001 (docs/frontend/match-p3-spec001-log.md)
+   ## p3-spec001-match (docs/frontend/p3-spec001-match-log.md)
    - ...
    ```
    If every log's issues turn out to be `Solved` (the filtered grep produces no output at all), report "No open issues — all known issues across frontend specs are resolved."

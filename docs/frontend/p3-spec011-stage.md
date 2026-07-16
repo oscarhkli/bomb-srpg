@@ -1,14 +1,27 @@
 ---
-title: "Phase 3.9: Render Occupant Information"
+title: "Phase 3.x: Match Settings Scene"
 ---
 
-# Render Occupant Information
+# Match Settings Scene
 
-Ignore the below as it's only a copied template.
+## Context
+
+Phase 3.5 implements the full game cycle of a match, but when the match concludes, the frontend didn't stop, resulting an error msg like `match already ended`. This spec adds a `VictoryCutscene` to conclude the match, and provide a way to restart the match.
+
+## Goal
+
+- Render `VictoryCutscene` when the match ends.
+- Add `rematchButton` to restart a match.
+
+## Non-Goal
+
+- Polished animations or tweens (easing curves, squash/stretch, particle effects, etc.)
+- HUD / status panel.
+- Detailed implementation of `MatchSetupScene` - a rough page for scene entry is accecptable. Detailed part will be initiated in `p3-spec011-stage.md`
 
 ## Scene Entry
 
-Who launches this scene and what data it receives.
+No change from spec001.
 
 ### Data on arrival
 
@@ -57,4 +70,4 @@ Remove once the real predecessor scene is implemented.
 
 ## Log _(optional - remove it if no implementatioun issue is found)_
 
-Implementation issues found during the build (non spec gaps) are tracked in [`match-p3-spec001-log.md`](./match-p3-spec001-log.md).
+Implementation issues found during the build (non spec gaps) are tracked in [`p3-spec001-match-log.md`](./p3-spec001-match-log.md).

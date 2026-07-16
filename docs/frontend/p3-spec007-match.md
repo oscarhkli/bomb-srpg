@@ -6,7 +6,7 @@ title: "Phase 3.7: MatchScene Render-Path Cleanup"
 
 ## Context
 
-Deferred out of `match-p3-spec005.md` so the full game cycle landed first, regardless of performance. spec005's "Game Loop" framing (and its "why `getMatchState()` is called twice" reasoning) has since drifted from the code: `MatchScene` is now event-driven (`beginTurn` / `handleTurnCommand` / `handleResolveTurn`), and the per-turn-start refresh already avoids a wholesale redraw.
+Deferred out of `p3-spec005-match.md` so the full game cycle landed first, regardless of performance. spec005's "Game Loop" framing (and its "why `getMatchState()` is called twice" reasoning) has since drifted from the code: `MatchScene` is now event-driven (`beginTurn` / `handleTurnCommand` / `handleResolveTurn`), and the per-turn-start refresh already avoids a wholesale redraw.
 
 Re-grounded against the current code, a small set of redundant, animation-hostile pieces survive after the initial paint — they are the target of this cleanup:
 

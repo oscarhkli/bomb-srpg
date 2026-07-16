@@ -73,4 +73,4 @@ Remove once the real predecessor scene is implemented.
 
 ## Log _(optional - remove it if no implementatioun issue is found)_
 
-Implementation issues found during the build (non spec gaps) are tracked in [`match-p3-spec001-log.md`](./match-p3-spec001-log.md).
+Implementation issues found during the build (non spec gaps) are tracked in [`p3-spec001-match-log.md`](./p3-spec001-match-log.md).

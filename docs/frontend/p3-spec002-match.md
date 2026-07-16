@@ -111,4 +111,4 @@ At this stage, we only render the initialization of a Match. To ease the testing
 
 ## Log
 
-Implementation issues found during the build (non spec gaps) are tracked in [match-p3-spec002-log.md](./match-p3-spec002-log.md).
+Implementation issues found during the build (non spec gaps) are tracked in [p3-spec002-match-log.md](./p3-spec002-match-log.md).

@@ -4,11 +4,11 @@ title: "Example Log (illustrative only)"
 
 # Known Issues
 
-> This is a template example from a past spec (`match-p3-spec001-log`), kept for illustration only.
+> This is a template example from a past spec (`p3-spec001-match-log`), kept for illustration only.
 > It is **not** the log for whatever spec you're currently working on — create a fresh
 > `{spec-basename}-log.md` per the "Known Issue Handling" rules in `SKILL.md`.
 
-Found via manual code walkthrough after implementation, not by unit tests. These are issues in the client-layer implementation and its test coverage, not gaps in `match-p3-spec001.md` —- logged here for traceability since that spec is what surfaced them.
+Found via manual code walkthrough after implementation, not by unit tests. These are issues in the client-layer implementation and its test coverage, not gaps in `p3-spec001-match.md` —- logged here for traceability since that spec is what surfaced them.
 
 1. **`api.ts`'s room/token guard was conflated.** The original `requireRoom()` threw unless *both* `roomId` and `token` were set, but the backend (`server/http_handlers.go`) only requires `Authorization` on action endpoints (`turn-commands`, `start-turn`, `reset`, `resolve`, `surrender`). Read/setup endpoints (`createMatch`, `getMatchState`, `getMatchConfig`, `getVictoryResult`, `getAllowedTiles`) need only a room id. Fixed by splitting into independent `requireRoomId()` / `requireToken()` checks — the latter only invoked via `authHeaders()`, used solely by the actually-authenticated calls.
    **Status: Solved.**

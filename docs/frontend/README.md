@@ -12,20 +12,20 @@ Specs will be written prior to development—partly handcrafted, and partly gene
 <!-- BEGIN SPEC TABLE -->
 | Specs | Category | Status | Completion Date |
 | --- | --- | --- | --- |
-| [Phase 3.1: Initialize Match Grid](match-p3-spec001.md) | MatchScene | Done | 2026-07-01 |
-| [Phase 3.2: Render Units, SoftBlocks and Bombs](match-p3-spec002.md) | MatchScene | Done | 2026-07-03 |
-| [Phase 3.3: Render Move and PlaceBomb](match-p3-spec003.md) | MatchScene | Done | 2026-07-07 |
-| [Phase 3.4: Render Resolve Turn](match-p3-spec004.md) | MatchScene | Done | 2026-07-10 |
-| [Phase 3.5: Turn Lifecycle Wiring (startTurn)](match-p3-spec005.md) | MatchScene | Done | 2026-07-12 |
-| [Phase 3.6: Victory Cutscene and Rematch](match-p3-spec006.md) | MatchScene | Done | 2026-07-14 |
-| [Phase 3.7: MatchScene Render-Path Cleanup](match-p3-spec007.md) | MatchScene | Done | 2026-07-16 |
-| [Phase 3.8 Surrender, Reset, and MatchSummaryPanel](match-p3-spec008.md) | MatchScene | Draft | — |
-| [Phase 3.9: Render Occupant Information](match-p3-spec009.md) | MatchScene | Parked Draft | — |
-| [Phase 3.10: Render Camera Navigation](match-p3-spec010.md) | MatchScene | Parked Draft | — |
-| [Phase 5.1: 2.5D Isometric Grid](match-p5-spec001.md) | MatchScene | Parked Draft | — |
-| [Phase 3.x: Lounge Scene](lounge-p3-spec013.md) | LoungeScene | Parked Draft | — |
-| [Phase 3.x: Title Scene](title-p3-spec012.md) | TitleScene | Parked Draft | — |
-| [Phase 3.x: Match Settings Scene](stage-p3-spec011.md) | StageSetupScene | Parked Draft | — |
+| [Phase 3.1: Initialize Match Grid](p3-spec001-match.md) | MatchScene | Done | 2026-07-01 |
+| [Phase 3.2: Render Units, SoftBlocks and Bombs](p3-spec002-match.md) | MatchScene | Done | 2026-07-03 |
+| [Phase 3.3: Render Move and PlaceBomb](p3-spec003-match.md) | MatchScene | Done | 2026-07-07 |
+| [Phase 3.4: Render Resolve Turn](p3-spec004-match.md) | MatchScene | Done | 2026-07-10 |
+| [Phase 3.5: Turn Lifecycle Wiring (startTurn)](p3-spec005-match.md) | MatchScene | Done | 2026-07-12 |
+| [Phase 3.6: Victory Cutscene and Rematch](p3-spec006-match.md) | MatchScene | Done | 2026-07-14 |
+| [Phase 3.7: MatchScene Render-Path Cleanup](p3-spec007-match.md) | MatchScene | Done | 2026-07-16 |
+| [Phase 3.8: Surrender, Reset, and MatchSummaryPanel](p3-spec008-match.md) | MatchScene | Draft | — |
+| [Phase 3.9: Render Occupant Information](p3-spec009-match.md) | MatchScene | Parked Draft | — |
+| [Phase 3.10: Render Camera Navigation](p3-spec010-match.md) | MatchScene | Parked Draft | — |
+| [Phase 3.x: Match Settings Scene](p3-spec011-stage.md) | StageSetupScene | Parked Draft | — |
+| [Phase 3.x: Title Scene](p3-spec012-title.md) | TitleScene | Parked Draft | — |
+| [Phase 3.x: Lounge Scene](p3-spec013-lounge.md) | LoungeScene | Parked Draft | — |
+| [Phase 5.1: 2.5D Isometric Grid](p5-spec001-match.md) | MatchScene | Parked Draft | — |
 <!-- END SPEC TABLE -->
 
 ## Workflow

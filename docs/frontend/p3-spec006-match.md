@@ -81,11 +81,11 @@ The buttons should be rendered **2s** after the rest of `VictoryCutscene` is ren
 
 `MatchScene` fades out in **200ms**, then restarts itself (`scene.restart()`, no `LoadingScene` transition — consistent with this spec's Non-Goal excluding polished transitions) and fades back in over **200ms**, calling `rematch()`, which reuses the currently registered room.
 
-> Note: `scene.restart()` can leave an in-flight fetch from the pre-restart scene instance (e.g. `create()`'s `getMatchState()` call, see `match-p3-spec002-log.md` issue #1) resolving after shutdown. Its callback must not mutate the new scene instance's display list — guard it (e.g. bail out if the scene has been shut down/restarted since the fetch started).
+> Note: `scene.restart()` can leave an in-flight fetch from the pre-restart scene instance (e.g. `create()`'s `getMatchState()` call, see `p3-spec002-match-log.md` issue #1) resolving after shutdown. Its callback must not mutate the new scene instance's display list — guard it (e.g. bail out if the scene has been shut down/restarted since the fetch started).
 
 ## Return to Match Settings
 
-Create a `MatchSettingsScene` with a title `Match Settings`. This is just a stub scene. The concrete one will be implement in `stage-p3-spec001.md`.
+Create a `MatchSettingsScene` with a title `Match Settings`. This is just a stub scene. The concrete one will be implement in `p3-spec011-stage.md`.
 
 `MatchScene` fades out in **200ms**, and transits to `MatchSettingsScene`.
 

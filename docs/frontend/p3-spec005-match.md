@@ -43,7 +43,7 @@ Currently, `initToken()` is called in when unit is clicked and during `resolveTu
 
 The active team's token is `playerTokens[activeTeam - 1]`. `initToken(playerTokens[activeTeam - 1])` must fire **before** the `startTurn()` API call — `startTurn()` sends `authHeaders()` and returns 401 without a token. Since `activeTeam` comes from the preceding `getMatchState()`, the order is `getMatchState()` → `initToken()` → `startTurn()`.
 
-Additionally, `MatchScene` no longer needs to `console.log` the `roomId` and `playerTokens` during the initialization. This addresses `match-p3-spec002-log.md` #12. Removing that log also requires updating the coupled `MatchScene.test.ts` assertion (`'logs roomId and playerTokens on create'`, which asserts on literal token values) so the suite stays green.
+Additionally, `MatchScene` no longer needs to `console.log` the `roomId` and `playerTokens` during the initialization. This addresses `p3-spec002-match-log.md` #12. Removing that log also requires updating the coupled `MatchScene.test.ts` assertion (`'logs roomId and playerTokens on create'`, which asserts on literal token values) so the suite stays green.
 
 ## Sudden Death
 
@@ -62,8 +62,8 @@ Because `injectSuddenDeathHazards()` has already committed these bombs server-si
     - A full-canvas `Rectangle` pinned to the camera (`scrollFactor 0`), filled with `TURN_PANEL_SUDDEN_DEATH_COLOR` (`constants.ts`), drawn above all board content.
     - Its alpha **pulses** via a yoyo, repeating `Tween`: `0 → 0.9` then back to `0` (one full pulse = **500ms**), looping for the **3s** `SuddenDeathCutscene` duration, then the rectangle is destroyed.
   - **2s** after the `SuddenDeathCutscene` starts rendering, for each `bombPlaced` event in `startTurnResponse.gameEvents` (present it as the bomb dropping from the sky):
-    - Resolve the target tile's world-space center via `tileCenter(bombPlacedEvent.position)` (the same helper used in `match-p3-spec003.md` / `match-p3-spec004.md`) — `bombPlacedEvent.position` is a grid coordinate, not pixels.
-    - Create the bomb graphic as in `match-p3-spec003.md`, but positioned **off-screen**: same world `x` as the target tile's center, with `y` set high enough that the bomb starts **fully above the visible board**.
+    - Resolve the target tile's world-space center via `tileCenter(bombPlacedEvent.position)` (the same helper used in `p3-spec003-match.md` / `p3-spec004-match.md`) — `bombPlacedEvent.position` is a grid coordinate, not pixels.
+    - Create the bomb graphic as in `p3-spec003-match.md`, but positioned **off-screen**: same world `x` as the target tile's center, with `y` set high enough that the bomb starts **fully above the visible board**.
     - `Tween` its `y` straight down to the target tile's world-space center `y` over **2s**. On complete it rests on the tile like a normally-placed bomb.
 
 > Note: Timing value will be updated during the implementation
@@ -78,7 +78,7 @@ The `TurnBanner` fades in in **200ms**, stays on `MatchScene` for **2sec** and f
 
 The section states the whole game loop as of Phase 3.5. `MatchScene` may have to adjust accordingly.
 
-> Render-path performance (render grid once, drop redundant re-render / sanity checks) is out of scope — tracked in `match-p3-spec007.md`.
+> Render-path performance (render grid once, drop redundant re-render / sanity checks) is out of scope — tracked in `p3-spec007-match.md`.
 
 1. `MatchScene` is launched by `LoungeScene` after a successful `createMatch()`. **All user interactions disabled.**
 2. `roomId` and `playerTokens` are stored in `MatchScene`.
@@ -95,7 +95,7 @@ The section states the whole game loop as of Phase 3.5. `MatchScene` may have to
    8. **All user interactions enabled.**
    9. Player clicks `resolveTurn`. **All user interactions disabled.**
    10. Render all `gameEvents` returned from backend's `ResolveTurn`.
-   11. (To be done in `match-p3-spec006.md`) Check `victoryResult` and break the Game Loop in the match has concluded. Otherwise, go back to **5.1**.
+   11. (To be done in `p3-spec006-match.md`) Check `victoryResult` and break the Game Loop in the match has concluded. Otherwise, go back to **5.1**.
 
 ---
 

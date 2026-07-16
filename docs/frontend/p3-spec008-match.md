@@ -1,5 +1,5 @@
 ---
-title: "Phase 3.8 Surrender, Reset, and MatchSummaryPanel"
+title: "Phase 3.8: Surrender, Reset, and MatchSummaryPanel"
 ---
 
 # Surrender
@@ -24,7 +24,7 @@ No change from spec006.
 
 There are 3 Turn Life-cycle operations in the game, `ResolveTurn`, `ResetTurn` and `Surrender`. Unlike `TurnCommand` which manipulate the `WorkingState`, Turn Life-cycle operations manipulate the whole turn data.
 
-**Interaction lock contract (applies project-wide):** Any action that triggers a server call — including `ResolveTurnButton`, `ResetTurnButton`, `SurrenderButton` here, and `ConfirmDialog`'s `yesButton` for `moveButton`/`placeBombButton` (`TurnCommandPanel`, see `match-p3-spec003.md`) — must disable all user interactions the instant the call is triggered, and only re-enable them once the server has responded (success or error). Re-rendering/animation is a parallel concern and must not gate when interactions re-enable.
+**Interaction lock contract (applies project-wide):** Any action that triggers a server call — including `ResolveTurnButton`, `ResetTurnButton`, `SurrenderButton` here, and `ConfirmDialog`'s `yesButton` for `moveButton`/`placeBombButton` (`TurnCommandPanel`, see `p3-spec003-match.md`) — must disable all user interactions the instant the call is triggered, and only re-enable them once the server has responded (success or error). Re-rendering/animation is a parallel concern and must not gate when interactions re-enable.
 
 ## MatchSummary Panel
 
@@ -75,7 +75,7 @@ Sample representation for the transparent panel:
 
 ## Surrender Button
 
-`SurrenderButton` is one the Game Lifecycle Command buttons, which falls in the same category of `ResolveTurnButton`. Therefore, the rendering spec (fill, border, font) should stay consistent. [Follow how `ResolveTurnButton` is rendered, and how Player interacts with `ResolveTurnButton`](match-p3-spec004.md#resolveturn-button).
+`SurrenderButton` is one the Game Lifecycle Command buttons, which falls in the same category of `ResolveTurnButton`. Therefore, the rendering spec (fill, border, font) should stay consistent. [Follow how `ResolveTurnButton` is rendered, and how Player interacts with `ResolveTurnButton`](p3-spec004-match.md#resolveturn-button).
 
 The only 3 differences are:
 
@@ -93,7 +93,7 @@ The only 3 differences are:
 
 > Note: `ResetTurn` is a **user-initiated** turn rollback only. It is **not** the client's
 > error-recovery path — a rejected/failed command resyncs via `getMatchState()` per
-> `match-p3-spec007.md` (Render-Path Contract, caller (c)), which must not route through Reset (that
+> `p3-spec007-match.md` (Render-Path Contract, caller (c)), which must not route through Reset (that
 > would discard the turn's other planned actions). Reset's masked re-render is caller (b) of that
 > same contract.
 
@@ -111,7 +111,7 @@ After clicking this button, a series of actions will be executed:
 - In parallel, dim the whole canvas in **200ms**, just like fading out, to mask the re-render.
 - While dimming the screen, call `resetTurn()` to notify the backend to `ResetTurn()`.
 - If the response is not **HTTP 200**, log the error in `ErrorPanel`.
-- If the response is **HTTP 200**, re-fetch and re-render from `getMatchState()`. After that, go back to [Game Loop #5.4](match-p3-spec005.md#game-loop).
+- If the response is **HTTP 200**, re-fetch and re-render from `getMatchState()`. After that, go back to [Game Loop #5.4](p3-spec005-match.md#game-loop).
 - After the re-rendering completes, undim the whole canvas in **200ms**, just like fading in. Interactions re-enable once `resetTurn()` has responded — this is independent of when the dim/undim/re-render visuals finish.
 > Note: ResetTurn() rollback to the state **after** Sudden Death hazard being injected. There is no need to re-render Sudden Death related animations.
 
