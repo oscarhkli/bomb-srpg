@@ -34,6 +34,12 @@ export function allGraphics(): ReturnType<typeof mockScene.add.graphics>[] {
   );
 }
 
+// Last `n` Graphics instances created so far, in creation order — e.g. the 3 buttons a just-opened
+// TurnCommandPanel drew (Move/Bomb/Back), or the 1 overlay tile just rendered.
+export function lastGraphics(n: number): ReturnType<typeof mockScene.add.graphics>[] {
+  return allGraphics().slice(-n);
+}
+
 export function textAt(index: number): ReturnType<typeof mockScene.add.text> {
   return mockScene.add.text.mock.results[index]!.value as ReturnType<typeof mockScene.add.text>;
 }

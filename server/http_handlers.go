@@ -295,7 +295,7 @@ func (h *Handler) HandleStartTurn(w http.ResponseWriter, r *http.Request) {
 }
 
 // HandleResetTurn sends ResetTurn signal to engine to drop the current WorkingState and reset to TrueState in a given MatchRoom.
-// It encodes the gameState as JSON and writes them to the response.
+// It writes HTTP 204 with no content to the response.
 func (h *Handler) HandleResetTurn(w http.ResponseWriter, r *http.Request) {
 	roomID := r.PathValue("roomID")
 
@@ -306,7 +306,7 @@ func (h *Handler) HandleResetTurn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	gs, err := h.Manager.ResetTurn(roomID, token)
+	err = h.Manager.ResetTurn(roomID, token)
 	if err != nil {
 		code, msg := mapError(err)
 		h.Logger.Warn("reset turn failed", "roomID", roomID, "error", err)
@@ -314,14 +314,7 @@ func (h *Handler) HandleResetTurn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-
-	if err := json.NewEncoder(w).Encode(gs); err != nil {
-		h.Logger.Error("encode gameState failed", "error", err)
-		http.Error(w, "Failed to encode gameState", http.StatusInternalServerError)
-		return
-	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // HandleResolveTurn sends ResolveTurn signal to engine to calculate the impacts of the Player's action in a given MatchRoom.

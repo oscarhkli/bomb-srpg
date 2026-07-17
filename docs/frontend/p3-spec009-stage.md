@@ -1,14 +1,16 @@
 ---
-title: "Phase 3.x: Match Settings Scene"
+title: "Phase 3.9: Match Settings Scene"
 ---
 
 # Match Settings Scene
 
 ## Context
 
-Phase 3.5 implements the full game cycle of a match, but when the match concludes, the frontend didn't stop, resulting an error msg like `match already ended`. This spec adds a `VictoryCutscene` to conclude the match, and provide a way to restart the match.
+Phase 3.6 concludes a match and return to Match Setting Scene, which is a blank scene. This spec render all necessary settings in UI, allowing Player to configure and start a match.
 
 ## Goal
+
+Ignore the below as it's only a copied template.
 
 - Render `VictoryCutscene` when the match ends.
 - Add `rematchButton` to restart a match.

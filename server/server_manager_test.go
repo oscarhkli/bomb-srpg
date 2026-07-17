@@ -885,7 +885,7 @@ func TestServerStateManager_ResetTurn(t *testing.T) {
 		name     string
 		setup    func(t *testing.T) (string, *ServerStateManager, string)
 		wantErr  error
-		validate func(t *testing.T, gs *engine.GameState, s *ServerStateManager, roomID string)
+		validate func(t *testing.T, s *ServerStateManager, roomID string)
 	}{
 		{
 			name: "Success",
@@ -897,7 +897,7 @@ func TestServerStateManager_ResetTurn(t *testing.T) {
 				return roomID, s, tokens[0]
 			},
 			wantErr: nil,
-			validate: func(t *testing.T, gs *engine.GameState, s *ServerStateManager, roomID string) {
+			validate: func(t *testing.T, s *ServerStateManager, roomID string) {
 				roomVal, ok := s.Rooms.Load(roomID)
 				if !ok {
 					t.Fatal("Room not found")
@@ -906,9 +906,6 @@ func TestServerStateManager_ResetTurn(t *testing.T) {
 
 				if got, want := room.Match.WorkingState.Units[16].HasMoved, false; got != want {
 					t.Errorf("Expected Unit %#X HasMoved reset to %v, got %v", 16, want, got)
-				}
-				if gs != room.Match.WorkingState {
-					t.Errorf("Expected matchState pointer %p, got %p", room.Match.WorkingState, gs)
 				}
 			},
 		},
@@ -934,16 +931,12 @@ func TestServerStateManager_ResetTurn(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			roomID, s, token := tt.setup(t)
-			gs, err := s.ResetTurn(roomID, token)
+			err := s.ResetTurn(roomID, token)
 			if !errors.Is(err, tt.wantErr) {
 				t.Fatalf("ResetTurn() error = %v, want %v", err, tt.wantErr)
 			}
 			if tt.validate != nil {
-				tt.validate(t, gs, s, roomID)
-			} else {
-				if gs != nil {
-					t.Errorf("Expected matchState to be nil, got %p", gs)
-				}
+				tt.validate(t, s, roomID)
 			}
 		})
 	}

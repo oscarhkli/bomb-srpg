@@ -25,6 +25,7 @@ function makePanel(overrides: Partial<Record<string, unknown>> = {}) {
   const defaultShowConfirm = vi.fn<(onYes: () => void, onNo: () => void) => void>();
   const defaultHideConfirm = vi.fn();
   const defaultIsConfirmOpen = vi.fn(() => false);
+  const defaultIsLocked = vi.fn(() => false);
   const callbacks = {
     getAllowedTiles: defaultGetAllowedTiles,
     onError: defaultOnError,
@@ -32,6 +33,7 @@ function makePanel(overrides: Partial<Record<string, unknown>> = {}) {
     showConfirm: defaultShowConfirm,
     hideConfirm: defaultHideConfirm,
     isConfirmOpen: defaultIsConfirmOpen,
+    isLocked: defaultIsLocked,
     ...overrides,
   };
   const panel = new TurnCommandPanel(mockScene as never, callbacks);
@@ -44,6 +46,7 @@ function makePanel(overrides: Partial<Record<string, unknown>> = {}) {
     showConfirm: callbacks.showConfirm,
     hideConfirm: callbacks.hideConfirm,
     isConfirmOpen: callbacks.isConfirmOpen,
+    isLocked: callbacks.isLocked,
   };
 }
 
@@ -317,5 +320,55 @@ describe('TurnCommandPanel', () => {
     expect(overlayTileGraphics!.destroy).toHaveBeenCalled();
     const newOverlayGraphics = allGraphics().slice(4).at(-1);
     expect(newOverlayGraphics).toBeDefined();
+  });
+
+  describe('isLocked guard (spec003-log issue #4 / spec008 interaction lock contract)', () => {
+    it('ignores moveButton/placeBombButton clicks while locked', async () => {
+      const isLocked = vi.fn(() => true);
+      const { panel, getAllowedTiles } = makePanel({ isLocked });
+      panel.openFor(makeUnit());
+
+      const [moveButtonGraphics, placeBombButtonGraphics] = allGraphics();
+      clickPointerdown(moveButtonGraphics!);
+      clickPointerdown(placeBombButtonGraphics!);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(getAllowedTiles).not.toHaveBeenCalled();
+    });
+
+    it('ignores backButton clicks while locked', () => {
+      const tiles: Coordinate[] = [{ x: 1, y: 0 }];
+      const isLocked = vi.fn(() => false);
+      const { panel } = makePanel({ isLocked, getAllowedTiles: vi.fn().mockResolvedValue(tiles) });
+      panel.openFor(makeUnit());
+      const [, , backButtonGraphics] = allGraphics();
+
+      isLocked.mockReturnValue(true);
+      clickPointerdown(backButtonGraphics!);
+
+      // Still open — a locked Back click must be a no-op, not close/pop the panel.
+      allGraphics().forEach(g => expect(g.destroy).not.toHaveBeenCalled());
+    });
+
+    it('ignores an allowed-tile click while locked', async () => {
+      const target: Coordinate = { x: 1, y: 0 };
+      const isLocked = vi.fn(() => false);
+      const { panel, showConfirm } = makePanel({
+        isLocked,
+        getAllowedTiles: vi.fn().mockResolvedValue([target]),
+      });
+      panel.openFor(makeUnit());
+      const [moveButtonGraphics] = allGraphics();
+      clickPointerdown(moveButtonGraphics!);
+      await Promise.resolve();
+      await Promise.resolve();
+      const [overlayTileGraphics] = allGraphics().slice(3);
+
+      isLocked.mockReturnValue(true);
+      clickPointerdown(overlayTileGraphics!);
+
+      expect(showConfirm).not.toHaveBeenCalled();
+    });
   });
 });

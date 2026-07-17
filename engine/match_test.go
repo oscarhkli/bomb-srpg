@@ -599,9 +599,13 @@ func TestMatch_CommandPlaceBomb(t *testing.T) {
 				if !exists {
 					t.Fatalf("expected bomb tracking map entry under ID %#X missing", expectedBombID)
 				}
-
 				if bomb.OwnerID != validUnitID || bomb.Position != validTarget || bomb.Range != 3 || bomb.Countdown != 5 {
 					t.Errorf("registered bomb structural parameters mismatched: %+v", bomb)
+				}
+
+				unit := m.WorkingState.Units[validUnitID]
+				if got, want := unit.BombUsed, 1; got != want {
+					t.Errorf("expected unit bombUsed reduced to %v, got: %v", want, got)
 				}
 
 				targetCell := m.WorkingState.Grid[validTarget.Y][validTarget.X]
@@ -1077,19 +1081,19 @@ func TestMatch_ResolveTurn_ExplosionAndBlast(t *testing.T) {
 	t.Run("Units caught in overlapping blast patterns receive exactly 1 flat HP damage max", func(t *testing.T) {
 		m := newTestMatch(16, 16)
 		u1 := NewUnitID(1, 0)
-		m.WorkingState.Units[u1] = &Unit{ID: u1, HP: 3, Position: Coordinate{2, 2}}
+		m.WorkingState.Units[u1] = &Unit{ID: u1, HP: 3, Position: Coordinate{2, 2}, BombUsed: 2, HasMoved: true}
 		m.WorkingState.Grid[2][2] = Tile{OccupantType: OccupantUnit, OccupantID: int64(u1)}
 
 		u2 := NewUnitID(2, 0)
-		m.WorkingState.Units[u2] = &Unit{ID: u2, HP: 1, Position: Coordinate{1, 0}}
+		m.WorkingState.Units[u2] = &Unit{ID: u2, HP: 1, Position: Coordinate{1, 0}, BombUsed: 2, HasMoved: true, HasUsedSkill: true}
 		m.WorkingState.Grid[0][1] = Tile{OccupantType: OccupantUnit, OccupantID: int64(u2)}
 
 		b1 := NewBombID(1, 1, u1)
-		m.WorkingState.Bombs[b1] = &Bomb{ID: b1, Countdown: 1, Range: 3, Position: Coordinate{2, 0}}
+		m.WorkingState.Bombs[b1] = &Bomb{ID: b1, OwnerID: u1, Countdown: 1, Range: 3, Position: Coordinate{2, 0}}
 		m.WorkingState.Grid[0][2] = Tile{OccupantType: OccupantBomb, OccupantID: int64(b1)}
 
 		b2 := NewBombID(1, 2, u1)
-		m.WorkingState.Bombs[b2] = &Bomb{ID: b2, Countdown: 1, Range: 3, Position: Coordinate{0, 2}}
+		m.WorkingState.Bombs[b2] = &Bomb{ID: b2, OwnerID: u1, Countdown: 1, Range: 3, Position: Coordinate{0, 2}}
 		m.WorkingState.Grid[2][0] = Tile{OccupantType: OccupantBomb, OccupantID: int64(b2)}
 
 		sb1 := 1
@@ -1097,6 +1101,19 @@ func TestMatch_ResolveTurn_ExplosionAndBlast(t *testing.T) {
 		m.WorkingState.Grid[3][0] = Tile{OccupantType: OccupantSoftBlock, OccupantID: int64(sb1)}
 
 		events := m.ResolveTurn()
+
+		if got, want := m.WorkingState.Units[u1].BombUsed, 0; got != want {
+			t.Errorf("expect Unit %#X bombUsed = %v, got %v", u1, got, want)
+		}
+		if got, want := m.WorkingState.Units[u2].BombUsed, 2; got != want {
+			t.Errorf("expect Unit %#X bombUsed = %v, got %v", u2, got, want)
+		}
+
+		for uid, u := range m.WorkingState.Units {
+			if u.HasMoved || u.HasUsedSkill {
+				t.Errorf("expect Unit %#X HasMoved and HasUsedSkill guard reset to false, got HasMoved = %v, HasUsedSkill = %v", uid, u.HasMoved, u.HasUsedSkill)
+			}
+		}
 
 		if m.WorkingState.Units[u1].HP != 2 {
 			t.Errorf("Flat injury rule failed for Unit %#X! Expected Unit HP = 2, got %d", u1, m.WorkingState.Units[u1].HP)

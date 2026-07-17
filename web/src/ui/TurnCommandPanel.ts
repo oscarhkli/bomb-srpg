@@ -31,6 +31,7 @@ export interface TurnCommandPanelCallbacks {
   showConfirm: (onYes: () => void, onNo: () => void) => void;
   hideConfirm: () => void;
   isConfirmOpen: () => boolean;
+  isLocked: () => boolean;
 }
 
 type ActionStackEntry =
@@ -126,7 +127,7 @@ export default class TurnCommandPanel {
   // Per spec: while ConfirmDialog is open, the panel's own buttons (including Back) are not
   // interactive — "No" is the only rollback path out of the confirmPending state.
   private onBackButtonClick(): void {
-    if (this.callbacks.isConfirmOpen()) {
+    if (this.callbacks.isConfirmOpen() || this.callbacks.isLocked()) {
       return;
     }
     this.actionStack.pop();
@@ -154,7 +155,7 @@ export default class TurnCommandPanel {
   }
 
   private async onActionButtonClick(turnCmdType: TurnCmdType): Promise<void> {
-    if (this.callbacks.isConfirmOpen() || !this.currentUnit) {
+    if (this.callbacks.isConfirmOpen() || this.callbacks.isLocked() || !this.currentUnit) {
       return;
     }
     await this.showAllowedTilesFor(this.currentUnit, turnCmdType, true);
@@ -196,7 +197,7 @@ export default class TurnCommandPanel {
         Phaser.Geom.Rectangle.Contains(shape, px, py)
       );
       g.on('pointerdown', () => {
-        if (this.callbacks.isConfirmOpen()) {
+        if (this.callbacks.isConfirmOpen() || this.callbacks.isLocked()) {
           return;
         }
         g.lineStyle(1, selectedColor, 1);

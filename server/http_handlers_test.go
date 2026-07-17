@@ -1509,18 +1509,16 @@ func TestHandleResetTurn(t *testing.T) {
 		rr := httptest.NewRecorder()
 		testMux("POST /api/match-rooms/{roomID}/match/reset", h.HandleResetTurn).ServeHTTP(rr, req)
 
-		if status := rr.Code; status != http.StatusOK {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusOK)
+		if got, want := rr.Code, http.StatusNoContent; got != want {
+			t.Errorf("Handler returned wrong status code: got %v want %v", got, want)
 		}
 
-		expectedHeader := "application/json"
-		if contentType := rr.Header().Get("Content-Type"); contentType != expectedHeader {
-			t.Errorf("Handler returned wrong content type: got %v want %v", contentType, expectedHeader)
+		if contentType := rr.Header().Get("Content-Type"); contentType != "" {
+			t.Errorf("Expected no Content-Type on 204, got %v", contentType)
 		}
 
-		var response ClientMatchStateResponse
-		if err := json.NewDecoder(rr.Body).Decode(&response); err != nil {
-			t.Fatalf("Failed to decode response JSON payload: %v", err)
+		if rr.Body.Len() > 0 {
+			t.Errorf("Expect empty body, got %q", rr.Body.String())
 		}
 
 		if got, want := room.Match.WorkingState.Units[uID].HasMoved, false; got != want {
@@ -1570,34 +1568,6 @@ func TestHandleResetTurn(t *testing.T) {
 		if !strings.Contains(rr.Body.String(), "match not found") {
 			t.Errorf("Expected error message 'match not found', got: %s", rr.Body.String())
 		}
-	})
-
-	t.Run("Failure: failed to Encode", func(t *testing.T) {
-		roomID, playerTokens, _, h := createTestRoomWithMatch(t)
-
-		testEncodeFailure(t, testMux("POST /api/match-rooms/{roomID}/match/reset", h.HandleResetTurn),
-			func() *http.Request {
-				req, _ := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/reset", nil)
-				req.Header.Set("Content-Type", "application/json")
-				req.Header.Set("Authorization", "Bearer "+playerTokens[0])
-				return req
-			}, http.StatusOK)
-	})
-
-	t.Run("Test Contract", func(t *testing.T) {
-		roomID, playerTokens, _, h := createTestRoomWithMatch(t)
-		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/reset", nil)
-		if err != nil {
-			t.Fatalf("Failed to create request: %v", err)
-		}
-		req.Header.Set("Authorization", "Bearer "+playerTokens[0])
-
-		rr := httptest.NewRecorder()
-		testMux("POST /api/match-rooms/{roomID}/match/reset", h.HandleResetTurn).ServeHTTP(rr, req)
-
-		assertObjectContract(t, rr.Body.Bytes(),
-			[]string{"turn", "inSuddenDeath", "activeTeam", "grid", "units", "bombs", "softBlocks", "turnCommands"},
-			assertMatchStateNested)
 	})
 
 	t.Run("Failure: missing Authorization header", func(t *testing.T) {

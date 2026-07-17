@@ -37,3 +37,12 @@ export function fadeInTargets(
   });
   scene.tweens.add({ targets, alpha: 1, duration, onComplete });
 }
+
+export function fadeOutTargets(
+  scene: Phaser.Scene,
+  targets: { alpha: number }[],
+  duration: number,
+  onComplete: () => void
+): void {
+  scene.tweens.add({ targets, alpha: 0, duration, onComplete });
+}

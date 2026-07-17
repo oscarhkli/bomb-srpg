@@ -72,8 +72,10 @@ Validate if:
   - Fill with `0x4c4c4c`.
   - `Draw Game` is rendered in the center of the banner. Font size is **48px**.
 
-3. A `rematchButton` button, same dimensions and coloring as `resolveButton` (`RESOLVE_BUTTON_WIDTH`/`RESOLVE_BUTTON_HEIGHT`, `PANEL_BUTTON_FILL_COLOR`, `PANEL_BUTTON_BORDER_COLOR` in `constants.ts`), with the text `Rematch`. This button should be placed underneath `VictoryBanner`. [Details for button handler](#rematch).
+3. A `rematchButton` button, same dimensions and coloring as `resolveButton` (`LIFECYCLE_BUTTON_WIDTH`/`LIFECYCLE_BUTTON_HEIGHT`, `PANEL_BUTTON_FILL_COLOR`, `PANEL_BUTTON_BORDER_COLOR` in `constants.ts`), with the text `Rematch`. This button should be placed underneath `VictoryBanner`. [Details for button handler](#rematch).
 4. A `returnMatchSettingsButton` button, same dimensions and coloring as `rematchButton`, with the text `Return to Match Settings`. This button should be placed underneath `rematchButton`. [Details for button handler](#return-to-match-settings).
+
+> **Superseded by `p3-spec008-match.md`:** `rematchButton`/`returnMatchSettingsButton` are resized to **44px** height (down from `LIFECYCLE_BUTTON_HEIGHT`'s 72px, matching `MatchSummaryPanel`'s `TurnLifeCycleButtons`) — width and font unchanged. This spec remains a frozen historical record of the original full-size buttons.
 
 The buttons should be rendered **2s** after the rest of `VictoryCutscene` is rendered. No fade-in effect needed.
 

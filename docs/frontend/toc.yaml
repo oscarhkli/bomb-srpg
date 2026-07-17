@@ -28,18 +28,18 @@ specs:
     category: MatchScene
     completion-date: 2026-07-16
   - file: p3-spec008-match.md
-    status: Draft
+    status: Done
     category: MatchScene
-    completion-date:
-  - file: p3-spec009-match.md
-    status: Parked Draft
+    completion-date: 2026-07-16
+  - file: p3-spec009-stage.md
+    status: Draft
     category: MatchScene
     completion-date:
   - file: p3-spec010-match.md
     status: Parked Draft
     category: MatchScene
     completion-date:
-  - file: p3-spec011-stage.md
+  - file: p3-spec011-match.md
     status: Parked Draft
     category: StageSetupScene
     completion-date:

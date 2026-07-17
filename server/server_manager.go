@@ -395,12 +395,12 @@ func (s *ServerStateManager) StartTurn(roomID string, token string) (bool, []eng
 }
 
 // ResetTurn sends ResetTurn signal to engine to drop the current WorkingState and reset to TrueState in a given MatchRoom.
-// Returns the latest WorkingState or an error if any pre-check is violated
-func (s *ServerStateManager) ResetTurn(roomID string, token string) (*engine.GameState, error) {
+// Returns an error if any pre-check is violated
+func (s *ServerStateManager) ResetTurn(roomID string, token string) error {
 	roomVal, ok := s.Rooms.Load(roomID)
 	if !ok {
 		s.Logger.Warn("match room not found", "roomID", roomID)
-		return nil, fmt.Errorf("%w: roomID=%s", ErrRoomNotFound, roomID)
+		return fmt.Errorf("%w: roomID=%s", ErrRoomNotFound, roomID)
 	}
 	room := roomVal.(*MatchRoom)
 
@@ -409,18 +409,18 @@ func (s *ServerStateManager) ResetTurn(roomID string, token string) (*engine.Gam
 
 	if room.Match == nil {
 		room.Logger.Warn("match not found")
-		return nil, fmt.Errorf("%w: roomID=%s", ErrMatchNotFound, roomID)
+		return fmt.Errorf("%w: roomID=%s", ErrMatchNotFound, roomID)
 	}
 
 	teamID := room.Match.WorkingState.ActiveTeam
 	if err := room.validatePlayerToken(teamID, token); err != nil {
-		return nil, err
+		return err
 	}
 
 	room.Match.ResetTurn()
 
 	room.LastActivity = time.Now()
-	return room.Match.WorkingState, nil
+	return nil
 }
 
 // ResetTurn sends ResolveTurn signal to engine to calculate the impacts of the Player's action in a given MatchRoom.

@@ -27,6 +27,7 @@ export function createMockGraphics() {
     strokePoints: vi.fn().mockReturnThis(),
     strokeCircle: vi.fn().mockReturnThis(),
     setInteractive: vi.fn().mockReturnThis(),
+    disableInteractive: vi.fn().mockReturnThis(),
     on: vi.fn().mockReturnThis(),
     off: vi.fn().mockReturnThis(),
     setDepth: vi.fn().mockReturnThis(),
@@ -43,6 +44,7 @@ export function createMockText() {
     setScrollFactor: vi.fn().mockReturnThis(),
     setText: vi.fn().mockReturnThis(),
     setColor: vi.fn().mockReturnThis(),
+    disableInteractive: vi.fn().mockReturnThis(),
     destroy: vi.fn(),
   };
 }

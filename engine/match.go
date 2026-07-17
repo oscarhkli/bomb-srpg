@@ -139,6 +139,7 @@ func (m *Match) CommandPlaceBomb(unitID UnitID, target Coordinate) ([]GameEvent,
 	}
 
 	gameEvents := m.placeBomb(unitID, target, unit.BombPower)
+	unit.BombUsed++
 	unit.HasUsedSkill = true
 
 	return gameEvents, nil
@@ -235,12 +236,17 @@ func (m *Match) injectSuddenDeathHazards() {
 // 1. Tick Bomb Countdowns
 // 2. Detonate Zero-Timer Bombs & Cascade Chain Reactions
 // 3. Calculate Occupant Destruction (Units, SoftBlocks, Items)
-// 4. Victory audit guard: Check who has living units left on the board
-// 5. Advance Turn Counter (Turn++)
-// 6. Reset move & skills limits
+// 4. Reset HasMoved and HasUsed guard
+// 5. Victory audit guard: Check who has living units left on the board
+// 6. Advance Turn Counter (Turn++)
 // 7. Overwrite TrueState with clean DeepCopy
 func (m *Match) ResolveTurn() []GameEvent {
 	m.resolveBombExplosionAndDamage()
+
+	for _, u := range m.WorkingState.Units {
+		u.HasMoved = false
+		u.HasUsedSkill = false
+	}
 
 	if m.WinnerTeamID == 0 {
 		winner := m.evaluateVictoryConditions()
@@ -248,10 +254,6 @@ func (m *Match) ResolveTurn() []GameEvent {
 		if winner == 0 {
 			m.WorkingState.Turn++
 			m.WorkingState.ActiveTeam = ((m.WorkingState.Turn - 1) & 1) + 1
-			for _, unit := range m.WorkingState.Units {
-				unit.HasMoved = false
-				unit.HasUsedSkill = false
-			}
 		} else {
 			// Concluded with win/draw
 			m.WinnerTeamID = winner
@@ -322,6 +324,9 @@ func (m *Match) processChainDetonations(
 		currBomb, ok := m.WorkingState.Bombs[currBombID]
 		if !ok {
 			continue
+		}
+		if owner, ok := m.WorkingState.Units[currBomb.OwnerID]; ok {
+			owner.BombUsed = max(owner.BombUsed-1, 0)
 		}
 
 		affectedTiles := m.WorkingState.FindReachableTilesOnSnapshot(currBomb.Position, frozenGrid, MovementRule{
