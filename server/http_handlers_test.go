@@ -290,7 +290,7 @@ func TestHandleCreateNewMatch(t *testing.T) {
 		}
 
 		gameCfg := engine.GameCfg{
-			StagePreset: "MAP01",
+			StagePreset: "Plain",
 			P1Teams:     []string{"King", "Fighter"},
 			P2Teams:     []string{"King", "Witch"},
 			MaxTurns:    10,
@@ -342,7 +342,7 @@ func TestHandleCreateNewMatch(t *testing.T) {
 		s := NewServerStateManager()
 		h := NewHandler(s)
 		gameCfg := engine.GameCfg{
-			StagePreset: "MAP01",
+			StagePreset: "Plain",
 			P1Teams:     []string{"King", "Fighter"},
 			P2Teams:     []string{"King", "Witch"},
 			MaxTurns:    10,
@@ -377,7 +377,7 @@ func TestHandleCreateNewMatch(t *testing.T) {
 		room.Match = &engine.Match{}
 
 		gameCfg := engine.GameCfg{
-			StagePreset: "MAP01",
+			StagePreset: "Plain",
 			P1Teams:     []string{"King", "Fighter"},
 			P2Teams:     []string{"King", "Witch"},
 			MaxTurns:    10,
@@ -465,7 +465,7 @@ func TestHandleCreateNewMatch(t *testing.T) {
 		}
 
 		gameCfg := engine.GameCfg{
-			StagePreset: "MAP01",
+			StagePreset: "Plain",
 			P1Teams:     []string{"King", "Fighter"},
 			P2Teams:     []string{"King", "Witch"},
 			MaxTurns:    10,
@@ -493,7 +493,7 @@ func TestHandleCreateNewMatch(t *testing.T) {
 			t.Fatalf("Failed to create room: %v", err)
 		}
 		gameCfg := engine.GameCfg{
-			StagePreset: "MAP01",
+			StagePreset: "Plain",
 			P1Teams:     []string{"King", "Fighter"},
 			P2Teams:     []string{"King", "Witch"},
 			MaxTurns:    10,
@@ -838,7 +838,7 @@ func TestHandleGetMatchState(t *testing.T) {
 		}
 
 		gameCfg := engine.GameCfg{
-			StagePreset: "MAP03",
+			StagePreset: "Divided",
 			P1Teams:     []string{"King", "Fighter"},
 			P2Teams:     []string{"King", "Witch"},
 			MaxTurns:    10,
@@ -944,7 +944,7 @@ func TestHandleGetMatchState(t *testing.T) {
 		}
 
 		gameCfg := engine.GameCfg{
-			StagePreset: "MAP01",
+			StagePreset: "Plain",
 			P1Teams:     []string{"King", "Fighter"},
 			P2Teams:     []string{"King", "Witch"},
 			MaxTurns:    10,
@@ -970,7 +970,7 @@ func TestHandleGetMatchState(t *testing.T) {
 		}
 
 		gameCfg := engine.GameCfg{
-			StagePreset: "MAP03",
+			StagePreset: "Divided",
 			P1Teams:     []string{"King", "Fighter"},
 			P2Teams:     []string{"King", "Witch"},
 			MaxTurns:    10,
@@ -1001,7 +1001,7 @@ func createTestRoomWithMatch(t *testing.T) (string, [2]string, *ServerStateManag
 	}
 
 	gameCfg := engine.GameCfg{
-		StagePreset: "MAP01",
+		StagePreset: "Plain",
 		P1Teams:     []string{"King", "Fighter"},
 		P2Teams:     []string{"King", "Witch"},
 		MaxTurns:    10,
@@ -2056,7 +2056,7 @@ func TestHandleGetMatchConfig(t *testing.T) {
 		}
 
 		gameCfg := engine.GameCfg{
-			StagePreset: "MAP03",
+			StagePreset: "Divided",
 			P1Teams:     []string{"King", "Fighter"},
 			P2Teams:     []string{"King", "Witch"},
 			MaxTurns:    10,
@@ -2145,7 +2145,7 @@ func TestHandleGetMatchConfig(t *testing.T) {
 		}
 
 		gameCfg := engine.GameCfg{
-			StagePreset: "MAP01",
+			StagePreset: "Plain",
 			P1Teams:     []string{"King", "Fighter"},
 			P2Teams:     []string{"King", "Witch"},
 			MaxTurns:    10,
@@ -2171,7 +2171,7 @@ func TestHandleGetMatchConfig(t *testing.T) {
 		}
 
 		gameCfg := engine.GameCfg{
-			StagePreset: "MAP03",
+			StagePreset: "Divided",
 			P1Teams:     []string{"King", "Fighter"},
 			P2Teams:     []string{"King", "Witch"},
 			MaxTurns:    10,
@@ -2200,7 +2200,7 @@ func TestHandleGetAllowedTiles(t *testing.T) {
 		}
 
 		gameCfg := engine.GameCfg{
-			StagePreset: "MAP03",
+			StagePreset: "Divided",
 			P1Teams:     []string{"King", "Fighter"},
 			P2Teams:     []string{"King", "Witch"},
 			MaxTurns:    10,
@@ -2257,7 +2257,7 @@ func TestHandleGetAllowedTiles(t *testing.T) {
 		}
 
 		gameCfg := engine.GameCfg{
-			StagePreset: "MAP03",
+			StagePreset: "Divided",
 			P1Teams:     []string{"King", "Fighter"},
 			P2Teams:     []string{"King", "Witch"},
 			MaxTurns:    10,
@@ -2292,7 +2292,7 @@ func TestHandleGetAllowedTiles(t *testing.T) {
 		}
 
 		gameCfg := engine.GameCfg{
-			StagePreset: "MAP03",
+			StagePreset: "Divided",
 			P1Teams:     []string{"King", "Fighter"},
 			P2Teams:     []string{"King", "Witch"},
 			MaxTurns:    10,
@@ -2370,7 +2370,7 @@ func TestHandleGetAllowedTiles(t *testing.T) {
 		}
 
 		gameCfg := engine.GameCfg{
-			StagePreset: "MAP01",
+			StagePreset: "Plain",
 			P1Teams:     []string{"King", "Fighter"},
 			P2Teams:     []string{"King", "Witch"},
 			MaxTurns:    10,
@@ -2396,7 +2396,7 @@ func TestHandleGetAllowedTiles(t *testing.T) {
 		}
 
 		gameCfg := engine.GameCfg{
-			StagePreset: "MAP03",
+			StagePreset: "Divided",
 			P1Teams:     []string{"King", "Fighter"},
 			P2Teams:     []string{"King", "Witch"},
 			MaxTurns:    10,

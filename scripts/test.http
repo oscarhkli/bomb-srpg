@@ -21,7 +21,7 @@ Content-Type: application/json
 
 {
   "gameCfg": {
-    "stagePreset": "MAP01",
+    "stagePreset": "Plain",
     "p1Teams": ["King", "Fighter", "Fighter", "Witch", "Bandit"],
     "p2Teams": ["King", "Witch", "Fighter", "Bandit", "Bandit"],
     "maxTurns": 30,

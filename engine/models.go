@@ -108,6 +108,16 @@ type StagePreset struct {
 	P2StartingPositions [5]Coordinate // Default order: 4,2,0,1,3 (top side)
 }
 
+// MarshalJSON serializes StagePreset struct to JSON that client needs
+func (s StagePreset) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Name     string `json:"name"`
+		Width    int    `json:"width"`
+		Height   int    `json:"height"`
+		MaxTurns int    `json:"maxTurns"`
+	}{s.Name, s.Width, s.Height, s.MaxTurns})
+}
+
 // SkillType is a bitmask for unit abilities (jump, fly, etc.).
 type SkillType uint32
 
@@ -232,7 +242,7 @@ type Bomb struct {
 
 // GameCfg holds all configuration for a match.
 type GameCfg struct {
-	StagePreset                 string   `json:"stagePreset"`    // Stage preset name (e.g., "MAP01")
+	StagePreset                 string   `json:"stagePreset"`    // Stage preset name (e.g., "Plain")
 	P1Teams                     []string `json:"p1Teams"`        // Archetype names for Player 1 (1-5 units, first must be King)
 	P2Teams                     []string `json:"p2Teams"`        // Archetype names for Player 2 (1-5 units, first must be King)
 	MaxTurns                    int      `json:"maxTurns"`       // Turn limit; 0 = instant sudden death

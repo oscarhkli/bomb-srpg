@@ -16,9 +16,9 @@ func TestInitGameState_Suite(t *testing.T) {
 		expectedTotalUnits int
 	}{
 		{
-			name: "Success: Full Teams (5 vs 5) with MAP01 Stage",
+			name: "Success: Full Teams (5 vs 5) with Plain Stage",
 			cfg: GameCfg{
-				StagePreset: "MAP01",
+				StagePreset: "Plain",
 				P1Teams:     []string{"King", "Fighter", "Witch", "Fighter", "Fighter"},
 				P2Teams:     []string{"King", "Fighter", "Witch", "Bandit", "Witch"},
 			},
@@ -26,9 +26,9 @@ func TestInitGameState_Suite(t *testing.T) {
 			expectedTotalUnits: 10, // 5 for each player
 		},
 		{
-			name: "Success: Minimum Teams (1 vs 1) with MAP01 Stage",
+			name: "Success: Minimum Teams (1 vs 1) with Plain Stage",
 			cfg: GameCfg{
-				StagePreset: "MAP01",
+				StagePreset: "Plain",
 				P1Teams:     []string{"King"},
 				P2Teams:     []string{"King"},
 			},
@@ -36,9 +36,9 @@ func TestInitGameState_Suite(t *testing.T) {
 			expectedTotalUnits: 2, // 1 for each player
 		},
 		{
-			name: "Success: Mixed Teams (3 vs 2) with MAP02 Stage",
+			name: "Success: Mixed Teams (3 vs 2) with Standard Stage",
 			cfg: GameCfg{
-				StagePreset: "MAP02",
+				StagePreset: "Standard",
 				P1Teams:     []string{"King", "Fighter", "Witch"},
 				P2Teams:     []string{"King", "Fighter"},
 			},
@@ -48,7 +48,7 @@ func TestInitGameState_Suite(t *testing.T) {
 		{
 			name: "Failure: Player 1 has no King",
 			cfg: GameCfg{
-				StagePreset: "MAP01",
+				StagePreset: "Plain",
 				P1Teams:     []string{"Fighter", "Witch", "Fighter"},
 				P2Teams:     []string{"King", "Fighter"},
 			},
@@ -58,7 +58,7 @@ func TestInitGameState_Suite(t *testing.T) {
 		{
 			name: "Failure: Player 2 has no King",
 			cfg: GameCfg{
-				StagePreset: "MAP01",
+				StagePreset: "Plain",
 				P1Teams:     []string{"King", "Fighter"},
 				P2Teams:     []string{"Fighter", "Witch"},
 			},
@@ -68,7 +68,7 @@ func TestInitGameState_Suite(t *testing.T) {
 		{
 			name: "Failure: Player 1 has more than 1 King",
 			cfg: GameCfg{
-				StagePreset: "MAP01",
+				StagePreset: "Plain",
 				P1Teams:     []string{"King", "King", "Fighter"},
 				P2Teams:     []string{"King", "Fighter"},
 			},
@@ -78,7 +78,7 @@ func TestInitGameState_Suite(t *testing.T) {
 		{
 			name: "Failure: Player 2 has more than 1 King",
 			cfg: GameCfg{
-				StagePreset: "MAP01",
+				StagePreset: "Plain",
 				P1Teams:     []string{"King", "Fighter"},
 				P2Teams:     []string{"King", "King", "Fighter"},
 			},
@@ -88,7 +88,7 @@ func TestInitGameState_Suite(t *testing.T) {
 		{
 			name: "Failure: Player 1's King is not the first unit",
 			cfg: GameCfg{
-				StagePreset: "MAP01",
+				StagePreset: "Plain",
 				P1Teams:     []string{"Fighter", "King", "Witch"},
 				P2Teams:     []string{"King", "Fighter"},
 			},
@@ -98,7 +98,7 @@ func TestInitGameState_Suite(t *testing.T) {
 		{
 			name: "Failure: Player 2's King is not the first unit",
 			cfg: GameCfg{
-				StagePreset: "MAP01",
+				StagePreset: "Plain",
 				P1Teams:     []string{"King", "Fighter"},
 				P2Teams:     []string{"Fighter", "King", "Witch"},
 			},
@@ -108,7 +108,7 @@ func TestInitGameState_Suite(t *testing.T) {
 		{
 			name: "Failure: Player 1 has more than 5 units",
 			cfg: GameCfg{
-				StagePreset: "MAP01",
+				StagePreset: "Plain",
 				P1Teams:     []string{"King", "Fighter", "Witch", "Bandit", "Witch", "Fighter"},
 				P2Teams:     []string{"King", "Fighter"},
 			},
@@ -118,7 +118,7 @@ func TestInitGameState_Suite(t *testing.T) {
 		{
 			name: "Failure: Player 2 has more than 5 units",
 			cfg: GameCfg{
-				StagePreset: "MAP01",
+				StagePreset: "Plain",
 				P1Teams:     []string{"King", "Fighter"},
 				P2Teams:     []string{"King", "Fighter", "Witch", "Bandit", "Witch", "Fighter"},
 			},
@@ -128,7 +128,7 @@ func TestInitGameState_Suite(t *testing.T) {
 		{
 			name: "Failure: Player 1 has no units",
 			cfg: GameCfg{
-				StagePreset: "MAP01",
+				StagePreset: "Plain",
 				P1Teams:     []string{},
 				P2Teams:     []string{"King", "Fighter"},
 			},
@@ -138,7 +138,7 @@ func TestInitGameState_Suite(t *testing.T) {
 		{
 			name: "Failure: Player 2 has no units",
 			cfg: GameCfg{
-				StagePreset: "MAP01",
+				StagePreset: "Plain",
 				P1Teams:     []string{"King", "Fighter"},
 				P2Teams:     []string{},
 			},
@@ -148,7 +148,7 @@ func TestInitGameState_Suite(t *testing.T) {
 		{
 			name: "Failure: Player 1 has an invalid archetype",
 			cfg: GameCfg{
-				StagePreset: "MAP01",
+				StagePreset: "Plain",
 				P1Teams:     []string{"King", "InvalidArchetype"},
 				P2Teams:     []string{"King", "Fighter"},
 			},
@@ -158,7 +158,7 @@ func TestInitGameState_Suite(t *testing.T) {
 		{
 			name: "Failure: Player 2 has an invalid archetype",
 			cfg: GameCfg{
-				StagePreset: "MAP01",
+				StagePreset: "Plain",
 				P1Teams:     []string{"King", "Fighter"},
 				P2Teams:     []string{"King", "InvalidArchetype"},
 			},
@@ -178,7 +178,7 @@ func TestInitGameState_Suite(t *testing.T) {
 		{
 			name: "Success: With Global Overrides for Speed and Bomb Range Positive",
 			cfg: GameCfg{
-				StagePreset:                "MAP01",
+				StagePreset:                "Plain",
 				P1Teams:                    []string{"King", "Fighter"},
 				P2Teams:                    []string{"King", "Fighter"},
 				GlobalSpeedOverride:        10,
@@ -190,7 +190,7 @@ func TestInitGameState_Suite(t *testing.T) {
 		{
 			name: "Success: With Global Overrides for Speed and Bomb Range Zero (No Override)",
 			cfg: GameCfg{
-				StagePreset:                "MAP01",
+				StagePreset:                "Plain",
 				P1Teams:                    []string{"King", "Fighter"},
 				P2Teams:                    []string{"King", "Fighter"},
 				GlobalSpeedOverride:        0,
@@ -202,7 +202,7 @@ func TestInitGameState_Suite(t *testing.T) {
 		{
 			name: "Success: With Global Overrides for Speed and Bomb Range Negative (Treated as No Override)",
 			cfg: GameCfg{
-				StagePreset:                "MAP01",
+				StagePreset:                "Plain",
 				P1Teams:                    []string{"King", "Fighter"},
 				P2Teams:                    []string{"King", "Fighter"},
 				GlobalSpeedOverride:        -5,
@@ -403,8 +403,10 @@ func TestInitGameState_LayoutGridCompilation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Temporarily add the custom preset to the registry for testing
-			stagePresetsRegistry[tt.customPreset.Name] = tt.customPreset
-			defer delete(stagePresetsRegistry, tt.customPreset.Name) // Clean up after test
+			stagePresetsRegistry = append(stagePresetsRegistry, tt.customPreset)
+			defer func() {
+				stagePresetsRegistry = stagePresetsRegistry[:len(stagePresetsRegistry)-1] // Clean up after test
+			}()
 
 			gameState, err := initGameState(GameCfg{
 				StagePreset: tt.presetName,
@@ -443,7 +445,7 @@ func TestInitGameState_LayoutGridCompilation(t *testing.T) {
 
 func TestInitGame_AllGood(t *testing.T) {
 	gameCfg := GameCfg{
-		StagePreset: "MAP01",
+		StagePreset: "Plain",
 		P1Teams:     []string{"King", "Fighter"},
 		P2Teams:     []string{"King", "Bandit"},
 	}

@@ -13,7 +13,7 @@ export default class DevBootScene extends Phaser.Scene {
     initRoom(roomId);
     const { playerTokens } = await createMatch({
       gameCfg: {
-        stagePreset: 'MAP03',
+        stagePreset: 'Divided',
         p1Teams: ['King', 'Fighter', 'Witch', 'Bandit', 'Fighter'],
         p2Teams: ['King', 'Fighter', 'Witch', 'Bandit', 'Fighter'],
         maxTurns: 6,

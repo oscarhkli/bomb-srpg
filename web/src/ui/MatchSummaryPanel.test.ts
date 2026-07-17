@@ -113,12 +113,12 @@ describe('MatchSummaryPanel.open', () => {
   it('renders gameCfg.stagePreset and gameCfg.maxTurns in the top section', () => {
     const { panel } = makePanel();
 
-    panel.open(makeState(), makeCfg({ stagePreset: 'MAP01', maxTurns: 30 }));
+    panel.open(makeState(), makeCfg({ stagePreset: 'Plain', maxTurns: 30 }));
 
     expect(mockScene.add.text).toHaveBeenCalledWith(
       expect.any(Number),
       expect.any(Number),
-      'MAP01',
+      'Plain',
       expect.objectContaining({})
     );
     expect(mockScene.add.text).toHaveBeenCalledWith(
@@ -219,12 +219,12 @@ describe('MatchSummaryPanel.open', () => {
   it('renders body text at MATCH_SUMMARY_TEXT_FONT_SIZE (36px)', () => {
     const { panel } = makePanel();
 
-    panel.open(makeState(), makeCfg({ stagePreset: 'MAP01' }));
+    panel.open(makeState(), makeCfg({ stagePreset: 'Plain' }));
 
     expect(mockScene.add.text).toHaveBeenCalledWith(
       expect.any(Number),
       expect.any(Number),
-      'MAP01',
+      'Plain',
       expect.objectContaining({ fontSize: `${MATCH_SUMMARY_TEXT_FONT_SIZE}px` })
     );
   });

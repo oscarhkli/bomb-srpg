@@ -103,7 +103,7 @@ describe('api.ts', () => {
   describe('createMatch', () => {
     const req = {
       gameCfg: makeCfg({
-        stagePreset: 'MAP01',
+        stagePreset: 'Plain',
         p1Teams: ['King'],
         p2Teams: ['King'],
         maxTurns: 10,
@@ -324,7 +324,7 @@ describe('api.ts', () => {
 
   describe('getMatchConfig', () => {
     const fixture: GameCfg = makeCfg({
-      stagePreset: 'MAP01',
+      stagePreset: 'Plain',
       p1Teams: ['Bomber'],
       p2Teams: ['Bomber'],
       maxTurns: 10,
