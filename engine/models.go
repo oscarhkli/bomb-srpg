@@ -101,6 +101,7 @@ type StagePreset struct {
 	Description         string
 	Width               int
 	Height              int
+	MaxTurns            int
 	LayoutGrid          []string // Visual layout matrix; each string is a row (Y), each char a column (X)
 	SoftBlocks          []Coordinate
 	P1StartingPositions [5]Coordinate // Default order: 3,1,0,2,4 (bottom side)
@@ -236,7 +237,6 @@ type GameCfg struct {
 	P2Teams                     []string `json:"p2Teams"`        // Archetype names for Player 2 (1-5 units, first must be King)
 	MaxTurns                    int      `json:"maxTurns"`       // Turn limit; 0 = instant sudden death
 	AllowResetTurn              bool     `json:"allowResetTurn"` // True = players can undo actions before committing
-	SuddenDeath                 bool     `json:"suddenDeath"`    // True = spawn hazards after MaxTurns; False = draw at limit
 	GlobalSpeedOverride         int      `json:"-"`              // Test override for all unit speeds (0 = disabled)
 	GlobalBombCountdownOverride int      `json:"-"`              // Test override for bomb countdown (0 = disabled)
 	GlobalBombMaxRangeOverride  int      `json:"-"`              // Test override for bomb max range (0 = disabled)

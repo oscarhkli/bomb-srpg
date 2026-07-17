@@ -66,6 +66,7 @@ var stagePresetsRegistry = map[string]StagePreset{
 		Description: "A simple open field with no obstacles.",
 		Width:       9,
 		Height:      9,
+		MaxTurns:    60,
 		LayoutGrid: []string{
 			".........",
 			".........",
@@ -86,6 +87,7 @@ var stagePresetsRegistry = map[string]StagePreset{
 		Description: "A balanced stage with hard blocks evenly distributed.",
 		Width:       9,
 		Height:      9,
+		MaxTurns:    15,
 		LayoutGrid: []string{
 			".........",
 			".B.B.B.B.",
@@ -106,6 +108,7 @@ var stagePresetsRegistry = map[string]StagePreset{
 		Description: "A stage divided by soft block",
 		Width:       9,
 		Height:      9,
+		MaxTurns:    20,
 		LayoutGrid: []string{
 			".........",
 			".........",

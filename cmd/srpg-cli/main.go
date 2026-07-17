@@ -12,7 +12,6 @@ func main() {
 		StagePreset:    "MAP01",
 		MaxTurns:       30,
 		AllowResetTurn: true,
-		SuddenDeath:    true,
 		P1Teams:        []string{"King", "Witch", "Bandit", "Fighter", "Fighter"},
 		P2Teams:        []string{"King", "Witch", "Bandit", "Fighter", "Fighter"},
 	}

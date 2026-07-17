@@ -1005,7 +1005,6 @@ func createTestRoomWithMatch(t *testing.T) (string, [2]string, *ServerStateManag
 		P1Teams:     []string{"King", "Fighter"},
 		P2Teams:     []string{"King", "Witch"},
 		MaxTurns:    10,
-		SuddenDeath: true,
 	}
 	playerTokens, err := s.CreateMatch(roomID, gameCfg)
 	if err != nil {
@@ -2187,7 +2186,7 @@ func TestHandleGetMatchConfig(t *testing.T) {
 		testMux("GET /api/match-rooms/{roomID}/match/config", h.HandleGetMatchConfig).ServeHTTP(rr, req)
 
 		assertObjectContract(t, rr.Body.Bytes(),
-			[]string{"stagePreset", "p1Teams", "p2Teams", "maxTurns", "allowResetTurn", "suddenDeath"}, nil)
+			[]string{"stagePreset", "p1Teams", "p2Teams", "maxTurns", "allowResetTurn"}, nil)
 	})
 }
 

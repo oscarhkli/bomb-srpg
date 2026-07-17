@@ -193,7 +193,7 @@ func (m *Match) StartTurn() []GameEvent {
 		return []GameEvent{} // Match has reached a conclusion; abort round initialization
 	}
 
-	if !(m.GameCfg.SuddenDeath && m.TrueState.Turn > m.GameCfg.MaxTurns) {
+	if m.TrueState.Turn <= m.GameCfg.MaxTurns {
 		m.WorkingState.InSuddenDeath = false
 		return []GameEvent{}
 	}

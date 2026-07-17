@@ -118,7 +118,6 @@ func (v *TerminalView) RenderGameConfig(cfg *engine.GameCfg) error {
 	fmt.Fprintln(v.output, "=== MATCH CONFIGURATION ===")
 	fmt.Fprintf(v.output, "Stage Preset: %s\n", cfg.StagePreset)
 	fmt.Fprintf(v.output, "Max Turns:    %d\n", cfg.MaxTurns)
-	fmt.Fprintf(v.output, "Sudden Death: %t\n", cfg.SuddenDeath)
 	fmt.Fprintln(v.output, "===========================")
 
 	return nil

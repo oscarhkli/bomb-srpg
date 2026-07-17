@@ -18,7 +18,6 @@ export default class DevBootScene extends Phaser.Scene {
         p2Teams: ['King', 'Fighter', 'Witch', 'Bandit', 'Fighter'],
         maxTurns: 6,
         allowResetTurn: true,
-        suddenDeath: true,
       },
     });
     this.scene.start('MatchScene', { roomId, playerTokens });

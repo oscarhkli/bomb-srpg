@@ -123,7 +123,6 @@ export interface GameCfg {
   p2Teams: string[]; // Archetype names (first = King)
   maxTurns: number; // 0 = instant sudden death
   allowResetTurn: boolean;
-  suddenDeath: boolean;
 }
 
 export interface CreateMatchRoomResponse {

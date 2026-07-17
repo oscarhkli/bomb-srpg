@@ -267,7 +267,6 @@ func validGameCfg() engine.GameCfg {
 		P1Teams:     []string{"King", "Fighter"},
 		P2Teams:     []string{"King", "Witch"},
 		MaxTurns:    10,
-		SuddenDeath: true,
 	}
 }
 
