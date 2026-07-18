@@ -64,6 +64,17 @@ func GetArchetype(name string) (Archetype, bool) {
 	return Archetype{}, false
 }
 
+// GetAllArchetypes gets all archestypes for game setup.
+func GetAllArchetypes() []Archetype {
+	results := []Archetype{}
+	for _, a := range archetypesRegistry {
+		if a.Selectable {
+			results = append(results, a)
+		}
+	}
+	return results
+}
+
 var stagePresetsRegistry = []StagePreset{
 	{
 		Name:        "Plain",
@@ -130,17 +141,6 @@ var stagePresetsRegistry = []StagePreset{
 	},
 }
 
-// GetAllArchetypes gets all archestypes for game setup.
-func GetAllArchetypes() []Archetype {
-	results := []Archetype{}
-	for _, a := range archetypesRegistry {
-		if a.Selectable {
-			results = append(results, a)
-		}
-	}
-	return results
-}
-
 // GetStagePreset mimics a read-only database query.
 // It returns the stage preset and a boolean indicating whether the stage preset exists.
 func GetStagePreset(name string) (StagePreset, bool) {
@@ -150,4 +150,9 @@ func GetStagePreset(name string) (StagePreset, bool) {
 		}
 	}
 	return StagePreset{}, false
+}
+
+// GetStagePresets gets all stagePresets for game setup.
+func GetAllStagePresets() []StagePreset {
+	return stagePresetsRegistry
 }

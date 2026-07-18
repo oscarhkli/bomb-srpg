@@ -3,7 +3,7 @@ import {
   initRoom,
   initToken,
   ApiError,
-  getArchetypes,
+  getCatalog,
   createMatchRoom,
   createMatch,
   getMatchState,
@@ -25,6 +25,8 @@ import type {
   GameCfg,
   TurnCommand,
   StartTurnResponse,
+  StagePreset,
+  Catalog,
 } from '../types/api';
 
 const mockFetch = vi.fn();
@@ -53,24 +55,34 @@ beforeEach(() => {
 });
 
 describe('api.ts', () => {
-  describe('getArchetypes', () => {
-    it('should fetch archetypes and return parsed array', async () => {
-      const fixture: Archetype[] = [
+  describe('getCatalog', () => {
+    it('should fetch catalog and return parsed array', async () => {
+      const archetypesFixture: Archetype[] = [
         { name: 'Bomber', speed: 3, bombMaxRange: 2, skills: ['Jump'] },
       ];
+      const stagePresetsFixture: StagePreset[] = [
+        {
+          name: 'Plain',
+          description: 'A simple open field with no obstacles.',
+          width: 9,
+          height: 9,
+          maxTurns: 60,
+        },
+      ];
+      const fixture: Catalog = { archetypes: archetypesFixture, stagePresets: stagePresetsFixture };
       mockOk(200, fixture);
 
-      const result = await getArchetypes();
+      const result = await getCatalog();
 
       expect(result).toEqual(fixture);
       expect(mockFetch).toHaveBeenCalledOnce();
-      expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('/api/archetypes'));
+      expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('/api/catalog'));
     });
 
     it('should throw ApiError on non-2xx response', async () => {
       mockErr(500, 'Internal server error');
 
-      const error = await getArchetypes().catch((e: unknown) => e);
+      const error = await getCatalog().catch((e: unknown) => e);
       expect(error).toBeInstanceOf(ApiError);
       expect((error as ApiError).status).toBe(500);
       expect((error as ApiError).message).toBe('Internal server error');

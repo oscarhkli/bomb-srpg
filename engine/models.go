@@ -97,25 +97,15 @@ type SoftBlock struct {
 
 // StagePreset defines a complete map layout including terrain, soft blocks, and starting positions.
 type StagePreset struct {
-	Name                string
-	Description         string
-	Width               int
-	Height              int
-	MaxTurns            int
-	LayoutGrid          []string // Visual layout matrix; each string is a row (Y), each char a column (X)
-	SoftBlocks          []Coordinate
-	P1StartingPositions [5]Coordinate // Default order: 3,1,0,2,4 (bottom side)
-	P2StartingPositions [5]Coordinate // Default order: 4,2,0,1,3 (top side)
-}
-
-// MarshalJSON serializes StagePreset struct to JSON that client needs
-func (s StagePreset) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
-		Name     string `json:"name"`
-		Width    int    `json:"width"`
-		Height   int    `json:"height"`
-		MaxTurns int    `json:"maxTurns"`
-	}{s.Name, s.Width, s.Height, s.MaxTurns})
+	Name                string        `json:"name"`
+	Description         string        `json:"description"`
+	Width               int           `json:"width"`
+	Height              int           `json:"height"`
+	MaxTurns            int           `json:"maxTurns"`
+	LayoutGrid          []string      `json:"-"` // Visual layout matrix; each string is a row (Y), each char a column (X)
+	SoftBlocks          []Coordinate  `json:"-"`
+	P1StartingPositions [5]Coordinate `json:"-"` // Default order: 3,1,0,2,4 (bottom side)
+	P2StartingPositions [5]Coordinate `json:"-"` // Default order: 4,2,0,1,3 (top side)
 }
 
 // SkillType is a bitmask for unit abilities (jump, fly, etc.).

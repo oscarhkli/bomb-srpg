@@ -1,5 +1,4 @@
 import type {
-  Archetype,
   CreateMatchRoomResponse,
   CreateMatchRequest,
   CreateMatchResponse,
@@ -11,6 +10,7 @@ import type {
   AllowedTilesResponse,
   GameCfg,
   StartTurnResponse,
+  Catalog,
 } from '../types/api';
 
 let roomId: string | undefined;
@@ -69,9 +69,9 @@ async function handleResponse<T>(res: Response): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export async function getArchetypes(): Promise<Archetype[]> {
-  const res = await fetch(buildUrl('/api/archetypes'));
-  return handleResponse<Archetype[]>(res);
+export async function getCatalog(): Promise<Catalog> {
+  const res = await fetch(buildUrl('/api/catalog'));
+  return handleResponse<Catalog>(res);
 }
 
 export async function createMatchRoom(): Promise<CreateMatchRoomResponse> {

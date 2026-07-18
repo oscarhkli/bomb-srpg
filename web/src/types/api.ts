@@ -50,6 +50,19 @@ export interface Archetype {
   skills: SkillType[];
 }
 
+export interface StagePreset {
+  name: string;
+  description: string;
+  width: number;
+  height: number;
+  maxTurns: number;
+}
+
+export interface Catalog {
+  archetypes: Archetype[];
+  stagePresets: StagePreset[];
+}
+
 export interface Unit {
   id: number; // UnitID (uint8)
   type: string;

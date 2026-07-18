@@ -144,19 +144,18 @@ func testEncodeFailure(t *testing.T, handler http.Handler, setup func() *http.Re
 	}
 }
 
-func TestHandleGetAllArchetypes(t *testing.T) {
-	s := NewServerStateManager()
-	h := NewHandler(s)
+func TestHandleGetCatelog(t *testing.T) {
+	h := NewHandler(NewServerStateManager())
 
-	t.Run("Success: called engine.GetAllArchetypes", func(t *testing.T) {
-		req, err := http.NewRequest("GET", "/api/archetypes", nil)
+	t.Run("Success: called engine.GetAllArchetypes and engine.GetAllStagePresets", func(t *testing.T) {
+		req, err := http.NewRequest("GET", "/api/catelog", nil)
 		if err != nil {
 			t.Fatalf("Failed to create request: %v", err)
 		}
 
 		rr := httptest.NewRecorder()
 
-		http.HandlerFunc(h.HandleGetAllArchetypes).ServeHTTP(rr, req)
+		http.HandlerFunc(h.HandleGetCatelog).ServeHTTP(rr, req)
 
 		if status := rr.Code; status != http.StatusOK {
 			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusOK)
@@ -167,32 +166,47 @@ func TestHandleGetAllArchetypes(t *testing.T) {
 			t.Errorf("Handler returned wrong content type: got %v want %v", contentType, expectedHeader)
 		}
 
-		var response []engine.Archetype
+		var response CatalogResopnse
 		if err := json.NewDecoder(rr.Body).Decode(&response); err != nil {
 			t.Fatalf("Failed to decode response JSON payload: %v", err)
 		}
 
-		expectedCount := len(engine.GetAllArchetypes())
-		if len(response) != expectedCount {
-			t.Errorf("Handler returned unexpected number of archetypes: got %d want %d", len(response), expectedCount)
+		if got, want := len(response.Archetypes), len(engine.GetAllArchetypes()); got != want {
+			t.Errorf("Handler returned unexpected number of archetypes: got %d want %d", got, want)
+		}
+		if got, want := len(response.StagePresets), len(engine.GetAllStagePresets()); got != want {
+			t.Errorf("Handler returned unexpected number of stagePresets: got %d want %d", got, want)
 		}
 	})
 
 	t.Run("Failure: failed to Encode", func(t *testing.T) {
-		testEncodeFailure(t, http.HandlerFunc(h.HandleGetAllArchetypes),
+		testEncodeFailure(t, http.HandlerFunc(h.HandleGetCatelog),
 			func() *http.Request {
-				req, _ := http.NewRequest("GET", "/api/archetypes", nil)
+				req, _ := http.NewRequest("GET", "/api/catelog", nil)
 				return req
 			}, http.StatusOK)
 	})
 
 	t.Run("Test Contract", func(t *testing.T) {
-		req, _ := http.NewRequest("GET", "/api/archetypes", nil)
+		req, _ := http.NewRequest("GET", "/api/catelog", nil)
 		rr := httptest.NewRecorder()
 
-		http.HandlerFunc(h.HandleGetAllArchetypes).ServeHTTP(rr, req)
+		http.HandlerFunc(h.HandleGetCatelog).ServeHTTP(rr, req)
 
-		assertArrayContract(t, rr.Body.Bytes(), []string{"name", "speed", "bombMaxRange", "skills"}, nil)
+		assertObjectContract(t, rr.Body.Bytes(), []string{"archestypes", "stagePresets"}, func(t *testing.T, raw map[string]any) {
+			t.Helper()
+			archetypesBytes, err := json.Marshal(raw["archestypes"])
+			if err != nil {
+				t.Fatalf("Failed to re-marshal archestypes: %v", err)
+			}
+			assertArrayContract(t, archetypesBytes, []string{"name", "speed", "bombMaxRange", "skills"}, nil)
+
+			stagePresetsBytes, err := json.Marshal(raw["stagePresets"])
+			if err != nil {
+				t.Fatalf("Failed to re-marshal stagePresets: %v", err)
+			}
+			assertArrayContract(t, stagePresetsBytes, []string{"name", "description", "width", "height", "maxTurns"}, nil)
+		})
 	})
 }
 
