@@ -326,13 +326,11 @@ func TestInitGameState_Suite(t *testing.T) {
 func TestInitGameState_LayoutGridCompilation(t *testing.T) {
 	tests := []struct {
 		name         string
-		presetName   string
 		customPreset StagePreset // mock sandbox layout for testing
 		expectError  bool
 	}{
 		{
-			name:       "Success: Compile Diverse Terrain Matrix",
-			presetName: "Sandbox3x3",
+			name: "Success: Compile Diverse Terrain Matrix",
 			customPreset: StagePreset{
 				Name:   "Sandbox3x3",
 				Width:  3,
@@ -342,14 +340,11 @@ func TestInitGameState_LayoutGridCompilation(t *testing.T) {
 					".BB", //
 					".LW", //
 				},
-				P1StartingPositions: [5]Coordinate{{1, 0}},
-				P2StartingPositions: [5]Coordinate{{0, 2}},
 			},
 			expectError: false,
 		},
 		{
-			name:       "Failure: Extra Width Layout typo",
-			presetName: "BrokenWidth3x3",
+			name: "Failure: Extra Width Layout typo",
 			customPreset: StagePreset{
 				Name:   "BrokenWidth3x3",
 				Width:  3,
@@ -359,14 +354,11 @@ func TestInitGameState_LayoutGridCompilation(t *testing.T) {
 					"....",
 					"...",
 				},
-				P1StartingPositions: [5]Coordinate{{0, 0}},
-				P2StartingPositions: [5]Coordinate{{2, 2}},
 			},
 			expectError: true,
 		},
 		{
-			name:       "Failure: Extra Height Layout typo",
-			presetName: "BrokenHeight3x3",
+			name: "Failure: Extra Height Layout typo",
 			customPreset: StagePreset{
 				Name:   "BrokenHeight3x3",
 				Width:  3,
@@ -377,14 +369,11 @@ func TestInitGameState_LayoutGridCompilation(t *testing.T) {
 					"...",
 					"...",
 				},
-				P1StartingPositions: [5]Coordinate{{0, 0}},
-				P2StartingPositions: [5]Coordinate{{2, 2}},
 			},
 			expectError: true,
 		},
 		{
-			name:       "Failure: Invalid Token Symbol",
-			presetName: "InvalidToken3x3",
+			name: "Failure: Invalid Token Symbol",
 			customPreset: StagePreset{
 				Name:   "InvalidToken3x3",
 				Width:  3,
@@ -394,25 +383,13 @@ func TestInitGameState_LayoutGridCompilation(t *testing.T) {
 					".X.",
 					"...",
 				},
-				P1StartingPositions: [5]Coordinate{{0, 0}},
-				P2StartingPositions: [5]Coordinate{{2, 2}},
 			},
 			expectError: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Temporarily add the custom preset to the registry for testing
-			stagePresetsRegistry = append(stagePresetsRegistry, tt.customPreset)
-			defer func() {
-				stagePresetsRegistry = stagePresetsRegistry[:len(stagePresetsRegistry)-1] // Clean up after test
-			}()
-
-			gameState, err := initGameState(GameCfg{
-				StagePreset: tt.presetName,
-				P1Teams:     []string{"King"},
-				P2Teams:     []string{"King"},
-			})
+			grid, err := compileGrid(tt.customPreset)
 
 			if (err != nil) != tt.expectError {
 				t.Fatalf("Expected error: %v, got: %v", tt.expectError, err)
@@ -428,7 +405,7 @@ func TestInitGameState_LayoutGridCompilation(t *testing.T) {
 				{TerrainPlain, TerrainLava, TerrainWater},
 			}
 
-			for y, row := range gameState.Grid {
+			for y, row := range grid {
 				for x, tile := range row {
 					if tile.Type != expectedMatrix[y][x] {
 						t.Errorf("Expected terrain at (%d,%d) to be %v, got %v", x, y, expectedMatrix[y][x], tile.Type)

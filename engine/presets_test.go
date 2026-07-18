@@ -150,7 +150,7 @@ func TestGetStagePreset(t *testing.T) {
 }
 
 func TestStagePresets(t *testing.T) {
-	for _, s := range stagePresetsRegistry {
+	for _, s := range stagePresetsRegistry() {
 		t.Run(s.Name, func(t *testing.T) {
 			stagePreset, exists := GetStagePreset(s.Name)
 			if !exists {
@@ -220,7 +220,7 @@ func TestStagePrests_Sanity(t *testing.T) {
 		PassPermissions: PassUnits | PassSoftBlocks | PassItems,
 	}
 
-	for _, s := range stagePresetsRegistry {
+	for _, s := range stagePresetsRegistry() {
 		t.Run(s.Name, func(t *testing.T) {
 			gs, err := initGameState(GameCfg{
 				StagePreset: s.Name,
