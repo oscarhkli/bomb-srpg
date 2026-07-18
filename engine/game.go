@@ -2,7 +2,6 @@ package engine
 
 import (
 	"fmt"
-	"maps"
 )
 
 var terrainToken = map[byte]TerrainType{
@@ -212,9 +211,8 @@ func (gs *GameState) DeepCopy() *GameState {
 				BombUsed:     unit.BombUsed,
 				Team:         unit.Team,
 				HP:           unit.HP,
-				Skills:       make(map[SkillType]bool),
+				Skills:       unit.Skills,
 			}
-			maps.Copy(clone.Units[id].Skills, unit.Skills)
 		}
 	}
 

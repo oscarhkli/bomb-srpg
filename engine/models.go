@@ -111,10 +111,13 @@ type StagePreset struct {
 // SkillType is a bitmask for unit abilities (jump, fly, etc.).
 type SkillType uint32
 
+const SkillNone SkillType = 0
 const (
 	SkillCanJump SkillType = 1 << iota
 	SkillCanFly
 )
+
+var allSkills = []SkillType{SkillCanJump, SkillCanFly}
 
 // String converts an SkillType integer value into a human-readable text string.
 func (s SkillType) String() string {
@@ -137,16 +140,16 @@ type Archetype struct {
 	BombPower    int
 	MaxBombCount int
 	BaseHP       int
-	PresetSkills map[SkillType]bool
+	PresetSkills SkillType
 	Selectable   bool
 }
 
 // MarshalJSON serializes Archetype struct to JSON that client needs
 func (a Archetype) MarshalJSON() ([]byte, error) {
 	skills := []string{}
-	for s, ok := range a.PresetSkills {
-		if ok {
-			skills = append(skills, s.String())
+	for _, skill := range allSkills {
+		if (skill & a.PresetSkills) != 0 {
+			skills = append(skills, skill.String())
 		}
 	}
 	return json.Marshal(struct {
@@ -177,7 +180,7 @@ type Unit struct {
 	BombUsed     int
 	Team         int // 1 = P1, 2 = P2 / COM
 	HP           int // 1 = alive, 0 = dead; extensible for multi-HP units
-	Skills       map[SkillType]bool
+	Skills       SkillType
 	HasMoved     bool
 	HasUsedSkill bool // True after placing bomb or using skill; resets each turn
 }
@@ -185,9 +188,9 @@ type Unit struct {
 // MarshalJSON serializes Unit struct to JSON that client needs
 func (u Unit) MarshalJSON() ([]byte, error) {
 	skills := []string{}
-	for s, ok := range u.Skills {
-		if ok {
-			skills = append(skills, s.String())
+	for _, skill := range allSkills {
+		if (skill & u.Skills) != 0 {
+			skills = append(skills, skill.String())
 		}
 	}
 	return json.Marshal(struct {

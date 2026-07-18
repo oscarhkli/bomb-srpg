@@ -16,7 +16,7 @@ func archetypesRegistry() []Archetype {
 			BombPower:    2,
 			MaxBombCount: 1,
 			BaseHP:       1,
-			PresetSkills: map[SkillType]bool{},
+			PresetSkills: SkillNone,
 			Selectable:   false,
 		},
 		{
@@ -27,7 +27,7 @@ func archetypesRegistry() []Archetype {
 			BombPower:    2,
 			MaxBombCount: 1,
 			BaseHP:       1,
-			PresetSkills: map[SkillType]bool{},
+			PresetSkills: SkillNone,
 			Selectable:   true,
 		},
 		{
@@ -38,7 +38,7 @@ func archetypesRegistry() []Archetype {
 			BombPower:    2,
 			MaxBombCount: 1,
 			BaseHP:       1,
-			PresetSkills: map[SkillType]bool{},
+			PresetSkills: SkillNone,
 			Selectable:   true,
 		},
 		{
@@ -49,7 +49,7 @@ func archetypesRegistry() []Archetype {
 			BombPower:    2,
 			MaxBombCount: 1,
 			BaseHP:       1,
-			PresetSkills: map[SkillType]bool{},
+			PresetSkills: SkillNone,
 			Selectable:   true,
 		},
 	}
