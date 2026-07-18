@@ -66,7 +66,7 @@ func GetArchetype(name string) (Archetype, bool) {
 	return Archetype{}, false
 }
 
-// GetAllArchetypes gets all archestypes for game setup.
+// GetAllArchetypes gets all archetypes for game setup.
 func GetAllArchetypes() []Archetype {
 	results := []Archetype{}
 	for _, a := range archetypesRegistry() {

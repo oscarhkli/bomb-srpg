@@ -25,7 +25,7 @@ Content-Type: application/json
     "p1Teams": ["King", "Fighter", "Fighter", "Witch", "Bandit"],
     "p2Teams": ["King", "Witch", "Fighter", "Bandit", "Bandit"],
     "maxTurns": 30,
-    "allowResetTurn": true,
+    "allowResetTurn": true
   }
 }
 

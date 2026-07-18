@@ -39,7 +39,7 @@ func NewHandler(m *ServerStateManager, opts ...HandlerOption) *Handler {
 }
 
 type CatalogResopnse struct {
-	Archetypes   []engine.Archetype   `json:"archestypes"`
+	Archetypes   []engine.Archetype   `json:"archetypes"`
 	StagePresets []engine.StagePreset `json:"stagePresets"`
 }
 

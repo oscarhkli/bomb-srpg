@@ -193,11 +193,11 @@ func TestHandleGetCatalog(t *testing.T) {
 
 		http.HandlerFunc(h.HandleGetCatalog).ServeHTTP(rr, req)
 
-		assertObjectContract(t, rr.Body.Bytes(), []string{"archestypes", "stagePresets"}, func(t *testing.T, raw map[string]any) {
+		assertObjectContract(t, rr.Body.Bytes(), []string{"archetypes", "stagePresets"}, func(t *testing.T, raw map[string]any) {
 			t.Helper()
-			archetypesBytes, err := json.Marshal(raw["archestypes"])
+			archetypesBytes, err := json.Marshal(raw["archetypes"])
 			if err != nil {
-				t.Fatalf("Failed to re-marshal archestypes: %v", err)
+				t.Fatalf("Failed to re-marshal archetypes: %v", err)
 			}
 			assertArrayContract(t, archetypesBytes, []string{"name", "speed", "bombMaxRange", "skills"}, nil)
 
