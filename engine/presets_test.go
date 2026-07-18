@@ -224,8 +224,8 @@ func TestStagePrests_Sanity(t *testing.T) {
 		t.Run(s.Name, func(t *testing.T) {
 			gs, err := initGameState(GameCfg{
 				StagePreset: s.Name,
-				P1Teams:     []string{"King"}, // we don't care this value in this test, as long as it can create a GameState
-				P2Teams:     []string{"King"}, // same as above
+				P1Teams:     []string{"King", "Fighter"}, // we don't care this value in this test, as long as it can create a GameState
+				P2Teams:     []string{"King", "Fighter"}, // same as above
 			})
 
 			if err != nil {

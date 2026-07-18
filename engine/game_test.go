@@ -26,14 +26,14 @@ func TestInitGameState_Suite(t *testing.T) {
 			expectedTotalUnits: 10, // 5 for each player
 		},
 		{
-			name: "Success: Minimum Teams (1 vs 1) with Plain Stage",
+			name: "Success: Minimum Teams (2 vs 2) with Plain Stage",
 			cfg: GameCfg{
 				StagePreset: "Plain",
-				P1Teams:     []string{"King"},
-				P2Teams:     []string{"King"},
+				P1Teams:     []string{"King", "Fighter"},
+				P2Teams:     []string{"King", "Fighter"},
 			},
 			expectError:        false,
-			expectedTotalUnits: 2, // 1 for each player
+			expectedTotalUnits: 4, // 2 for each player
 		},
 		{
 			name: "Success: Mixed Teams (3 vs 2) with Standard Stage",
@@ -44,6 +44,16 @@ func TestInitGameState_Suite(t *testing.T) {
 			},
 			expectError:        false,
 			expectedTotalUnits: 5, // 3 for Player 1, 2 for Player 2
+		},
+		{
+			name: "Success: With NO_UNIT",
+			cfg: GameCfg{
+				StagePreset: "Plain",
+				P1Teams:     []string{"King", NoUnit, "Fighter"},
+				P2Teams:     []string{"King", "Fighter"},
+			},
+			expectError:        false,
+			expectedTotalUnits: 4, // 2 for each player
 		},
 		{
 			name: "Failure: Player 1 has no King",
@@ -113,7 +123,7 @@ func TestInitGameState_Suite(t *testing.T) {
 				P2Teams:     []string{"King", "Fighter"},
 			},
 			expectError:   true,
-			errorContains: "Player 1 must have between 1 and 5 units",
+			errorContains: "Player 1 must have between 2 and 5 units",
 		},
 		{
 			name: "Failure: Player 2 has more than 5 units",
@@ -123,7 +133,27 @@ func TestInitGameState_Suite(t *testing.T) {
 				P2Teams:     []string{"King", "Fighter", "Witch", "Bandit", "Witch", "Fighter"},
 			},
 			expectError:   true,
-			errorContains: "Player 2 must have between 1 and 5 units",
+			errorContains: "Player 2 must have between 2 and 5 units",
+		},
+		{
+			name: "Failure: Player 1 has 1 unit",
+			cfg: GameCfg{
+				StagePreset: "Plain",
+				P1Teams:     []string{"King"},
+				P2Teams:     []string{"King", "Fighter"},
+			},
+			expectError:   true,
+			errorContains: "Player 1 must have between 2 and 5 units",
+		},
+		{
+			name: "Failure: Player 2 has 1 unit",
+			cfg: GameCfg{
+				StagePreset: "Plain",
+				P1Teams:     []string{"King", "Fighter"},
+				P2Teams:     []string{"King"},
+			},
+			expectError:   true,
+			errorContains: "Player 2 must have between 2 and 5 units",
 		},
 		{
 			name: "Failure: Player 1 has no units",
@@ -133,7 +163,7 @@ func TestInitGameState_Suite(t *testing.T) {
 				P2Teams:     []string{"King", "Fighter"},
 			},
 			expectError:   true,
-			errorContains: "Player 1 must have between 1 and 5 units",
+			errorContains: "Player 1 must have between 2 and 5 units",
 		},
 		{
 			name: "Failure: Player 2 has no units",
@@ -143,7 +173,7 @@ func TestInitGameState_Suite(t *testing.T) {
 				P2Teams:     []string{},
 			},
 			expectError:   true,
-			errorContains: "Player 2 must have between 1 and 5 units",
+			errorContains: "Player 2 must have between 2 and 5 units",
 		},
 		{
 			name: "Failure: Player 1 has an invalid archetype",
@@ -164,6 +194,16 @@ func TestInitGameState_Suite(t *testing.T) {
 			},
 			expectError:   true,
 			errorContains: "archetype 'InvalidArchetype' for Player 2 not found",
+		},
+		{
+			name: "Failure: Player 1 has 1 unit as NO_UNIT doesn't count",
+			cfg: GameCfg{
+				StagePreset: "Plain",
+				P1Teams:     []string{"King", NoUnit},
+				P2Teams:     []string{"King", "Fighter"},
+			},
+			expectError:   true,
+			errorContains: "Player 1 must have between 2 and 5 units",
 		},
 		{
 			name: "Failure: Invalid stage preset",

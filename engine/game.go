@@ -4,12 +4,16 @@ import (
 	"fmt"
 )
 
-var terrainToken = map[byte]TerrainType{
-	'.': TerrainPlain,
-	'B': TerrainBlock,
-	'T': TerrainTower,
-	'W': TerrainWater,
-	'L': TerrainLava,
+const NoUnit string = "NO_UNIT"
+
+func terrainToken() map[byte]TerrainType {
+	return map[byte]TerrainType{
+		'.': TerrainPlain,
+		'B': TerrainBlock,
+		'T': TerrainTower,
+		'W': TerrainWater,
+		'L': TerrainLava,
+	}
 }
 
 // InitGame validates the config, builds the initial GameState, and returns a ready-to-play Match.
@@ -28,17 +32,27 @@ func InitGame(gameCfg GameCfg) (*Match, error) {
 	}, nil
 }
 
+func teamSize(team []string) int {
+	count := 0
+	for _, v := range team {
+		if v != NoUnit {
+			count++
+		}
+	}
+	return count
+}
+
 func initGameState(gameCfg GameCfg) (*GameState, error) {
 	stagePreset, exists := GetStagePreset(gameCfg.StagePreset)
 	if !exists {
 		return nil, fmt.Errorf("%w: stage preset '%s' not found", ErrInvalidStagePreset, gameCfg.StagePreset)
 	}
 
-	if len(gameCfg.P1Teams) < 1 || len(gameCfg.P1Teams) > 5 {
-		return nil, fmt.Errorf("%w: Player 1 must have between 1 and 5 units, got %d", ErrInvalidTeamSize, len(gameCfg.P1Teams))
+	if t := teamSize(gameCfg.P1Teams); t < 2 || t > 5 {
+		return nil, fmt.Errorf("%w: Player 1 must have between 2 and 5 units, got %d", ErrInvalidTeamSize, t)
 	}
-	if len(gameCfg.P2Teams) < 1 || len(gameCfg.P2Teams) > 5 {
-		return nil, fmt.Errorf("%w: Player 2 must have between 1 and 5 units, got %d", ErrInvalidTeamSize, len(gameCfg.P2Teams))
+	if t := teamSize(gameCfg.P2Teams); t < 2 || t > 5 {
+		return nil, fmt.Errorf("%w: Player 2 must have between 2 and 5 units, got %d", ErrInvalidTeamSize, t)
 	}
 
 	// Only 1 king each team allowed, and must be the first unit if present
@@ -102,7 +116,7 @@ func compileGrid(preset StagePreset) ([][]Tile, error) {
 	for y, row := range preset.LayoutGrid {
 		grid[y] = make([]Tile, preset.Width)
 		for x, char := range row {
-			terrain, exists := terrainToken[byte(char)]
+			terrain, exists := terrainToken()[byte(char)]
 			if !exists {
 				return nil, fmt.Errorf("%w: invalid terrain character '%c' at (%d, %d)", ErrInvalidTerrain, char, x, y)
 			}
@@ -136,6 +150,9 @@ func createUnits(
 	gameCfg GameCfg,
 ) error {
 	for i, archetypeName := range teams {
+		if archetypeName == NoUnit { // allowing non-full team in a specific location
+			continue
+		}
 		archetype, exists := GetArchetype(archetypeName)
 		if !exists {
 			return fmt.Errorf("%w: archetype '%s' for Player %d not found", ErrUnknownArchetype, archetypeName, teamID)
