@@ -28,9 +28,9 @@ func TestHTTPRouting(t *testing.T) {
 		wantStatus int
 	}{
 		{
-			name:       "GET /api/catelog",
+			name:       "GET /api/catalog",
 			method:     "GET",
-			path:       "/api/catelog",
+			path:       "/api/catalog",
 			wantStatus: http.StatusOK,
 		},
 		{
@@ -88,9 +88,9 @@ func TestHTTPRouting(t *testing.T) {
 			wantStatus: http.StatusMethodNotAllowed,
 		},
 		{
-			name:       "POST /api/catelog (405)",
+			name:       "POST /api/catalog (405)",
 			method:     "POST",
-			path:       "/api/catelog",
+			path:       "/api/catalog",
 			wantStatus: http.StatusMethodNotAllowed,
 		},
 		{
@@ -100,9 +100,9 @@ func TestHTTPRouting(t *testing.T) {
 			wantStatus: http.StatusMethodNotAllowed,
 		},
 		{
-			name:       "PUT /api/catelog (405)",
+			name:       "PUT /api/catalog (405)",
 			method:     "PUT",
-			path:       "/api/catelog",
+			path:       "/api/catalog",
 			wantStatus: http.StatusMethodNotAllowed,
 		},
 		{

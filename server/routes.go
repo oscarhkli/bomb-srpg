@@ -4,7 +4,7 @@ import "net/http"
 
 // RegisterRoutes registers all HTTP routes for the Bomb Tactics REST API on the given ServeMux.
 func RegisterRoutes(mux *http.ServeMux, h *Handler) {
-	mux.HandleFunc("GET /api/catelog", h.HandleGetCatelog)
+	mux.HandleFunc("GET /api/catalog", h.HandleGetCatalog)
 	mux.HandleFunc("POST /api/match-rooms", h.HandleCreateMatchRoom)
 	mux.HandleFunc("POST /api/match-rooms/{roomID}/match", h.HandleCreateMatch)
 	mux.HandleFunc("POST /api/match-rooms/{roomID}/rematch", h.HandleRematch)

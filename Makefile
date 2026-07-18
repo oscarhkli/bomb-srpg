@@ -10,7 +10,7 @@ vet: fmt
 test: vet
 	go test -cover -coverprofile=coverage.txt ./cli/... ./engine/... ./server/...
 
-test-race:
+test-race: vet
 	go test -race ./cli/... ./engine/... ./server/...
 
 coverage: test

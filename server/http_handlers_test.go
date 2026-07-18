@@ -144,18 +144,18 @@ func testEncodeFailure(t *testing.T, handler http.Handler, setup func() *http.Re
 	}
 }
 
-func TestHandleGetCatelog(t *testing.T) {
+func TestHandleGetCatalog(t *testing.T) {
 	h := NewHandler(NewServerStateManager())
 
 	t.Run("Success: called engine.GetAllArchetypes and engine.GetAllStagePresets", func(t *testing.T) {
-		req, err := http.NewRequest("GET", "/api/catelog", nil)
+		req, err := http.NewRequest("GET", "/api/catalog", nil)
 		if err != nil {
 			t.Fatalf("Failed to create request: %v", err)
 		}
 
 		rr := httptest.NewRecorder()
 
-		http.HandlerFunc(h.HandleGetCatelog).ServeHTTP(rr, req)
+		http.HandlerFunc(h.HandleGetCatalog).ServeHTTP(rr, req)
 
 		if status := rr.Code; status != http.StatusOK {
 			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusOK)
@@ -180,18 +180,18 @@ func TestHandleGetCatelog(t *testing.T) {
 	})
 
 	t.Run("Failure: failed to Encode", func(t *testing.T) {
-		testEncodeFailure(t, http.HandlerFunc(h.HandleGetCatelog),
+		testEncodeFailure(t, http.HandlerFunc(h.HandleGetCatalog),
 			func() *http.Request {
-				req, _ := http.NewRequest("GET", "/api/catelog", nil)
+				req, _ := http.NewRequest("GET", "/api/catalog", nil)
 				return req
 			}, http.StatusOK)
 	})
 
 	t.Run("Test Contract", func(t *testing.T) {
-		req, _ := http.NewRequest("GET", "/api/catelog", nil)
+		req, _ := http.NewRequest("GET", "/api/catalog", nil)
 		rr := httptest.NewRecorder()
 
-		http.HandlerFunc(h.HandleGetCatelog).ServeHTTP(rr, req)
+		http.HandlerFunc(h.HandleGetCatalog).ServeHTTP(rr, req)
 
 		assertObjectContract(t, rr.Body.Bytes(), []string{"archestypes", "stagePresets"}, func(t *testing.T, raw map[string]any) {
 			t.Helper()

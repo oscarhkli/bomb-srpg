@@ -4,8 +4,8 @@
 @token2 = {{createMatch.response.body.playerTokens.1}}
 
 
-### Get Archetypes
-GET http://localhost:8080/api/archetypes
+### Get Catalog
+GET http://localhost:8080/api/catalog
 Content-Type: application/json
 
 

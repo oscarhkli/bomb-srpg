@@ -70,9 +70,9 @@ type StartTurnResponse struct {
 	GameEvents    []engine.GameEvent `json:"gameEvents"`
 }
 
-// HandleGetCatelog returns all available unit archetypes and stages for the client to display in the lobby.
+// HandleGetCatalog returns all available unit archetypes and stages for the client to display in the lobby.
 // It encodes the archetype and stagePreset definitions as JSON and writes them to the response.
-func (h *Handler) HandleGetCatelog(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) HandleGetCatalog(w http.ResponseWriter, r *http.Request) {
 	archetypes := engine.GetAllArchetypes()
 	stagePresets := engine.GetAllStagePresets()
 
@@ -81,8 +81,8 @@ func (h *Handler) HandleGetCatelog(w http.ResponseWriter, r *http.Request) {
 
 	res := CatalogResopnse{Archetypes: archetypes, StagePresets: stagePresets}
 	if err := json.NewEncoder(w).Encode(res); err != nil {
-		h.Logger.Error("encode catelog failed", "error", err)
-		http.Error(w, "Failed to encode catelog definitions", http.StatusInternalServerError)
+		h.Logger.Error("encode catalog failed", "error", err)
+		http.Error(w, "Failed to encode catalog definitions", http.StatusInternalServerError)
 		return
 	}
 }
