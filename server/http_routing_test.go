@@ -28,9 +28,9 @@ func TestHTTPRouting(t *testing.T) {
 		wantStatus int
 	}{
 		{
-			name:       "GET /api/archetypes",
+			name:       "GET /api/catalog",
 			method:     "GET",
-			path:       "/api/archetypes",
+			path:       "/api/catalog",
 			wantStatus: http.StatusOK,
 		},
 		{
@@ -88,9 +88,9 @@ func TestHTTPRouting(t *testing.T) {
 			wantStatus: http.StatusMethodNotAllowed,
 		},
 		{
-			name:       "POST /api/archetypes (405)",
+			name:       "POST /api/catalog (405)",
 			method:     "POST",
-			path:       "/api/archetypes",
+			path:       "/api/catalog",
 			wantStatus: http.StatusMethodNotAllowed,
 		},
 		{
@@ -100,9 +100,9 @@ func TestHTTPRouting(t *testing.T) {
 			wantStatus: http.StatusMethodNotAllowed,
 		},
 		{
-			name:       "PUT /api/archetypes (405)",
+			name:       "PUT /api/catalog (405)",
 			method:     "PUT",
-			path:       "/api/archetypes",
+			path:       "/api/catalog",
 			wantStatus: http.StatusMethodNotAllowed,
 		},
 		{
@@ -300,7 +300,7 @@ func TestHTTPRouting(t *testing.T) {
 	}
 
 	gameCfgBody, _ := json.Marshal(engine.GameCfg{
-		StagePreset: "MAP01",
+		StagePreset: "Plain",
 		P1Teams:     []string{"King"},
 		P2Teams:     []string{"King"},
 		MaxTurns:    10,

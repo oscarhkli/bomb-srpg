@@ -124,9 +124,9 @@ func TestGameStateJSONSerialization(t *testing.T) {
 			name: "Unit Archetype name",
 			gs: &GameState{
 				Units: map[UnitID]*Unit{
-					0x11: {ID: 0x11, Type: Archetype{Name: "King"}, Position: Coordinate{X: 0, Y: 0}, Team: 1, HP: 1, Skills: map[SkillType]bool{}},
-					0x21: {ID: 0x21, Type: Archetype{Name: "Fighter"}, Position: Coordinate{X: 1, Y: 0}, Team: 1, HP: 1, Skills: map[SkillType]bool{SkillCanFly: true}},
-					0x31: {ID: 0x31, Type: Archetype{Name: "Witch"}, Position: Coordinate{X: 2, Y: 0}, Team: 2, HP: 1, Skills: map[SkillType]bool{SkillCanJump: true}},
+					0x11: {ID: 0x11, Type: Archetype{Name: "King"}, Position: Coordinate{X: 0, Y: 0}, Team: 1, HP: 1, Skills: SkillNone},
+					0x21: {ID: 0x21, Type: Archetype{Name: "Fighter"}, Position: Coordinate{X: 1, Y: 0}, Team: 1, HP: 1, Skills: SkillCanFly},
+					0x31: {ID: 0x31, Type: Archetype{Name: "Witch"}, Position: Coordinate{X: 2, Y: 0}, Team: 2, HP: 1, Skills: SkillCanJump},
 				},
 			},
 			want: []string{"King", "Fighter", "Witch", "Fly", "Jump", "hasMoved", "hasUsedSkill"},

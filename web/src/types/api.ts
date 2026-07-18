@@ -50,6 +50,19 @@ export interface Archetype {
   skills: SkillType[];
 }
 
+export interface StagePreset {
+  name: string;
+  description: string;
+  width: number;
+  height: number;
+  maxTurns: number;
+}
+
+export interface Catalog {
+  archetypes: Archetype[];
+  stagePresets: StagePreset[];
+}
+
 export interface Unit {
   id: number; // UnitID (uint8)
   type: string;
@@ -123,7 +136,6 @@ export interface GameCfg {
   p2Teams: string[]; // Archetype names (first = King)
   maxTurns: number; // 0 = instant sudden death
   allowResetTurn: boolean;
-  suddenDeath: boolean;
 }
 
 export interface CreateMatchRoomResponse {

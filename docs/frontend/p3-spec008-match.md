@@ -60,27 +60,28 @@ The `MatchSummaryPanel` fades in in **200ms**, stays on `MatchScene` until the P
     - All `Yes` handlers in `ConfirmDialog` triggered by 3 `TurnLifeCycleButtons` should start with closing `MatchSummaryPanel`, followed by their corresponding actions.
 
 Sample representation for the transparent panel:
-  ```text
-  +-------------------------------------+
-  |                                     |
-  |      Stage                MAP03     |
-  |                                     |
-  |    Max Turns                 6      |
-  |                                     |
-  |  [P1]                       [P2]    |
-  |                                     |
-  |    5        Living Units      5     |
-  |                                     |
-  |   12       Available Bombs   12     |
-  |                                     |
-  |                                     |
-  |                                     |
-  |         [ResolveTurnButton]         |
-  |          [ResetTurnButton]          |
-  |          [SurrenderButton]          |
-  |     [MatchSummaryPanelBackButton]   |
-  |                                     |
-  +-------------------------------------+
+
+```text
++-------------------------------------+
+|                                     |
+|      Stage                Divided   |
+|                                     |
+|    Max Turns                 6      |
+|                                     |
+|  [P1]                       [P2]    |
+|                                     |
+|    5        Living Units      5     |
+|                                     |
+|   12       Available Bombs   12     |
+|                                     |
+|                                     |
+|                                     |
+|         [ResolveTurnButton]         |
+|          [ResetTurnButton]          |
+|          [SurrenderButton]          |
+|     [MatchSummaryPanelBackButton]   |
+|                                     |
++-------------------------------------+
 ```
 
 ## Surrender Button
@@ -125,7 +126,7 @@ After clicking this button, a series of actions will be executed:
 - If the response is not **HTTP 2xx**, log the error in `ErrorPanel`.
 - If the response is **HTTP 2xx**, re-fetch via `getMatchState()` and rebuild the **occupant layer only** — the occupant-only wholesale swap defined by `p3-spec007-match.md`'s Render-Path Contract (caller (b)). The terrain layer is not rebuilt. After that, go back to [Game Loop #5.4](p3-spec005-match.md#game-loop).
 - After the re-rendering completes, undim the whole canvas in **200ms**, just like fading in. Interactions re-enable once `resetTurn()` has responded — this is independent of when the dim/undim/re-render visuals finish.
-> Note: ResetTurn() rollback to the state **after** Sudden Death hazard being injected. There is no need to re-render Sudden Death related animations.
+  > Note: ResetTurn() rollback to the state **after** Sudden Death hazard being injected. There is no need to re-render Sudden Death related animations.
 
 ## MatchSummaryPanelBack Button
 

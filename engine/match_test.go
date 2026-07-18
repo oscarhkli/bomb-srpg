@@ -828,7 +828,6 @@ func TestMatch_StartTurn_NotTriggeringSuddenDeath(t *testing.T) {
 
 	t.Run("match has reached a conclusion", func(t *testing.T) {
 		m := newTestMatch(3, 3)
-		m.GameCfg.SuddenDeath = true
 		u1 := NewUnitID(1, 0)
 		u2 := NewUnitID(2, 0)
 		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 0}
@@ -847,33 +846,8 @@ func TestMatch_StartTurn_NotTriggeringSuddenDeath(t *testing.T) {
 		}
 	})
 
-	t.Run("suddenDeath disabled", func(t *testing.T) {
-		m := newTestMatch(3, 3)
-		m.GameCfg.SuddenDeath = false
-		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1, Position: Coordinate{0, 0}, Type: king}
-		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1, Position: Coordinate{0, 1}, Type: king}
-		m.WorkingState.Units[u3] = &Unit{ID: u3, Team: 1, HP: 1, Position: Coordinate{0, 7}, Type: fighter}
-		m.WorkingState.Units[u4] = &Unit{ID: u4, Team: 2, HP: 1, Position: Coordinate{0, 8}, Type: fighter}
-
-		gameEvents := m.StartTurn()
-
-		if got, want := len(m.WorkingState.Bombs), 0; got != want {
-			t.Errorf("Sudden Death check failure: Bomb count = %d, want: %d", got, want)
-		}
-		if got, want := m.WorkingState.InSuddenDeath, false; got != want {
-			t.Errorf("Sudden Death check failure: InSuddenDeath = %v, want: %v", got, want)
-		}
-		if len(gameEvents) > 0 {
-			t.Errorf("expected empty gameEvents return, got %#v", gameEvents)
-		}
-		if len(m.PlaybackLog) > 0 {
-			t.Errorf("expected empty PlaybackLog, got %#v", m.PlaybackLog)
-		}
-	})
-
 	t.Run("turn limit not exceed yet", func(t *testing.T) {
 		m := newTestMatch(3, 3)
-		m.GameCfg.SuddenDeath = true
 		m.TrueState.Turn = 100
 		m.WorkingState.Turn = 100
 		m.WorkingState.ActiveTeam = 2
@@ -917,7 +891,6 @@ func TestMatch_StartTurn_SuddenDeath(t *testing.T) {
 
 	t.Run("stage has many available tiles", func(t *testing.T) {
 		m := newTestMatch(4, 3)
-		m.GameCfg.SuddenDeath = true
 		m.TrueState.Turn = 101
 
 		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1, Position: Coordinate{0, 0}, Type: king}
@@ -951,7 +924,6 @@ func TestMatch_StartTurn_SuddenDeath(t *testing.T) {
 
 	t.Run("stage has many 1 available tile", func(t *testing.T) {
 		m := newTestMatch(1, 9)
-		m.GameCfg.SuddenDeath = true
 		m.TrueState.Turn = 101
 		bID := NewBombID(100, 1, u1)
 		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1, Position: Coordinate{0, 0}, Type: king}
@@ -991,7 +963,6 @@ func TestMatch_StartTurn_SuddenDeath(t *testing.T) {
 
 	t.Run("stage has no available tile", func(t *testing.T) {
 		m := newTestMatch(1, 5)
-		m.GameCfg.SuddenDeath = true
 		m.TrueState.Turn = 101
 		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1, Position: Coordinate{0, 0}, Type: king}
 		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1, Position: Coordinate{0, 1}, Type: king}

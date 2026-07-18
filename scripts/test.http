@@ -4,8 +4,8 @@
 @token2 = {{createMatch.response.body.playerTokens.1}}
 
 
-### Get Archetypes
-GET http://localhost:8080/api/archetypes
+### Get Catalog
+GET http://localhost:8080/api/catalog
 Content-Type: application/json
 
 
@@ -21,12 +21,11 @@ Content-Type: application/json
 
 {
   "gameCfg": {
-    "stagePreset": "MAP01",
+    "stagePreset": "Plain",
     "p1Teams": ["King", "Fighter", "Fighter", "Witch", "Bandit"],
     "p2Teams": ["King", "Witch", "Fighter", "Bandit", "Bandit"],
     "maxTurns": 30,
-    "allowResetTurn": true,
-    "suddenDeath": true
+    "allowResetTurn": true
   }
 }
 

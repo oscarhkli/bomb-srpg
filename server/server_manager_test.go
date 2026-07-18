@@ -263,11 +263,10 @@ func TestServerStateManager_ReadOnlyMethodsDoNotUpdateLastActivity(t *testing.T)
 
 func validGameCfg() engine.GameCfg {
 	return engine.GameCfg{
-		StagePreset: "MAP01",
+		StagePreset: "Plain",
 		P1Teams:     []string{"King", "Fighter"},
 		P2Teams:     []string{"King", "Witch"},
 		MaxTurns:    10,
-		SuddenDeath: true,
 	}
 }
 
@@ -367,8 +366,8 @@ func TestServerStateManager_CreateMatch(t *testing.T) {
 				if room.Match == nil {
 					t.Fatal("Expected Match to be created, got nil")
 				}
-				if room.Match.GameCfg.StagePreset != "MAP01" {
-					t.Errorf("Expected StagePreset 'MAP01', got '%s'", room.Match.GameCfg.StagePreset)
+				if room.Match.GameCfg.StagePreset != "Plain" {
+					t.Errorf("Expected StagePreset 'Plain', got '%s'", room.Match.GameCfg.StagePreset)
 				}
 				if room.Match.GameCfg.MaxTurns != 10 {
 					t.Errorf("Expected MaxTurns 10, got %d", room.Match.GameCfg.MaxTurns)
@@ -520,8 +519,8 @@ func TestServerStateManager_Rematch(t *testing.T) {
 				if room.Match == nil {
 					t.Fatal("Expected Match to be created, got nil")
 				}
-				if room.Match.GameCfg.StagePreset != "MAP01" {
-					t.Errorf("Expected StagePreset 'MAP01', got '%s'", room.Match.GameCfg.StagePreset)
+				if room.Match.GameCfg.StagePreset != "Plain" {
+					t.Errorf("Expected StagePreset 'Plain', got '%s'", room.Match.GameCfg.StagePreset)
 				}
 				if len(playerTokens) != 2 || playerTokens[0] == "" || playerTokens[1] == "" || playerTokens[0] == playerTokens[1] {
 					t.Errorf("Expected 2 unique non-empty PlayerToken, got %v", playerTokens)

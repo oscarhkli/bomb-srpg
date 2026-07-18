@@ -127,7 +127,6 @@ func TestTerminalView_RenderGameConfig(t *testing.T) {
 		cfg := &engine.GameCfg{
 			StagePreset: "Plain",
 			MaxTurns:    50,
-			SuddenDeath: true,
 		}
 
 		err := view.RenderGameConfig(cfg)
@@ -139,13 +138,10 @@ func TestTerminalView_RenderGameConfig(t *testing.T) {
 		result := fakeScreen.String()
 
 		if !strings.Contains(result, "Stage Preset: Plain") {
-			t.Errorf("Expected output to mention stage preset, got:\n%s", result)
+			t.Errorf("Expected output to mention stage preset, got:\n%q", result)
 		}
 		if !strings.Contains(result, "Max Turns:    50") {
-			t.Errorf("Expected output to mention turn limit, got:\n%s", result)
-		}
-		if !strings.Contains(result, "Sudden Death: true") {
-			t.Errorf("Expected output to show sudden death flag, got:\n%s", result)
+			t.Errorf("Expected output to mention turn limit, got:\n%q", result)
 		}
 	})
 

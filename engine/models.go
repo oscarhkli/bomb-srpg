@@ -97,23 +97,27 @@ type SoftBlock struct {
 
 // StagePreset defines a complete map layout including terrain, soft blocks, and starting positions.
 type StagePreset struct {
-	Name                string
-	Description         string
-	Width               int
-	Height              int
-	LayoutGrid          []string // Visual layout matrix; each string is a row (Y), each char a column (X)
-	SoftBlocks          []Coordinate
-	P1StartingPositions [5]Coordinate // Default order: 3,1,0,2,4 (bottom side)
-	P2StartingPositions [5]Coordinate // Default order: 4,2,0,1,3 (top side)
+	Name                string        `json:"name"`
+	Description         string        `json:"description"`
+	Width               int           `json:"width"`
+	Height              int           `json:"height"`
+	MaxTurns            int           `json:"maxTurns"`
+	LayoutGrid          []string      `json:"-"` // Visual layout matrix; each string is a row (Y), each char a column (X)
+	SoftBlocks          []Coordinate  `json:"-"`
+	P1StartingPositions [5]Coordinate `json:"-"` // Default order: 3,1,0,2,4 (bottom side)
+	P2StartingPositions [5]Coordinate `json:"-"` // Default order: 4,2,0,1,3 (top side)
 }
 
 // SkillType is a bitmask for unit abilities (jump, fly, etc.).
 type SkillType uint32
 
+const SkillNone SkillType = 0
 const (
 	SkillCanJump SkillType = 1 << iota
 	SkillCanFly
 )
+
+var allSkills = []SkillType{SkillCanJump, SkillCanFly}
 
 // String converts an SkillType integer value into a human-readable text string.
 func (s SkillType) String() string {
@@ -136,16 +140,16 @@ type Archetype struct {
 	BombPower    int
 	MaxBombCount int
 	BaseHP       int
-	PresetSkills map[SkillType]bool
+	PresetSkills SkillType
 	Selectable   bool
 }
 
 // MarshalJSON serializes Archetype struct to JSON that client needs
 func (a Archetype) MarshalJSON() ([]byte, error) {
 	skills := []string{}
-	for s, ok := range a.PresetSkills {
-		if ok {
-			skills = append(skills, s.String())
+	for _, skill := range allSkills {
+		if (skill & a.PresetSkills) != 0 {
+			skills = append(skills, skill.String())
 		}
 	}
 	return json.Marshal(struct {
@@ -176,7 +180,7 @@ type Unit struct {
 	BombUsed     int
 	Team         int // 1 = P1, 2 = P2 / COM
 	HP           int // 1 = alive, 0 = dead; extensible for multi-HP units
-	Skills       map[SkillType]bool
+	Skills       SkillType
 	HasMoved     bool
 	HasUsedSkill bool // True after placing bomb or using skill; resets each turn
 }
@@ -184,9 +188,9 @@ type Unit struct {
 // MarshalJSON serializes Unit struct to JSON that client needs
 func (u Unit) MarshalJSON() ([]byte, error) {
 	skills := []string{}
-	for s, ok := range u.Skills {
-		if ok {
-			skills = append(skills, s.String())
+	for _, skill := range allSkills {
+		if (skill & u.Skills) != 0 {
+			skills = append(skills, skill.String())
 		}
 	}
 	return json.Marshal(struct {
@@ -231,12 +235,11 @@ type Bomb struct {
 
 // GameCfg holds all configuration for a match.
 type GameCfg struct {
-	StagePreset                 string   `json:"stagePreset"`    // Stage preset name (e.g., "MAP01")
+	StagePreset                 string   `json:"stagePreset"`    // Stage preset name (e.g., "Plain")
 	P1Teams                     []string `json:"p1Teams"`        // Archetype names for Player 1 (1-5 units, first must be King)
 	P2Teams                     []string `json:"p2Teams"`        // Archetype names for Player 2 (1-5 units, first must be King)
 	MaxTurns                    int      `json:"maxTurns"`       // Turn limit; 0 = instant sudden death
 	AllowResetTurn              bool     `json:"allowResetTurn"` // True = players can undo actions before committing
-	SuddenDeath                 bool     `json:"suddenDeath"`    // True = spawn hazards after MaxTurns; False = draw at limit
 	GlobalSpeedOverride         int      `json:"-"`              // Test override for all unit speeds (0 = disabled)
 	GlobalBombCountdownOverride int      `json:"-"`              // Test override for bomb countdown (0 = disabled)
 	GlobalBombMaxRangeOverride  int      `json:"-"`              // Test override for bomb max range (0 = disabled)

@@ -16,9 +16,9 @@ func TestInitGameState_Suite(t *testing.T) {
 		expectedTotalUnits int
 	}{
 		{
-			name: "Success: Full Teams (5 vs 5) with MAP01 Stage",
+			name: "Success: Full Teams (5 vs 5) with Plain Stage",
 			cfg: GameCfg{
-				StagePreset: "MAP01",
+				StagePreset: "Plain",
 				P1Teams:     []string{"King", "Fighter", "Witch", "Fighter", "Fighter"},
 				P2Teams:     []string{"King", "Fighter", "Witch", "Bandit", "Witch"},
 			},
@@ -26,19 +26,19 @@ func TestInitGameState_Suite(t *testing.T) {
 			expectedTotalUnits: 10, // 5 for each player
 		},
 		{
-			name: "Success: Minimum Teams (1 vs 1) with MAP01 Stage",
+			name: "Success: Minimum Teams (2 vs 2) with Plain Stage",
 			cfg: GameCfg{
-				StagePreset: "MAP01",
-				P1Teams:     []string{"King"},
-				P2Teams:     []string{"King"},
+				StagePreset: "Plain",
+				P1Teams:     []string{"King", "Fighter"},
+				P2Teams:     []string{"King", "Fighter"},
 			},
 			expectError:        false,
-			expectedTotalUnits: 2, // 1 for each player
+			expectedTotalUnits: 4, // 2 for each player
 		},
 		{
-			name: "Success: Mixed Teams (3 vs 2) with MAP02 Stage",
+			name: "Success: Mixed Teams (3 vs 2) with Standard Stage",
 			cfg: GameCfg{
-				StagePreset: "MAP02",
+				StagePreset: "Standard",
 				P1Teams:     []string{"King", "Fighter", "Witch"},
 				P2Teams:     []string{"King", "Fighter"},
 			},
@@ -46,9 +46,19 @@ func TestInitGameState_Suite(t *testing.T) {
 			expectedTotalUnits: 5, // 3 for Player 1, 2 for Player 2
 		},
 		{
+			name: "Success: With NO_UNIT",
+			cfg: GameCfg{
+				StagePreset: "Plain",
+				P1Teams:     []string{"King", NoUnit, "Fighter"},
+				P2Teams:     []string{"King", "Fighter"},
+			},
+			expectError:        false,
+			expectedTotalUnits: 4, // 2 for each player
+		},
+		{
 			name: "Failure: Player 1 has no King",
 			cfg: GameCfg{
-				StagePreset: "MAP01",
+				StagePreset: "Plain",
 				P1Teams:     []string{"Fighter", "Witch", "Fighter"},
 				P2Teams:     []string{"King", "Fighter"},
 			},
@@ -58,7 +68,7 @@ func TestInitGameState_Suite(t *testing.T) {
 		{
 			name: "Failure: Player 2 has no King",
 			cfg: GameCfg{
-				StagePreset: "MAP01",
+				StagePreset: "Plain",
 				P1Teams:     []string{"King", "Fighter"},
 				P2Teams:     []string{"Fighter", "Witch"},
 			},
@@ -68,7 +78,7 @@ func TestInitGameState_Suite(t *testing.T) {
 		{
 			name: "Failure: Player 1 has more than 1 King",
 			cfg: GameCfg{
-				StagePreset: "MAP01",
+				StagePreset: "Plain",
 				P1Teams:     []string{"King", "King", "Fighter"},
 				P2Teams:     []string{"King", "Fighter"},
 			},
@@ -78,7 +88,7 @@ func TestInitGameState_Suite(t *testing.T) {
 		{
 			name: "Failure: Player 2 has more than 1 King",
 			cfg: GameCfg{
-				StagePreset: "MAP01",
+				StagePreset: "Plain",
 				P1Teams:     []string{"King", "Fighter"},
 				P2Teams:     []string{"King", "King", "Fighter"},
 			},
@@ -88,7 +98,7 @@ func TestInitGameState_Suite(t *testing.T) {
 		{
 			name: "Failure: Player 1's King is not the first unit",
 			cfg: GameCfg{
-				StagePreset: "MAP01",
+				StagePreset: "Plain",
 				P1Teams:     []string{"Fighter", "King", "Witch"},
 				P2Teams:     []string{"King", "Fighter"},
 			},
@@ -98,7 +108,7 @@ func TestInitGameState_Suite(t *testing.T) {
 		{
 			name: "Failure: Player 2's King is not the first unit",
 			cfg: GameCfg{
-				StagePreset: "MAP01",
+				StagePreset: "Plain",
 				P1Teams:     []string{"King", "Fighter"},
 				P2Teams:     []string{"Fighter", "King", "Witch"},
 			},
@@ -108,47 +118,67 @@ func TestInitGameState_Suite(t *testing.T) {
 		{
 			name: "Failure: Player 1 has more than 5 units",
 			cfg: GameCfg{
-				StagePreset: "MAP01",
+				StagePreset: "Plain",
 				P1Teams:     []string{"King", "Fighter", "Witch", "Bandit", "Witch", "Fighter"},
 				P2Teams:     []string{"King", "Fighter"},
 			},
 			expectError:   true,
-			errorContains: "Player 1 must have between 1 and 5 units",
+			errorContains: "Player 1 must have between 2 and 5 units",
 		},
 		{
 			name: "Failure: Player 2 has more than 5 units",
 			cfg: GameCfg{
-				StagePreset: "MAP01",
+				StagePreset: "Plain",
 				P1Teams:     []string{"King", "Fighter"},
 				P2Teams:     []string{"King", "Fighter", "Witch", "Bandit", "Witch", "Fighter"},
 			},
 			expectError:   true,
-			errorContains: "Player 2 must have between 1 and 5 units",
+			errorContains: "Player 2 must have between 2 and 5 units",
+		},
+		{
+			name: "Failure: Player 1 has 1 unit",
+			cfg: GameCfg{
+				StagePreset: "Plain",
+				P1Teams:     []string{"King"},
+				P2Teams:     []string{"King", "Fighter"},
+			},
+			expectError:   true,
+			errorContains: "Player 1 must have between 2 and 5 units",
+		},
+		{
+			name: "Failure: Player 2 has 1 unit",
+			cfg: GameCfg{
+				StagePreset: "Plain",
+				P1Teams:     []string{"King", "Fighter"},
+				P2Teams:     []string{"King"},
+			},
+			expectError:   true,
+			errorContains: "Player 2 must have between 2 and 5 units",
 		},
 		{
 			name: "Failure: Player 1 has no units",
 			cfg: GameCfg{
-				StagePreset: "MAP01",
+				StagePreset: "Plain",
 				P1Teams:     []string{},
 				P2Teams:     []string{"King", "Fighter"},
 			},
 			expectError:   true,
-			errorContains: "Player 1 must have between 1 and 5 units",
+			errorContains: "Player 1 must have between 2 and 5 units",
 		},
 		{
 			name: "Failure: Player 2 has no units",
 			cfg: GameCfg{
-				StagePreset: "MAP01",
+				StagePreset: "Plain",
 				P1Teams:     []string{"King", "Fighter"},
 				P2Teams:     []string{},
 			},
 			expectError:   true,
-			errorContains: "Player 2 must have between 1 and 5 units",
+			errorContains: "Player 2 must have between 2 and 5 units",
 		},
 		{
 			name: "Failure: Player 1 has an invalid archetype",
 			cfg: GameCfg{
-				StagePreset: "MAP01",
+				StagePreset: "Plain",
 				P1Teams:     []string{"King", "InvalidArchetype"},
 				P2Teams:     []string{"King", "Fighter"},
 			},
@@ -158,12 +188,22 @@ func TestInitGameState_Suite(t *testing.T) {
 		{
 			name: "Failure: Player 2 has an invalid archetype",
 			cfg: GameCfg{
-				StagePreset: "MAP01",
+				StagePreset: "Plain",
 				P1Teams:     []string{"King", "Fighter"},
 				P2Teams:     []string{"King", "InvalidArchetype"},
 			},
 			expectError:   true,
 			errorContains: "archetype 'InvalidArchetype' for Player 2 not found",
+		},
+		{
+			name: "Failure: Player 1 has 1 unit as NO_UNIT doesn't count",
+			cfg: GameCfg{
+				StagePreset: "Plain",
+				P1Teams:     []string{"King", NoUnit},
+				P2Teams:     []string{"King", "Fighter"},
+			},
+			expectError:   true,
+			errorContains: "Player 1 must have between 2 and 5 units",
 		},
 		{
 			name: "Failure: Invalid stage preset",
@@ -178,7 +218,7 @@ func TestInitGameState_Suite(t *testing.T) {
 		{
 			name: "Success: With Global Overrides for Speed and Bomb Range Positive",
 			cfg: GameCfg{
-				StagePreset:                "MAP01",
+				StagePreset:                "Plain",
 				P1Teams:                    []string{"King", "Fighter"},
 				P2Teams:                    []string{"King", "Fighter"},
 				GlobalSpeedOverride:        10,
@@ -190,7 +230,7 @@ func TestInitGameState_Suite(t *testing.T) {
 		{
 			name: "Success: With Global Overrides for Speed and Bomb Range Zero (No Override)",
 			cfg: GameCfg{
-				StagePreset:                "MAP01",
+				StagePreset:                "Plain",
 				P1Teams:                    []string{"King", "Fighter"},
 				P2Teams:                    []string{"King", "Fighter"},
 				GlobalSpeedOverride:        0,
@@ -202,7 +242,7 @@ func TestInitGameState_Suite(t *testing.T) {
 		{
 			name: "Success: With Global Overrides for Speed and Bomb Range Negative (Treated as No Override)",
 			cfg: GameCfg{
-				StagePreset:                "MAP01",
+				StagePreset:                "Plain",
 				P1Teams:                    []string{"King", "Fighter"},
 				P2Teams:                    []string{"King", "Fighter"},
 				GlobalSpeedOverride:        -5,
@@ -326,13 +366,11 @@ func TestInitGameState_Suite(t *testing.T) {
 func TestInitGameState_LayoutGridCompilation(t *testing.T) {
 	tests := []struct {
 		name         string
-		presetName   string
 		customPreset StagePreset // mock sandbox layout for testing
 		expectError  bool
 	}{
 		{
-			name:       "Success: Compile Diverse Terrain Matrix",
-			presetName: "Sandbox3x3",
+			name: "Success: Compile Diverse Terrain Matrix",
 			customPreset: StagePreset{
 				Name:   "Sandbox3x3",
 				Width:  3,
@@ -342,14 +380,11 @@ func TestInitGameState_LayoutGridCompilation(t *testing.T) {
 					".BB", //
 					".LW", //
 				},
-				P1StartingPositions: [5]Coordinate{{1, 0}},
-				P2StartingPositions: [5]Coordinate{{0, 2}},
 			},
 			expectError: false,
 		},
 		{
-			name:       "Failure: Extra Width Layout typo",
-			presetName: "BrokenWidth3x3",
+			name: "Failure: Extra Width Layout typo",
 			customPreset: StagePreset{
 				Name:   "BrokenWidth3x3",
 				Width:  3,
@@ -359,14 +394,11 @@ func TestInitGameState_LayoutGridCompilation(t *testing.T) {
 					"....",
 					"...",
 				},
-				P1StartingPositions: [5]Coordinate{{0, 0}},
-				P2StartingPositions: [5]Coordinate{{2, 2}},
 			},
 			expectError: true,
 		},
 		{
-			name:       "Failure: Extra Height Layout typo",
-			presetName: "BrokenHeight3x3",
+			name: "Failure: Extra Height Layout typo",
 			customPreset: StagePreset{
 				Name:   "BrokenHeight3x3",
 				Width:  3,
@@ -377,14 +409,11 @@ func TestInitGameState_LayoutGridCompilation(t *testing.T) {
 					"...",
 					"...",
 				},
-				P1StartingPositions: [5]Coordinate{{0, 0}},
-				P2StartingPositions: [5]Coordinate{{2, 2}},
 			},
 			expectError: true,
 		},
 		{
-			name:       "Failure: Invalid Token Symbol",
-			presetName: "InvalidToken3x3",
+			name: "Failure: Invalid Token Symbol",
 			customPreset: StagePreset{
 				Name:   "InvalidToken3x3",
 				Width:  3,
@@ -394,23 +423,13 @@ func TestInitGameState_LayoutGridCompilation(t *testing.T) {
 					".X.",
 					"...",
 				},
-				P1StartingPositions: [5]Coordinate{{0, 0}},
-				P2StartingPositions: [5]Coordinate{{2, 2}},
 			},
 			expectError: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Temporarily add the custom preset to the registry for testing
-			stagePresetsRegistry[tt.customPreset.Name] = tt.customPreset
-			defer delete(stagePresetsRegistry, tt.customPreset.Name) // Clean up after test
-
-			gameState, err := initGameState(GameCfg{
-				StagePreset: tt.presetName,
-				P1Teams:     []string{"King"},
-				P2Teams:     []string{"King"},
-			})
+			grid, err := compileGrid(tt.customPreset)
 
 			if (err != nil) != tt.expectError {
 				t.Fatalf("Expected error: %v, got: %v", tt.expectError, err)
@@ -426,7 +445,7 @@ func TestInitGameState_LayoutGridCompilation(t *testing.T) {
 				{TerrainPlain, TerrainLava, TerrainWater},
 			}
 
-			for y, row := range gameState.Grid {
+			for y, row := range grid {
 				for x, tile := range row {
 					if tile.Type != expectedMatrix[y][x] {
 						t.Errorf("Expected terrain at (%d,%d) to be %v, got %v", x, y, expectedMatrix[y][x], tile.Type)
@@ -443,7 +462,7 @@ func TestInitGameState_LayoutGridCompilation(t *testing.T) {
 
 func TestInitGame_AllGood(t *testing.T) {
 	gameCfg := GameCfg{
-		StagePreset: "MAP01",
+		StagePreset: "Plain",
 		P1Teams:     []string{"King", "Fighter"},
 		P2Teams:     []string{"King", "Bandit"},
 	}

@@ -118,18 +118,18 @@ func TestGetStagePreset(t *testing.T) {
 		expectedExists bool
 	}{
 		{
-			name:           "Existing stage preset MAP01",
-			inputName:      "MAP01",
+			name:           "Existing stage preset Plain",
+			inputName:      "Plain",
 			expectedExists: true,
 		},
 		{
-			name:           "Existing stage prset MAP02",
-			inputName:      "MAP02",
+			name:           "Existing stage prset Standard",
+			inputName:      "Standard",
 			expectedExists: true,
 		},
 		{
-			name:           "Existing stage prset MAP03",
-			inputName:      "MAP03",
+			name:           "Existing stage prset Divided",
+			inputName:      "Divided",
 			expectedExists: true,
 		},
 		{
@@ -150,26 +150,26 @@ func TestGetStagePreset(t *testing.T) {
 }
 
 func TestStagePresets(t *testing.T) {
-	for name := range stagePresetsRegistry {
-		t.Run(name, func(t *testing.T) {
-			stagePreset, exists := GetStagePreset(name)
+	for _, s := range stagePresetsRegistry() {
+		t.Run(s.Name, func(t *testing.T) {
+			stagePreset, exists := GetStagePreset(s.Name)
 			if !exists {
-				t.Fatalf("Stage preset %s should exist", name)
+				t.Fatalf("Stage preset %s should exist", s.Name)
 			}
 			if stagePreset.Width < 5 {
-				t.Errorf("Width for %s should be minimum 5, got %d", name, stagePreset.Width)
+				t.Errorf("Width for %s should be minimum 5, got %d", s.Name, stagePreset.Width)
 			}
 			if stagePreset.Height < 5 {
-				t.Errorf("Height for %s should be minimum 5, got %d", name, stagePreset.Height)
+				t.Errorf("Height for %s should be minimum 5, got %d", s.Name, stagePreset.Height)
 			}
 
 			// Check if layout grid dimensions match width and height
 			if len(stagePreset.LayoutGrid) != stagePreset.Height {
-				t.Errorf("LayoutGrid row count for %s should match Height, got %d rows, expected %d", name, len(stagePreset.LayoutGrid), stagePreset.Height)
+				t.Errorf("LayoutGrid row count for %s should match Height, got %d rows, expected %d", s.Name, len(stagePreset.LayoutGrid), stagePreset.Height)
 			} else {
 				for i, row := range stagePreset.LayoutGrid {
 					if len(row) != stagePreset.Width {
-						t.Errorf("LayoutGrid row %d for %s should match Width, got %d columns, expected %d", i, name, len(row), stagePreset.Width)
+						t.Errorf("LayoutGrid row %d for %s should match Width, got %d columns, expected %d", i, s.Name, len(row), stagePreset.Width)
 					}
 				}
 			}
@@ -177,9 +177,9 @@ func TestStagePresets(t *testing.T) {
 			// Check if all SoftBlocks are in terrainPlain (.) positions
 			for _, softBlock := range stagePreset.SoftBlocks {
 				if softBlock.X < 0 || softBlock.X >= stagePreset.Width || softBlock.Y < 0 || softBlock.Y >= stagePreset.Height {
-					t.Errorf("SoftBlock at (%d, %d) for %s is out of bounds", softBlock.X, softBlock.Y, name)
+					t.Errorf("SoftBlock at (%d, %d) for %s is out of bounds", softBlock.X, softBlock.Y, s.Name)
 				} else if stagePreset.LayoutGrid[softBlock.Y][softBlock.X] != '.' {
-					t.Errorf("SoftBlock at (%d, %d) for %s should be on a plain terrain (.), but found '%c'", softBlock.X, softBlock.Y, name, stagePreset.LayoutGrid[softBlock.Y][softBlock.X])
+					t.Errorf("SoftBlock at (%d, %d) for %s should be on a plain terrain (.), but found '%c'", softBlock.X, softBlock.Y, s.Name, stagePreset.LayoutGrid[softBlock.Y][softBlock.X])
 				}
 			}
 			// Check if all SoftBlocks are not overlapping with each other
@@ -187,7 +187,7 @@ func TestStagePresets(t *testing.T) {
 			for _, softBlock := range stagePreset.SoftBlocks {
 				pos := Coordinate{softBlock.X, softBlock.Y}
 				if softBlockPositions[pos] {
-					t.Errorf("SoftBlock at (%d, %d) for %s is overlapping with another SoftBlock", softBlock.X, softBlock.Y, name)
+					t.Errorf("SoftBlock at (%d, %d) for %s is overlapping with another SoftBlock", softBlock.X, softBlock.Y, s.Name)
 				}
 				softBlockPositions[pos] = true
 			}
@@ -195,16 +195,16 @@ func TestStagePresets(t *testing.T) {
 			// Check if starting positions for P1 and P2 are on plain terrain (.)
 			for i, pos := range stagePreset.P1StartingPositions {
 				if pos.X < 0 || pos.X >= stagePreset.Width || pos.Y < 0 || pos.Y >= stagePreset.Height {
-					t.Errorf("P1 Starting Position %d at (%d, %d) for %s is out of bounds", i, pos.X, pos.Y, name)
+					t.Errorf("P1 Starting Position %d at (%d, %d) for %s is out of bounds", i, pos.X, pos.Y, s.Name)
 				} else if stagePreset.LayoutGrid[pos.Y][pos.X] != '.' {
-					t.Errorf("P1 Starting Position %d at (%d, %d) for %s should be on a plain terrain (.), but found '%c'", i, pos.X, pos.Y, name, stagePreset.LayoutGrid[pos.Y][pos.X])
+					t.Errorf("P1 Starting Position %d at (%d, %d) for %s should be on a plain terrain (.), but found '%c'", i, pos.X, pos.Y, s.Name, stagePreset.LayoutGrid[pos.Y][pos.X])
 				}
 			}
 			for i, pos := range stagePreset.P2StartingPositions {
 				if pos.X < 0 || pos.X >= stagePreset.Width || pos.Y < 0 || pos.Y >= stagePreset.Height {
-					t.Errorf("P2 Starting Position %d at (%d, %d) for %s is out of bounds", i, pos.X, pos.Y, name)
+					t.Errorf("P2 Starting Position %d at (%d, %d) for %s is out of bounds", i, pos.X, pos.Y, s.Name)
 				} else if stagePreset.LayoutGrid[pos.Y][pos.X] != '.' {
-					t.Errorf("P2 Starting Position %d at (%d, %d) for %s should be on a plain terrain (.), but found '%c'", i, pos.X, pos.Y, name, stagePreset.LayoutGrid[pos.Y][pos.X])
+					t.Errorf("P2 Starting Position %d at (%d, %d) for %s should be on a plain terrain (.), but found '%c'", i, pos.X, pos.Y, s.Name, stagePreset.LayoutGrid[pos.Y][pos.X])
 				}
 			}
 		})
@@ -220,21 +220,21 @@ func TestStagePrests_Sanity(t *testing.T) {
 		PassPermissions: PassUnits | PassSoftBlocks | PassItems,
 	}
 
-	for name := range stagePresetsRegistry {
-		t.Run(name, func(t *testing.T) {
+	for _, s := range stagePresetsRegistry() {
+		t.Run(s.Name, func(t *testing.T) {
 			gs, err := initGameState(GameCfg{
-				StagePreset: name,
-				P1Teams:     []string{"King"}, // we don't care this value in this test, as long as it can create a GameState
-				P2Teams:     []string{"King"}, // same as above
+				StagePreset: s.Name,
+				P1Teams:     []string{"King", "Fighter"}, // we don't care this value in this test, as long as it can create a GameState
+				P2Teams:     []string{"King", "Fighter"}, // same as above
 			})
 
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			stagePreset, exists := GetStagePreset(name)
+			stagePreset, exists := GetStagePreset(s.Name)
 			if !exists {
-				t.Fatalf("Stage preset %s should exist", name)
+				t.Fatalf("Stage preset %s should exist", s.Name)
 			}
 
 			for i, p1Pos := range stagePreset.P1StartingPositions {
@@ -243,7 +243,7 @@ func TestStagePrests_Sanity(t *testing.T) {
 				for j, p2Pos := range stagePreset.P2StartingPositions {
 					if _, ok := tiles[p2Pos]; !ok {
 						t.Errorf("Reachable validation failed for %s: P1 Starting Position %d at (%d, %d) cannot reach P2 Starting Position %d at (%d, %d)",
-							name, i, p1Pos.X, p1Pos.Y, j, p2Pos.X, p2Pos.Y)
+							s.Name, i, p1Pos.X, p1Pos.Y, j, p2Pos.X, p2Pos.Y)
 					}
 				}
 			}

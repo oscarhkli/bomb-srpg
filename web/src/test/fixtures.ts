@@ -57,7 +57,6 @@ export function makeCfg(overrides: Partial<GameCfg> = {}): GameCfg {
     p2Teams: [],
     maxTurns: 30,
     allowResetTurn: true,
-    suddenDeath: false,
     ...overrides,
   };
 }

@@ -9,10 +9,9 @@ import (
 
 func main() {
 	gameCfg := engine.GameCfg{
-		StagePreset:    "MAP01",
+		StagePreset:    "Plain",
 		MaxTurns:       30,
 		AllowResetTurn: true,
-		SuddenDeath:    true,
 		P1Teams:        []string{"King", "Witch", "Bandit", "Fighter", "Fighter"},
 		P2Teams:        []string{"King", "Witch", "Bandit", "Fighter", "Fighter"},
 	}

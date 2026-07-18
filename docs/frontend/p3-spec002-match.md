@@ -71,12 +71,12 @@ Each `Unit` is rendered as a **32×32px** shape centered on its `Tile` using Pha
 
 Archetype shape is drawn inside the fill (white stroke):
 
-| Archetype (by `type` string) | Shape     |
-| ---------------------------- | --------- |
-| King                         | Star      |
-| Fighter                      | Pentagon  |
-| Witch                        | Triangle  |
-| Bandit                       | Circle    |
+| Archetype (by `type` string) | Shape    |
+| ---------------------------- | -------- |
+| King                         | Star     |
+| Fighter                      | Pentagon |
+| Witch                        | Triangle |
+| Bandit                       | Circle   |
 
 ### SoftBlock
 
@@ -92,7 +92,7 @@ Each `Bomb` is drawn as a **24×24px** HEX `0x222222` circle centered on its `Ti
 
 At this stage, we only render the initialization of a Match. To ease the testing, update `GameCfg`:
 
-- Set `stagePreset` to `MAP03` as it contains `Units`, `SoftBlocks`, `TerrainPlain` and `TerrainBlock`.
+- Set `stagePreset` to `Divided` as it contains `Units`, `SoftBlocks`, `TerrainPlain` and `TerrainBlock`.
 - Update both `p1Teams` and `p2Teams` to contain all King, Fighter, Witch and Bandit with below rules:
   - King must be the first unit.
   - Max size of the team is 5.

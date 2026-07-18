@@ -38,6 +38,11 @@ func NewHandler(m *ServerStateManager, opts ...HandlerOption) *Handler {
 	return h
 }
 
+type CatalogResopnse struct {
+	Archetypes   []engine.Archetype   `json:"archetypes"`
+	StagePresets []engine.StagePreset `json:"stagePresets"`
+}
+
 // CreateMatchRoomResponse is returned when a new match room is created.
 type CreateMatchRoomResponse struct {
 	ID string `json:"id"`
@@ -65,17 +70,19 @@ type StartTurnResponse struct {
 	GameEvents    []engine.GameEvent `json:"gameEvents"`
 }
 
-// HandleGetAllArchetypes returns all available unit archetypes for the client to display in the lobby.
-// It encodes the archetype definitions as JSON and writes them to the response.
-func (h *Handler) HandleGetAllArchetypes(w http.ResponseWriter, r *http.Request) {
+// HandleGetCatalog returns all available unit archetypes and stages for the client to display in the lobby.
+// It encodes the archetype and stagePreset definitions as JSON and writes them to the response.
+func (h *Handler) HandleGetCatalog(w http.ResponseWriter, r *http.Request) {
 	archetypes := engine.GetAllArchetypes()
+	stagePresets := engine.GetAllStagePresets()
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 
-	if err := json.NewEncoder(w).Encode(archetypes); err != nil {
-		h.Logger.Error("encode archetypes failed", "error", err)
-		http.Error(w, "Failed to encode archetype definitions", http.StatusInternalServerError)
+	res := CatalogResopnse{Archetypes: archetypes, StagePresets: stagePresets}
+	if err := json.NewEncoder(w).Encode(res); err != nil {
+		h.Logger.Error("encode catalog failed", "error", err)
+		http.Error(w, "Failed to encode catalog definitions", http.StatusInternalServerError)
 		return
 	}
 }

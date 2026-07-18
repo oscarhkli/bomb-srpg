@@ -10,10 +10,8 @@ Phase 3.6 concludes a match and return to Match Setting Scene, which is a blank 
 
 ## Goal
 
-Ignore the below as it's only a copied template.
-
-- Render `VictoryCutscene` when the match ends.
-- Add `rematchButton` to restart a match.
+- Render `MatchSettingsScene` to allow the Player to configure the match.
+- Enter `MatchScene` via `MatchSettingsScene`
 
 ## Non-Goal
 
