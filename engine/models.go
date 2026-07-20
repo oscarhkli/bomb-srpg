@@ -122,6 +122,8 @@ var allSkills = []SkillType{SkillCanJump, SkillCanFly}
 // String converts an SkillType integer value into a human-readable text string.
 func (s SkillType) String() string {
 	switch s {
+	case SkillNone:
+		return "None"
 	case SkillCanFly:
 		return "Fly"
 	case SkillCanJump:

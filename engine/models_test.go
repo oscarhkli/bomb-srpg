@@ -58,9 +58,10 @@ func TestSkillTypeString(t *testing.T) {
 		skill SkillType
 		want  string
 	}{
+		{"Skill None", SkillNone, "None"},
 		{"Skill Fly", SkillCanFly, "Fly"},
 		{"Skill Jump", SkillCanJump, "Jump"},
-		{"Invalid Value", SkillType(0), "Unknown"},
+		{"Invalid Value", SkillType(123), "Unknown"},
 	}
 
 	for _, tt := range tests {
