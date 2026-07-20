@@ -35,19 +35,19 @@ specs:
     status: Draft
     category: MatchScene
     completion-date:
-  - file: p3-spec010-match.md
-    status: Parked Draft
+  - file: p3-spec010-stage.md
+    status: Draft
     category: MatchScene
     completion-date:
-  - file: p3-spec011-match.md
-    status: Parked Draft
-    category: StageSetupScene
-    completion-date:
-  - file: p3-spec012-title.md
+  - file: p3-spec011-title.md
     status: Parked Draft
     category: TitleScene
     completion-date:
-  - file: p3-spec013-lounge.md
+  - file: p3-spec013-match.md
+    status: Parked Draft
+    category: StageSetupScene
+    completion-date:
+  - file: p3-spec014-lounge.md
     status: Parked Draft
     category: LoungeScene
     completion-date:
