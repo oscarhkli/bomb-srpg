@@ -1,19 +1,156 @@
 import Phaser from 'phaser';
-import { GAME_FONT_FAMILY } from '../constants';
+import { getCatalog } from '../engine/api';
+import ErrorPanel from '../ui/ErrorPanel';
+import { drawBackButton } from '../ui/backButton';
+import UnitPage from '../ui/matchSettings/UnitPage';
+import StagePage from '../ui/matchSettings/StagePage';
+import type { PageBounds, SettingsPage, SettingsPageNav } from '../ui/matchSettings/SettingsPage';
+import type { Catalog, GameCfg } from '../types/api';
+import {
+  SETTINGS_SCENE_MARGIN,
+  SETTINGS_REGION_HEIGHT,
+  SETTINGS_HEADER_SPACER,
+  BACK_BUTTON_SIZE,
+  FADE_MS,
+} from '../constants';
 
-// Stub scene: a rough landing page for scene entry. A concrete version will replace it later.
+export interface MatchSettingsSceneData {
+  gameCfg?: GameCfg;
+}
+
+function defaultGameCfg(): GameCfg {
+  return {
+    stagePreset: 'Plain',
+    p1Teams: ['King'],
+    p2Teams: ['King'],
+    maxTurns: 60,
+    allowResetTurn: true,
+  };
+}
+
+// Configures a match: 2 UnitPages (one per Player) + a StagePage, swapped via fadeTransition
+// behind persistent chrome (BackButton + HeaderRegion/NavRegion).
 export default class MatchSettingsScene extends Phaser.Scene {
+  private gameCfg!: GameCfg;
+  private pages: SettingsPage[] = [];
+  private currentPageIndex = 0;
+  private errorPanel!: ErrorPanel;
+  // Bumped on 'shutdown' so late-resolving async work can detect a torn-down scene.
+  private generation = 0;
+
   constructor() {
     super('MatchSettingsScene');
   }
 
-  create(): void {
-    const { width, height } = this.cameras.main;
-    const text = this.add.text(width / 2, height / 2, 'Match Settings', {
-      fontFamily: GAME_FONT_FAMILY,
-      fontSize: '32px',
-      color: '#ffffff',
+  create(data: MatchSettingsSceneData = {}): void {
+    const gen = this.generation;
+    this.gameCfg = data.gameCfg ?? defaultGameCfg();
+    this.pages = [];
+    this.currentPageIndex = 0;
+    this.errorPanel = new ErrorPanel(this);
+    this.events.once('shutdown', () => {
+      this.generation++;
     });
-    text.setOrigin(0.5);
+
+    this.renderBackButton();
+
+    getCatalog()
+      .then(catalog => {
+        if (gen !== this.generation) {
+          return;
+        }
+        // Empty archetypes or stagePresets is unplayable — report and stop.
+        if (catalog.archetypes.length === 0 || catalog.stagePresets.length === 0) {
+          this.errorPanel.show(
+            'Failed to load match catalog: no archetypes or stage presets available'
+          );
+          return;
+        }
+        this.buildPages(catalog);
+        this.showPage(0);
+      })
+      .catch(() => {
+        if (gen !== this.generation) {
+          return;
+        }
+        this.errorPanel.show('Failed to load match catalog');
+      });
+  }
+
+  private renderBackButton(): void {
+    drawBackButton(this, SETTINGS_SCENE_MARGIN, SETTINGS_SCENE_MARGIN, () => {
+      this.pages[this.currentPageIndex]?.handleBack();
+    });
+  }
+
+  private buildPages(catalog: Catalog): void {
+    const nav: SettingsPageNav = {
+      goNext: () => this.goToPage(this.currentPageIndex + 1),
+      goBack: () => this.goToPage(this.currentPageIndex - 1),
+    };
+    // Array (not 3 hardcoded fields) so nav stays index-driven regardless of Page count.
+    this.pages = [
+      new UnitPage(1, this.gameCfg, catalog.archetypes, nav),
+      new UnitPage(2, this.gameCfg, catalog.archetypes, nav),
+      new StagePage(nav),
+    ];
+  }
+
+  private bodyBounds(): PageBounds {
+    const { width, height } = this.cameras.main;
+    return {
+      x: SETTINGS_SCENE_MARGIN,
+      y: SETTINGS_SCENE_MARGIN + SETTINGS_REGION_HEIGHT,
+      width: width - SETTINGS_SCENE_MARGIN * 2,
+      height: height - SETTINGS_SCENE_MARGIN * 2 - SETTINGS_REGION_HEIGHT * 2,
+    };
+  }
+
+  private navBounds(): PageBounds {
+    const { width, height } = this.cameras.main;
+    return {
+      x: SETTINGS_SCENE_MARGIN,
+      y: height - SETTINGS_SCENE_MARGIN - SETTINGS_REGION_HEIGHT,
+      width: width - SETTINGS_SCENE_MARGIN * 2,
+      height: SETTINGS_REGION_HEIGHT,
+    };
+  }
+
+  private renderActivePage(): void {
+    const page = this.pages[this.currentPageIndex];
+    if (!page) {
+      return;
+    }
+    const titleX = SETTINGS_SCENE_MARGIN + BACK_BUTTON_SIZE + SETTINGS_HEADER_SPACER;
+    const titleY = SETTINGS_SCENE_MARGIN + SETTINGS_REGION_HEIGHT / 2;
+    page.renderHeaderTitle(this, titleX, titleY);
+    page.renderBody(this, this.bodyBounds());
+    page.renderNav(this, this.navBounds());
+  }
+
+  private showPage(index: number): void {
+    this.currentPageIndex = index;
+    this.renderActivePage();
+  }
+
+  // Page swap = fadeTransition: fade out, destroy the outgoing Page, render the incoming one,
+  // fade in. BackButton persists across the swap untouched.
+  private goToPage(index: number): void {
+    const target = this.pages[index];
+    if (!target) {
+      return;
+    }
+    // Guards against a stale callback firing after the scene was torn down/recreated.
+    const gen = this.generation;
+    this.cameras.main.fadeOut(FADE_MS, 0, 0, 0);
+    this.cameras.main.once('camerafadeoutcomplete', () => {
+      if (gen !== this.generation) {
+        return;
+      }
+      this.pages[this.currentPageIndex]?.destroy();
+      this.currentPageIndex = index;
+      this.renderActivePage();
+      this.cameras.main.fadeIn(FADE_MS);
+    });
   }
 }

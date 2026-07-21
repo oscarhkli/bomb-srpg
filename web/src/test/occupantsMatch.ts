@@ -1,8 +1,5 @@
-// Test-only render-fidelity oracle. Asserts the invariant "the occupant graphics maps contain
-// exactly the occupants that server truth says exist" — every live unit, every bomb, every
-// softBlock has a graphics entry, and nothing extra. This is the assertion for resolveTurnPlayer /
-// render-fidelity tests: it catches the client apply-code bugs that a runtime diff cannot justify
-// guarding against (see spec007). It lives test-side and is never imported by production code.
+// Test-only oracle: asserts the occupant graphics maps contain exactly the occupants that
+// server truth says exist, nothing missing or extra.
 import type Phaser from 'phaser';
 import type { GameState } from '../types/api';
 import type { BombGraphics } from '../rendering/resolveTurnPlayer';

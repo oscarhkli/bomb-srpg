@@ -13,11 +13,12 @@ export const BLAST_COLOR_MID = 0xf5ee27;
 export const BLAST_COLOR_INNER = 0xfcfabb;
 export const BLAST_ALPHA = 0.6;
 
-// Fire shape (unitDamaged / softBlockDestroyed)
+export const FIRE_GLYPH = '🔥';
 export const FIRE_SHAPE_SIZE = 42;
-export const FIRE_ALPHA = 0.7;
 export const FIRE_DURATION_MS = 5000;
 
-// Bomb countdown text
+export const BOMB_GLYPH = '💣';
+export const BOMB_GLYPH_FONT_SIZE = 24;
+
 export const BOMB_COUNTDOWN_ZERO_COLOR = 0xff0000;
 export const BOMB_COUNTDOWN_TEXT_COLOR = 0xffffff;

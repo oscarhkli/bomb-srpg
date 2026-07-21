@@ -1,7 +1,7 @@
 // Shared mockScene accessors/drivers for tests. Centralizes the `mock.results[i].value` casts
 // (mockScene.add.graphics()/add.text() return a FRESH instance per call — see setup.ts) and the
 // "invoke a scheduled tween/timer callback manually" idiom that recurs across UI/rendering tests.
-import { mockScene, createMockGraphics, createMockText, createMockContainer } from './setup';
+import { mockScene, createMockText, createMockContainer } from './setup';
 import type { BombGraphics } from '../rendering/resolveTurnPlayer';
 
 // Drains the microtask queue `times` times — enough for a chain of already-resolved mock
@@ -93,17 +93,19 @@ export function fireShutdown(): void {
   (call?.[1] as (() => void) | undefined)?.();
 }
 
-// Finds and invokes the camera's 'camerafadeoutcomplete' listener registered via
-// this.cameras.main.once(...), simulating a fadeOut() finishing.
+// Simulates a fadeOut() finishing by invoking the most recently registered
+// 'camerafadeoutcomplete' listener — the mock keeps every registration, unlike a real `.once()`.
 export function fireCameraFadeOutComplete(): void {
-  const call = mockScene.cameras.main.once.mock.calls.find(c => c[0] === 'camerafadeoutcomplete');
+  const calls = mockScene.cameras.main.once.mock.calls.filter(
+    c => c[0] === 'camerafadeoutcomplete'
+  );
+  const call = calls[calls.length - 1];
   (call?.[1] as (() => void) | undefined)?.();
 }
 
 export function makeBombGraphics(): BombGraphics {
   return {
     container: createMockContainer() as never,
-    circle: createMockGraphics() as never,
     countdownText: createMockText() as never,
   };
 }

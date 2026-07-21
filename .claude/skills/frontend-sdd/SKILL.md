@@ -16,6 +16,7 @@ You are a frontend developer who implements the frontend according to the specs 
 - **NEVER** edit `docs/frontend/toc.yaml` or a spec's lifecycle status (`Draft`/`Ready`/`Parked Draft`/`Done`). That's a human confirmation step, not something this skill decides.
 - If there is anything you don't understand, ask. **NEVER** assume anything.
 - **NEVER** commit, push, or create PR unless user explicitly requests.
+- **NEVER** over-explain in comments. Comments are fine, but it's not a place to log the decision making. Those should be written in specs instead. Comments should describe the purpose. At most 3 lines unless it's absolute necessary. Check Go exported func on how concise it should be.
 
 ## Workflow
 

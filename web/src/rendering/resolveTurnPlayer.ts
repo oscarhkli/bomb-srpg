@@ -13,7 +13,6 @@ import { colorToCss } from '../ui/gameObjectUtils';
 
 export interface BombGraphics {
   container: Phaser.GameObjects.Container;
-  circle: Phaser.GameObjects.Graphics;
   countdownText: Phaser.GameObjects.Text;
 }
 
@@ -224,7 +223,7 @@ export function playResolveTurnEvents(
     }
   }
 
-  const fireByUnitId = new Map<number, Phaser.GameObjects.Graphics>();
+  const fireByUnitId = new Map<number, Phaser.GameObjects.Text>();
 
   for (const event of events) {
     if (event.type === 'unitDamaged') {

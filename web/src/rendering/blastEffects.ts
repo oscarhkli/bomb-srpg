@@ -1,10 +1,10 @@
-import Phaser from 'phaser';
+import type Phaser from 'phaser';
 import type { Coordinate } from '../types/api';
-import { TILE_SIZE } from '../constants';
+import { TILE_SIZE, GAME_FONT_FAMILY } from '../constants';
 import {
   DEPTH_BLAST,
   DEPTH_FIRE,
-  FIRE_ALPHA,
+  FIRE_GLYPH,
   FIRE_SHAPE_SIZE,
   BLAST_ALPHA,
   BLAST_BEAM_WIDTH,
@@ -12,8 +12,6 @@ import {
   BLAST_COLOR_MID,
   BLAST_COLOR_INNER,
 } from './constants';
-
-const FIRE_COLOR = 0xff6600;
 
 export type CardinalDirection = 'N' | 'S' | 'E' | 'W';
 
@@ -24,35 +22,18 @@ function tileCenter(position: Coordinate): { cx: number; cy: number } {
   };
 }
 
-// A mild flame shape (two overlapping triangles) — polish is explicitly out of scope here.
-export function drawFireShape(
-  scene: Phaser.Scene,
-  position: Coordinate
-): Phaser.GameObjects.Graphics {
+// A 🔥 glyph at the tile center — placeholder for a formal sprite, so kept minimal
+export function drawFireShape(scene: Phaser.Scene, position: Coordinate): Phaser.GameObjects.Text {
   const { cx, cy } = tileCenter(position);
-  const r = FIRE_SHAPE_SIZE / 2;
 
-  const g = scene.add.graphics();
-  g.setDepth(DEPTH_FIRE);
-  g.fillStyle(FIRE_COLOR, FIRE_ALPHA);
-  g.fillPoints(
-    [
-      new Phaser.Math.Vector2(cx, cy - r),
-      new Phaser.Math.Vector2(cx - r * 0.6, cy + r * 0.6),
-      new Phaser.Math.Vector2(cx + r * 0.6, cy + r * 0.6),
-    ],
-    true
-  );
-  g.fillPoints(
-    [
-      new Phaser.Math.Vector2(cx, cy - r * 0.5),
-      new Phaser.Math.Vector2(cx - r * 0.35, cy + r),
-      new Phaser.Math.Vector2(cx + r * 0.35, cy + r),
-    ],
-    true
-  );
+  const text = scene.add.text(cx, cy, FIRE_GLYPH, {
+    fontFamily: GAME_FONT_FAMILY,
+    fontSize: `${FIRE_SHAPE_SIZE}px`,
+  });
+  text.setOrigin(0.5);
+  text.setDepth(DEPTH_FIRE);
 
-  return g;
+  return text;
 }
 
 interface BandSegment {
@@ -79,10 +60,7 @@ function bandSegments(totalLength: number, currentLen: number): BandSegment[] {
   return segments;
 }
 
-// Draws a pill shape (fully-rounded rect) rather than a hard-edged rectangle, so the beam's
-// leading tip reads as a rounded "head" rather than a flat blocky end. Radius is clamped to
-// half the segment's own length so a very short (just-starting-to-grow) segment doesn't
-// request a radius larger than its own geometry allows.
+// Draws a pill-shaped (fully-rounded) rect; radius is clamped to half the segment length.
 function drawSegmentRect(
   g: Phaser.GameObjects.Graphics,
   cx: number,

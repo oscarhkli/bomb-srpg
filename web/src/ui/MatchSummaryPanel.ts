@@ -225,10 +225,7 @@ export default class MatchSummaryPanel {
     return { livingUnits: livingUnits.length, availableBombs };
   }
 
-  // panelBottomY is the content box's own bottom edge (y0 + MATCH_SUMMARY_PANEL_HEIGHT) — the
-  // 4-button block is bottom-aligned against it (12px gap preserved after the last button),
-  // not top-anchored right below the mid-section. This leaves open space between the mid
-  // section and the button block, which grows/shrinks with MATCH_SUMMARY_PANEL_HEIGHT.
+  // The button block is bottom-aligned against panelBottomY, not top-anchored below mid-section.
   private renderButtons(x0: number, panelBottomY: number, cfg: GameCfg): void {
     const x = x0 + MATCH_SUMMARY_PANEL_WIDTH / 2 - LIFECYCLE_BUTTON_WIDTH / 2;
     const resetEnabled = cfg.allowResetTurn;

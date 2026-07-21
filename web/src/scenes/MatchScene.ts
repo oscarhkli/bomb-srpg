@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import type { MatchSettingsSceneData } from './MatchSettingsScene';
 import {
   initRoom,
   initToken,
@@ -82,24 +83,13 @@ export default class MatchScene extends Phaser.Scene {
   private victoryCutscene!: VictoryCutscene;
   private isSubmitting = false;
   private interactionsEnabled = false;
-  // Whether MatchSummaryPanel is currently open. Folded into isLocked() so unit clicks and
-  // TurnCommandPanel are blocked while it's open — the panel's own buttons call MatchScene's
-  // handlers directly (not through isLocked()), since they're only reachable while it IS open.
+  // Whether MatchSummaryPanel is currently open; folded into isLocked().
   private summaryPanelOpen = false;
-  // Whether a lifecycle button's (Resolve/Reset/Surrender) own ConfirmDialog is currently
-  // pending Yes/No — distinct from confirmDialog.isOpen, since a stale TurnCommandPanel confirm
-  // must NOT count here (see isLifecycleButtonBusy()).
+  // Whether a lifecycle button's (Resolve/Reset/Surrender) own ConfirmDialog is pending Yes/No.
   private lifecycleConfirmOpen = false;
-  // Guards VictoryCutscene's Rematch/Return buttons, which (unlike every other button in this
-  // scene) never destroy themselves after use — without this, a double-click would queue two
-  // scene.restart() calls or two deleteMatch()+scene.start() calls back-to-back.
+  // Guards VictoryCutscene's Rematch/Return buttons against a double-click queuing two actions.
   private victoryActionTaken = false;
-  // Bumped by the 'shutdown' listener below every time the scene tears down. Async callbacks
-  // capture this value at their own start and compare it before touching scene state — a plain
-  // boolean can't tell "torn down, not yet recreated" apart from "torn down and recreated again",
-  // which is exactly what scene.restart() does for the rematch flow: it would reset a boolean
-  // back to false in the new create(), silently un-guarding the OLD create()'s still-pending
-  // fetch.
+  // Bumped on 'shutdown'; async callbacks compare against this to detect a torn-down scene.
   private generation = 0;
 
   constructor() {
@@ -196,10 +186,8 @@ export default class MatchScene extends Phaser.Scene {
     }
   }
 
-  // Per-turn startTurn() sequence: refresh state, init the active team's token, call startTurn(),
-  // play the sudden-death cutscene (if triggered) then the turn banner, all sequentially. All
-  // interactions are disabled for the duration so no click can race a turn transition; re-enabled
-  // in `finally` so a failed startTurn() never deadlocks the scene.
+  // Per-turn startTurn() sequence: refresh state, start the turn, play sudden-death/turn-banner
+  // cutscenes. Interactions are disabled for the duration and re-enabled in `finally`.
   private async beginTurn(): Promise<void> {
     const gen = this.generation;
     this.interactionsEnabled = false;
@@ -217,10 +205,7 @@ export default class MatchScene extends Phaser.Scene {
         return;
       }
       if (resp.inSuddenDeath) {
-        // injectSuddenDeathHazards() has already committed the new bombs server-side by the
-        // time startTurn() resolves, so refetching now keeps gameState.bombs in sync with what
-        // dropSuddenDeathBomb() is about to render — otherwise a later resolveTurn() would
-        // reference a bombId this.gameState doesn't know about.
+        // Refetch so gameState.bombs includes the hazards startTurn() just injected server-side.
         this.gameState = await getMatchState();
         if (gen !== this.generation) {
           return;
@@ -246,9 +231,7 @@ export default class MatchScene extends Phaser.Scene {
     }
   }
 
-  // Renders a sudden-death-injected bomb dropping in from off-screen, resting on its tile once
-  // the drop tween completes. Reuses renderBomb() so the bomb is registered in bombGraphicsById
-  // exactly like a normally-placed bomb.
+  // Renders a sudden-death bomb dropping in from off-screen onto its tile, via renderBomb().
   private dropSuddenDeathBomb(event: GameEvent): Promise<void> {
     const { unitId, bombId, position, countdown } = event;
     if (bombId === undefined || !position || countdown === undefined || !this.inBounds(position)) {
@@ -271,9 +254,7 @@ export default class MatchScene extends Phaser.Scene {
     }
 
     const restY = bomb.container.y;
-    // Offset relative to the bomb's own rest position (not a fixed camera-height offset) so the
-    // drop always starts fully off-screen with a BOMB_SIZE margin, regardless of which tile the
-    // bomb lands on.
+    // Relative to the bomb's own rest position so the drop starts fully off-screen on any tile.
     const dropOffset = restY + BOMB_SIZE;
     bomb.container.y -= dropOffset;
     bomb.container.setDepth(DEPTH_SUDDEN_DEATH_BOMB);
@@ -413,14 +394,8 @@ export default class MatchScene extends Phaser.Scene {
     return true;
   }
 
-  // Per-op refetch that keeps gameState current (the resolve snapshot and next turn depend on it).
-  // On success the optimistic in-place visuals (a command's tween / renderBomb, or a resolve's
-  // playResolveTurnEvents end-state) already reflect the server's own returned events, so we only
-  // adopt the fresh state — no redraw (a wholesale repaint would snap sprites out of their finished
-  // animation). On failure this is the reactive recovery path: rebuild the occupant layer from truth
-  // to resync (covers network non-determinism, e.g. a lost/duplicated response). The terrain layer is
-  // never rebuilt. `afterAdopt` runs post-reconciliation for callers with turn-advance UI to refresh
-  // (turnPanel / resolve button) regardless of success — that's not reconciliation.
+  // Refetches gameState. On success, adopts it without redrawing (optimistic visuals already
+  // match). On failure, rebuilds the occupant layer from truth to resync.
   private async resyncFromServer(
     gen: number,
     succeeded: boolean,
@@ -445,16 +420,12 @@ export default class MatchScene extends Phaser.Scene {
     }
   }
 
-  // Shared base for isLocked()/isLifecycleButtonBusy(): true while a server call is in flight or
-  // a fresh render hasn't finished yet. Both methods add their own extra condition on top of
-  // this — keep them in sync if a third shared condition is ever needed.
+  // True while a server call is in flight or a fresh render hasn't finished yet.
   private isBusy(): boolean {
     return this.isSubmitting || !this.interactionsEnabled;
   }
 
-  // Gates unit clicks, TurnCommandPanel, and MatchSummaryButton — NOT the lifecycle buttons
-  // inside MatchSummaryPanel itself (Resolve/Reset/Surrender/Back), which are only reachable
-  // while the panel is open and so must not be blocked by summaryPanelOpen.
+  // Gates unit clicks, TurnCommandPanel, and MatchSummaryButton.
   private isLocked(): boolean {
     return this.isBusy() || this.summaryPanelOpen;
   }
@@ -473,15 +444,8 @@ export default class MatchScene extends Phaser.Scene {
     this.matchSummaryPanel.close();
   }
 
-  // Deliberately narrower than isLocked(): these 3 handlers are only reachable via
-  // MatchSummaryPanel's own buttons, which are only clickable while the panel IS open — so
-  // isLocked()'s summaryPanelOpen check would always block them.
-  //
-  // Guards on lifecycleConfirmOpen rather than confirmDialog.isOpen: a stale TurnCommandPanel
-  // confirm (from an in-progress Move/Bomb) must NOT block a lifecycle button — it gets
-  // force-closed and superseded instead (see the "opens the resolve confirm even when a
-  // TurnCommandPanel confirm is already open" test). Only a still-pending confirm opened by
-  // ANOTHER lifecycle button click should block a second one from silently discarding it.
+  // Gates the Resolve/Reset/Surrender lifecycle buttons; narrower than isLocked() since these
+  // are only reachable while MatchSummaryPanel is open.
   private isLifecycleButtonBusy(): boolean {
     return this.isBusy() || this.lifecycleConfirmOpen;
   }
@@ -503,9 +467,6 @@ export default class MatchScene extends Phaser.Scene {
     );
   }
 
-  // None of these 3 handlers reads gameCfg today, but if one ever needs to: it's already
-  // guaranteed loaded here, since they're only reachable via MatchSummaryPanel's buttons, and
-  // openMatchSummaryPanel() guards on gameCfg before the panel opens.
   private onResolveButtonClicked(): void {
     if (this.isLifecycleButtonBusy()) {
       return;
@@ -527,10 +488,7 @@ export default class MatchScene extends Phaser.Scene {
     this.showLifecycleConfirm(() => void this.handleSurrender(), CONFIRM_TEXT_SURRENDER);
   }
 
-  // Masks the reset's occupant-only rebuild behind the same camera fade-out/fade-in Rematch
-  // uses (this.cameras.main.fadeOut/fadeIn), per spec008's Reset Button flow. Interactions
-  // re-enable as soon as resetTurn()/getMatchState() settle (the `finally` below), independent
-  // of when the fade-out/fade-in itself finishes.
+  // Masks the occupant rebuild behind a camera fade-out/fade-in.
   private async handleResetTurn(): Promise<void> {
     if (this.isSubmitting) {
       return;
@@ -562,8 +520,7 @@ export default class MatchScene extends Phaser.Scene {
     }
   }
 
-  // Reuses handleMatchEnded()'s existing VictoryCutscene rendering as-is (winner derivation is
-  // identical to resolveTurn's matchEnded path) — surrender only differs in how the event arrives.
+  // Reuses handleMatchEnded()'s VictoryCutscene rendering; surrender just delivers the event differently.
   private async handleSurrender(): Promise<void> {
     if (this.isSubmitting) {
       return;
@@ -697,14 +654,14 @@ export default class MatchScene extends Phaser.Scene {
       console.error('Failed to delete match:', err instanceof Error ? err.message : err)
     );
     void Promise.all([fadeDone, deleteDone]).then(() => {
-      this.scene.start('MatchSettingsScene');
+      // Forward gameCfg so MatchSettingsScene remembers the last match's settings.
+      this.scene.start('MatchSettingsScene', {
+        gameCfg: this.gameCfg,
+      } satisfies MatchSettingsSceneData);
     });
   }
 
-  // Wholesale occupant swap: destroy-and-repaint the occupant layer from server truth and keep
-  // gameState in sync. The terrain layer is never in scope. Runs only at scene entry (after the
-  // one-time terrain paint) and on the error/recovery path — never on the happy path, where a
-  // destroy-and-repaint would snap sprites to rest state mid-animation.
+  // Destroy-and-repaint the occupant layer from server truth; terrain is never touched.
   private renderBoard(state: GameState): void {
     this.gameState = state;
     renderOccupants(this.boardCtx(), state);
@@ -724,11 +681,7 @@ export default class MatchScene extends Phaser.Scene {
     };
   }
 
-  // `clickedUnit` may be a stale snapshot: attachUnitClickHandler (boardRenderer.ts) binds
-  // pointerdown to whichever `unit` object existed at the last occupant rebuild, and a
-  // successful command never triggers one (AC3/spec007) — so its hasMoved/hasUsedSkill can be
-  // out of date even though this.gameState.units was already refreshed. Always resolve the
-  // live copy by id before handing it to TurnCommandPanel.
+  // `clickedUnit` may be a stale snapshot, so resolve the live copy by id before use.
   private onUnitClicked(clickedUnit: Unit): void {
     if (this.isLocked()) {
       return;
@@ -748,9 +701,7 @@ export default class MatchScene extends Phaser.Scene {
     this.errorPanel.show(message);
   }
 
-  // Clears the error log at the start of each new user-initiated action (not inside
-  // renderBoard(), since some flows call showError() immediately before a synchronous
-  // renderBoard() — clearing there would destroy the message before it's ever seen).
+  // Clears the error log at the start of each new user-initiated action.
   private clearErrors(): void {
     this.errorPanel.clear();
   }

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mockScene } from '../test/setup';
 import { tweenConfigAt } from '../test/sceneHelpers';
 import {
-  FIRE_ALPHA,
+  FIRE_GLYPH,
   FIRE_SHAPE_SIZE,
   DEPTH_FIRE,
   DEPTH_BLAST,
@@ -20,23 +20,21 @@ beforeEach(() => {
 });
 
 describe('drawFireShape', () => {
-  it('draws a fire shape centered on the tile at DEPTH_FIRE with FIRE_ALPHA', () => {
-    const g = drawFireShape(mockScene as never, { x: 1, y: 2 }) as unknown as ReturnType<
-      typeof mockScene.add.graphics
-    >;
-
+  it('draws a 42px 🔥 glyph centered on the tile at DEPTH_FIRE', () => {
     const cx = 1 * TILE_SIZE + TILE_SIZE / 2;
     const cy = 2 * TILE_SIZE + TILE_SIZE / 2;
 
-    expect(g.setDepth).toHaveBeenCalledWith(DEPTH_FIRE);
-    // fillStyle called with some color and FIRE_ALPHA
-    expect(g.fillStyle).toHaveBeenCalledWith(expect.any(Number), FIRE_ALPHA);
-    // something was drawn at/around the tile center within FIRE_SHAPE_SIZE bounds
-    const fillCalls = [...g.fillCircle.mock.calls, ...g.fillPoints.mock.calls];
-    expect(fillCalls.length).toBeGreaterThan(0);
-    expect(FIRE_SHAPE_SIZE).toBeGreaterThan(0);
-    expect(cx).toBe(72);
-    expect(cy).toBe(120);
+    drawFireShape(mockScene as never, { x: 1, y: 2 });
+
+    expect(mockScene.add.text).toHaveBeenCalledWith(
+      cx,
+      cy,
+      FIRE_GLYPH,
+      expect.objectContaining({ fontSize: `${FIRE_SHAPE_SIZE}px` })
+    );
+    const text = mockScene.add.text.mock.results[0]!.value as ReturnType<typeof mockScene.add.text>;
+    expect(text.setOrigin).toHaveBeenCalledWith(0.5);
+    expect(text.setDepth).toHaveBeenCalledWith(DEPTH_FIRE);
   });
 });
 

@@ -5,12 +5,8 @@
   }
 };
 
-// Fake Graphics/Text instances so chained calls (fillStyle().fillRect(), setOrigin())
-// don't throw on the bare vi.fn() that add.graphics()/add.text() would otherwise return.
-// Each occupant (grid + every unit/softBlock/bomb) gets its own Graphics instance with its
-// own interactive hit area, so add.graphics()/add.text() must return a FRESH object per call
-// — use mockScene.add.graphics.mock.results[i].value / add.text.mock.results[i].value to
-// inspect a specific call's instance.
+// Fake Graphics/Text so chained calls don't throw. add.graphics()/add.text() return a fresh
+// instance per call — inspect via mock.results[i].value.
 export function createMockGraphics() {
   return {
     x: 0,
