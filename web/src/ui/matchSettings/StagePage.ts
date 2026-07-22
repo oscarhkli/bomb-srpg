@@ -48,7 +48,8 @@ export default class StagePage implements SettingsPage {
 
   renderNav(scene: Phaser.Scene, bounds: PageBounds): void {
     destroyAll(this.navObjects);
-    const x = bounds.x + bounds.width / 2 - SETTINGS_NAV_BUTTON_WIDTH / 2;
+    // Flush against the NavRegion's right edge, matching UnitPage's NextButton.
+    const x = bounds.x + bounds.width - SETTINGS_NAV_BUTTON_WIDTH;
     const y = bounds.y + bounds.height / 2 - SETTINGS_NAV_BUTTON_HEIGHT / 2;
 
     this.navObjects.push(

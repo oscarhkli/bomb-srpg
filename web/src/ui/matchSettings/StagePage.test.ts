@@ -52,6 +52,16 @@ describe('StagePage', () => {
     expect(pointerDownOf(firstGraphics())).toBeUndefined();
   });
 
+  it('positions StartMatchButton flush against the NavRegion right edge, matching NextButton', () => {
+    const page = new StagePage({ goNext: vi.fn(), goBack: vi.fn() });
+    const b = bounds();
+
+    page.renderNav(mockScene as never, b);
+
+    const [x] = firstGraphics().fillRoundedRect.mock.calls[0] as [number, number];
+    expect(x).toBe(b.x + b.width - 144);
+  });
+
   it('handleBack navigates back to UnitPage 2 (AC 15)', () => {
     const goBack = vi.fn();
     const page = new StagePage({ goNext: vi.fn(), goBack });

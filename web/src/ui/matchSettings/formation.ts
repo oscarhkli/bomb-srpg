@@ -2,9 +2,12 @@
 // the click-placement queries that drive FormationPanel/ArchetypesPanel.
 export const NO_UNIT = 'NO_UNIT';
 
-// Top-to-bottom render order so 1-based order numbers read 4, 2, 1, 3, 5 (mirrors
-// engine/presets.go's center-out ordering). Index 0 is always King.
-export const SLOT_DISPLAY_ORDER = [3, 1, 0, 2, 4] as const;
+// Left-to-right render order so 1-based order numbers read 4, 2, 1, 3, 5 (mirrors
+// engine/presets.go's P1StartingPositions center-out ordering). Index 0 is always King.
+export const SLOT_DISPLAY_ORDER_P1 = [3, 1, 0, 2, 4] as const;
+
+// Team 2 faces Team 1, so its order numbers mirror P1's: 5, 3, 1, 2, 4 (P2StartingPositions).
+export const SLOT_DISPLAY_ORDER_P2 = [4, 2, 0, 1, 3] as const;
 
 // Builds the 5-slot array from gameCfg.p{X}Teams, defaulting missing slots to NO_UNIT;
 // index 0 is always forced to 'King'.

@@ -148,9 +148,9 @@ export const CONFIRM_TEXT_RESET = 'All turn actions will reset. Confirm?';
 export const CONFIRM_TEXT_SURRENDER = 'Confirm to surrender?';
 
 // MatchSettingsScene (p3-spec009-stage) — chrome shared by every Page.
-export const SETTINGS_SCENE_MARGIN = 48;
+export const SETTINGS_SCENE_MARGIN = 24;
 // Both HeaderRegion and NavRegion are this tall.
-export const SETTINGS_REGION_HEIGHT = 108;
+export const SETTINGS_REGION_HEIGHT = 84;
 // Gap between BackButton and the active Page's title in HeaderRegion.
 export const SETTINGS_HEADER_SPACER = 48;
 // Default text size for this scene (page titles, UnitCard stats/name).
@@ -158,7 +158,7 @@ export const SETTINGS_TEXT_FONT_SIZE = 24;
 // Corner radius shared by this scene's rounded shapes (BackButton, UnitSlot, UnitCard).
 export const SETTINGS_CORNER_RADIUS = 8;
 
-export const BACK_BUTTON_SIZE = 96;
+export const BACK_BUTTON_SIZE = 64;
 export const BACK_BUTTON_COLOR = 0x4c4c4c;
 // U+2B90, a symbol not an emoji — can tofu on sparse font coverage.
 export const BACK_BUTTON_GLYPH = '⮐';
@@ -171,8 +171,9 @@ export const UNIT_PAGE_TEAM_BADGE_CORNER_RADIUS = 8;
 // Gap between the TeamBadge and the "Unit Selection" title text.
 export const UNIT_PAGE_TITLE_GAP = 8;
 
-// FormationPanel
-export const FORMATION_PANEL_WIDTH_RATIO = 0.25;
+// FormationPanel — the top band of UnitPage's body, full width.
+export const FORMATION_PANEL_HEIGHT_RATIO = 0.35;
+export const UNIT_FORMATION_HEADER_FONT_SIZE = 36;
 export const UNIT_SLOT_SIZE = 96;
 export const UNIT_SLOT_SPACING = 12;
 export const UNIT_SLOT_ORDER_LABEL_INSET = 4;
@@ -184,7 +185,7 @@ export const DEPTH_UNIT_SLOT_LABEL = 1;
 
 // ArchetypesPanel / UnitCard
 export const UNIT_CARD_WIDTH = 180;
-export const UNIT_CARD_HEIGHT = 240;
+export const UNIT_CARD_HEIGHT = 200;
 export const UNIT_CARD_PADDING = 12;
 export const UNIT_CARD_SPACING = 12;
 export const UNIT_CARD_SPRITE_SIZE = 96;

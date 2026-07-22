@@ -1,18 +1,27 @@
 import { describe, it, expect } from 'vitest';
 import {
   NO_UNIT,
-  SLOT_DISPLAY_ORDER,
+  SLOT_DISPLAY_ORDER_P1,
+  SLOT_DISPLAY_ORDER_P2,
   deserializeTeams,
   serializeTeams,
   lowestFreeSlot,
   occupiedCount,
 } from './formation';
 
-describe('SLOT_DISPLAY_ORDER', () => {
-  it('maps top-to-bottom rendering to order numbers 4,2,1,3,5', () => {
-    expect(SLOT_DISPLAY_ORDER).toEqual([3, 1, 0, 2, 4]);
-    const orderNumbers = SLOT_DISPLAY_ORDER.map(i => i + 1);
+describe('SLOT_DISPLAY_ORDER_P1', () => {
+  it('maps left-to-right rendering to order numbers 4,2,1,3,5', () => {
+    expect(SLOT_DISPLAY_ORDER_P1).toEqual([3, 1, 0, 2, 4]);
+    const orderNumbers = SLOT_DISPLAY_ORDER_P1.map(i => i + 1);
     expect(orderNumbers).toEqual([4, 2, 1, 3, 5]);
+  });
+});
+
+describe('SLOT_DISPLAY_ORDER_P2', () => {
+  it('maps left-to-right rendering to order numbers 5,3,1,2,4 (mirrors P1)', () => {
+    expect(SLOT_DISPLAY_ORDER_P2).toEqual([4, 2, 0, 1, 3]);
+    const orderNumbers = SLOT_DISPLAY_ORDER_P2.map(i => i + 1);
+    expect(orderNumbers).toEqual([5, 3, 1, 2, 4]);
   });
 });
 

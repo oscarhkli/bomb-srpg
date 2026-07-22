@@ -2,7 +2,8 @@ import type Phaser from 'phaser';
 import type { Archetype, GameCfg } from '../../types/api';
 import {
   NO_UNIT,
-  SLOT_DISPLAY_ORDER,
+  SLOT_DISPLAY_ORDER_P1,
+  SLOT_DISPLAY_ORDER_P2,
   deserializeTeams,
   serializeTeams,
   lowestFreeSlot,
@@ -22,7 +23,8 @@ import {
   UNIT_PAGE_TEAM_BADGE_HEIGHT,
   UNIT_PAGE_TEAM_BADGE_CORNER_RADIUS,
   UNIT_PAGE_TITLE_GAP,
-  FORMATION_PANEL_WIDTH_RATIO,
+  FORMATION_PANEL_HEIGHT_RATIO,
+  UNIT_FORMATION_HEADER_FONT_SIZE,
   UNIT_SLOT_SIZE,
   UNIT_SLOT_SPACING,
   UNIT_SLOT_ORDER_LABEL_INSET,
@@ -91,6 +93,11 @@ export default class UnitPage implements SettingsPage {
 
   private teamColor(): number {
     return TEAM_COLORS[this.playerIndex] ?? TEAM_COLOR_FALLBACK;
+  }
+
+  // Team 2 faces Team 1, so its slots render in the mirrored order (formation.ts).
+  private slotDisplayOrder(): readonly number[] {
+    return this.playerIndex === 1 ? SLOT_DISPLAY_ORDER_P1 : SLOT_DISPLAY_ORDER_P2;
   }
 
   renderHeaderTitle(scene: Phaser.Scene, x: number, y: number): void {
@@ -170,22 +177,21 @@ export default class UnitPage implements SettingsPage {
     }
     destroyAll(this.formationObjects);
 
-    const panelWidth = bounds.width * FORMATION_PANEL_WIDTH_RATIO;
-    const panelCenterX = bounds.x + panelWidth / 2;
-
-    const header = scene.add.text(panelCenterX, bounds.y, 'Formation', {
+    const header = scene.add.text(bounds.x, bounds.y, 'Formation', {
       fontFamily: GAME_FONT_FAMILY,
-      fontSize: `${SETTINGS_TEXT_FONT_SIZE}px`,
+      fontSize: `${UNIT_FORMATION_HEADER_FONT_SIZE}px`,
       color: colorToCss(0xffffff),
     });
-    header.setOrigin(0.5, 0);
+    header.setOrigin(0, 0);
     this.formationObjects.push(header);
 
-    const columnStartY = bounds.y + UNIT_SLOT_SPACING + UNIT_SLOT_ORDER_LABEL_FONT_SIZE * 2;
-    SLOT_DISPLAY_ORDER.forEach((slotIndex, displayPos) => {
-      const slotY = columnStartY + displayPos * (UNIT_SLOT_SIZE + UNIT_SLOT_SPACING);
-      const slotX = panelCenterX - UNIT_SLOT_SIZE / 2;
-      this.renderUnitSlot(slotIndex, slotX, slotY);
+    const rowY = bounds.y + UNIT_FORMATION_HEADER_FONT_SIZE + UNIT_SLOT_SPACING;
+    const order = this.slotDisplayOrder();
+    const rowWidth = order.length * UNIT_SLOT_SIZE + (order.length - 1) * UNIT_SLOT_SPACING;
+    const rowStartX = bounds.x + (bounds.width - rowWidth) / 2;
+    order.forEach((slotIndex, displayPos) => {
+      const slotX = rowStartX + displayPos * (UNIT_SLOT_SIZE + UNIT_SLOT_SPACING);
+      this.renderUnitSlot(slotIndex, slotX, rowY);
     });
   }
 
@@ -247,13 +253,22 @@ export default class UnitPage implements SettingsPage {
     }
     destroyAll(this.archetypeObjects);
 
-    const panelX = bounds.x + bounds.width * FORMATION_PANEL_WIDTH_RATIO;
+    const panelY = bounds.y + bounds.height * FORMATION_PANEL_HEIGHT_RATIO;
+    const rowCount = Math.ceil(this.archetypes.length / ARCHETYPES_PER_ROW);
 
     this.archetypes.forEach((archetype, i) => {
       const row = Math.floor(i / ARCHETYPES_PER_ROW);
       const col = i % ARCHETYPES_PER_ROW;
-      const x = panelX + col * (UNIT_CARD_WIDTH + UNIT_CARD_SPACING);
-      const y = bounds.y + row * (UNIT_CARD_HEIGHT + UNIT_CARD_SPACING);
+      // Each row is centered on its own card count, not left-stuck in a full-width grid — e.g.
+      // today's 2-archetype row sits centered as its own pair.
+      const cardsInRow =
+        row === rowCount - 1
+          ? this.archetypes.length - row * ARCHETYPES_PER_ROW
+          : ARCHETYPES_PER_ROW;
+      const rowWidth = cardsInRow * UNIT_CARD_WIDTH + (cardsInRow - 1) * UNIT_CARD_SPACING;
+      const rowStartX = bounds.x + (bounds.width - rowWidth) / 2;
+      const x = rowStartX + col * (UNIT_CARD_WIDTH + UNIT_CARD_SPACING);
+      const y = panelY + row * (UNIT_CARD_HEIGHT + UNIT_CARD_SPACING);
       this.renderUnitCard(archetype, x, y);
     });
   }
@@ -350,7 +365,8 @@ export default class UnitPage implements SettingsPage {
     }
     destroyAll(this.navObjects);
 
-    const x = bounds.x + bounds.width / 2 - SETTINGS_NAV_BUTTON_WIDTH / 2;
+    // Flush against the NavRegion's right edge (the region is already inset by the scene margin).
+    const x = bounds.x + bounds.width - SETTINGS_NAV_BUTTON_WIDTH;
     const y = bounds.y + bounds.height / 2 - SETTINGS_NAV_BUTTON_HEIGHT / 2;
     const enabled = occupiedCount(this.slots) >= 2;
 

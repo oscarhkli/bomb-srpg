@@ -73,7 +73,7 @@ describe('UnitPage — FormationPanel', () => {
     p.renderBody(mockScene as never, bodyBounds());
 
     // Graphics order: [formationHeader is text, slot(0)..slot(4) as graphics in display order]
-    // SLOT_DISPLAY_ORDER = [3, 1, 0, 2, 4] -> displayPos 2 renders slotIndex 0 (King).
+    // SLOT_DISPLAY_ORDER_P1 = [3, 1, 0, 2, 4] -> displayPos 2 renders slotIndex 0 (King).
     const slotGraphics = allGraphics()[2]!;
     expect(pointerDownOf(slotGraphics)).toBeUndefined();
   });
@@ -106,7 +106,7 @@ describe('UnitPage — FormationPanel', () => {
     const p = page(1, cfg);
     p.renderBody(mockScene as never, bodyBounds());
 
-    // SLOT_DISPLAY_ORDER = [3, 1, 0, 2, 4]; displayPos 1 renders slotIndex 1 (Fighter).
+    // SLOT_DISPLAY_ORDER_P1 = [3, 1, 0, 2, 4]; displayPos 1 renders slotIndex 1 (Fighter).
     const slotIndex1Graphics = allGraphics()[1]!;
     clickPointerdown(slotIndex1Graphics);
 
@@ -118,13 +118,63 @@ describe('UnitPage — FormationPanel', () => {
     const p = page(1, cfg);
     p.renderBody(mockScene as never, bodyBounds());
 
-    // Graphics are created in display-position order (SLOT_DISPLAY_ORDER = [3, 1, 0, 2, 4]):
+    // Graphics are created in display-position order (SLOT_DISPLAY_ORDER_P1 = [3, 1, 0, 2, 4]):
     // index 1 -> slotIndex 1 (Fighter), index 3 -> slotIndex 2 (Witch).
     clickPointerdown(allGraphics()[1]!);
     p.renderBody(mockScene as never, bodyBounds());
     clickPointerdown(allGraphics()[3]!);
 
     expect(cfg.p1Teams).toEqual(['King', NO_UNIT, NO_UNIT, 'Witch', 'Fighter']);
+  });
+
+  it('frees the correct non-King UnitSlot for Player 2 (mirrored SLOT_DISPLAY_ORDER_P2)', () => {
+    const cfg = makeCfg({ p2Teams: ['King', 'Fighter', 'Witch'] });
+    const p = page(2, cfg);
+    p.renderBody(mockScene as never, bodyBounds());
+
+    // SLOT_DISPLAY_ORDER_P2 = [4, 2, 0, 1, 3]; displayPos 1 renders slotIndex 2 (Witch), unlike
+    // P1 where displayPos 1 renders slotIndex 1.
+    clickPointerdown(allGraphics()[1]!);
+
+    expect(cfg.p2Teams).toEqual(['King', 'Fighter']);
+  });
+});
+
+describe('UnitPage — Panel stacking', () => {
+  it('renders ArchetypesPanel below FormationPanel (not a side-by-side column)', () => {
+    const p = page(1, makeCfg({ p1Teams: ['King'] }));
+    const bounds = bodyBounds();
+    p.renderBody(mockScene as never, bounds);
+
+    // Graphics order: slot(0)..slot(4) (5 graphics), then the first UnitCard (Fighter).
+    const firstCardGraphics = allGraphics()[5]!;
+    const [, cardY] = firstCardGraphics.fillRoundedRect.mock.calls[0] as [number, number];
+
+    expect(cardY).toBeGreaterThanOrEqual(bounds.y + bounds.height * 0.35);
+  });
+
+  it('centers the FormationPanel UnitSlot row within the panel width', () => {
+    const p = page(1, makeCfg({ p1Teams: ['King'] }));
+    const bounds = bodyBounds();
+    p.renderBody(mockScene as never, bounds);
+
+    // 5 slots x 96px + 4 gaps x 12px = 528px row width, centered in a 1184px-wide panel.
+    const firstSlotGraphics = allGraphics()[0]!;
+    const [slotX] = firstSlotGraphics.fillRoundedRect.mock.calls[0] as [number, number];
+
+    expect(slotX).toBe(bounds.x + (bounds.width - 528) / 2);
+  });
+
+  it('centers a partial ArchetypesPanel row on its own card count, not a full 4-column block', () => {
+    const p = page(1, makeCfg({ p1Teams: ['King'] }));
+    const bounds = bodyBounds();
+    p.renderBody(mockScene as never, bounds);
+
+    // 2 archetypes x 180px + 1 gap x 12px = 372px row width, centered as its own pair.
+    const firstCardGraphics = allGraphics()[5]!;
+    const [cardX] = firstCardGraphics.fillRoundedRect.mock.calls[0] as [number, number];
+
+    expect(cardX).toBe(bounds.x + (bounds.width - 372) / 2);
   });
 });
 
@@ -155,6 +205,17 @@ describe('UnitPage — NextButton', () => {
       NEXT_BUTTON_LABEL,
       expect.objectContaining({})
     );
+  });
+
+  it('positions NextButton flush against the NavRegion right edge', () => {
+    const p = page(1, makeCfg({ p1Teams: ['King', 'Fighter'] }));
+    const bounds = navBounds();
+    p.renderNav(mockScene as never, bounds);
+
+    const nextButtonGraphics = allGraphics()[0]!;
+    const [x] = nextButtonGraphics.fillRoundedRect.mock.calls[0] as [number, number];
+
+    expect(x).toBe(bounds.x + bounds.width - 144);
   });
 
   it('re-renders (enabling) NextButton after a put-on crosses the 2-unit threshold', () => {

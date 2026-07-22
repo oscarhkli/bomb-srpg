@@ -139,7 +139,7 @@ describe('MatchSettingsScene — UnitPage 1 (default entry)', () => {
     await bootScene({ gameCfg });
 
     const g = currentPageGraphics();
-    // slot array-index 1 (order number 2) is at SLOT_DISPLAY_ORDER displayPos 1.
+    // slot array-index 1 (order number 2) is at SLOT_DISPLAY_ORDER_P1 displayPos 1.
     const slot1 = slotGraphics(g, 1);
     // Witch's icon is a 3-point triangle (drawArchetypeIcon).
     const [points] = slot1.strokePoints.mock.calls[0] as [{ x: number; y: number }[]];
@@ -151,7 +151,7 @@ describe('MatchSettingsScene — UnitPage 1 (default entry)', () => {
     await bootScene();
 
     const g = currentPageGraphics();
-    // King is array index 0, at SLOT_DISPLAY_ORDER displayPos 2.
+    // King is array index 0, at SLOT_DISPLAY_ORDER_P1 displayPos 2.
     const kingSlot = slotGraphics(g, 2);
     expect(pointerDownOf(kingSlot)).toBeUndefined();
   });
@@ -190,7 +190,7 @@ describe('MatchSettingsScene — UnitPage 1 (default entry)', () => {
     await bootScene({ gameCfg });
 
     const g = currentPageGraphics();
-    // Array index 1 (order number 2) is at SLOT_DISPLAY_ORDER displayPos 1.
+    // Array index 1 (order number 2) is at SLOT_DISPLAY_ORDER_P1 displayPos 1.
     clickPointerdown(slotGraphics(g, 1));
 
     expect(gameCfg.p1Teams).toEqual(['King', NO_UNIT, NO_UNIT, 'Witch', 'Witch']);

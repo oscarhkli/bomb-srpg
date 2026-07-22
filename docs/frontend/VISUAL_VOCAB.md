@@ -22,7 +22,7 @@ All three role names below are just Phaser `Container`s — the name conveys the
 
 - **PillButton(size)** — pill-shaped button, `PANEL_BUTTON_*`/`LIFECYCLE_BUTTON_*` style (constants.ts). `size` ∈ { panel, lifecycle, lifecycle-small }, matching the constants' named variants. Canonical shape source: TurnCommandPanel buttons (p3-spec003-match.md). A caller may keep the style (fill/border colors) while overriding the size with an explicit `pill(w, h)` — state the size when doing so.
 - **DisabledButton** — same shape as its enabled counterpart, filled with `DISABLED_BUTTON_COLOR` (0x999999, constants.ts).
-- **BackButton** — shared back-navigation button: `rounded-square(96px, 0x4c4c4c)` with a `⮐` glyph centered (36px, `0xffffff`). Distinct rendering from MatchScene's own in-match back control. Introduced by p3-spec009-stage.md. `⮐` (`U+2B90`) is a symbol, not emoji — no emoji fallback, and Roboto/system-sans coverage is spotty, so it's the one glyph here that can tofu (▯). **Backup:** fall back to the `Back` text label (`BACK_BUTTON_LABEL`, constants.ts) if manual testing shows tofu.
+- **BackButton** — shared back-navigation button: `rounded-square(64px, 0x4c4c4c)` with a `⮐` glyph centered (36px, `0xffffff`). Distinct rendering from MatchScene's own in-match back control. Introduced by p3-spec009-stage.md. `⮐` (`U+2B90`) is a symbol, not emoji — no emoji fallback, and Roboto/system-sans coverage is spotty, so it's the one glyph here that can tofu (▯). **Backup:** fall back to the `Back` text label (`BACK_BUTTON_LABEL`, constants.ts) if manual testing shows tofu.
 - **TeamBadge(w, h)** — rounded-rect/pill filled with `TeamColor(team)`, holding a `P{X}` label.
 
 ## Transitions
