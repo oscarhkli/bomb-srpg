@@ -117,11 +117,15 @@ const (
 	SkillCanFly
 )
 
-var allSkills = []SkillType{SkillCanJump, SkillCanFly}
+func allSkills() []SkillType {
+	return []SkillType{SkillCanJump, SkillCanFly}
+}
 
 // String converts an SkillType integer value into a human-readable text string.
 func (s SkillType) String() string {
 	switch s {
+	case SkillNone:
+		return "None"
 	case SkillCanFly:
 		return "Fly"
 	case SkillCanJump:
@@ -147,7 +151,7 @@ type Archetype struct {
 // MarshalJSON serializes Archetype struct to JSON that client needs
 func (a Archetype) MarshalJSON() ([]byte, error) {
 	skills := []string{}
-	for _, skill := range allSkills {
+	for _, skill := range allSkills() {
 		if (skill & a.PresetSkills) != 0 {
 			skills = append(skills, skill.String())
 		}
@@ -188,7 +192,7 @@ type Unit struct {
 // MarshalJSON serializes Unit struct to JSON that client needs
 func (u Unit) MarshalJSON() ([]byte, error) {
 	skills := []string{}
-	for _, skill := range allSkills {
+	for _, skill := range allSkills() {
 		if (skill & u.Skills) != 0 {
 			skills = append(skills, skill.String())
 		}

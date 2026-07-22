@@ -20,8 +20,8 @@ import {
   OCCUPANT_STROKE_COLOR,
   SOFTBLOCK_COLOR,
   SOFTBLOCK_CORNER_RADIUS,
-  BOMB_COLOR,
 } from '../constants';
+import { BOMB_GLYPH } from './constants';
 import type { Bomb, GameState, SoftBlock, Tile, TerrainType, Unit } from '../types/api';
 import type { BombGraphics } from './resolveTurnPlayer';
 import {
@@ -29,6 +29,8 @@ import {
   renderOccupants,
   renderBomb,
   tileCenter,
+  drawUnitSprite,
+  drawArchetypeIcon,
   type BoardRenderContext,
 } from './boardRenderer';
 
@@ -246,7 +248,7 @@ describe('renderOccupants — softBlocks & bombs', () => {
     consoleSpy.mockRestore();
   });
 
-  it('renders a bomb as a circle with countdown text parented in a single container and registers both in the map', () => {
+  it('renders a bomb as a 💣 glyph with countdown text parented in a single container and registers both in the map', () => {
     const c = ctx();
     renderAll(
       c,
@@ -255,11 +257,13 @@ describe('renderOccupants — softBlocks & bombs', () => {
       })
     );
 
-    const g = occupantGraphics(0);
-    expect(g.fillStyle).toHaveBeenCalledWith(BOMB_COLOR);
-    expect(g.fillCircle).toHaveBeenCalledWith(0, 0, 12);
+    expect(mockScene.add.text).toHaveBeenCalledWith(0, 0, BOMB_GLYPH, expect.objectContaining({}));
+    // Countdown text is added last, so it renders on top of the glyph.
     expect(mockScene.add.text).toHaveBeenCalledWith(0, 0, '5', expect.objectContaining({}));
-    expect(mockScene.add.container).toHaveBeenCalledWith(72, 24, [g, expect.anything()]);
+    expect(mockScene.add.container).toHaveBeenCalledWith(72, 24, [
+      expect.anything(),
+      expect.anything(),
+    ]);
     expect(c.bombGraphicsById.has(9)).toBe(true);
   });
 });
@@ -269,12 +273,80 @@ describe('renderBomb', () => {
     const c = ctx();
     renderBomb(c, bomb({ id: 42, position: { x: 0, y: 0 }, countdown: 2 }));
 
-    expect(mockScene.add.graphics).toHaveBeenCalledOnce();
-    const g = terrainGraphics();
-    expect(g.fillCircle).toHaveBeenCalledWith(0, 0, 12);
-    expect(mockScene.add.container).toHaveBeenCalledWith(24, 24, [g, expect.anything()]);
+    // No Graphics allocated for the bomb itself — it's rendered entirely as Text glyphs.
+    expect(mockScene.add.graphics).not.toHaveBeenCalled();
+    expect(mockScene.add.text).toHaveBeenCalledWith(0, 0, BOMB_GLYPH, expect.objectContaining({}));
+    expect(mockScene.add.container).toHaveBeenCalledWith(24, 24, [
+      expect.anything(),
+      expect.anything(),
+    ]);
     expect(c.bombGraphicsById.has(42)).toBe(true);
     expect(c.occupantObjects.length).toBeGreaterThan(0);
+  });
+});
+
+describe('drawUnitSprite', () => {
+  it('fills a team-colored square of the given size and scales the archetype icon radius', () => {
+    const c = ctx();
+    renderTerrain(c, [[plainTile()]]);
+    const g = terrainGraphics();
+
+    drawUnitSprite(g as never, 48, 48, 96, 'Bandit', TEAM_COLORS[1]!);
+
+    expect(g.fillStyle).toHaveBeenCalledWith(TEAM_COLORS[1]);
+    expect(g.fillRect).toHaveBeenCalledWith(0, 0, 96, 96);
+    // radius scales with size: 96 * (10/32) = 30
+    expect(g.strokeCircle).toHaveBeenCalledWith(48, 48, 30);
+  });
+
+  it('fills a rounded-corner square when cornerRadius is given', () => {
+    const c = ctx();
+    renderTerrain(c, [[plainTile()]]);
+    const g = terrainGraphics();
+
+    drawUnitSprite(g as never, 48, 48, 96, 'Bandit', TEAM_COLORS[1]!, 8);
+
+    expect(g.fillRoundedRect).toHaveBeenCalledWith(0, 0, 96, 96, 8);
+  });
+});
+
+describe('drawArchetypeIcon', () => {
+  it('defaults to OCCUPANT_ICON_RADIUS when no radius is given', () => {
+    const c = ctx();
+    renderTerrain(c, [[plainTile()]]);
+    const g = terrainGraphics();
+
+    drawArchetypeIcon(g as never, 'Bandit', 10, 10);
+
+    expect(g.strokeCircle).toHaveBeenCalledWith(10, 10, 10);
+  });
+
+  it('honors an explicit radius', () => {
+    const c = ctx();
+    renderTerrain(c, [[plainTile()]]);
+    const g = terrainGraphics();
+
+    drawArchetypeIcon(g as never, 'Bandit', 10, 10, 40);
+
+    expect(g.strokeCircle).toHaveBeenCalledWith(10, 10, 40);
+  });
+
+  it("scales the King star's inner radius proportionally with an explicit radius", () => {
+    const c = ctx();
+    renderTerrain(c, [[plainTile()]]);
+    const g = terrainGraphics();
+
+    drawArchetypeIcon(g as never, 'King', 0, 0, 40);
+
+    // Outer/inner ratio must stay 10:4 (OCCUPANT_ICON_RADIUS's default) at any size — a fixed
+    // 4px inner radius looked fine at the board's default 10px but rendered a thin, spiky star
+    // once callers (e.g. MatchSettingsScene) scaled the outer radius up.
+    const [points] = g.strokePoints.mock.calls[0] as [{ x: number; y: number }[]];
+    const distances = points.map(p => Math.hypot(p.x, p.y));
+    const outer = Math.max(...distances);
+    const inner = Math.min(...distances);
+    expect(outer).toBeCloseTo(40);
+    expect(inner).toBeCloseTo(16);
   });
 });
 

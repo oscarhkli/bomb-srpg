@@ -45,13 +45,9 @@ vi.mock('../ui/TurnBanner');
 vi.mock('../ui/SuddenDeathCutscene');
 vi.mock('../ui/VictoryCutscene');
 
-// Queues getMatchState() resolutions across the whole per-turn lifecycle: call 1 is the
-// initial board render in create(), call 2 is beginTurn()'s own per-turn refresh (fires
-// automatically right after create(), before any test interaction) — both get `states[0]`
-// unless a distinct value is passed. Any further explicit `states` cover calls made by a
-// test's own action (a Move/Bomb refresh, a resolve-turn refresh, etc.), and the LAST state
-// given becomes the persistent fallback for every call beyond that (e.g. the beginTurn() that
-// automatically follows a successful resolve).
+// Queues getMatchState() resolutions across the per-turn lifecycle (create() + beginTurn()'s
+// automatic refresh get `states[0]`; further states cover a test's own actions, with the last
+// one as the persistent fallback).
 function queueMatchStates(...states: GameState[]): void {
   const mocked = vi.mocked(getMatchState);
   const [first, ...rest] = states;
@@ -65,10 +61,7 @@ function queueMatchStates(...states: GameState[]): void {
   mocked.mockResolvedValue(rest.length > 0 ? rest[rest.length - 1]! : first);
 }
 
-// flush() (from sceneHelpers) drains the microtask queue enough times for the full
-// create() -> beginTurn() chain (getMatchState -> initToken -> startTurn ->
-// [SuddenDeathCutscene] -> TurnBanner) to settle, regardless of how many `.then`/`await` hops
-// are in it — cheap since everything here is an already-resolved mock promise, not a real timer.
+// Boots the scene and drains the create() -> beginTurn() chain to settle.
 async function bootScene(overrides: Partial<MatchSceneData> = {}): Promise<MatchScene> {
   const scene = new MatchScene();
   scene.create({ roomId: 'room-abc', playerTokens: ['t1', 't2'], ...overrides });
@@ -76,18 +69,12 @@ async function bootScene(overrides: Partial<MatchSceneData> = {}): Promise<Match
   return scene;
 }
 
-// Also created synchronously within create()'s initial .then(), right after the grid/occupants
-// — same index formula as occupantGraphics (results[i+1]), kept as a distinctly-named alias here
-// since spec008 moved ResolveTurnButton off MatchScene into MatchSummaryPanel, leaving this fixed
-// position occupied by the "≡" MatchSummaryButton instead.
+// The "≡" MatchSummaryButton's Graphics, at the same index formula as occupantGraphics.
 function matchSummaryButtonGraphics(unitCount: number): ReturnType<typeof mockScene.add.graphics> {
   return occupantGraphics(unitCount);
 }
 
-// Opens MatchSummaryPanel (clicking its "≡" button) then clicks one of its 4 lifecycle buttons.
-// Graphics call order on open is [scrim, P1 badge, P2 badge, Resolve, Reset, Surrender, Back]
-// (7 total) — see MatchSummaryPanel.test.ts. Slicing the last 5 conveniently drops scrim/P1
-// badge, so offset 0 below lands on P2 badge (unused) and offsets 1-4 land on the 4 buttons.
+// Opens MatchSummaryPanel then clicks one of its 4 lifecycle buttons.
 function clickSummaryPanelButton(
   unitCount: number,
   button: 'resolve' | 'reset' | 'surrender' | 'back'
@@ -383,11 +370,8 @@ describe('MatchScene', () => {
     expect(unitGraphics.destroy).not.toHaveBeenCalled();
   });
 
-  // A successful command never rebuilds the occupant layer (AC3/spec007), so the unit's
-  // Graphics object — and the `unit` closure attachUnitClickHandler bound its pointerdown to —
-  // survives untouched. A second click on that same Graphics must still reflect the unit's
-  // fresh hasUsedSkill from the post-command gameState refetch, not the stale pre-command
-  // snapshot captured at the last occupant rebuild.
+  // A second click on the same (never-rebuilt) Graphics must reflect fresh hasUsedSkill, not
+  // the stale snapshot from the last occupant rebuild.
   it('disables the Bomb button on a second click after a successful bomb placement, even without an occupant rebuild', async () => {
     const unit = makeUnit({
       id: 7,
@@ -1269,7 +1253,9 @@ describe('MatchScene', () => {
       resolveDelete();
       await flush();
 
-      expect(mockScene.scene.start).toHaveBeenCalledWith('MatchSettingsScene');
+      expect(mockScene.scene.start).toHaveBeenCalledWith('MatchSettingsScene', {
+        gameCfg: makeCfg(),
+      });
     });
 
     it('logs the failure reason via console.error and still starts MatchSettingsScene when deleteMatch() rejects', async () => {
@@ -1283,7 +1269,9 @@ describe('MatchScene', () => {
       await flush();
 
       expect(consoleSpy).toHaveBeenCalledWith('Failed to delete match:', 'delete failed');
-      expect(mockScene.scene.start).toHaveBeenCalledWith('MatchSettingsScene');
+      expect(mockScene.scene.start).toHaveBeenCalledWith('MatchSettingsScene', {
+        gameCfg: makeCfg(),
+      });
       consoleSpy.mockRestore();
     });
 

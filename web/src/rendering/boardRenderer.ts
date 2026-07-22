@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { destroyAll, colorToCss } from '../ui/gameObjectUtils';
-import { BOMB_COUNTDOWN_TEXT_COLOR } from './constants';
+import { BOMB_COUNTDOWN_TEXT_COLOR, BOMB_GLYPH, BOMB_GLYPH_FONT_SIZE } from './constants';
 import type { BombGraphics } from './resolveTurnPlayer';
 import {
   TILE_SIZE,
@@ -15,23 +15,15 @@ import {
   SOFTBLOCK_COLOR,
   SOFTBLOCK_SIZE,
   SOFTBLOCK_CORNER_RADIUS,
-  BOMB_COLOR,
-  BOMB_SIZE,
   DEPTH_GRID,
   DEPTH_OCCUPANT,
+  GAME_FONT_FAMILY,
 } from '../constants';
 import type { Bomb, Coordinate, GameState, SoftBlock, Tile, Unit } from '../types/api';
 
-// Static board rendering: draws the grid, units, softBlocks, and bombs into a scene and tracks
-// the created graphics in the shared per-occupant maps. This is the "initial/static" twin of
-// resolveTurnPlayer's animated playback — the maps are the shared contract between them.
-// The scene owns the state and the click semantics; the renderer only wires each occupant's
-// pointerdown to the provided callbacks.
-//
-// Two layers, two lifetimes: `terrainObjects` holds the immutable grid, painted once per scene
-// entry (renderTerrain) and never swapped; `occupantObjects` holds units/softBlocks/bombs, which
-// renderOccupants destroys-and-rebuilds on a wholesale swap. Keeping them apart lets an occupant
-// swap (error recovery, future Reset) leave the terrain untouched.
+// Static board rendering: draws grid/units/softBlocks/bombs and tracks each one's Graphics in
+// the shared per-occupant maps. terrainObjects and occupantObjects have separate lifetimes so an
+// occupant swap (renderOccupants) never touches the terrain layer.
 export interface BoardRenderContext {
   scene: Phaser.Scene;
   terrainObjects: Phaser.GameObjects.GameObject[];
@@ -42,10 +34,8 @@ export interface BoardRenderContext {
   onUnitClicked: (unit: Unit) => void;
 }
 
-// Paints the immutable terrain (grid) layer and returns the grid dimensions so the caller can
-// size dependent UI (grid bounds, camera centering) from a single source. Called once per scene
-// entry. Idempotent: destroys any prior terrain first, so a scene re-entry (rematch) that re-runs
-// create() replaces the grid instead of leaking stale graphics.
+// Paints the immutable terrain (grid) layer; returns its dimensions for sizing dependent UI.
+// Idempotent — destroys any prior terrain first so scene re-entry doesn't leak graphics.
 export function renderTerrain(
   ctx: BoardRenderContext,
   grid: Tile[][]
@@ -107,11 +97,28 @@ function renderUnits(ctx: BoardRenderContext, units: Unit[]): void {
           `Unit ${unit.id} has unconfigured team ${unit.team}, rendering as fallback grey`
         );
       }
-      g.fillStyle(teamColor ?? TEAM_COLOR_FALLBACK);
-      g.fillRect(cx - UNIT_SIZE / 2, cy - UNIT_SIZE / 2, UNIT_SIZE, UNIT_SIZE);
-      drawArchetypeIcon(g, unit.type, cx, cy);
+      drawUnitSprite(g, cx, cy, UNIT_SIZE, unit.type, teamColor ?? TEAM_COLOR_FALLBACK);
       attachUnitClickHandler(ctx, g, unit);
     });
+}
+
+// Paints a unit sprite (team-colored square + archetype icon) into a caller-owned Graphics.
+export function drawUnitSprite(
+  g: Phaser.GameObjects.Graphics,
+  cx: number,
+  cy: number,
+  size: number,
+  archetype: string,
+  teamColor: number,
+  cornerRadius = 0
+): void {
+  g.fillStyle(teamColor);
+  if (cornerRadius > 0) {
+    g.fillRoundedRect(cx - size / 2, cy - size / 2, size, size, cornerRadius);
+  } else {
+    g.fillRect(cx - size / 2, cy - size / 2, size, size);
+  }
+  drawArchetypeIcon(g, archetype, cx, cy, (size * OCCUPANT_ICON_RADIUS) / UNIT_SIZE);
 }
 
 function attachUnitClickHandler(
@@ -143,30 +150,28 @@ function renderSoftBlocks(ctx: BoardRenderContext, softBlocks: SoftBlock[]): voi
 }
 
 // Renders a single bomb; used both by renderOccupants and by MatchScene's optimistic bomb placement.
-// The circle and countdown text are drawn at local (0,0) and parented in a Container placed at
-// the tile center, so the bomb is one positionable/tweenable unit (see dropSuddenDeathBomb in
-// MatchScene) instead of two independently-positioned objects that can drift apart.
 export function renderBomb(ctx: BoardRenderContext, bomb: Bomb): void {
   const { cx, cy } = tileCenter(bomb.position);
-  const g = ctx.scene.add.graphics();
-  g.fillStyle(BOMB_COLOR);
-  g.fillCircle(0, 0, BOMB_SIZE / 2);
+  const glyph = ctx.scene.add.text(0, 0, BOMB_GLYPH, {
+    fontFamily: GAME_FONT_FAMILY,
+    fontSize: `${BOMB_GLYPH_FONT_SIZE}px`,
+  });
+  glyph.setOrigin(0.5);
+  // Countdown text is added last, so it renders on top of the 💣 glyph within the container.
   const text = ctx.scene.add.text(0, 0, String(bomb.countdown), {
     color: colorToCss(BOMB_COUNTDOWN_TEXT_COLOR),
   });
   text.setOrigin(0.5);
 
-  const container = ctx.scene.add.container(cx, cy, [g, text]);
+  const container = ctx.scene.add.container(cx, cy, [glyph, text]);
   container.setDepth(DEPTH_OCCUPANT);
   ctx.occupantObjects.push(container);
 
   attachContainerClickLogger(container, `Bomb ${bomb.id}`, bomb);
-  ctx.bombGraphicsById.set(bomb.id, { container, circle: g, countdownText: text });
+  ctx.bombGraphicsById.set(bomb.id, { container, countdownText: text });
 }
 
-// Containers always have local origin (0,0) — unlike attachClickLogger's world-space tile rect
-// (valid only because the ungrouped Graphics it targets never moves from (0,0)), the hit area
-// here must be centered on the container's own origin instead.
+// Containers use local origin (0,0), not world space.
 function attachContainerClickLogger(
   container: Phaser.GameObjects.Container,
   label: string,
@@ -202,25 +207,26 @@ function setTileHitArea(g: Phaser.GameObjects.Graphics, position: Coordinate): v
   );
 }
 
-function drawArchetypeIcon(
+export function drawArchetypeIcon(
   g: Phaser.GameObjects.Graphics,
   archetype: string,
   cx: number,
-  cy: number
+  cy: number,
+  radius: number = OCCUPANT_ICON_RADIUS
 ): void {
   g.lineStyle(OCCUPANT_ICON_STROKE_WIDTH, OCCUPANT_STROKE_COLOR);
   switch (archetype) {
     case 'Bandit':
-      g.strokeCircle(cx, cy, OCCUPANT_ICON_RADIUS);
+      g.strokeCircle(cx, cy, radius);
       break;
     case 'Witch':
-      g.strokePoints(regularPolygonPoints(cx, cy, 3, OCCUPANT_ICON_RADIUS), true);
+      g.strokePoints(regularPolygonPoints(cx, cy, 3, radius), true);
       break;
     case 'Fighter':
-      g.strokePoints(regularPolygonPoints(cx, cy, 5, OCCUPANT_ICON_RADIUS), true);
+      g.strokePoints(regularPolygonPoints(cx, cy, 5, radius), true);
       break;
     case 'King':
-      g.strokePoints(starPoints(cx, cy, 5, OCCUPANT_ICON_RADIUS, 4), true);
+      g.strokePoints(starPoints(cx, cy, 5, radius, radius * 0.4), true);
       break;
     default:
       console.warn(`Unrecognized archetype "${archetype}", drawing no icon`);

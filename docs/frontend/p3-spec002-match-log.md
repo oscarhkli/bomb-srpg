@@ -17,7 +17,7 @@ Found via a `frontend-code-review` pass after implementation (already user-confi
 5. **`MatchScene.test.ts` helpers (`gridGraphics`, `occupantGraphics`, `errorText`) use non-null assertions (`mock.results[i]!.value`) guarded only by a comment, not a runtime check.** Test-hygiene nit on scaffolding likely to be reshaped once real interaction tests exist.
    **Status: Deferred.**
 6. **No documented convention for when something is "render" vs "draw."** `drawArchetypeIcon` sits alongside the `render*` family with no stated rule; will blur further if more decoration helpers are added.
-   **Status: Deferred.**
+   **Status: Solved (p3-spec009-stage).** Convention now documented in `VISUAL_VOCAB.md`: `render*` creates and places a GameObject in the scene graph; `draw*` paints into a `Graphics` object supplied by the caller. `drawUnitSprite` (new, `boardRenderer.ts`) and `drawArchetypeIcon` both follow it, and `MatchSettingsScene`'s `UnitPage`/`StagePage` reuse them instead of duplicating per-unit drawing.
 7. **Duplication across `renderUnits`/`renderSoftBlocks`/`renderBombs`** (tileCenter → add.graphics → fill-shape → attachClickLogger skeleton). Acceptable at 3 call sites per the reviewer's own note; watch-list item if a 4th occupant type is added.
    **Status: Deferred.**
 8. **`setup.ts`'s block comment above `createMockGraphics`/`createMockText` mixes "why mockReturnThis" with "how to index mock.results."** The latter logically belongs near the test-file helpers that consume it.

@@ -38,10 +38,8 @@ const BUTTON_STYLE = {
   borderWidth: PANEL_BUTTON_BORDER_WIDTH,
 };
 
-// Terminal full-canvas overlay shown once a match ends: a dim scrim + a banner announcing the
-// winner (or draw), followed 2s later by Rematch/Return-to-Settings buttons. Unlike TurnBanner
-// or SuddenDeathCutscene, this never fades out or destroys itself — it's the last thing shown in
-// this MatchScene instance until the player picks a button (which tears the whole scene down).
+// Terminal full-canvas overlay shown once a match ends: a scrim + winner/draw banner, followed
+// by Rematch/Return-to-Settings buttons. Unlike other cutscenes, this never destroys itself.
 export default class VictoryCutscene {
   constructor(private readonly scene: Phaser.Scene) {}
 

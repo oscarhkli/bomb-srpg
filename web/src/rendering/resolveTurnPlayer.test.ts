@@ -32,7 +32,6 @@ describe('playResolveTurnEvents — bombCountdownUpdated', () => {
         1,
         {
           container: createMockContainer() as never,
-          circle: createMockGraphics() as never,
           countdownText: countdownText as never,
         },
       ],
@@ -62,7 +61,6 @@ describe('playResolveTurnEvents — bombCountdownUpdated', () => {
         1,
         {
           container: createMockContainer() as never,
-          circle: createMockGraphics() as never,
           countdownText: countdownText as never,
         },
       ],
@@ -234,14 +232,12 @@ describe('playResolveTurnEvents — validation', () => {
 describe('playResolveTurnEvents — bombExploded (non-chain)', () => {
   it('destroys the bomb graphics immediately and grows a beam toward the affected tiles', () => {
     const container = createMockContainer();
-    const circle = createMockGraphics();
     const countdownText = createMockText();
     const bombGraphicsById = new Map<number, BombGraphics>([
       [
         1,
         {
           container: container as never,
-          circle: circle as never,
           countdownText: countdownText as never,
         },
       ],
@@ -517,10 +513,8 @@ function fireAllDelayedCalls(): void {
   }
 }
 
-// Render-fidelity oracle: play the event stream to completion against the graphics maps, then
-// assert the maps hold exactly the occupants the expected end-state says survived. occupantsMatch
-// is the independent source of truth here — it catches the apply-code bugs a runtime diff can't
-// justify guarding (spec007), which is why it lives test-side.
+// Plays the event stream to completion, then asserts the graphics maps hold exactly the
+// occupants the expected end-state says survived.
 describe('playResolveTurnEvents — render fidelity oracle', () => {
   interface FidelityCase {
     name: string;

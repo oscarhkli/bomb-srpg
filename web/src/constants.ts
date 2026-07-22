@@ -1,13 +1,8 @@
 import type { TerrainType } from './types/api';
 
-// Shared across multiple components (not scoped to any single one below).
-// Fallback color whenever a team ID isn't in TEAM_COLORS — used both for a genuine
-// "unconfigured team" bug guard (TurnBanner, TurnPanel, boardRenderer) and for VictoryCutscene's
-// draw case (winnerTeamId -1, which is never a TEAM_COLORS key by construction).
+// Fallback color for an unconfigured/unknown team ID.
 export const TEAM_COLOR_FALLBACK = 0x4c4c4c;
-// Duration for every fade in/out in this UI (TurnBanner, VictoryCutscene, MatchScene's
-// rematch/return-to-settings camera transitions) — 200ms unless a specific effect calls for
-// something else.
+// Default fade in/out duration used across this UI.
 export const FADE_MS = 200;
 
 export const TILE_SIZE = 48;
@@ -33,7 +28,6 @@ export const TEAM_COLORS: Record<number, number> = {
 
 export const SOFTBLOCK_COLOR = 0xe6e6e6;
 export const SOFTBLOCK_CORNER_RADIUS = 4;
-export const BOMB_COLOR = 0x222222;
 export const OCCUPANT_STROKE_COLOR = 0xffffff;
 export const OCCUPANT_ICON_RADIUS = 10;
 export const OCCUPANT_ICON_STROKE_WIDTH = 2;
@@ -145,15 +139,70 @@ export const LIFECYCLE_BUTTON_HEIGHT_SMALL = 44;
 export const MATCH_SUMMARY_TEAM_BADGE_WIDTH = 96;
 export const MATCH_SUMMARY_TEAM_BADGE_HEIGHT = 48;
 export const MATCH_SUMMARY_TEAM_BADGE_CORNER_RADIUS = 8;
-// Button label/prompt text, following RESOLVE_BUTTON_LABEL's un-prefixed naming — these describe
-// the ResetTurnButton/SurrenderButton/BackButton concepts themselves, not MatchSummaryPanel's own
-// layout (which is what the MATCH_SUMMARY_ prefix above is reserved for).
+// Button labels/prompts, unprefixed like RESOLVE_BUTTON_LABEL.
 export const RESET_BUTTON_LABEL = 'Reset this turn';
 export const SURRENDER_BUTTON_LABEL = 'Surrender';
 export const BACK_BUTTON_LABEL = 'Back';
 export const CONFIRM_TEXT_RESOLVE = 'Confirm to end this turn?';
 export const CONFIRM_TEXT_RESET = 'All turn actions will reset. Confirm?';
 export const CONFIRM_TEXT_SURRENDER = 'Confirm to surrender?';
+
+// MatchSettingsScene (p3-spec009-stage) — chrome shared by every Page.
+export const SETTINGS_SCENE_MARGIN = 24;
+// Both HeaderRegion and NavRegion are this tall.
+export const SETTINGS_REGION_HEIGHT = 84;
+// Gap between BackButton and the active Page's title in HeaderRegion.
+export const SETTINGS_HEADER_SPACER = 48;
+// Default text size for this scene (page titles, UnitCard stats/name).
+export const SETTINGS_TEXT_FONT_SIZE = 24;
+// Corner radius shared by this scene's rounded shapes (BackButton, UnitSlot, UnitCard).
+export const SETTINGS_CORNER_RADIUS = 8;
+
+export const BACK_BUTTON_SIZE = 64;
+export const BACK_BUTTON_COLOR = 0x4c4c4c;
+// U+2B90, a symbol not an emoji — can tofu on sparse font coverage.
+export const BACK_BUTTON_GLYPH = '⮐';
+export const BACK_BUTTON_GLYPH_FONT_SIZE = 36;
+
+// UnitPage's TeamBadge (header): P{X} on a TeamColor rounded-rect.
+export const UNIT_PAGE_TEAM_BADGE_WIDTH = 96;
+export const UNIT_PAGE_TEAM_BADGE_HEIGHT = 48;
+export const UNIT_PAGE_TEAM_BADGE_CORNER_RADIUS = 8;
+// Gap between the TeamBadge and the "Unit Selection" title text.
+export const UNIT_PAGE_TITLE_GAP = 8;
+
+// FormationPanel — the top band of UnitPage's body, full width.
+export const FORMATION_PANEL_HEIGHT_RATIO = 0.35;
+export const UNIT_FORMATION_HEADER_FONT_SIZE = 36;
+export const UNIT_SLOT_SIZE = 96;
+export const UNIT_SLOT_SPACING = 12;
+export const UNIT_SLOT_ORDER_LABEL_INSET = 4;
+// Matches SETTINGS_TEXT_FONT_SIZE.
+export const UNIT_SLOT_ORDER_LABEL_FONT_SIZE = 24;
+// The order-number label must render above the slot's unit sprite (they overlap); the sprite
+// itself is left at Phaser's default depth (0).
+export const DEPTH_UNIT_SLOT_LABEL = 1;
+
+// ArchetypesPanel / UnitCard
+export const UNIT_CARD_WIDTH = 180;
+export const UNIT_CARD_HEIGHT = 200;
+export const UNIT_CARD_PADDING = 12;
+export const UNIT_CARD_SPACING = 12;
+export const UNIT_CARD_SPRITE_SIZE = 96;
+// Vertical gap between the sprite's bottom edge and the name text below it.
+export const UNIT_CARD_NAME_GAP = 16;
+// Vertical gap between each subsequent text line (name -> stats -> skill).
+export const UNIT_CARD_LINE_GAP = 32;
+// Extra gap between archetype.speed and the 💣 glyph on UnitCard's stat line.
+export const UNIT_CARD_STAT_GLYPH_GAP = 12;
+export const ARCHETYPES_PER_ROW = 4;
+
+// NavRegion buttons (NextButton / StartMatchButton) — pill(144, 96), overriding
+// PANEL_BUTTON_WIDTH/HEIGHT while keeping PANEL_BUTTON_* fill/border colors.
+export const SETTINGS_NAV_BUTTON_WIDTH = 144;
+export const SETTINGS_NAV_BUTTON_HEIGHT = 96;
+export const NEXT_BUTTON_LABEL = 'NEXT →';
+export const START_MATCH_BUTTON_LABEL = 'Start Match';
 
 // VictoryCutscene — above every other overlay, since it's the terminal screen.
 export const DEPTH_VICTORY_CUTSCENE = 80;
