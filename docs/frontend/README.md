@@ -21,10 +21,10 @@ Specs will be written prior to development—partly handcrafted, and partly gene
 | [Phase 3.7: MatchScene Render-Path Cleanup](p3-spec007-match.md) | MatchScene | Done | 2026-07-16 |
 | [Phase 3.8: Surrender, Reset, and MatchSummaryPanel](p3-spec008-match.md) | MatchScene | Done | 2026-07-16 |
 | [Phase 3.9: Match Settings Scene](p3-spec009-stage.md) | MatchScene | Done | 2026-07-22 |
-| [Phase 3.10: Match Settings Scene - Stage Page](p3-spec010-stage.md) | MatchScene | Ready | — |
-| [Phase 3.11: Title Scene](p3-spec011-title.md) | TitleScene | Parked Draft | — |
-| [Phase 3.13: Render Camera Navigation](p3-spec013-match.md) | StageSetupScene | Parked Draft | — |
-| [Phase 3.14: Lounge Scene](p3-spec014-lounge.md) | LoungeScene | Parked Draft | — |
+| [Phase 3.10: Match Settings Scene - Stage Page](p3-spec010-stage.md) | MatchScene | Done | 2026-07-23 |
+| [Phase 3.11: Title Scene](p3-spec011-title.md) | TitleScene | Draft | — |
+| [Phase 3.12: Render Occupant Information](p3-spec012-match.md) | StageSetupScene | Parked Draft | — |
+| [Phase 3.13: Render Camera Navigation](p3-spec013-match.md) | LoungeScene | Parked Draft | — |
 | [Phase 5.1: 2.5D Isometric Grid](p5-spec001-match.md) | MatchScene | Parked Draft | — |
 <!-- END SPEC TABLE -->
 
