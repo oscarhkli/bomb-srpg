@@ -2,7 +2,6 @@ import Phaser from 'phaser';
 import './style.css';
 import MatchScene from './scenes/MatchScene';
 import MatchSettingsScene from './scenes/MatchSettingsScene';
-import DevBootScene from './scenes/DevBootScene';
 
 new Phaser.Game({
   type: Phaser.AUTO,
@@ -13,6 +12,6 @@ new Phaser.Game({
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
-  // DevBootScene first = auto-starts on load; remove once LoungeScene exists.
-  scene: [DevBootScene, MatchScene, MatchSettingsScene],
+  // MatchSettingsScene first = auto-starts on load.
+  scene: [MatchSettingsScene, MatchScene],
 });

@@ -5,6 +5,18 @@ export function destroyAll(objects: { destroy(): void }[]): void {
   objects.length = 0;
 }
 
+// Left edge of a row of `itemCount` fixed-size items, centered within a container.
+export function centeredRowStartX(
+  containerX: number,
+  containerWidth: number,
+  itemCount: number,
+  itemSize: number,
+  spacing: number
+): number {
+  const rowWidth = itemCount * itemSize + (itemCount - 1) * spacing;
+  return containerX + (containerWidth - rowWidth) / 2;
+}
+
 export function colorToCss(color: number): string {
   return `#${color.toString(16).padStart(6, '0')}`;
 }

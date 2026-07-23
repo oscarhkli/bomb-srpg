@@ -173,9 +173,7 @@ export default class MatchScene extends Phaser.Scene {
         this.showError('Failed to load match config');
       });
 
-    if (data.isRematch) {
-      this.cameras.main.fadeIn(FADE_MS);
-    }
+    this.cameras.main.fadeIn(FADE_MS);
   }
 
   // gameState and gameCfg are fetched via two independent promise chains (kept separate so

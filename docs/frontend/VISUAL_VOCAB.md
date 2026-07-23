@@ -39,3 +39,20 @@ Two different things, easy to confuse:
 ## Typography
 
 - Default text: 12px, `0xffffff`, unless a spec states otherwise.
+
+## Sizing & Layout
+
+Layout numbers should be **rooted, not scattered**. A magic number isn't "a literal" — it's an *unnamed literal that duplicates a fact defined elsewhere*.
+
+- **root constant** — a named absolute px, defined once, that everything else derives from. The recursion of "relative to what?" bottoms out here. Roots: the canvas size, a base spacing unit, and the scene margin.
+- **derived value** — any other size/position, expressed in terms of a root.
+
+Rules when placing anything:
+
+1. **Canvas size** comes from Phaser (`this.scale.width` / `this.scale.height`, = 1280×720), never a retyped `1280`/`720`.
+2. **Positions** anchor to edges + margin or to a neighbor, not absolute coordinates: `this.scale.width - MARGIN - w`, or `prev.y + prev.h + GAP` — not `x = 1136`.
+3. **Sizes** derive from available space or a base-unit multiple (`BASE * n`), not a frozen per-element constant. The board tile fills its region (`floor(regionH / rows)`), rather than a hardcoded `TILE_SIZE`.
+
+**Litmus test:** *"If the canvas weren't 1280×720, would this number still be right?"* If no, it's a disguised duplicate of a root — name it and derive.
+
+> Scope: this is the going-forward habit for new layout code. Existing fixed-px constants (`TILE_SIZE`, panel widths) are retrofitted later in the visual pass, not eagerly.

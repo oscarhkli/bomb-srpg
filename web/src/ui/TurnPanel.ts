@@ -14,8 +14,7 @@ import {
 import { destroyAll, colorToCss } from './gameObjectUtils';
 
 const HEADER_HEIGHT = TURN_PANEL_HEIGHT / 2;
-// Fixed pixel reservations for the right-aligned "NN / NN" value row so 1-vs-2-digit numbers
-// don't shift layout — spec caps both turn and maxTurns at 99 (2 digits).
+// Fixed pixel reservations for the right-aligned "NN / NN" value row (max 2 digits).
 const VALUE_DIGIT_WIDTH = 20;
 const VALUE_SLASH_WIDTH = 12;
 

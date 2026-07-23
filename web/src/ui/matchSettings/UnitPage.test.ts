@@ -26,7 +26,7 @@ function navBounds(): PageBounds {
 }
 
 function nav(overrides: Partial<SettingsPageNav> = {}): SettingsPageNav {
-  return { goNext: vi.fn(), goBack: vi.fn(), ...overrides };
+  return { goNext: vi.fn(), goBack: vi.fn(), startMatch: vi.fn(), ...overrides };
 }
 
 function page(playerIndex: 1 | 2, cfg: GameCfg, n: SettingsPageNav = nav()): UnitPage {

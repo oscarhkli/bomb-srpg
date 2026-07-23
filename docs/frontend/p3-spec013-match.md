@@ -1,5 +1,5 @@
 ---
-title: "Phase 3.10: Render Camera Navigation"
+title: "Phase 3.13: Render Camera Navigation"
 ---
 
 # Render Camera Navigation

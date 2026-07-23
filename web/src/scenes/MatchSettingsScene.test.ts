@@ -11,7 +11,7 @@ import {
   fireShutdown,
 } from '../test/sceneHelpers';
 import { makeCfg } from '../test/fixtures';
-import { getCatalog } from '../engine/api';
+import { getCatalog, createMatchRoom, initRoom, createMatch } from '../engine/api';
 import MatchSettingsScene, { type MatchSettingsSceneData } from './MatchSettingsScene';
 import { NO_UNIT } from '../ui/matchSettings/formation';
 import { TEAM_COLORS, NEXT_BUTTON_LABEL, START_MATCH_BUTTON_LABEL } from '../constants';
@@ -111,6 +111,15 @@ describe('MatchSettingsScene — catalog loading', () => {
 
     // Only the BackButton was ever created — the resolved catalog was discarded.
     expect(allGraphics()).toHaveLength(1);
+  });
+});
+
+describe('MatchSettingsScene — Scene Entry (fadeTransition)', () => {
+  it('fades in on create(), completing the fadeTransition pair regardless of entry path (AC 12)', async () => {
+    mockCatalog();
+    await bootScene();
+
+    expect(mockScene.cameras.main.fadeIn).toHaveBeenCalledWith(200);
   });
 });
 
@@ -279,5 +288,97 @@ describe('MatchSettingsScene — BackButton', () => {
 
     const g3 = graphicsSince(since);
     expect(g3[0]!.fillStyle).toHaveBeenCalledWith(TEAM_COLORS[2]);
+  });
+
+  it('ignores a second NextButton click fired while the first transition is still fading (re-entrancy guard)', async () => {
+    mockCatalog();
+    const gameCfg = makeCfg({ p1Teams: ['King', 'Fighter'], p2Teams: ['King'] });
+    await bootScene({ gameCfg });
+    // Isolates the transition's own fadeIn from create()'s entry fadeIn.
+    vi.mocked(mockScene.cameras.main.fadeIn).mockClear();
+
+    const g = currentPageGraphics();
+    clickPointerdown(nextButtonGraphics(g));
+    // Fires before camerafadeoutcomplete — the transition is still mid-fade.
+    clickPointerdown(nextButtonGraphics(g));
+    fireCameraFadeOutComplete();
+
+    // Only 1 fadeIn: a second concurrent transition would have queued its own fadeOut/fadeIn pair.
+    expect(mockScene.cameras.main.fadeIn).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('MatchSettingsScene — StartMatchButton', () => {
+  async function bootAndAdvanceToStagePage(gameCfg: GameCfg): Promise<void> {
+    await bootScene({ gameCfg });
+    clickPointerdown(nextButtonGraphics(currentPageGraphics()));
+    fireCameraFadeOutComplete();
+    clickPointerdown(nextButtonGraphics(currentPageGraphics()));
+    fireCameraFadeOutComplete();
+  }
+
+  function startMatchButtonGraphics(): ReturnType<typeof allGraphics>[number] {
+    return currentPageGraphics()[currentPageGraphics().length - 1]!;
+  }
+
+  it('creates the room and match, then transitions to MatchScene with roomId + playerTokens (AC 1)', async () => {
+    mockCatalog();
+    const gameCfg = makeCfg({ p1Teams: ['King', 'Fighter'], p2Teams: ['King', 'Witch'] });
+    await bootAndAdvanceToStagePage(gameCfg);
+    vi.mocked(createMatchRoom).mockResolvedValue({ id: 'room-xyz' });
+    vi.mocked(createMatch).mockResolvedValue({
+      success: true,
+      playerTokens: ['t1', 't2'],
+    });
+
+    clickPointerdown(startMatchButtonGraphics());
+    expect(mockScene.cameras.main.fadeOut).toHaveBeenCalledWith(200, 0, 0, 0);
+
+    await flush();
+    fireCameraFadeOutComplete();
+    await flush();
+
+    expect(createMatchRoom).toHaveBeenCalled();
+    expect(initRoom).toHaveBeenCalledWith('room-xyz');
+    expect(createMatch).toHaveBeenCalledWith({ gameCfg });
+    expect(mockScene.scene.start).toHaveBeenCalledWith('MatchScene', {
+      roomId: 'room-xyz',
+      playerTokens: ['t1', 't2'],
+    });
+  });
+
+  it('shows an error and fades back in (without transitioning) when createMatch fails', async () => {
+    mockCatalog();
+    const gameCfg = makeCfg({ p1Teams: ['King', 'Fighter'], p2Teams: ['King', 'Witch'] });
+    await bootAndAdvanceToStagePage(gameCfg);
+    vi.mocked(createMatchRoom).mockRejectedValue(new Error('network error'));
+
+    clickPointerdown(startMatchButtonGraphics());
+    await flush();
+    fireCameraFadeOutComplete();
+    await flush();
+
+    expect(mockScene.scene.start).not.toHaveBeenCalled();
+    expect(mockScene.cameras.main.fadeIn).toHaveBeenCalledWith(200);
+    expect(textCalls().some(c => typeof c[2] === 'string' && c[2].includes('match'))).toBe(true);
+  });
+
+  it('ignores a second StartMatchButton click fired while the first is still in flight (re-entrancy guard)', async () => {
+    mockCatalog();
+    const gameCfg = makeCfg({ p1Teams: ['King', 'Fighter'], p2Teams: ['King', 'Witch'] });
+    await bootAndAdvanceToStagePage(gameCfg);
+    vi.mocked(createMatchRoom).mockResolvedValue({ id: 'room-xyz' });
+    vi.mocked(createMatch).mockResolvedValue({
+      success: true,
+      playerTokens: ['t1', 't2'],
+    });
+
+    clickPointerdown(startMatchButtonGraphics());
+    clickPointerdown(startMatchButtonGraphics());
+    await flush();
+    fireCameraFadeOutComplete();
+    await flush();
+
+    expect(createMatchRoom).toHaveBeenCalledTimes(1);
   });
 });

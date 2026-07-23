@@ -1,16 +1,18 @@
 ---
-title: "Phase 3.10: Match Settings Scene - Stage Subscene"
+title: "Phase 3.10: Match Settings Scene - Stage Page"
 ---
 
-# Match Settings Scene - Stage Subscene"
+# Match Settings Scene - Stage Page
 
 ## Context
 
-Phase 3.9 introduced Match Settings Scene with `UnitSubscreen`. This spec renders the remaing `StageSubscreen` to complate the flow of Match Settings, allowing Player to configure and start a match.
+Phase 3.9 introduced Match Settings Scene with `UnitPage`. This spec renders the body region of `StagePage` and the event handlers to complete the flow of Match Settings, allowing Player to configure and start a match.
+
+> **Shared vocabulary:** This spec relies on shared terms and design conventions — `Page`, `region`, `Panel`, `fadeTransition`, `BackButton`, the `render*`/`draw*` split, etc. — defined in [`VISUAL_VOCAB.md`](./VISUAL_VOCAB.md). Read it first.
 
 ## Goal
 
-- Render `StageSubscreen` in `MatchSettingsScene` to allow the Player to configure the match.
+- Render `StagePage` in `MatchSettingsScene` to allow the Player to configure the match.
 - Enter `MatchScene` via `MatchSettingsScene`.
 - Start the app from `MatchSettingsScene`.
 
@@ -21,169 +23,89 @@ Phase 3.9 introduced Match Settings Scene with `UnitSubscreen`. This spec render
 
 ## Scene Entry
 
-TBC.
+Starting from Phase 3.10, `DevBootScene` is no longer necessary. The app should start in `MatchSettingsScene`.
 
-In `MatchScene`, when `VictoryCutScene` is shown, Player can click `returnMatchSettingsButton` to transition to `MatchSettingsScene`. It should bring `gameCfg` to `MatchSettingsScene`, representing `MatchSettingsScene` remember the last match's settings.
+`MatchScene` is launched by `MatchSettingsScene` after a successful `createMatch()`.
 
-## Shared Components
+Every Scene transition (not just `Page` swaps within `MatchSettingsScene`) is a `fadeTransition`: the outgoing Scene `fadeOut`s before calling `scene.start()`/`scene.restart()`, and the incoming Scene `fadeIn`s unconditionally in its own `create()`. Both halves of the pair are required — a Scene that fades out without its destination fading back in leaves the camera stuck dark. This applies to `MatchSettingsScene -> MatchScene` (`StartMatchButton`, below) and `MatchScene -> MatchSettingsScene` (Return to Settings).
 
-### BackButton
+## StagePage
 
-The functionality of the shared `BackButton` is similar to the one in `MatchScene`, but withi different rendering. It will be used in various scenes other that `MatchScene`.
+The main region of `StagePage` consists of 2 panels, `StagesPanel` and `StageDetailPanel`, sitting in 2 columns. `StagePage` receives `stagePresets` (from `MatchSettingsScene`'s catalog) and the shared `gameCfg` reference, mirroring how `UnitPage` already receives `archetypes`/`gameCfg`.
 
-It's a **96x96px** rounded squares filled with HEX `0x4c4c4c`. In the center render a ASCII `⮐` but **flipped horizontally** representing it's turning back. The font size is **36px** and font color is HEX `0xffffff`.
+### Visual Effect of Stages Panel
 
-### Transitions
+`StagesPanel` covers 60% of `StagePage`. Each side should have **12px** padding.
 
-We generally use `200ms dim -> 200ms undim` as fading out then fading in transition effect for all scene to scene or subscene to subscene.
+`StagesPanel` lists all `StageCards` in a row, center aligned. Each card should have **12px** spacing. Note that in future there will be more than 8 stagePresets available, so `StagesPanel` should be horizontally swipable. Since there is not enough StagePresets to scroll at the moment, the swipe effect is a **non-goal** unless it's very simple to do.
 
-> Note: Agent should tell if we could define a name `200ms dim -> 200ms undim` which we generally use for scene transition so that we don't have to type this long keyword.
+#### Stage Card
 
-## Data Fetching
+`StageCard` is a **160Wx160Hpx** rounded rectangle container, with **12px** padding on 4 side. [User Interaction](#user-interaction-and-visual-effect-of-stage-page) will describe a **Select** behavior. When a `StageCard` is selected, add a border of **4px** in HEX `0xdc9e23`.
 
-### Catalog
+- For simplicity, `stagePreset.name` should be rendered at the center of the card, with font size **36px**.
+- If `MatchSettingsScene.gameCfg` contains `stagePreset`, select it according. Otherwise, select the first `StageCard`.
 
-When `MatchSettingsScene` loads up, call `getCatalog()` to fetch available `archetypes` and `stagePresets`. Both of them are essential data sets for the game setup. If either one of them returns an empty list, report the error and do not allow the game to proceed. Since they are constants unless a redeployment. It's safe to store in `MatchSettingsScene`.
+### Visual Effect of StageDetail Panel
 
-## MatchSettings Scene
+`StagesDetailPanel` covers 40% of `StagePage`. Reserve a rectangular region of size 80% of `StagesDetailPanel`, namely `InnerPanel`, for the 4 rows below — `InnerPanel` is a layout region, not a drawn/visible box. Each side of `InnerPanel` should have **12px** padding.
 
-`MatchSettingsScene` consists of 3 subscene:
+Similar to `ArchetypesPanel` in `UnitPage`, `StagesDetailPanel` lists the selected `StageCard`'s `stagePreset` details.
 
-- `UnitSubscene` for Player 1
-- `UnitSubscene` for Player 2
-- `StageSubscene`
-
-Overall, the scene should leave **48px** margin for all 4 sides.
-
-There could be more/fewer subscenes in future, esp for future we have other modes like VS COM or Online, so don't hardcode it as 3 only.
-
-`MatchSettingsScene` divides into 3 sections:
-
-- The top **108px** is the `HeaderSection`.
-  - It should contain a `BackButton`, then 48px of spacer, then renders the title of the current subscene.
-- The bottom **108px** is the `NavSection` which renders the Next/Confirm buttons.
-- The middle main sections are for the subscenes.
-
-> Note: Agent should check `subscene` and `section` is an appropriate term in Phaser and give a better name if needed.
-
-### Store the Latest `gameCfg`
-
-`MatchSettingsScene` keeps the latest `gameCfg` as a private scene-instance field. The main duty of the scene is to assist Player to construct the correct `gameCfg` and pass to backend to create a match.
-
-It could carry `gameCfg` from the last match (see: [Scene Entry](#scene-entry)). But if there isn't, below is the default values of `gameCfg` for initialization:
-
-```json
-{
-  stagePreset: 'Plain',
-  p1Teams: ['King'],
-  p2Teams: ['King'],
-  maxTurns: 60,
-  allowResetTurn: true,
-}
-```
-
-## Unit Subscene
-
-The title to be rendered in the `HeaderSection` is `[P{X}] Unit Selection`, where X is 1 or 2 as this is for both players. `P1` and `P2` are each wrapped in a rounded rectangle filled with that team's `TEAM_COLORS` (`constants.ts`) entry (team 1's color behind `P1`, team 2's color behind `P2`) — the same color used elsewhere for that team (e.g. `MatchSummary`).
-
-In the main section, divide it verically into 2 sections, `FormationPanel` and `ArchetypesPanel`.
-
-In the footer section, render a **144Wx96Hpx** rounded rectangle button (`NextButton`), using `PANEL_BUTTON_*` style in `constants.ts`. The button should contains `NEXT →` in the center. Align with `PanelButton` in `MatchScene`.
-
-### Visual Effect of Formation Panel
-
-`FormationPanel` covers **25%** of the left of `UnitSubscene`, which shows the team formation that the Player selects.
-
-- Render a header `Formation` on the top, center aligned, in font size **12px**,  font color `0xffffff`.
-- Render 5 **96x96px** rounded squares as a column, named `UnitSlot`, filled with team's `TEAM_COLORS` (`constants.ts`), with **12px** spacing.
-  - A number is assigned and render in each `UnitSlot` From the top to the bottom. Render the number at the top left corner, in font size **8px**, font color `0xffffff`.
-  - The number order from the top to the bottom is **4 -> 2 -> 1 -> 3 -> 5**, representing the order of `gameCfg.p{X}teams` to be passed to create the match. Note that as user interface, we use 1-base representation, but in coding we should always use 0-base representation.
-  - Render the `order number` at the top left corner, leaving 4px each side, in font size **8px**,  font color `0xffffff`. 
-    - Refer to `@engine/presets.go` `stagePresetsRegistry()` for this special order.
-  - The middle `UnitSlot` **1** is for `King` only. Render a **96x96px** sprite of King in the team's `TEAM_COLORS` (`constants.ts`). Refactor `renderUnits()` and `drawArchetypeIcon()` in `@web/src/rendering/boardRenderer.ts` so that they could be reusable. Since `Unit's` sprite overlaps `order number`, the `Unit's` sprite should have a lower depth then `order number`.
-  - [User Interaction and Visual Effect of Unit Subscene](#user-interaction-and-visual-effect-of-unit-subscene) will explain more on how to trigger the "put on the units and put down the units". When the `Unit` is put on the the selected `UnitSlot`, that `UnitSlot` should render the `Unit` like how `King` is rendered in `UnitSlot 1`.
-- If `MatchSettingsScene.gameCfg` contains `p{X}teams`, render it accordingly.
-
-### Visual Effect of Archetypes Panel
-
-`ArchetypesPanel` covers the remaining **75%** of the `UnitSubscene`, which shows all `archetypes` obtained previously. Each `archetype` should convert to `Unit` represented by a `UnitCard`.
-
-`ArchetypesPanel` lists all `UnitCards`. Each card should have **12px** spacing. At the moment there should be 4 `UnitCards` a row. Note that in future there will be more than 16 archetypes available, so `ArchetypesPanel` should be veritically scrollable.
-
-#### Unit Card
-
-`UnitCard` is a **144Wx192Hpx** rounded rectangle container, with **12px** padding on 4 side.
-
-- All the elements should be center-aligned.
-- All the text is in font size **12px**,  font color `0xffffff`.
-- In `UnitCard`, render a **120x120px** rounded square container. Refactor `renderUnits()` and `drawArchetypeIcon()` in `@web/src/rendering/boardRenderer.ts` so that they could be reusable.
-
-> Convention: `render*` owns creating and placing a GameObject in the scene graph; `draw*` paints shapes into a `Graphics` object the caller already created and passed in. `drawArchetypeIcon` already fits this — reuse it by having `UnitCard` pass in its own `Graphics`. Apply this rule to any new decoration helpers added by this spec.
-- The remaining space in `UnitCard` should render the preset stats of an `Archetype`, using `archetype.name`, `archetype.speed`, `archeType.bombMaxRange` and `archeType.skills`.
-- `archetype.speed`, `archeType.bombMaxRange` should be combined in 1 line. Use 👟 and 💣 in front of the values. Leave extra **12px** in between `archetype.speed` and 💣.
-- At this moment, `archeType.skills` always contain at most 1 skill. Render `-` for `None`.
-
-Below is the sample `UnitCard` of Witch for Team 1:
+Inside `InnerPanel`, render 4 rows of text using `stagePreset.name`, `stagePreset.description`, `stagePreset.width`, `stagePreset.height` and `stagePreset.maxTurns`. Each row should have **12px** space. Sample is shown below:
 
 ```text
-+------------+
-| +--------+ |
-| | Witch  | |
-| | sprite | |
-| | (Blue) | |
-| +--------+ |
-|   Witch    |
-| 👟 1  💣 3 |
-|     -      |
-+------------+
++--------------------+
+|      {name}        |
+| {description}      |
+| {description-wrap} |
+| {width} x {height} |
+|  ❰  {maxTurns}  ❱  |
++--------------------+
 ```
 
-> Note: Current font `Roboto` may not render glyph correctly. Agent should explore a font if necessary, but **DO NOT** put much effort as all glyphs will be replaced by better representation sprite anyway.
+- Font size should all be **24px**.
+- `{name}`: Center aligned.
+- `{description}`: Center aligned with 1 extra line reserved for line wrapping.
+- `{width} x {height}`: Center aligned. `x` should be at the dead center.
+- `{maxTurns}`: This is a selection component named `MaxTurnsSelector`, with a `❰` and `❱` wrapped.
+  - 2 arrows symbol should be at a fixed position, i.e. **24px** at the nearest edge. The font color is HEX `0xdc9e23`.
+    - This 24px is measured from `InnerPanel`'s own edge, not from the padded content edge (i.e. it sits 12px inside the row's own 12px content padding, not flush with it).
 
-### User Interaction and Visual Effect of Unit Subscene
+### User Interaction and Visual Effect of Stage Page
 
-- All `UnitCards` in `ArchetypesPanel` have click handlers.
-  - If a `UnitCard` is clicked, that `Unit` should be put on the **lowest available** `UnitSlot` in `FormationPanel`.
-    - e.g., If in `FormationPanel` `UnitSlot` 1 is `King`, `UnitSlots` 2 and 5 are `NO_UNIT`, `UnitSlots` 3 and 4 is `Fighter`, when I click `Witch` in `ArchetypePanel`, `Witch` should be put on `UnitSlot 2`.
-  - If all `UserSlots` are full, `UnitCards'` click handlers should do nothing.
-- All `UnitSlots` expcet the middle one (`King`) have click handlers.
-  - Since `King` is always in the middle and can't be removed, there is no click handler for `King` in `UnitSlot`.
-  - If the `UnitSlots` doesn't contain a unit, its click handler should do nothing.
-  - Otherwise, the `Unit` in the clicked `UnitSlot` should be removed, meaning, to free a slot for user to select again from `FormationPanel`.
-  All the put on/off should update `MatchSettingsScene.gameCfg.p{X}Teams` immediately.
-- Under this interaction setup, it's possible to have partial teams in non-continuous order. Player can put on `Units` to all 5 `UnitSlots`, then click `UnitSlots` 2 and 4, causing the team only occupies `UnitSlots` 1, 3, and 5.
-- `NextButton` should react on `FormationPanel's` data.
-  - It should be disabled (with `DISABLED_BUTTON_*` style in `constants.ts`) if only `King` is in `FormationPanel`.
-  - Button handler should be available when there are **2-5** units in `FormationPanel`.
-    - Collect the `p{x}Teams` in string, e.g., If `UnitSlots` 1-5 are `King`, `Fighter`, <Empty>, `Witch`, `Witch` for Team 1, `p1Teams = ['King', 'Fighter', 'NO_UNIT', 'Witch', 'Witch']`. Ref `@engine/game.go` `NoUnit`.
-    - If current subscene is `UnitScene` 1, transitions to `UnitScene` 1.
-    - If current subscene is `UnitScene` 2, transitions to `StageSubscene`.
-- `BackButton`
-  - Since `TitleScene is not ready, `BackButton should have no effect if current subscene is `UnitScene` 1.
-  - If current subscene is `UnitScene` 2, transitions to `UnitScene` 1.
+- All `StageCards` in `StagesPanel` have click handlers.
+  - If a `StageCard` is clicked, the `StageCard` is selected. The other `StageCard` should be unselected.
+  - `StagesDetailPanel` should get the infomation from `stagePresets` and replace all the information inside.
+  - `maxTurns` is a cyclic selection component (`MaxTurnsSelector`). The available selections are: `💣`, `15`, `20`, `30`, `45`, `60`. Note that `💣` means `0` in behind.
+    - Selecting *any* `StageCard` — including re-selecting one whose `maxTurns` was previously customized — always resets `MaxTurnsSelector` to `stagePreset.maxTurns` (that stage's recommended value), discarding any prior customization for that stage. Unlike the other components, it never restores the value from `MatchSettingsScene.gameCfg`.
+      - This applies on `StagePage`'s initial mount too, not just on click: the selector always starts at the selected `StageCard`'s `stagePreset.maxTurns`, even if `MatchSettingsScene.gameCfg.maxTurns` holds a previously customized value (e.g. from a prior visit to this page). Only the selected `StageCard` itself is restored from `gameCfg` (via `gameCfg.stagePreset`) on mount.
+    - Add a click handler for `❰` - clicking this will shift the selection left, e.g., `20 -> 15`. Note that it's cyclic, i.e., `💣 -> 60`.
+    - Add a click handler for `❱` - clicking this will shift the selection right, e.g., `15 -> 20`. Note that it's cyclic, i.e., `60 -> 💣`.
+    - If the currently selected value is `stagePreset.maxTurns`, render a `🌟` with font size **16px** next to the value, meaning it's recommended max turns. Note that it should be a fix position - never move any elements to accommodate it.
+  - Any user interaction in `StagePage` should update `MatchSettingsScene.gameCfg.stagePreset` and `MatchSettingsScene.gameCfg.maxTurns` immediately.
+- `StartMatchButton`:
+  - Since 1 and only 1 `StageCards` is always selected, validation isn't necessary in `StagePage`, i.e., `StartMatchButton` should always enabled.
+  - If Player clicks `StartMatchButton`, follow how `DevBootScene` calls `create()`:
+    - Call `createMatchRoom()` to get `roomId`.
+    - Use `roomId` to `initRoom()`.
+    - Use `roomId` and `MatchSettingsScene.gameCfg` to call `createMatch()`.
+    - `fadeTransition` to `MatchScene` with `roomId` and `playerTokens`.
+  - If `createMatchRoom()` or `createMatch()` fails, report the error and stay on `StagePage` (no transition to `MatchScene`).
 
-## Stage Subscene
-
-The title to be rendered in the `HeaderSection` is `Stage Selection`.
-
-In the footer section, render a **144Wx96Hpx** rounded rectangle button (`StartMatchButton`), using `PANEL_BUTTON_*` style in `constants.ts`. The button should contains `Start Match` in the center. Align the style of  `NextButton` in `UnitSubscene`.
-
-## Misc Updates other than Match Setting Scene
-
-This spec also does cosmetic refinement in `MatchScene`:
-
-- Instead of rendering `bomb` with **24×24px** circle, use **24px** `💣`.
-  - **Countdown** should still be rendere on top of it.
-- Instead of rendering `burn` with 2 triangles in `unitDamagedEvent` and `softBlockDestroyedEvent`, use **42px** `🔥`.
-
-> Note:
-> - Current font `Roboto` may not render glyph correctly. Agent should explore a font if necessary, but **DO NOT** put much effort as all glyphs will be replaced by better representation sprite anyway.
-> - Though it's out of scope, but the reasons to include here:
->   1. Glyphs are closely related to `UnitCard` in this spec.
->   2. Small change to avoid overhead.
 ---
 
 ## Acceptance Criteria
 
-1. Given … When … Then …
-2. Given … When … Then …
+1. Given both Player 1 and Player 2 configure their `Units` in `UnitPage`, and they select the `Stage` in `StagePage`, When Players click `StartMatchButton`, the game creates the `Room` and `Match` and transitions to `MatchScene`.
+2. Given `MatchSettingsScene` boots, When no `DevBootScene` precedes it, Then the app starts directly in `MatchSettingsScene` (no dev-boot scaffolding in the scene list).
+3. Given `StagePage` mounts, Then it renders one `StageCard` per entry in `stagePresets`, each labeled with `stagePreset.name`.
+4. Given `MatchSettingsScene.gameCfg.stagePreset` matches one of the `stagePresets`, When `StagePage` mounts, Then the matching `StageCard` is selected; otherwise the first `StageCard` is selected.
+5. Given a `StageCard` is selected, When Player clicks a different `StageCard`, Then the clicked card becomes selected (bordered), the previously selected card is unselected, and `StageDetailPanel` immediately replaces its content with the newly selected preset's details.
+6. Given any `StageCard` is clicked (including re-clicking the already-selected one), Then `MaxTurnsSelector` resets to that `stagePreset.maxTurns`, discarding any prior customization — this includes `StagePage`'s initial mount, which always seeds from the selected preset's `maxTurns` rather than from `gameCfg.maxTurns`.
+7. Given `MaxTurnsSelector` is showing some value, When Player clicks `❰` or `❱`, Then the value cycles to the previous/next entry in `[💣, 15, 20, 30, 45, 60]`, wrapping at both ends (`💣 -> 60` on left from `💣`, `60 -> 💣` on right from `60`), and `MatchSettingsScene.gameCfg.maxTurns` is committed immediately.
+8. Given `MaxTurnsSelector`'s current value equals the selected preset's `maxTurns`, Then the 🌟 recommended glyph is shown next to it; otherwise it is hidden, without shifting any neighboring element's position.
+9. Given `StagePage` is currently active, `StartMatchButton` is always enabled (never rendered disabled), since a `StageCard` is always selected.
+10. Given `StagePage` is currently active, When Player clicks `StartMatchButton`, Then the scene calls `createMatchRoom()`, `initRoom()`, `createMatch()` with `gameCfg` in sequence and `fadeTransition`s to `MatchScene` with the resulting `roomId` and `playerTokens`.
+11. Given `createMatchRoom()` or `createMatch()` fails, When Player clicks `StartMatchButton`, Then `MatchSettingsScene` reports the error and does not transition to `MatchScene`.
+12. Given `MatchSettingsScene.create()` runs (fresh boot or re-entry from `MatchScene`'s Return to Settings), Then it unconditionally `fadeIn`s, completing the `fadeTransition` pair regardless of which Scene preceded it.

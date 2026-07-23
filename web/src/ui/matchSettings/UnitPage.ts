@@ -12,7 +12,7 @@ import {
 import type { PageBounds, SettingsPage, SettingsPageNav } from './SettingsPage';
 import { drawUnitSprite } from '../../rendering/boardRenderer';
 import { drawPillButton, attachRectClickHandler, type PillButtonStyle } from '../pillButton';
-import { colorToCss, destroyAll } from '../gameObjectUtils';
+import { colorToCss, destroyAll, centeredRowStartX } from '../gameObjectUtils';
 import {
   TEAM_COLORS,
   TEAM_COLOR_FALLBACK,
@@ -187,8 +187,13 @@ export default class UnitPage implements SettingsPage {
 
     const rowY = bounds.y + UNIT_FORMATION_HEADER_FONT_SIZE + UNIT_SLOT_SPACING;
     const order = this.slotDisplayOrder();
-    const rowWidth = order.length * UNIT_SLOT_SIZE + (order.length - 1) * UNIT_SLOT_SPACING;
-    const rowStartX = bounds.x + (bounds.width - rowWidth) / 2;
+    const rowStartX = centeredRowStartX(
+      bounds.x,
+      bounds.width,
+      order.length,
+      UNIT_SLOT_SIZE,
+      UNIT_SLOT_SPACING
+    );
     order.forEach((slotIndex, displayPos) => {
       const slotX = rowStartX + displayPos * (UNIT_SLOT_SIZE + UNIT_SLOT_SPACING);
       this.renderUnitSlot(slotIndex, slotX, rowY);
@@ -243,7 +248,6 @@ export default class UnitPage implements SettingsPage {
   }
 
   // ---- ArchetypesPanel ----
-  // No scrolling yet. A static grid is rendered once; click handlers read this.slots live.
 
   private renderArchetypesPanel(): void {
     const scene = this.scene;
@@ -259,14 +263,17 @@ export default class UnitPage implements SettingsPage {
     this.archetypes.forEach((archetype, i) => {
       const row = Math.floor(i / ARCHETYPES_PER_ROW);
       const col = i % ARCHETYPES_PER_ROW;
-      // Each row is centered on its own card count, not left-stuck in a full-width grid — e.g.
-      // today's 2-archetype row sits centered as its own pair.
       const cardsInRow =
         row === rowCount - 1
           ? this.archetypes.length - row * ARCHETYPES_PER_ROW
           : ARCHETYPES_PER_ROW;
-      const rowWidth = cardsInRow * UNIT_CARD_WIDTH + (cardsInRow - 1) * UNIT_CARD_SPACING;
-      const rowStartX = bounds.x + (bounds.width - rowWidth) / 2;
+      const rowStartX = centeredRowStartX(
+        bounds.x,
+        bounds.width,
+        cardsInRow,
+        UNIT_CARD_WIDTH,
+        UNIT_CARD_SPACING
+      );
       const x = rowStartX + col * (UNIT_CARD_WIDTH + UNIT_CARD_SPACING);
       const y = panelY + row * (UNIT_CARD_HEIGHT + UNIT_CARD_SPACING);
       this.renderUnitCard(archetype, x, y);
@@ -307,8 +314,6 @@ export default class UnitPage implements SettingsPage {
     nameText.setOrigin(0.5);
     this.archetypeObjects.push(nameText);
 
-    // 2 separate Text objects so the gap between speed and 💣 is an exact pixel value, not a
-    // literal-space approximation.
     const statsY = nameY + UNIT_CARD_LINE_GAP;
     const speedText = scene.add.text(
       cx - UNIT_CARD_STAT_GLYPH_GAP / 2,
@@ -365,7 +370,6 @@ export default class UnitPage implements SettingsPage {
     }
     destroyAll(this.navObjects);
 
-    // Flush against the NavRegion's right edge (the region is already inset by the scene margin).
     const x = bounds.x + bounds.width - SETTINGS_NAV_BUTTON_WIDTH;
     const y = bounds.y + bounds.height / 2 - SETTINGS_NAV_BUTTON_HEIGHT / 2;
     const enabled = occupiedCount(this.slots) >= 2;
