@@ -5,7 +5,7 @@ import {
   occupantGraphics,
   lastGraphics,
   pointerDownOf,
-  errorTextByMessage,
+  textByContent,
   flush,
   tweenConfigAt,
   fireShutdown,
@@ -920,7 +920,7 @@ describe('MatchScene', () => {
     pointerDownOf(moveButtonGraphics!)();
     await flush();
 
-    const staleErrorText = errorTextByMessage('tiles unavailable');
+    const staleErrorText = textByContent('tiles unavailable');
     expect(staleErrorText.destroy).not.toHaveBeenCalled();
 
     // Now successfully submit a Move for the same unit — a fresh turn-command action.

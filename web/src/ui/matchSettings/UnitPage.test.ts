@@ -26,7 +26,13 @@ function navBounds(): PageBounds {
 }
 
 function nav(overrides: Partial<SettingsPageNav> = {}): SettingsPageNav {
-  return { goNext: vi.fn(), goBack: vi.fn(), startMatch: vi.fn(), ...overrides };
+  return {
+    goNext: vi.fn(),
+    goBack: vi.fn(),
+    startMatch: vi.fn(),
+    exitToTitle: vi.fn(),
+    ...overrides,
+  };
 }
 
 function page(playerIndex: 1 | 2, cfg: GameCfg, n: SettingsPageNav = nav()): UnitPage {
@@ -238,22 +244,26 @@ describe('UnitPage — NextButton', () => {
 });
 
 describe('UnitPage — BackButton delegation', () => {
-  it('Player 1: handleBack is a no-op (AC 13)', () => {
+  it('Player 1: handleBack exits to TitleScene (p3-spec011 AC 5)', () => {
     const goBack = vi.fn();
-    const p = page(1, makeCfg(), nav({ goBack }));
+    const exitToTitle = vi.fn();
+    const p = page(1, makeCfg(), nav({ goBack, exitToTitle }));
 
     p.handleBack();
 
+    expect(exitToTitle).toHaveBeenCalled();
     expect(goBack).not.toHaveBeenCalled();
   });
 
-  it('Player 2: handleBack navigates to UnitPage 1 (AC 14)', () => {
+  it('Player 2: handleBack navigates to UnitPage 1 (AC 14, p3-spec011 AC 6)', () => {
     const goBack = vi.fn();
-    const p = page(2, makeCfg(), nav({ goBack }));
+    const exitToTitle = vi.fn();
+    const p = page(2, makeCfg(), nav({ goBack, exitToTitle }));
 
     p.handleBack();
 
     expect(goBack).toHaveBeenCalled();
+    expect(exitToTitle).not.toHaveBeenCalled();
   });
 });
 

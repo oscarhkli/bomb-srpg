@@ -34,7 +34,12 @@ export function createMockGraphics() {
 
 export function createMockText() {
   return {
+    x: 0,
+    y: 0,
     height: 16,
+    width: 100,
+    setInteractive: vi.fn().mockReturnThis(),
+    on: vi.fn().mockReturnThis(),
     setOrigin: vi.fn().mockReturnThis(),
     setDepth: vi.fn().mockReturnThis(),
     setScrollFactor: vi.fn().mockReturnThis(),
@@ -88,6 +93,7 @@ export const mockScene = {
   scene: { restart: vi.fn(), start: vi.fn() },
   sys: { game: { config: { width: 1280, height: 720 } } },
   load: {
+    font: vi.fn(),
     image: vi.fn(),
     spritesheet: vi.fn(),
     atlas: vi.fn(),

@@ -58,9 +58,24 @@ export function textCalls(): [number, number, string, ...unknown[]][] {
   return mockScene.add.text.mock.calls as unknown as [number, number, string, ...unknown[]][];
 }
 
-export function errorTextByMessage(message: string): ReturnType<typeof mockScene.add.text> {
-  const index = textCalls().findIndex(c => c[2] === message);
+export function textByContent(content: string): ReturnType<typeof mockScene.add.text> {
+  const index = textCalls().findIndex(c => c[2] === content);
+  if (index === -1) {
+    throw new Error(`no text created with content "${content}"`);
+  }
   return textAt(index);
+}
+
+// Finds and invokes a Text mock's listener for the given pointer event (e.g. 'pointerover').
+export function fireTextPointerEvent(
+  text: ReturnType<typeof mockScene.add.text>,
+  event: string
+): void {
+  const call = text.on.mock.calls.find(c => c[0] === event);
+  if (!call) {
+    throw new Error(`no listener registered for "${event}"`);
+  }
+  (call[1] as () => void)();
 }
 
 export function pointerDownOf(g: ReturnType<typeof mockScene.add.graphics>): () => void {

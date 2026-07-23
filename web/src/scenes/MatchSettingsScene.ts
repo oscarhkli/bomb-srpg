@@ -93,6 +93,7 @@ export default class MatchSettingsScene extends Phaser.Scene {
       goNext: () => this.goToPage(this.currentPageIndex + 1),
       goBack: () => this.goToPage(this.currentPageIndex - 1),
       startMatch: () => this.startMatch(),
+      exitToTitle: () => this.exitToTitle(),
     };
     this.pages = [
       new UnitPage(1, this.gameCfg, catalog.archetypes, nav),
@@ -138,15 +139,13 @@ export default class MatchSettingsScene extends Phaser.Scene {
     this.renderActivePage();
   }
 
-  // Page swap = fadeTransition: fade out, destroy the outgoing Page, render the incoming one,
-  // fade in. BackButton persists across the swap untouched.
-  private goToPage(index: number): void {
-    const target = this.pages[index];
-    if (!target || this.isTransitioning) {
+  // Fades out, then runs onFadedOut — unless the scene was torn down/recreated mid-fade
+  // (generation check) or another transition is already in flight.
+  private fadeOutThen(onFadedOut: () => void): void {
+    if (this.isTransitioning) {
       return;
     }
     this.isTransitioning = true;
-    // Guards against a stale callback firing after the scene was torn down/recreated.
     const gen = this.generation;
     this.cameras.main.fadeOut(FADE_MS, 0, 0, 0);
     this.cameras.main.once('camerafadeoutcomplete', () => {
@@ -154,11 +153,28 @@ export default class MatchSettingsScene extends Phaser.Scene {
         this.isTransitioning = false;
         return;
       }
+      onFadedOut();
+    });
+  }
+
+  // Page swap = fadeTransition: fade out, destroy the outgoing Page, render the incoming one,
+  // fade in. BackButton persists across the swap untouched.
+  private goToPage(index: number): void {
+    if (!this.pages[index]) {
+      return;
+    }
+    this.fadeOutThen(() => {
       this.pages[this.currentPageIndex]?.destroy();
       this.currentPageIndex = index;
       this.renderActivePage();
       this.cameras.main.fadeIn(FADE_MS);
       this.isTransitioning = false;
+    });
+  }
+
+  private exitToTitle(): void {
+    this.fadeOutThen(() => {
+      this.scene.start('TitleScene');
     });
   }
 
