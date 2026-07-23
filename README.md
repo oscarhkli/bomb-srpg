@@ -7,22 +7,30 @@ Phase 3 (Phaser UI) — in progress. See [docs/roadmap.md](/docs/roadmap.md) for
 
 ## Prerequisites
 
-To build and run this project, you need to install **Go** on your system. 
+To build and run this project, you need to install **Go** and **Node.js** (with npm) on your system.
+
+Install frontend dependencies once:
+
+```bash
+cd web && npm install
+```
 
 ---
 
-## Usage (backend only version)
+## Usage
 
-Build the project and run the Web Server:
+Build the project and run the Web Server (must be running first — the frontend proxies API calls to it):
 
 ```bash
-# Build
-make build-server
-
-# Run web server
-./bin/srpg-web
+make run-server
 ```
 
-Then go to http://localhost:8080/debug_board.html to view the debug board and play with the [test.http file](/scripts/test.http), or simply use `curl`.
+Start the frontend dev server:
+
+```bash
+make web-dev
+```
+
+Then go to http://localhost:5173.
 
 [Visit oscarhkli.com for more](https://oscarhkli.com/)
