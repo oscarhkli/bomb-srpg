@@ -1221,13 +1221,13 @@ describe('MatchScene', () => {
       expect(mockScene.cameras.main.fadeIn).toHaveBeenCalledWith(200);
     });
 
-    it('does not call rematch() on a normal (non-rematch) create()', async () => {
+    it('does not call rematch() on a normal (non-rematch) create(), but still fades in (fadeTransition)', async () => {
       queueMatchStates(makeState({ grid: [[plainTile()]] }));
 
       await bootScene();
 
       expect(rematch).not.toHaveBeenCalled();
-      expect(mockScene.cameras.main.fadeIn).not.toHaveBeenCalled();
+      expect(mockScene.cameras.main.fadeIn).toHaveBeenCalledWith(200);
     });
 
     it('return to settings: fades out and calls deleteMatch() concurrently, then starts MatchSettingsScene once both settle', async () => {
@@ -1338,6 +1338,9 @@ describe('MatchScene', () => {
       vi.mocked(resetTurn).mockResolvedValue(undefined);
 
       await bootScene({ playerTokens: ['team1-token', 'team2-token'] });
+      // create() itself fades in (fadeTransition entry) — clear it so the assertions below only
+      // observe the Reset flow's own fadeOut/fadeIn pair.
+      mockScene.cameras.main.fadeIn.mockClear();
 
       const unitGraphics = occupantGraphics(0);
       const grid = terrainGraphics();

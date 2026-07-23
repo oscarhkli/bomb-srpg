@@ -204,6 +204,42 @@ export const SETTINGS_NAV_BUTTON_HEIGHT = 96;
 export const NEXT_BUTTON_LABEL = 'NEXT →';
 export const START_MATCH_BUTTON_LABEL = 'Start Match';
 
+// StagePage — StagesPanel / StageDetailPanel split the body region 60/40.
+export const STAGES_PANEL_WIDTH_RATIO = 0.6;
+export const STAGE_DETAIL_PANEL_WIDTH_RATIO = 0.4;
+export const STAGE_PANEL_PADDING = 12;
+
+// StagesPanel / StageCard
+export const STAGE_CARD_SIZE = 160;
+export const STAGE_CARD_PADDING = 12;
+export const STAGE_CARD_SPACING = 12;
+export const STAGE_CARD_NAME_FONT_SIZE = 36;
+// Reuses PANEL_BUTTON_BORDER_COLOR (0xdc9e23) for the selected-card border.
+export const STAGE_CARD_SELECTED_BORDER_WIDTH = 4;
+
+// StageDetailPanel / InnerPanel
+export const STAGE_DETAIL_INNER_PANEL_SIZE_RATIO = 0.8;
+export const STAGE_DETAIL_INNER_PANEL_PADDING = 12;
+// Matches SETTINGS_TEXT_FONT_SIZE.
+export const STAGE_DETAIL_ROW_FONT_SIZE = 24;
+export const STAGE_DETAIL_ROW_GAP = 12;
+// Description row reserves 2 lines of height (1 extra for wrapping), regardless of whether the
+// current description actually wraps.
+export const STAGE_DETAIL_DESCRIPTION_LINES = 2;
+// Horizontal offset of the width/height numbers from the centered "x" glyph on that row.
+export const STAGE_DETAIL_WIDTH_HEIGHT_GAP = 12;
+
+// MaxTurnsSelector — inside StageDetailPanel's InnerPanel, 4th row.
+export const MAX_TURNS_ARROW_LEFT_LABEL = '❰';
+export const MAX_TURNS_ARROW_RIGHT_LABEL = '❱';
+// Fixed inset of each arrow from InnerPanel's nearest edge.
+export const MAX_TURNS_ARROW_INSET = 24;
+export const MAX_TURNS_RECOMMENDED_GLYPH = '🌟';
+export const MAX_TURNS_RECOMMENDED_FONT_SIZE = 16;
+// Reserved gap between the maxTurns value and the (possibly-hidden) recommended-glyph slot, so
+// the glyph's fixed slot never shifts other elements when toggled visible/hidden.
+export const MAX_TURNS_RECOMMENDED_GLYPH_GAP = 20;
+
 // VictoryCutscene — above every other overlay, since it's the terminal screen.
 export const DEPTH_VICTORY_CUTSCENE = 80;
 // Named by size tier, not line position: the draw case's single "Draw Game" line uses the

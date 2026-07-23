@@ -124,8 +124,7 @@ export default class TurnCommandPanel {
     this.panelObjects.push(...objects);
   }
 
-  // Per spec: while ConfirmDialog is open, the panel's own buttons (including Back) are not
-  // interactive — "No" is the only rollback path out of the confirmPending state.
+  // Disabled while ConfirmDialog is open — "No" is the only rollback path.
   private onBackButtonClick(): void {
     if (this.callbacks.isConfirmOpen() || this.callbacks.isLocked()) {
       return;

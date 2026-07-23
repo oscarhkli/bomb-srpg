@@ -14,6 +14,7 @@ export interface PageBounds {
 export interface SettingsPageNav {
   goNext: () => void;
   goBack: () => void;
+  startMatch: () => void;
 }
 
 // A swappable content view within MatchSettingsScene's body (VISUAL_VOCAB "Page"). The scene's
