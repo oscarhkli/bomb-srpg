@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import './style.css';
 import MatchScene from './scenes/MatchScene';
 import MatchSettingsScene from './scenes/MatchSettingsScene';
+import TitleScene from './scenes/TitleScene';
 
 new Phaser.Game({
   type: Phaser.AUTO,
@@ -12,6 +13,6 @@ new Phaser.Game({
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
-  // MatchSettingsScene first = auto-starts on load.
-  scene: [MatchSettingsScene, MatchScene],
+  // TitleScene first = auto-starts on load.
+  scene: [TitleScene, MatchSettingsScene, MatchScene],
 });

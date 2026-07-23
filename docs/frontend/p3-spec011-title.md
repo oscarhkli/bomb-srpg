@@ -69,6 +69,10 @@ Sample as below:
   - `fadeTransition` to `MatchSettingsScene`.
   - Once the transition starts, further clicks on any option are ignored.
 
+## Font Loading
+
+As the boot scene, `TitleScene` preloads the game font in `preload()` via Phaser's `this.load.font()` from self-hosted files (`web/public/fonts/`), so the font is registered before any text rasterizes. This supersedes p3-spec003's `<link>`-tag mechanism: stylesheet fonts load lazily on first DOM use, and canvas text never triggers that fetch, so Phaser `Text` could rasterize permanently in the fallback font.
+
 ## User Interaction of MatchSettingsScene
 
 Since we now have `TitleScene`, when Player clicks `BackButton` in `UnitPage` for Player **1** in `MatchSettingsScene`, `MatchSettingsScene` should `fadeTransition` to `TitleScene`.
@@ -85,3 +89,7 @@ Since we now have `TitleScene`, when Player clicks `BackButton` in `UnitPage` fo
 6. Given `UnitPage` for Player 2, When Player clicks `BackButton`, Then it still goes to `UnitPage` for Player 1, not `TitleScene`.
 7. Given Player returned to `TitleScene` from `MatchSettingsScene`, When Player clicks `Start Game`, Then `MatchSettingsScene` shows default settings.
 8. Given `TitleScene` is shown, Then `CopyrightText` shows the current calendar year.
+
+## Log
+
+Implementation issues found during the build (non spec gaps) are tracked in [p3-spec011-title-log.md](./p3-spec011-title-log.md).

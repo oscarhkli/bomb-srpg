@@ -153,10 +153,12 @@ export default class UnitPage implements SettingsPage {
     this.renderNextButton();
   }
 
-  // P1: no-op (TitleScene isn't reachable yet). P2: back to UnitPage 1.
+  // P1: back to TitleScene. P2: back to UnitPage 1.
   handleBack(): void {
     if (this.playerIndex === 2) {
       this.nav.goBack();
+    } else {
+      this.nav.exitToTitle();
     }
   }
 

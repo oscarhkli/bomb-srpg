@@ -41,8 +41,8 @@ export const DEPTH_TURN_COMMAND_PANEL = 30;
 export const DEPTH_CONFIRM_DIALOG = 40;
 export const DEPTH_ERROR_PANEL = 50;
 
-// Phase 3.3's first UI text — single font referenced everywhere via this constant so it can
-// be swapped later without touching call sites. Loaded via a <link> tag in index.html.
+// Single font referenced everywhere so it can be swapped without touching call sites.
+// Self-hosted in public/fonts/, loaded via TitleScene.preload().
 export const GAME_FONT_FAMILY = "'Roboto', sans-serif";
 
 export const DISABLED_BUTTON_COLOR = 0x999999;
@@ -82,9 +82,7 @@ export const TURN_PANEL_PADDING = 8;
 export const TURN_PANEL_TEXT_COLOR = 0xeeeeee;
 export const SUDDEN_DEATH_COLOR = 0xff0000;
 
-// Shared pill-button size for the "big" lifecycle-style buttons: ResolveTurnButton,
-// ResetTurnButton, SurrenderButton, MatchSummaryPanelBackButton, and VictoryCutscene's
-// Rematch/Return-to-Settings — distinct from TurnCommandPanel's smaller PANEL_BUTTON_* size.
+// Shared pill-button size for lifecycle-style buttons, distinct from PANEL_BUTTON_*.
 export const LIFECYCLE_BUTTON_WIDTH = 320;
 export const LIFECYCLE_BUTTON_HEIGHT = 72;
 export const RESOLVE_BUTTON_LABEL = 'End this turn';
@@ -131,15 +129,12 @@ export const MATCH_SUMMARY_TOP_SECTION_RATIO = 0.15;
 export const MATCH_SUMMARY_MID_SECTION_RATIO = 0.35;
 // Vertical breathing room between the top (Stage/Max Turns) and mid (team stats) sections.
 export const MATCH_SUMMARY_SECTION_GAP = 24;
-// Smaller pill-button height shared by MatchSummaryPanel's TurnLifeCycleButtons and
-// VictoryCutscene's Rematch/Return-to-Settings buttons — down from the full LIFECYCLE_BUTTON_HEIGHT
-// (72px), same width, unscaled font.
+// Smaller pill-button height shared by panel/cutscene buttons; same width as LIFECYCLE_BUTTON_WIDTH.
 export const LIFECYCLE_BUTTON_HEIGHT_SMALL = 44;
 // P1/P2 badge behind the mid-section's team headers, filled with that team's TEAM_COLORS entry.
 export const MATCH_SUMMARY_TEAM_BADGE_WIDTH = 96;
 export const MATCH_SUMMARY_TEAM_BADGE_HEIGHT = 48;
 export const MATCH_SUMMARY_TEAM_BADGE_CORNER_RADIUS = 8;
-// Button labels/prompts, unprefixed like RESOLVE_BUTTON_LABEL.
 export const RESET_BUTTON_LABEL = 'Reset this turn';
 export const SURRENDER_BUTTON_LABEL = 'Surrender';
 export const BACK_BUTTON_LABEL = 'Back';
@@ -147,7 +142,7 @@ export const CONFIRM_TEXT_RESOLVE = 'Confirm to end this turn?';
 export const CONFIRM_TEXT_RESET = 'All turn actions will reset. Confirm?';
 export const CONFIRM_TEXT_SURRENDER = 'Confirm to surrender?';
 
-// MatchSettingsScene (p3-spec009-stage) — chrome shared by every Page.
+// MatchSettingsScene — chrome shared by every Page.
 export const SETTINGS_SCENE_MARGIN = 24;
 // Both HeaderRegion and NavRegion are this tall.
 export const SETTINGS_REGION_HEIGHT = 84;
@@ -177,7 +172,6 @@ export const UNIT_FORMATION_HEADER_FONT_SIZE = 36;
 export const UNIT_SLOT_SIZE = 96;
 export const UNIT_SLOT_SPACING = 12;
 export const UNIT_SLOT_ORDER_LABEL_INSET = 4;
-// Matches SETTINGS_TEXT_FONT_SIZE.
 export const UNIT_SLOT_ORDER_LABEL_FONT_SIZE = 24;
 // The order-number label must render above the slot's unit sprite (they overlap); the sprite
 // itself is left at Phaser's default depth (0).
@@ -197,8 +191,7 @@ export const UNIT_CARD_LINE_GAP = 32;
 export const UNIT_CARD_STAT_GLYPH_GAP = 12;
 export const ARCHETYPES_PER_ROW = 4;
 
-// NavRegion buttons (NextButton / StartMatchButton) — pill(144, 96), overriding
-// PANEL_BUTTON_WIDTH/HEIGHT while keeping PANEL_BUTTON_* fill/border colors.
+// NavRegion buttons (NextButton / StartMatchButton).
 export const SETTINGS_NAV_BUTTON_WIDTH = 144;
 export const SETTINGS_NAV_BUTTON_HEIGHT = 96;
 export const NEXT_BUTTON_LABEL = 'NEXT →';
@@ -214,36 +207,39 @@ export const STAGE_CARD_SIZE = 160;
 export const STAGE_CARD_PADDING = 12;
 export const STAGE_CARD_SPACING = 12;
 export const STAGE_CARD_NAME_FONT_SIZE = 36;
-// Reuses PANEL_BUTTON_BORDER_COLOR (0xdc9e23) for the selected-card border.
 export const STAGE_CARD_SELECTED_BORDER_WIDTH = 4;
 
 // StageDetailPanel / InnerPanel
 export const STAGE_DETAIL_INNER_PANEL_SIZE_RATIO = 0.8;
 export const STAGE_DETAIL_INNER_PANEL_PADDING = 12;
-// Matches SETTINGS_TEXT_FONT_SIZE.
 export const STAGE_DETAIL_ROW_FONT_SIZE = 24;
 export const STAGE_DETAIL_ROW_GAP = 12;
-// Description row reserves 2 lines of height (1 extra for wrapping), regardless of whether the
-// current description actually wraps.
 export const STAGE_DETAIL_DESCRIPTION_LINES = 2;
 // Horizontal offset of the width/height numbers from the centered "x" glyph on that row.
 export const STAGE_DETAIL_WIDTH_HEIGHT_GAP = 12;
 
-// MaxTurnsSelector — inside StageDetailPanel's InnerPanel, 4th row.
+// MaxTurnsSelector — inside StageDetailPanel's InnerPanel.
 export const MAX_TURNS_ARROW_LEFT_LABEL = '❰';
 export const MAX_TURNS_ARROW_RIGHT_LABEL = '❱';
 // Fixed inset of each arrow from InnerPanel's nearest edge.
 export const MAX_TURNS_ARROW_INSET = 24;
 export const MAX_TURNS_RECOMMENDED_GLYPH = '🌟';
 export const MAX_TURNS_RECOMMENDED_FONT_SIZE = 16;
-// Reserved gap between the maxTurns value and the (possibly-hidden) recommended-glyph slot, so
-// the glyph's fixed slot never shifts other elements when toggled visible/hidden.
+// Fixed slot for the recommended glyph so toggling it never shifts the layout.
 export const MAX_TURNS_RECOMMENDED_GLYPH_GAP = 20;
+
+// TitleScene
+export const TITLE_TOP_MARGIN = 48;
+export const TITLE_FONT_SIZE = 48;
+export const TITLE_GAME_MODE_FONT_SIZE = 24;
+export const TITLE_COPYRIGHT_BOTTOM_MARGIN = 12;
+export const TITLE_COPYRIGHT_FONT_SIZE = 16;
+// Hover indicator: the 💣 renders this many px left of the hovered game mode option.
+export const TITLE_HOVER_BOMB_GAP = 24;
 
 // VictoryCutscene — above every other overlay, since it's the terminal screen.
 export const DEPTH_VICTORY_CUTSCENE = 80;
-// Named by size tier, not line position: the draw case's single "Draw Game" line uses the
-// TITLE size, matching the non-draw case's 2nd (bigger) line, not a literal "line 2".
+// Named by size tier, not line position: the draw case's single line uses the TITLE size.
 export const VICTORY_SUBTITLE_FONT_SIZE = 36;
 export const VICTORY_TITLE_FONT_SIZE = 48;
 // Vertical offset of each text line's center from the banner's own vertical center.

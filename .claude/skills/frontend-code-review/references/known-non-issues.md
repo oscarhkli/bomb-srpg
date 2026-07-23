@@ -17,3 +17,11 @@ Patterns previously flagged by this skill that the user confirmed are not actual
 **Why not an issue:** A Scene's `Clock` (`this.time`) and `TweenManager` (`this.tweens`) are both per-scene systems managed by the Scene's own lifecycle — per the installed `time-and-timers`/`scenes` Phaser 4 skill docs, the Clock is "managed by scene lifecycle events (`PRE_UPDATE`, `UPDATE`, `SHUTDOWN`, `DESTROY`)" and `scene.stop()` "clears display list and timers." Phaser already cancels pending `delayedCall`s and tweens when the owning scene shuts down — no manual `this.events.once('shutdown', ...)` cleanup is needed for timers/tweens specifically (as opposed to e.g. external event listeners or DOM references, which genuinely do need manual cleanup).
 
 **Revisit if:** a future Phaser version changes this behavior, or code introduces a custom scene-transition path (e.g. reusing a live Scene instance across matches without a real `stop()`/`shutdown()`) that could bypass the normal lifecycle.
+
+## Repeated fade-out → `camerafadeoutcomplete` → `scene.start`/`restart` idiom across scenes
+
+**Applies to:** `TitleScene`, `MatchSettingsScene` (`fadeOutThen`, `startMatch`), `MatchScene` (reset rebuild, rematch, return-to-settings).
+
+**Why not an issue:** DRY-by-coincidence — the call sites share a surface shape but differ semantically: rebuild-in-place with no scene change, `restart` with data, fades raced via `Promise.all` against network calls with different guards (`isTransitioning`+generation vs `victoryActionTaken`). A shared helper would need parameters for every variant and per-scene guard state, costing more than the ~8 duplicated lines. User decided (2026-07-23) to keep the copies.
+
+**Revisit if:** two or more call sites converge to genuinely identical semantics (same guard, same completion action), or a bug is traced to the copies drifting.

@@ -241,14 +241,17 @@ describe('MatchSettingsScene — BackButton', () => {
     fireCameraFadeOutComplete();
   }
 
-  it('does nothing on UnitPage 1 (AC 13)', async () => {
+  it('fadeTransitions to TitleScene on UnitPage 1 (p3-spec011 AC 5)', async () => {
     mockCatalog();
     await bootScene();
 
     const backButtonGraphics = allGraphics()[0]!;
     clickPointerdown(backButtonGraphics);
 
-    expect(mockScene.cameras.main.fadeOut).not.toHaveBeenCalled();
+    expect(mockScene.cameras.main.fadeOut).toHaveBeenCalledWith(200, 0, 0, 0);
+    fireCameraFadeOutComplete();
+
+    expect(mockScene.scene.start).toHaveBeenCalledWith('TitleScene');
   });
 
   it('returns from UnitPage 2 to UnitPage 1 (AC 14)', async () => {
