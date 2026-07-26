@@ -33,23 +33,27 @@ specs:
     completion-date: 2026-07-16
   - file: p3-spec009-stage.md
     status: Done
-    category: MatchScene
+    category: MatchSettingsScene
     completion-date: 2026-07-22
   - file: p3-spec010-stage.md
     status: Done
-    category: MatchScene
+    category: MatchSettingsScene
     completion-date: 2026-07-23
   - file: p3-spec011-title.md
-    status: Ready
+    status: Done
     category: TitleScene
-    completion-date:
-  - file: p3-spec012-match.md
+    completion-date: 2026-07-23
+  - file: p3-spec012-sprites.md
     status: Parked Draft
-    category: StageSetupScene
+    category: Sprites
     completion-date:
-  - file: p3-spec013-match.md
+  - file: p3-spec020-match.md
     status: Parked Draft
-    category: LoungeScene
+    category: match
+    completion-date:
+  - file: p3-spec030-match.md
+    status: Parked Draft
+    category: match
     completion-date:
   - file: p5-spec001-match.md
     status: Parked Draft

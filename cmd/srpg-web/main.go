@@ -25,14 +25,14 @@ func main() {
 	serverState.StartCleanupLoop(ctx, server.CleanupInterval)
 
 	r := http.NewServeMux()
-	fs := http.FileServer(http.Dir("./web/public"))
+	fs := http.FileServer(http.Dir("./web/dist"))
 	r.Handle("GET /", fs)
 
 	server.RegisterRoutes(r, handler)
 
 	s := &http.Server{
 		Addr:         ":8080",
-		Handler:      r,
+		Handler:      server.SecurityHeaders(server.RecoverPanic(logger, r)),
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 5 * time.Second,
 	}

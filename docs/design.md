@@ -164,6 +164,7 @@ bomb-srpg
 │
 ├── server/                     <-- Phase 2: HTTP Web server package
 │   ├── http_handlers.go        <-- REST HTTP interface boundary
+│   ├── middleware.go           <-- HTTP middleware: security headers, panic recovery
 │   ├── routes.go               <-- HTTP route registration
 │   ├── server_manager.go       <-- Web server memory manager, state locks & housekeeper
 │   └── ws_hub.go               <-- Phase 5: WebSocket connection event pump

@@ -20,11 +20,12 @@ Specs will be written prior to development—partly handcrafted, and partly gene
 | [Phase 3.6: Victory Cutscene and Rematch](p3-spec006-match.md) | MatchScene | Done | 2026-07-14 |
 | [Phase 3.7: MatchScene Render-Path Cleanup](p3-spec007-match.md) | MatchScene | Done | 2026-07-16 |
 | [Phase 3.8: Surrender, Reset, and MatchSummaryPanel](p3-spec008-match.md) | MatchScene | Done | 2026-07-16 |
-| [Phase 3.9: Match Settings Scene](p3-spec009-stage.md) | MatchScene | Done | 2026-07-22 |
-| [Phase 3.10: Match Settings Scene - Stage Page](p3-spec010-stage.md) | MatchScene | Done | 2026-07-23 |
-| [Phase 3.11: Title Scene](p3-spec011-title.md) | TitleScene | Draft | — |
-| [Phase 3.12: Render Occupant Information](p3-spec012-match.md) | StageSetupScene | Parked Draft | — |
-| [Phase 3.13: Render Camera Navigation](p3-spec013-match.md) | LoungeScene | Parked Draft | — |
+| [Phase 3.9: Match Settings Scene](p3-spec009-stage.md) | MatchSettingsScene | Done | 2026-07-22 |
+| [Phase 3.10: Match Settings Scene - Stage Page](p3-spec010-stage.md) | MatchSettingsScene | Done | 2026-07-23 |
+| [Phase 3.11: Title Scene](p3-spec011-title.md) | TitleScene | Done | 2026-07-23 |
+| [Phase 3.12: Swapping Sprites for All Existing Vector Graphics](p3-spec012-sprites.md) | Sprites | Parked Draft | — |
+| [Phase 3.x: Render Camera Navigation](p3-spec020-match.md) | match | Parked Draft | — |
+| [Phase 3.x: Render Camera Navigation](p3-spec030-match.md) | match | Parked Draft | — |
 | [Phase 5.1: 2.5D Isometric Grid](p5-spec001-match.md) | MatchScene | Parked Draft | — |
 <!-- END SPEC TABLE -->
 
