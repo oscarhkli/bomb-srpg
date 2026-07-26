@@ -38,11 +38,8 @@ func TestServerStateManager_CreateMatchRoom(t *testing.T) {
 				if id == "" {
 					t.Fatal("Expected non-empty room ID")
 				}
-				if len(id) != 5 {
-					t.Errorf("Expected ID length 5, got %d: %s", len(id), id)
-				}
-				if !isValidCrockfordCode(id) {
-					t.Errorf("ID contains invalid characters: %s", id)
+				if len(id) != 10 {
+					t.Errorf("Expected ID length 10, got %d: %s", len(id), id)
 				}
 				roomVal, ok := s.Rooms.Load(id)
 				if !ok {
@@ -70,7 +67,7 @@ func TestServerStateManager_CreateMatchRoom(t *testing.T) {
 				if id == "ABCDE" {
 					t.Fatal("Returned ID should not match pre-seeded ID")
 				}
-				if len(id) != 5 || !isValidCrockfordCode(id) {
+				if len(id) != 10 {
 					t.Errorf("Invalid generated ID: %s", id)
 				}
 				if _, ok := s.Rooms.Load("ABCDE"); !ok {
@@ -90,13 +87,13 @@ func TestServerStateManager_CreateMatchRoom(t *testing.T) {
 				for _, id := range roomIDs {
 					s.Rooms.Store(id, &MatchRoom{ID: id})
 				}
-				s.generateRoomID = func(int) string {
+				s.generateRoomID = func(int) (string, error) {
 					if callCount < len(roomIDs) {
 						id := roomIDs[callCount]
 						callCount++
-						return id
+						return id, nil
 					}
-					return "SHOULD_NOT_REACH"
+					return "SHOULD_NOT_REACH", nil
 				}
 				return s
 			},
@@ -109,6 +106,22 @@ func TestServerStateManager_CreateMatchRoom(t *testing.T) {
 					if _, ok := s.Rooms.Load(existing); !ok {
 						t.Errorf("Predefined room %s missing", existing)
 					}
+				}
+			},
+		},
+		{
+			name: "Error thrown during geneateRoomID",
+			setup: func() *ServerStateManager {
+				s := NewServerStateManager()
+				s.generateRoomID = func(int) (string, error) {
+					return "", errors.New("bad things happened")
+				}
+				return s
+			},
+			wantErr: true,
+			validate: func(t *testing.T, s *ServerStateManager, id string, err error) {
+				if id != "" {
+					t.Errorf("Expected empty ID on error, got: %s", id)
 				}
 			},
 		},
@@ -126,6 +139,7 @@ func TestServerStateManager_CreateMatchRoom(t *testing.T) {
 	}
 }
 
+// dropped in RoomID but will be used in RoomKey in online mtulti-player mode phase
 func isValidCrockfordCode(s string) bool {
 	const alphabet = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 	for _, c := range s {
@@ -1266,7 +1280,7 @@ func TestServerStateManager_cleanupInactiveRooms(t *testing.T) {
 	roomVal, _ := s.Rooms.Load(roomID2)
 	room := roomVal.(*MatchRoom)
 	room.mu.Lock()
-	room.LastActivity = time.Now().Add(-12 * time.Minute)
+	room.LastActivity = time.Now().Add(-120 * time.Minute)
 	room.mu.Unlock()
 
 	// Room 3: ended match

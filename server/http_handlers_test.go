@@ -238,8 +238,8 @@ func TestHandleCreateMatchRoom(t *testing.T) {
 			t.Fatalf("Failed to decode response JSON payload: %v", err)
 		}
 
-		if len(response.ID) != 5 {
-			t.Errorf("Handler returned unexpected Match Room ID: got %v want length of 5", response.ID)
+		if got, want := len(response.ID), 10; got != want {
+			t.Errorf("Handler returned unexpected Match Room ID: got %v want length of %v", response.ID, want)
 		}
 	})
 
@@ -269,13 +269,13 @@ func TestHandleCreateMatchRoom(t *testing.T) {
 			s.Rooms.Store(id, &MatchRoom{ID: id})
 		}
 		callCount := 0
-		s.generateRoomID = func(int) string {
+		s.generateRoomID = func(int) (string, error) {
 			if callCount < len(roomIDs) {
 				id := roomIDs[callCount]
 				callCount++
-				return id
+				return id, nil
 			}
-			return "SHOULD_NOT_REACH"
+			return "SHOULD_NOT_REACH", nil
 		}
 
 		req, _ := http.NewRequest("POST", "/api/match-rooms", nil)

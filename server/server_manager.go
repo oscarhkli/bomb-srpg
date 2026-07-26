@@ -4,12 +4,12 @@ import (
 	"bomb-srpg/engine"
 	"context"
 	cryptorand "crypto/rand"
+	"crypto/subtle"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
 	"maps"
-	"math/rand/v2"
 	"net/http"
 	"slices"
 	"sync"
@@ -17,10 +17,9 @@ import (
 )
 
 const (
-	roomIDLength          = 5
-	crockfordAlphabet     = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
-	RoomInactivityTimeout = 10 * time.Minute
-	CleanupInterval       = 10 * time.Minute
+	roomIDBytes           = 5
+	RoomInactivityTimeout = 60 * time.Minute
+	CleanupInterval       = 60 * time.Minute
 )
 
 var (
@@ -88,7 +87,7 @@ type MatchRoom struct {
 
 type ServerStateManager struct {
 	Rooms          sync.Map
-	generateRoomID func(int) string
+	generateRoomID func(int) (string, error)
 	Logger         *slog.Logger
 }
 
@@ -103,17 +102,11 @@ func WithLogger(logger *slog.Logger) Option {
 }
 
 // NewServerStateManager constructs a new ServerStateManager with an empty room map.
-// It uses the Crockford32 alphabet to generate collision-resistant room IDs.
+// It generates collision-resistant room IDs.
 func NewServerStateManager(opts ...Option) *ServerStateManager {
 	manager := &ServerStateManager{
-		generateRoomID: func(length int) string {
-			code := make([]byte, length)
-			for i := range length {
-				code[i] = crockfordAlphabet[rand.IntN(len(crockfordAlphabet))]
-			}
-			return string(code)
-		},
-		Logger: slog.Default(),
+		generateRoomID: randomHex,
+		Logger:         slog.Default(),
 	}
 	for _, opt := range opts {
 		opt(manager)
@@ -127,9 +120,12 @@ func NewServerStateManager(opts ...Option) *ServerStateManager {
 func (s *ServerStateManager) CreateMatchRoom() (string, error) {
 	maxRetry := 5
 
-	var id string
 	for range maxRetry {
-		id = s.generateRoomID(roomIDLength)
+		id, err := s.generateRoomID(roomIDBytes)
+		if err != nil {
+			s.Logger.Warn("failed to generate room ID", "error", err)
+			return "", fmt.Errorf("failed to generate room ID: %w", err)
+		}
 		room := &MatchRoom{
 			ID:           id,
 			Match:        nil,
@@ -145,8 +141,8 @@ func (s *ServerStateManager) CreateMatchRoom() (string, error) {
 	return "", fmt.Errorf("room unavailable: failed to generate a MatchRoom ID after %d times of retry", maxRetry)
 }
 
-func generatePlayerToken() (string, error) {
-	b := make([]byte, 16)
+func randomHex(byteLength int) (string, error) {
+	b := make([]byte, byteLength)
 	if _, err := cryptorand.Read(b); err != nil {
 		return "", err
 	}
@@ -156,7 +152,7 @@ func generatePlayerToken() (string, error) {
 func generatePlayerTokens() ([2]string, error) {
 	var tokens [2]string
 	for i := range 2 {
-		token, err := generatePlayerToken()
+		token, err := randomHex(16)
 		if err != nil {
 			return [2]string{}, fmt.Errorf("failed to generate playerToken for Player %d: %w", i, err)
 		}
@@ -203,17 +199,21 @@ func (mr *MatchRoom) validatePlayerToken(teamID int, token string) error {
 		return ErrInvalidConfig
 	}
 
-	if mr.PlayerTokens[idx] != token {
+	if !matchToken(mr.PlayerTokens[idx], token) {
 		return ErrInvalidToken
 	}
 	return nil
 }
 
 func (mr *MatchRoom) validateAnyMatchPlayerToken(token string) error {
-	if mr.PlayerTokens[0] != token && mr.PlayerTokens[1] != token {
+	if !matchToken(mr.PlayerTokens[0], token) && !matchToken(mr.PlayerTokens[1], token) {
 		return ErrInvalidToken
 	}
 	return nil
+}
+
+func matchToken(a, b string) bool {
+	return subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1
 }
 
 func (s *ServerStateManager) roomReadyForMatch(roomID string) (*MatchRoom, error) {
@@ -244,8 +244,8 @@ func (s *ServerStateManager) createMatchLocked(room *MatchRoom, gameCfg engine.G
 
 	match, err := engine.InitGame(gameCfg)
 	if err != nil {
-		room.Logger.Error("invalid game config", "error", err)
-		return nil, fmt.Errorf("%w: gameCfg=%+v: %v", ErrInvalidConfig, gameCfg, err)
+		room.Logger.Error("invalid game config", "gameCfg", gameCfg, "error", err)
+		return nil, fmt.Errorf("%w: %v", ErrInvalidConfig, err)
 	}
 
 	return match, nil
@@ -353,8 +353,8 @@ func (s *ServerStateManager) SubmitTurnCommand(roomID string, cmd engine.TurnCom
 
 	gameEvents, err := room.Match.ApplyTurnCommand(cmd)
 	if err != nil {
-		room.Logger.Error("invalid turn command", "turnCmdType", cmd.Type, "error", err)
-		return nil, fmt.Errorf("%w: turnCommand=%+v: %v", ErrInvalidTurnCmd, cmd, err)
+		room.Logger.Error("invalid turn command", "turnCommand", cmd, "error", err)
+		return nil, fmt.Errorf("%w: %v", ErrInvalidTurnCmd, err)
 	}
 
 	room.LastActivity = time.Now()
