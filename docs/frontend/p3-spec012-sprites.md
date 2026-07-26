@@ -1,8 +1,8 @@
 ---
-title: "Phase 3.12: Render Occupant Information"
+title: "Phase 3.12: Swapping Sprites for All Existing Vector Graphics"
 ---
 
-# Render Occupant Information
+# Swapping Sprites for All Existing Vector Graphics
 
 Ignore the below as it's only a copied template.
 
