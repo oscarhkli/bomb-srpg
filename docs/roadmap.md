@@ -67,18 +67,33 @@
 
 Refer to [Frontend README](frontend/README.md)
 
-## Phase 4: Cloud Deployment
+## Phase 4a: Cloud Deployment
 - **Goal:** Deploy the game publicly so anyone can play via a URL without local setup.
 - **Scope:** Containerize, provision cloud VM / managed service, configure HTTPS, domain, health checks, graceful shutdown. CI/CD pipeline.
 - **DoD:** Game accessible at a stable public URL. Two players on different networks can complete a match. Zero local build required.
 
 ### TODO
+- [x] Security Checks - OWASP, etc.
 - [ ] Dockerfile
 - [ ] Choose hosting
 - [ ] CI/CD
 - [ ] HTTPS + custom domain
 - [ ] Health endpoint + graceful shutdown verification
 - [ ] Load test?
+
+## Phase 4b: Add Sprites
+- **Goal:** Include sprites for all occupants and tiles instead of roughly made symbols so that the UI is more presentable.
+- **Scope:** Add unit, bomb, soft block sprites and tile maps.
+- **DoD:** Game feels like units interact with each other rather than the symbols moving on their own.
+
+### TODO
+- [ ] Archetypes / Units
+- [ ] Bombs
+- [ ] Effects in match
+- [ ] Tilemap
+- [ ] In-game text
+- [ ] Game Menu
+- [ ] Title Scene
 
 ## Phase 5a: UI Refinement (Polish Pass)
 - **Goal:** Elevate the rough local client to a presentable, responsive, accessible experience.
@@ -88,19 +103,13 @@ Refer to [Frontend README](frontend/README.md)
 ### TODO
 - [ ] Mobile-responsive layout
 
-## Phase 5b: Add WebSockets
-- **Goal:** Upgrade the networking layer to support live, real-time online multiplayer between separate machines.
-- **Scope:** Connection pool management in Go, game room/lobby routers, and client disconnect handling.
-- **DoD:** Two players on completely separate computers/browsers can join a unique game room via a URL and play a full match with real-time UI synchronization without manual page refreshes.
+## Phase 5b: Add Computer Player with AI
+- **Goal:** Introduce a single-player mode against an automated opponent.
+- **Scope:** Heuristic-based enemy unit logic running inside an asynchronous backend goroutine worker.
+- **DoD:** A player can play a match against a local AI opponent that automatically calculates and executes its movements when its turn segment activates.
 
 ### TODO
-- [ ] WebSockets setup
-- [ ] Multiplayer management
-  - [ ] Join/leave room
-  - [ ] Join/leave match
-  - [ ] GameCfg + Team formation
-  - [ ] Interruption handling
-- [ ] Room config mutability after creation
+- [ ] Risk management???
 
 ## Phase 6a: More Character Classes & Skills
 - **Goal:** Expand game depth by transitioning from basic stats to a flexible, component-based unit and ability engine.
@@ -120,13 +129,19 @@ Refer to [Frontend README](frontend/README.md)
 - [ ] Terrains: Lava, Water
 - [ ] Softblock with / without items
 
-## Phase 7: Add Computer Player with AI
-- **Goal:** Introduce a single-player mode against an automated opponent.
-- **Scope:** Heuristic-based enemy unit logic running inside an asynchronous backend goroutine worker.
-- **DoD:** A player can play a match against a local AI opponent that automatically calculates and executes its movements when its turn segment activates.
+## Phase 6c: Add WebSockets
+- **Goal:** Upgrade the networking layer to support live, real-time online multiplayer between separate machines.
+- **Scope:** Connection pool management in Go, game room/lobby routers, and client disconnect handling.
+- **DoD:** Two players on completely separate computers/browsers can join a unique game room via a URL and play a full match with real-time UI synchronization without manual page refreshes.
 
 ### TODO
-- [ ] Risk management???
+- [ ] WebSockets setup
+- [ ] Multiplayer management
+  - [ ] Join/leave room
+  - [ ] Join/leave match
+  - [ ] GameCfg + Team formation
+  - [ ] Interruption handling
+- [ ] Room config mutability after creation
 
 ## Wish list
 - Story Mode (pre-req: Computer Player)

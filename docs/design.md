@@ -7,9 +7,7 @@
 - **State Sandboxing Pattern**: At the start of a turn, the engine clones the definitive `GameState` into a temporary `WorkingState` sandbox. All mid-turn actions (moving, placing bombs, picking up power-ups) alter this sandbox layer.
   - A `/reset` or `ResetTurn()` command discards the sandbox and re-clones the definitive checkpoint (`m.TrueState`), wiping any uncommitted player actions.
   - A `/commit` or `ResolveTurn()` command executes batch-resolution loops against the sandbox, advances the timeline, and permanently promotes the sandboxed state to the master history via a deep-copy clone.
-
-* **Batch Resolution**: All damage calculations, terrain updates, bomb explosions, and chain reactions are deferred until a turn is committed. The resolution engine runs synchronously and returns a chronological `Animation Event Queue` string/binary array payload to the client.
-
+- **Batch Resolution**: All damage calculations, terrain updates, bomb explosions, and chain reactions are deferred until a turn is committed. The resolution engine runs synchronously and returns a chronological `Animation Event Queue` string/binary array payload to the client.
 - **Synchronous Execution Bound**: Given the low-density metrics (16x16 maximum matrix, <= 10 active characters), all grid lookups, BFS pathfinding, and explosion cascade evaluations are run synchronously to avoid multi-threaded race conditions.
 
 ## 2. Spatial Mapping & State Model Definitions
@@ -17,9 +15,7 @@
 - **Stage Dimensions**: Dynamic N x M grid layout (supporting ranges from 7x7 up to a maximum bound of 16x16).
 - **Storage Type**: Rows are allocated via dynamic Go slices (`[][]Tile`) to support custom asymmetrical maps without recompiling code.
 - **Coordinate Mapping**: Layout is indexed as `Grid[Y][X]`. The top-left corner of the map is designated as `(0,0)`.
-
-* **Dynamic Boundary Rule**: Every check evaluates dynamically against active bounds: `0 <= X < len(grid)` and `0 <= Y < len(grid)`.
-
+- **Dynamic Boundary Rule**: Every check evaluates dynamically against active bounds: `0 <= X < len(grid)` and `0 <= Y < len(grid)`.
 - **Memory Normalization**: The Board Matrix tracks tile references via minimal structural fields (`OccupantType`, `OccupantID`). The GameState Engine maintains the master map directory of active entities. Moving an object updates only the cell metadata, leaving base entity metrics untouched.
 
 ## 3. Strongly Typed Identity Contracts & Bitmask Configurations
@@ -122,10 +118,11 @@ Surrender: `POST /surrender` (either team, any time).
 
 - **State exposure**: `WorkingState` only (sandbox), never `TrueState`
 - **Surrender**: Either team, validated as 1 or 2
-- **Locking**: Global `mu` (Phase 2), per-room deferred to Phase 4
-- **Stale cleanup**: 10min timeout, 30s interval, `LastActivity` updated on every request
+- **Locking**: Per-room `sync.RWMutex` on each `MatchRoom`; the room table itself is a `sync.Map` (no global manager mutex)
+- **Stale cleanup**: 60min timeout, 60min interval, `LastActivity` updated on every request
 - **CreateMatch**: Full GameCfg required (Phase 2); partial/join deferred to Phase 4
-- **Player authorization with anonymous tokens**: Room IDs and UnitIDs are guessable. Any client with a room ID can impersonate any player. The solution is to adopt per-team cryptographically random tokens generated and stored in a new Match, returned once in `CreateMatchResponse`. Token will be validated in mutation endpoints. No restriction to read-only enpoints at the moment.
+- **Player authorization with anonymous tokens**: Room IDs and UnitIDs are guessable. Any client with a room ID can impersonate any player. The solution is to adopt per-team cryptographically random tokens generated and stored in a new Match, returned once in `CreateMatchResponse`. Token will be validated in mutation endpoints via constant-time comparison (`crypto/subtle.ConstantTimeCompare`). No restriction to read-only enpoints at the moment.
+- **Security hardening (`server/middleware.go`)**: `SecurityHeaders` middleware sets baseline hardening headers on every response (`X-Content-Type-Options`, `X-Frame-Options`, HSTS, CSP, `Referrer-Policy`). `RecoverPanic` middleware turns a handler panic into a structured log entry and a clean 500 instead of a dropped connection. Room IDs are generated via `crypto/rand` + hex encoding, not a predictable scheme.
 
 ## 9. Phase 3 Frontend Toolchain & Decisions
 
@@ -137,7 +134,7 @@ Surrender: `POST /surrender` (either team, any time).
 - **Logical Resolution**: Fixed at `1280x720` to simplify UI layout math (16×9 aspect ratio).
 - **Tile Size**: `48px` per cell provides visual clarity on standard desktop monitors while fitting 16x16 grids in viewport.
 - **Mock Mode**: TitleScene includes an offline-play button for development (test game flow without backend connectivity).
-- **Input Model**: Click-only interaction for Phase 3 (keyboard shortcuts deferred to Phase 5 polish pass).
+- **Input Model**: Click-only interaction for Phase 3 (keyboard shortcuts deferred to Phase 5+ polish pass).
 - **Retro Art Strategy**: Phaser Graphics API generates all visuals procedurally (no sprite sheets required):
   - **Tiles**: Colored rectangles with borders.
   - **Units**: Geometric shapes (circles, triangles, pentagons, stars) tinted by team color.
@@ -167,7 +164,7 @@ bomb-srpg
 │   ├── middleware.go           <-- HTTP middleware: security headers, panic recovery
 │   ├── routes.go               <-- HTTP route registration
 │   ├── server_manager.go       <-- Web server memory manager, state locks & housekeeper
-│   └── ws_hub.go               <-- Phase 5: WebSocket connection event pump
+│   └── ws_hub.go               <-- Phase 5+: WebSocket connection event pump
 │
 ├── docs/                       <-- Design, roadmap and other docs
 ├── engine/                     <-- Pure core logic
@@ -202,7 +199,7 @@ The game flow operates through a decoupled presentation layer managed entirely o
      - Map presets (Stages)
      - Max Turn limitations
      - Character Archetype choices for 2 Teams, etc.
-   - Action Button: Clicking `[Start Game]` validates choices, bundles the parameters into a `GameCfg` JSON structure, and sends a `POST /api/match/create` network request to the Go backend room manager.
+   - Action Button: Clicking `[Start Game]` validates choices, bundles the parameters into a `GameCfg` JSON structure, and sends a `POST /api/match-rooms` request to create a room, followed by `POST /api/match-rooms/{roomId}/match` to create the match within it.
 
 3. **The Active Gameplay Canvas**
    - Phaser.js captures the initialized `WorkingState` JSON reply from the server and instantly renders the 2D grid matrix world.
@@ -213,7 +210,7 @@ The game flow operates through a decoupled presentation layer managed entirely o
 
 To preserve strategic depth and prevent infinite execution exploits within a single sandbox turn planning cycle, each individual `Unit` is strictly bounded by a rigid action economy:
 
-- **The Rule of 1-Move & 1-Bomb**: Within a single turn loop, an active character unit is permitted to execute a maximum of **one move action** and **one bomb placement action**.
+- **The Rule of 1-Move & 1-Bomb**: Within a single turn loop, all alive character units are permitted to execute a maximum of **one move action** and **one bomb placement action** each.
 - **Order Independent**: The execution sequence is completely flexible. A unit may choose to:
   - Move first, then drop a bomb.
   - Drop a bomb first, then move away.

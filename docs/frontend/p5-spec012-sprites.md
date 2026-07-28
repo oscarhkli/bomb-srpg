@@ -1,5 +1,5 @@
 ---
-title: "Phase 3.12: Swapping Sprites for All Existing Vector Graphics"
+title: "Phase 5.12: Swapping Sprites for All Existing Vector Graphics"
 ---
 
 # Swapping Sprites for All Existing Vector Graphics
