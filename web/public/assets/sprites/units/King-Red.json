@@ -1,10 +1,10 @@
 { "frames": [
    {
     "filename": "King #Red.aseprite",
-    "frame": { "x": 0, "y": 0, "w": 19, "h": 37 },
+    "frame": { "x": 0, "y": 0, "w": 64, "h": 64 },
     "rotated": false,
-    "trimmed": true,
-    "spriteSourceSize": { "x": 22, "y": 11, "w": 19, "h": 37 },
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 64, "h": 64 },
     "sourceSize": { "w": 64, "h": 64 },
     "duration": 100
    }
@@ -14,7 +14,7 @@
   "version": "1.x-dev",
   "image": "King-Red.png",
   "format": "RGBA8888",
-  "size": { "w": 19, "h": 37 },
+  "size": { "w": 64, "h": 64 },
   "scale": "1"
  }
 }
