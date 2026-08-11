@@ -3,6 +3,7 @@ import { mockScene } from '../test/setup';
 import {
   firstGraphics as terrainGraphics,
   occupantGraphics,
+  occupantSprite,
   lastGraphics,
   pointerDownOf,
   textByContent,
@@ -37,6 +38,8 @@ import {
   DEPTH_OCCUPANT,
   SUDDEN_DEATH_BOMB_DROP_DURATION_MS,
   CONFIRM_TEXT_RESET,
+  MATCH_CAMERA_WIDTH,
+  MATCH_CAMERA_HEIGHT,
 } from '../constants';
 
 vi.mock('../engine/api');
@@ -69,17 +72,15 @@ async function bootScene(overrides: Partial<MatchSceneData> = {}): Promise<Match
   return scene;
 }
 
-// The "≡" MatchSummaryButton's Graphics, at the same index formula as occupantGraphics.
-function matchSummaryButtonGraphics(unitCount: number): ReturnType<typeof mockScene.add.graphics> {
-  return occupantGraphics(unitCount);
+// The "≡" MatchSummaryButton's Graphics. Units/softBlocks/bombs are Sprites/Containers now, not
+// Graphics, so the button is always the first Graphics after the grid.
+function matchSummaryButtonGraphics(): ReturnType<typeof mockScene.add.graphics> {
+  return occupantGraphics(0);
 }
 
 // Opens MatchSummaryPanel then clicks one of its 4 lifecycle buttons.
-function clickSummaryPanelButton(
-  unitCount: number,
-  button: 'resolve' | 'reset' | 'surrender' | 'back'
-): void {
-  pointerDownOf(matchSummaryButtonGraphics(unitCount))();
+function clickSummaryPanelButton(button: 'resolve' | 'reset' | 'surrender' | 'back'): void {
+  pointerDownOf(matchSummaryButtonGraphics())();
   const offset = { resolve: 1, reset: 2, surrender: 3, back: 4 }[button];
   const buttonGraphics = lastGraphics(5)[offset]!;
   pointerDownOf(buttonGraphics)();
@@ -97,10 +98,10 @@ async function expectActionStackClearedBy(
 
   await bootScene();
 
-  pointerDownOf(occupantGraphics(0))();
+  pointerDownOf(occupantSprite(0))();
   const [moveButtonGraphics] = lastGraphics(3);
 
-  clickSummaryPanelButton(1, button);
+  clickSummaryPanelButton(button);
 
   expect(moveButtonGraphics!.destroy).toHaveBeenCalled();
 }
@@ -108,7 +109,7 @@ async function expectActionStackClearedBy(
 // Drives the full UI path (click unit -> click Move/Bomb -> click allowed tile -> click Yes)
 // assuming getAllowedTiles is mocked to resolve with exactly one tile.
 async function submitViaUI(
-  unitGraphics: ReturnType<typeof mockScene.add.graphics>,
+  unitGraphics: ReturnType<typeof mockScene.add.sprite>,
   buttonIndex: 0 | 1 // 0 = Move, 1 = Bomb
 ): Promise<void> {
   pointerDownOf(unitGraphics)(); // opens TurnCommandPanel
@@ -166,22 +167,52 @@ describe('MatchScene', () => {
     consoleSpy.mockRestore();
   });
 
-  it('centers camera on a 3x2 grid', async () => {
+  describe('camera setup', () => {
+    it('adds a 640x320 camera as main, scrolled to world origin, and removes the pre-existing default camera', async () => {
+      // cameras.add(..., makeMain: true) only repoints `.main` — it never removes the scene's
+      // auto-created default camera, so MatchScene must remove it explicitly or render through
+      // two overlapping cameras (the spec requires exactly one).
+      const defaultCamera = mockScene.cameras.main;
+
+      await bootScene();
+
+      expect(mockScene.cameras.add).toHaveBeenCalledWith(
+        0,
+        0,
+        MATCH_CAMERA_WIDTH,
+        MATCH_CAMERA_HEIGHT,
+        true,
+        expect.any(String)
+      );
+      const added = mockScene.cameras.add.mock.results[0]!.value as ReturnType<
+        typeof mockScene.cameras.add
+      >;
+      expect(mockScene.cameras.main).toBe(added);
+      expect(added.setScroll).toHaveBeenCalledWith(0, 0);
+      expect(mockScene.cameras.remove).toHaveBeenCalledWith(defaultCamera);
+    });
+
+    it('never accumulates un-removed cameras across repeated scene entries', async () => {
+      await bootScene();
+      const firstCamera = mockScene.cameras.main;
+
+      fireShutdown();
+      await bootScene();
+
+      // Each create() removes whatever camera was main beforehand, so the prior entry's camera
+      // is always paired with a removal — net active cameras never grow across re-entries.
+      expect(mockScene.cameras.add).toHaveBeenCalledTimes(2);
+      expect(mockScene.cameras.remove).toHaveBeenCalledWith(firstCamera);
+    });
+  });
+
+  it('never centers the camera on the grid — it stays scrolled to world origin, anchoring the grid top-left of GameBoardRegion', async () => {
     const row = (): Tile[] => [plainTile(), plainTile(), plainTile()];
     queueMatchStates(makeState({ grid: [row(), row()] }));
 
     await bootScene();
 
-    expect(mockScene.cameras.main.centerOn).toHaveBeenCalledWith(72, 48);
-  });
-
-  it('centers camera on a differently-sized 5x7 grid', async () => {
-    const row = (): Tile[] => Array.from({ length: 5 }, plainTile);
-    queueMatchStates(makeState({ grid: Array.from({ length: 7 }, row) }));
-
-    await bootScene();
-
-    expect(mockScene.cameras.main.centerOn).toHaveBeenCalledWith(120, 168);
+    expect(mockScene.cameras.main.centerOn).not.toHaveBeenCalled();
   });
 
   it('calls initToken exactly once at turn start (beginTurn), not on unit click', async () => {
@@ -193,7 +224,7 @@ describe('MatchScene', () => {
     expect(initToken).toHaveBeenCalledOnce();
 
     const graphicsBefore = mockScene.add.graphics.mock.calls.length;
-    pointerDownOf(occupantGraphics(0))();
+    pointerDownOf(occupantSprite(0))();
 
     // TurnCommandPanel.openFor draws 3 new button Graphics (Move/Bomb/Back), but initToken is
     // not called again — it already fired once for this turn in beginTurn().
@@ -210,7 +241,7 @@ describe('MatchScene', () => {
     expect(initToken).toHaveBeenCalledOnce();
 
     const graphicsBefore = mockScene.add.graphics.mock.calls.length;
-    pointerDownOf(occupantGraphics(0))();
+    pointerDownOf(occupantSprite(0))();
 
     expect(initToken).toHaveBeenCalledOnce();
     expect(consoleSpy).toHaveBeenCalledWith('Unit 7 is clicked', unit);
@@ -225,7 +256,7 @@ describe('MatchScene', () => {
 
     await bootScene();
 
-    const onUnitPointerDown = pointerDownOf(occupantGraphics(0));
+    const onUnitPointerDown = pointerDownOf(occupantSprite(0));
 
     // Open the panel, click Move, close it, reopen, click Move again.
     onUnitPointerDown();
@@ -250,7 +281,7 @@ describe('MatchScene', () => {
 
     await bootScene();
 
-    const onUnitPointerDown = pointerDownOf(occupantGraphics(0));
+    const onUnitPointerDown = pointerDownOf(occupantSprite(0));
     onUnitPointerDown();
 
     const [moveButtonGraphics] = lastGraphics(3);
@@ -321,13 +352,15 @@ describe('MatchScene', () => {
 
     await bootScene();
 
-    const unitGraphics = occupantGraphics(0);
+    const unitGraphics = occupantSprite(0);
     await submitViaUI(unitGraphics, 0);
     await flush();
 
     expect(submitTurnCommand).toHaveBeenCalledWith({ type: 'move', unitId: 7, target });
+    // On this 1x2 grid, centered in GameBoardRegion: toCenter.cx=256 (moved one tile right from
+    // fromCenter.cx=224); groundY for row 0 is 192 (unaffected — same row).
     expect(mockScene.tweens.add).toHaveBeenCalledWith(
-      expect.objectContaining({ targets: unitGraphics, x: 48, y: 0, ease: 'Linear' })
+      expect.objectContaining({ targets: unitGraphics, x: 256, y: 192, ease: 'Linear' })
     );
   });
 
@@ -359,14 +392,15 @@ describe('MatchScene', () => {
 
     await bootScene();
 
-    const unitGraphics = occupantGraphics(0);
+    const unitGraphics = occupantSprite(0);
     await submitViaUI(unitGraphics, 1);
     await flush();
 
     expect(submitTurnCommand).toHaveBeenCalledWith({ type: 'placeBomb', unitId: 7, target });
     // In-place render (renderBomb), not a wholesale swap: a bomb container is drawn at the
-    // target tile center (tileCenter of {x:1,y:0} = 72,24) and the initial unit graphics survives.
-    expect(mockScene.add.container).toHaveBeenCalledWith(72, 24, expect.any(Array));
+    // target tile center (tileCenter of {x:1,y:0} on this 1x2 grid, centered in GameBoardRegion
+    // => 256,160) and the initial unit graphics survives.
+    expect(mockScene.add.container).toHaveBeenCalledWith(256, 160, expect.any(Array));
     expect(unitGraphics.destroy).not.toHaveBeenCalled();
   });
 
@@ -407,7 +441,7 @@ describe('MatchScene', () => {
 
     await bootScene();
 
-    const unitGraphics = occupantGraphics(0);
+    const unitGraphics = occupantSprite(0);
     await submitViaUI(unitGraphics, 1); // clicks Bomb (index 1)
     await flush();
 
@@ -432,7 +466,7 @@ describe('MatchScene', () => {
     await bootScene();
 
     const gridGraphics = terrainGraphics();
-    const unitGraphics = occupantGraphics(0);
+    const unitGraphics = occupantSprite(0);
     await submitViaUI(unitGraphics, 0);
     await flush();
 
@@ -463,7 +497,7 @@ describe('MatchScene', () => {
 
     await bootScene();
 
-    const unitGraphics = occupantGraphics(0);
+    const unitGraphics = occupantSprite(0);
     await submitViaUI(unitGraphics, 0);
     await flush();
 
@@ -499,12 +533,14 @@ describe('MatchScene', () => {
 
     await bootScene();
 
-    const unitGraphics = occupantGraphics(0);
+    const unitGraphics = occupantSprite(0);
     await submitViaUI(unitGraphics, 0);
     await flush();
 
+    // On this 1x2 grid, centered in GameBoardRegion: fromCenter.cx=224, toCenter.cx=256 (moved
+    // one tile right, delta +32); groundY for row 0 is 192 (unaffected — same row).
     expect(mockScene.tweens.add).toHaveBeenCalledWith(
-      expect.objectContaining({ targets: unitGraphics, x: 48, y: 0, ease: 'Linear' })
+      expect.objectContaining({ targets: unitGraphics, x: 256, y: 192, ease: 'Linear' })
     );
     expect(mockScene.add.text).not.toHaveBeenCalledWith(
       expect.any(Number),
@@ -534,14 +570,15 @@ describe('MatchScene', () => {
 
     await bootScene();
 
-    const unitGraphics = occupantGraphics(0);
+    const unitGraphics = occupantSprite(0);
     await submitViaUI(unitGraphics, 0);
     await flush();
 
-    // The tween follows the server's `to` (x:2 → 96px), not the requested x:1 (48px), and no
-    // error is raised — the client renders the server's authoritative event verbatim.
+    // The tween follows the server's `to` (x:2), not the requested x:1, and no error is raised —
+    // the client renders the server's authoritative event verbatim. On this 1x3 grid, centered
+    // in GameBoardRegion: toCenter.cx=272 (vs. the requested tile's 240); groundY row 0 is 192.
     expect(mockScene.tweens.add).toHaveBeenCalledWith(
-      expect.objectContaining({ targets: unitGraphics, x: 96, y: 0, ease: 'Linear' })
+      expect.objectContaining({ targets: unitGraphics, x: 272, y: 192, ease: 'Linear' })
     );
     expect(mockScene.add.text).not.toHaveBeenCalledWith(
       expect.any(Number),
@@ -572,7 +609,7 @@ describe('MatchScene', () => {
     await bootScene();
 
     const gridGraphics = terrainGraphics(); // painted once at scene entry
-    const unitGraphics = occupantGraphics(0);
+    const unitGraphics = occupantSprite(0);
     const refetchesBefore = vi.mocked(getMatchState).mock.calls.length;
 
     await submitViaUI(unitGraphics, 0);
@@ -598,7 +635,7 @@ describe('MatchScene', () => {
 
     await bootScene();
 
-    const unitGraphics = occupantGraphics(0);
+    const unitGraphics = occupantSprite(0);
     pointerDownOf(unitGraphics)();
     const [moveButtonGraphics] = lastGraphics(3);
     pointerDownOf(moveButtonGraphics!)();
@@ -628,7 +665,7 @@ describe('MatchScene', () => {
 
     await bootScene();
 
-    const unitGraphics = occupantGraphics(0);
+    const unitGraphics = occupantSprite(0);
     pointerDownOf(unitGraphics)();
     const [moveButtonGraphics] = lastGraphics(3);
     pointerDownOf(moveButtonGraphics!)();
@@ -697,15 +734,15 @@ describe('MatchScene', () => {
 
     await bootScene();
 
-    const unitGraphics = occupantGraphics(0);
+    const unitGraphics = occupantSprite(0);
     await submitViaUI(unitGraphics, 0);
     await flush();
 
-    // The mock Graphics object never actually animates (tweens.add is a no-op spy), so simulate
+    // The mock Sprite object never actually animates (tweens.add is a no-op spy), so simulate
     // the first tween having completed by advancing the object's position ourselves before the
     // second move — this is what the real Phaser tween would have left it at.
     unitGraphics.x = 48;
-    unitGraphics.y = 0;
+    unitGraphics.y = 48;
 
     pointerDownOf(unitGraphics)();
     const [moveButtonGraphics] = lastGraphics(3);
@@ -718,7 +755,7 @@ describe('MatchScene', () => {
     await flush();
 
     expect(mockScene.tweens.add).toHaveBeenLastCalledWith(
-      expect.objectContaining({ targets: unitGraphics, x: 96, y: 0 })
+      expect.objectContaining({ targets: unitGraphics, x: 80, y: 48 })
     );
   });
 
@@ -755,7 +792,7 @@ describe('MatchScene', () => {
 
     await bootScene({ playerTokens: ['team1-token', 'team2-token'] });
 
-    clickSummaryPanelButton(0, 'resolve');
+    clickSummaryPanelButton('resolve');
   }
 
   it('pins MatchSummaryButton to the camera viewport (scrollFactor 0) instead of the grid/world', async () => {
@@ -763,7 +800,7 @@ describe('MatchScene', () => {
 
     await bootScene();
 
-    expect(matchSummaryButtonGraphics(0).setScrollFactor).toHaveBeenCalledWith(0);
+    expect(matchSummaryButtonGraphics().setScrollFactor).toHaveBeenCalledWith(0);
   });
 
   it('shows an error instead of crashing when MatchSummaryButton is clicked before match config has loaded', async () => {
@@ -772,7 +809,7 @@ describe('MatchScene', () => {
 
     await bootScene();
 
-    expect(() => pointerDownOf(matchSummaryButtonGraphics(0))()).not.toThrow();
+    expect(() => pointerDownOf(matchSummaryButtonGraphics())()).not.toThrow();
     expect(mockScene.add.text).toHaveBeenCalledWith(
       expect.any(Number),
       expect.any(Number),
@@ -798,7 +835,7 @@ describe('MatchScene', () => {
 
     // Drive the Move flow until the shared ConfirmDialog is open (click unit -> Move ->
     // allowed tile). At this point confirmDialog.isOpen is true.
-    pointerDownOf(occupantGraphics(0))();
+    pointerDownOf(occupantSprite(0))();
     const [moveButtonGraphics] = lastGraphics(3);
     pointerDownOf(moveButtonGraphics!)();
     await flush();
@@ -807,7 +844,7 @@ describe('MatchScene', () => {
 
     // Clicking Resolve must still surface the resolve prompt (previously the open confirm
     // caused an early return and nothing happened).
-    clickSummaryPanelButton(1, 'resolve');
+    clickSummaryPanelButton('resolve');
 
     expect(mockScene.add.text).toHaveBeenCalledWith(
       expect.any(Number),
@@ -884,9 +921,9 @@ describe('MatchScene', () => {
 
     await bootScene({ playerTokens: ['team1-token', 'team2-token'] });
 
-    const unitGraphics = occupantGraphics(0);
+    const unitGraphics = occupantSprite(0);
 
-    clickSummaryPanelButton(1, 'resolve');
+    clickSummaryPanelButton('resolve');
     const [, yesButtonGraphics] = lastGraphics(3);
     pointerDownOf(yesButtonGraphics!)();
     await flush();
@@ -914,7 +951,7 @@ describe('MatchScene', () => {
 
     await bootScene();
 
-    const unitGraphics = occupantGraphics(0);
+    const unitGraphics = occupantSprite(0);
     pointerDownOf(unitGraphics)();
     const [moveButtonGraphics] = lastGraphics(3);
     pointerDownOf(moveButtonGraphics!)();
@@ -928,7 +965,7 @@ describe('MatchScene', () => {
     vi.mocked(submitTurnCommand).mockResolvedValue([
       { type: 'unitMoved', unitId: 7, from: { x: 0, y: 0 }, to: target },
     ]);
-    await submitViaUI(occupantGraphics(0), 0);
+    await submitViaUI(occupantSprite(0), 0);
     await flush();
 
     expect(staleErrorText.destroy).toHaveBeenCalled();
@@ -1006,7 +1043,8 @@ describe('MatchScene', () => {
         onComplete: () => void;
       };
       expect(tweenCfg.targets).toBe(bombContainer);
-      expect(tweenCfg.y).toBe(24); // tileCenter of {x:1,y:0}: cy = 0*48 + 24
+      // tileCenter of {x:1,y:0} on this 1x2 grid, centered in GameBoardRegion: cy = 0*32+16+144
+      expect(tweenCfg.y).toBe(160);
       expect(tweenCfg.duration).toBe(SUDDEN_DEATH_BOMB_DROP_DURATION_MS);
       expect(bombContainer.setDepth).toHaveBeenCalledWith(DEPTH_SUDDEN_DEATH_BOMB);
 
@@ -1073,7 +1111,7 @@ describe('MatchScene', () => {
       vi.mocked(resolveTurn).mockResolvedValue([
         { type: 'bombCountdownUpdated', bombId: 999, countdown: 2 },
       ]);
-      clickSummaryPanelButton(0, 'resolve');
+      clickSummaryPanelButton('resolve');
       const [, yesButtonGraphics] = lastGraphics(3);
       pointerDownOf(yesButtonGraphics!)();
       await flush();
@@ -1098,14 +1136,14 @@ describe('MatchScene', () => {
       await flush();
 
       const graphicsBefore = mockScene.add.graphics.mock.calls.length;
-      pointerDownOf(occupantGraphics(0))();
-      pointerDownOf(matchSummaryButtonGraphics(1))();
+      pointerDownOf(occupantSprite(0))();
+      pointerDownOf(matchSummaryButtonGraphics())();
       expect(mockScene.add.graphics.mock.calls.length).toBe(graphicsBefore);
 
       resolveBanner();
       await flush();
 
-      pointerDownOf(occupantGraphics(0))();
+      pointerDownOf(occupantSprite(0))();
       expect(mockScene.add.graphics.mock.calls.length).toBeGreaterThan(graphicsBefore);
     });
 
@@ -1182,13 +1220,13 @@ describe('MatchScene', () => {
       await bootScene();
       vi.mocked(resolveTurn).mockResolvedValue([{ type: 'matchEnded', winnerTeamId: 1 }]);
 
-      clickSummaryPanelButton(1, 'resolve');
+      clickSummaryPanelButton('resolve');
       const [, yesButtonGraphics] = lastGraphics(3);
       pointerDownOf(yesButtonGraphics!)();
       await flush();
 
       const graphicsBefore = mockScene.add.graphics.mock.calls.length;
-      pointerDownOf(occupantGraphics(0))();
+      pointerDownOf(occupantSprite(0))();
       expect(mockScene.add.graphics.mock.calls.length).toBe(graphicsBefore);
     });
 
@@ -1342,10 +1380,10 @@ describe('MatchScene', () => {
       // observe the Reset flow's own fadeOut/fadeIn pair.
       mockScene.cameras.main.fadeIn.mockClear();
 
-      const unitGraphics = occupantGraphics(0);
+      const unitGraphics = occupantSprite(0);
       const grid = terrainGraphics();
 
-      clickSummaryPanelButton(1, 'reset');
+      clickSummaryPanelButton('reset');
       const [, yesButtonGraphics] = lastGraphics(3);
       pointerDownOf(yesButtonGraphics!)();
 
@@ -1371,18 +1409,19 @@ describe('MatchScene', () => {
 
       await bootScene();
 
-      clickSummaryPanelButton(1, 'reset');
+      clickSummaryPanelButton('reset');
       const [, yesButtonGraphics] = lastGraphics(3);
       pointerDownOf(yesButtonGraphics!)();
       await flush();
 
       // The undim tween's onComplete was never fired — yet a unit click on the freshly rebuilt
-      // occupant graphics still opens TurnCommandPanel, proving interactions already re-enabled.
-      const freshUnitGraphics = mockScene.add.graphics.mock.results.at(-1)!.value as ReturnType<
-        typeof mockScene.add.graphics
+      // occupant sprite still opens TurnCommandPanel (drawn via Graphics), proving interactions
+      // already re-enabled.
+      const freshUnitSprite = mockScene.add.sprite.mock.results.at(-1)!.value as ReturnType<
+        typeof mockScene.add.sprite
       >;
       const graphicsBefore = mockScene.add.graphics.mock.calls.length;
-      pointerDownOf(freshUnitGraphics)();
+      pointerDownOf(freshUnitSprite)();
 
       expect(mockScene.add.graphics.mock.calls.length).toBeGreaterThan(graphicsBefore);
     });
@@ -1394,7 +1433,7 @@ describe('MatchScene', () => {
 
       await bootScene();
 
-      clickSummaryPanelButton(1, 'reset');
+      clickSummaryPanelButton('reset');
       const [, yesButtonGraphics] = lastGraphics(3);
       pointerDownOf(yesButtonGraphics!)();
       await flush();
@@ -1409,7 +1448,7 @@ describe('MatchScene', () => {
       expect(getMatchState).toHaveBeenCalledTimes(2);
 
       const graphicsBefore = mockScene.add.graphics.mock.calls.length;
-      pointerDownOf(occupantGraphics(0))();
+      pointerDownOf(occupantSprite(0))();
       expect(mockScene.add.graphics.mock.calls.length).toBeGreaterThan(graphicsBefore);
     });
 
@@ -1425,7 +1464,7 @@ describe('MatchScene', () => {
 
       await bootScene();
 
-      clickSummaryPanelButton(1, 'reset');
+      clickSummaryPanelButton('reset');
       const [, yesButtonGraphics] = lastGraphics(3);
       pointerDownOf(yesButtonGraphics!)();
 
@@ -1449,7 +1488,7 @@ describe('MatchScene', () => {
       vi.mocked(surrender).mockResolvedValue([{ type: 'matchEnded', winnerTeamId: 1 }]);
 
       await bootScene();
-      clickSummaryPanelButton(0, 'surrender');
+      clickSummaryPanelButton('surrender');
       const [, yesButtonGraphics] = lastGraphics(3);
       pointerDownOf(yesButtonGraphics!)();
       await flush();
@@ -1463,7 +1502,7 @@ describe('MatchScene', () => {
       vi.mocked(surrender).mockResolvedValue([]);
 
       await bootScene();
-      clickSummaryPanelButton(0, 'surrender');
+      clickSummaryPanelButton('surrender');
       const [, yesButtonGraphics] = lastGraphics(3);
       pointerDownOf(yesButtonGraphics!)();
       await flush();
@@ -1482,7 +1521,7 @@ describe('MatchScene', () => {
       vi.mocked(surrender).mockRejectedValue(new Error('network down'));
 
       await bootScene();
-      clickSummaryPanelButton(0, 'surrender');
+      clickSummaryPanelButton('surrender');
       const [, yesButtonGraphics] = lastGraphics(3);
       pointerDownOf(yesButtonGraphics!)();
       await flush();
@@ -1506,7 +1545,7 @@ describe('MatchScene', () => {
       queueMatchStates(makeState({ grid: [[plainTile()]], activeTeam: 1 }));
       await bootScene();
 
-      pointerDownOf(matchSummaryButtonGraphics(0))(); // opens MatchSummaryPanel
+      pointerDownOf(matchSummaryButtonGraphics())(); // opens MatchSummaryPanel
       const [, , resetGraphics, surrenderGraphics] = lastGraphics(5);
       pointerDownOf(resetGraphics!)(); // opens Reset's own confirm — still pending, no Yes/No yet
 
@@ -1527,7 +1566,7 @@ describe('MatchScene', () => {
       await bootScene();
 
       // Drive the Move flow until TurnCommandPanel's own ConfirmDialog is open.
-      pointerDownOf(occupantGraphics(0))();
+      pointerDownOf(occupantSprite(0))();
       const [moveButtonGraphics] = lastGraphics(3);
       pointerDownOf(moveButtonGraphics!)();
       await flush();
@@ -1536,7 +1575,7 @@ describe('MatchScene', () => {
 
       // Reset must still surface its own prompt — a stale TurnCommandPanel confirm is superseded,
       // not treated as an already-pending lifecycle confirm.
-      clickSummaryPanelButton(1, 'reset');
+      clickSummaryPanelButton('reset');
 
       expect(mockScene.add.text).toHaveBeenCalledWith(
         expect.any(Number),

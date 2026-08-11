@@ -28,12 +28,11 @@ import {
   renderOccupants,
   renderBomb,
   tileCenter,
+  occupantDepth,
   type BoardRenderContext,
 } from '../rendering/boardRenderer';
 import {
-  TILE_SIZE,
   BOMB_SIZE,
-  DEPTH_OCCUPANT,
   DEPTH_SUDDEN_DEATH_BOMB,
   UNIT_MOVE_TWEEN_DURATION,
   SUDDEN_DEATH_BOMB_DROP_DURATION_MS,
@@ -41,6 +40,8 @@ import {
   CONFIRM_TEXT_RESET,
   CONFIRM_TEXT_SURRENDER,
   FADE_MS,
+  MATCH_CAMERA_WIDTH,
+  MATCH_CAMERA_HEIGHT,
 } from '../constants';
 import type {
   Coordinate,
@@ -60,6 +61,21 @@ export interface MatchSceneData {
   isRematch?: boolean;
 }
 
+// Entity -> texture key/path, per docs/frontend/p4-spec001-sprites.md's Sprites table.
+const SPRITE_MANIFEST: { key: string; png: string; json: string }[] = [
+  { key: 'unit_fighter_blue', png: 'units/Fighter-Blue.png', json: 'units/Fighter-Blue.json' },
+  { key: 'unit_fighter_red', png: 'units/Fighter-Red.png', json: 'units/Fighter-Red.json' },
+  { key: 'unit_king_blue', png: 'units/King-Blue.png', json: 'units/King-Blue.json' },
+  { key: 'unit_king_red', png: 'units/King-Red.png', json: 'units/King-Red.json' },
+  { key: 'unit_bandit_blue', png: 'units/Bandit-Blue.png', json: 'units/Bandit-Blue.json' },
+  { key: 'unit_bandit_red', png: 'units/Bandit-Red.png', json: 'units/Bandit-Red.json' },
+  { key: 'unit_witch_blue', png: 'units/Witch-Blue.png', json: 'units/Witch-Blue.json' },
+  { key: 'unit_witch_red', png: 'units/Witch-Red.png', json: 'units/Witch-Red.json' },
+  { key: 'bomb', png: 'Bomb.png', json: 'Bomb.json' },
+  { key: 'soft_block', png: 'SoftBlock.png', json: 'SoftBlock.json' },
+];
+const SPRITE_ASSET_BASE = 'assets/sprites/';
+
 export default class MatchScene extends Phaser.Scene {
   private roomId!: string;
   private playerTokens!: [string, string];
@@ -69,9 +85,9 @@ export default class MatchScene extends Phaser.Scene {
   // immutable for a match, so no operation rebuilds it. occupantObjects is the swappable layer.
   private terrainObjects: Phaser.GameObjects.GameObject[] = [];
   private occupantObjects: Phaser.GameObjects.GameObject[] = [];
-  private unitGraphicsById = new Map<number, Phaser.GameObjects.Graphics>();
+  private unitSpritesById = new Map<number, Phaser.GameObjects.Sprite>();
   private bombGraphicsById = new Map<number, BombGraphics>();
-  private softBlockGraphicsById = new Map<number, Phaser.GameObjects.Graphics>();
+  private softBlockSpritesById = new Map<number, Phaser.GameObjects.Sprite>();
   private allowedTilesCache = new Map<string, Coordinate[]>();
   private turnCommandPanel!: TurnCommandPanel;
   private confirmDialog!: ConfirmDialog;
@@ -96,6 +112,12 @@ export default class MatchScene extends Phaser.Scene {
     super('MatchScene');
   }
 
+  preload(): void {
+    for (const { key, png, json } of SPRITE_MANIFEST) {
+      this.load.aseprite(key, `${SPRITE_ASSET_BASE}${png}`, `${SPRITE_ASSET_BASE}${json}`);
+    }
+  }
+
   create(data: MatchSceneData): void {
     const gen = this.generation;
     this.roomId = data.roomId;
@@ -105,6 +127,19 @@ export default class MatchScene extends Phaser.Scene {
     this.interactionsEnabled = false;
     this.summaryPanelOpen = false;
     this.lifecycleConfirmOpen = false;
+    // cameras.add(..., makeMain: true) only repoints `.main` — the pre-existing default camera
+    // must be removed explicitly or MatchScene renders through two overlapping cameras.
+    const defaultCamera = this.cameras.main;
+    const matchCamera = this.cameras.add(
+      0,
+      0,
+      MATCH_CAMERA_WIDTH,
+      MATCH_CAMERA_HEIGHT,
+      true,
+      'match'
+    );
+    matchCamera.setScroll(0, 0);
+    this.cameras.remove(defaultCamera);
     this.events.once('shutdown', () => {
       this.generation++;
     });
@@ -141,12 +176,10 @@ export default class MatchScene extends Phaser.Scene {
         if (gen !== this.generation) {
           return;
         }
-        // Paint the immutable terrain layer once, then the occupants. Grid bounds are set here
-        // (grid is immutable, so no later swap re-sets them).
-        const { cols, rows } = renderTerrain(this.boardCtx(), state.grid);
-        this.turnCommandPanel.setGridBounds(cols * TILE_SIZE, rows * TILE_SIZE);
+        // Paint the immutable terrain layer once, then the occupants. renderTerrain() centers
+        // the grid within GameBoardRegion (boardOffset) — the camera is scrolled to (0, 0).
+        renderTerrain(this.boardCtx(), state.grid);
         this.renderBoard(state);
-        this.cameras.main.centerOn((cols * TILE_SIZE) / 2, (rows * TILE_SIZE) / 2);
         this.matchSummaryPanel.renderButton();
         this.refreshTurnPanelIfReady();
         void this.beginTurn();
@@ -264,7 +297,7 @@ export default class MatchScene extends Phaser.Scene {
         duration: SUDDEN_DEATH_BOMB_DROP_DURATION_MS,
         ease: 'Linear',
         onComplete: () => {
-          bomb.container.setDepth(DEPTH_OCCUPANT);
+          bomb.container.setDepth(occupantDepth(position));
           resolve();
         },
       });
@@ -351,10 +384,11 @@ export default class MatchScene extends Phaser.Scene {
       return false;
     }
 
-    const g = this.unitGraphicsById.get(unitId);
+    const g = this.unitSpritesById.get(unitId);
     if (g) {
       const fromCenter = tileCenter(from);
       const toCenter = tileCenter(to);
+      g.setDepth(occupantDepth(to));
       this.tweens.add({
         targets: g,
         x: g.x + (toCenter.cx - fromCenter.cx),
@@ -567,9 +601,9 @@ export default class MatchScene extends Phaser.Scene {
         const { ok, done } = playResolveTurnEvents(events, {
           scene: this,
           gameStateSnapshot: this.gameState,
-          unitGraphicsById: this.unitGraphicsById,
+          unitSpritesById: this.unitSpritesById,
           bombGraphicsById: this.bombGraphicsById,
-          softBlockGraphicsById: this.softBlockGraphicsById,
+          softBlockSpritesById: this.softBlockSpritesById,
           onError: message => this.showError(message),
         });
         if (ok) {
@@ -672,9 +706,9 @@ export default class MatchScene extends Phaser.Scene {
       scene: this,
       terrainObjects: this.terrainObjects,
       occupantObjects: this.occupantObjects,
-      unitGraphicsById: this.unitGraphicsById,
+      unitSpritesById: this.unitSpritesById,
       bombGraphicsById: this.bombGraphicsById,
-      softBlockGraphicsById: this.softBlockGraphicsById,
+      softBlockSpritesById: this.softBlockSpritesById,
       onUnitClicked: unit => this.onUnitClicked(unit),
     };
   }

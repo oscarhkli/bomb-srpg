@@ -6,15 +6,15 @@ import type { BombGraphics } from '../rendering/resolveTurnPlayer';
 
 export function occupantsMatch(
   state: GameState,
-  unitGraphicsById: Map<number, Phaser.GameObjects.Graphics>,
+  unitSpritesById: Map<number, Phaser.GameObjects.Sprite>,
   bombGraphicsById: Map<number, BombGraphics>,
-  softBlockGraphicsById: Map<number, Phaser.GameObjects.Graphics>
+  softBlockSpritesById: Map<number, Phaser.GameObjects.Sprite>
 ): boolean {
   const liveUnits = state.units.filter(u => u.hp > 0);
-  if (liveUnits.length !== unitGraphicsById.size) {
+  if (liveUnits.length !== unitSpritesById.size) {
     return false;
   }
-  if (!liveUnits.every(u => unitGraphicsById.has(u.id))) {
+  if (!liveUnits.every(u => unitSpritesById.has(u.id))) {
     return false;
   }
 
@@ -25,10 +25,10 @@ export function occupantsMatch(
     return false;
   }
 
-  if (state.softBlocks.length !== softBlockGraphicsById.size) {
+  if (state.softBlocks.length !== softBlockSpritesById.size) {
     return false;
   }
-  if (!state.softBlocks.every(s => softBlockGraphicsById.has(s.id))) {
+  if (!state.softBlocks.every(s => softBlockSpritesById.has(s.id))) {
     return false;
   }
 

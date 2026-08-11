@@ -42,9 +42,9 @@ describe('playResolveTurnEvents — bombCountdownUpdated', () => {
       {
         scene: mockScene as never,
         gameStateSnapshot: baseState(),
-        unitGraphicsById: new Map(),
+        unitSpritesById: new Map(),
         bombGraphicsById,
-        softBlockGraphicsById: new Map(),
+        softBlockSpritesById: new Map(),
         onError: vi.fn(),
       }
     );
@@ -69,9 +69,9 @@ describe('playResolveTurnEvents — bombCountdownUpdated', () => {
     playResolveTurnEvents([{ type: 'bombCountdownUpdated', bombId: 1, countdown: 0 }], {
       scene: mockScene as never,
       gameStateSnapshot: baseState(),
-      unitGraphicsById: new Map(),
+      unitSpritesById: new Map(),
       bombGraphicsById,
-      softBlockGraphicsById: new Map(),
+      softBlockSpritesById: new Map(),
       onError: vi.fn(),
     });
 
@@ -86,9 +86,9 @@ describe('playResolveTurnEvents — bombCountdownUpdated', () => {
     playResolveTurnEvents([{ type: 'bombCountdownUpdated', bombId: 1, countdown: 3 }], {
       scene: mockScene as never,
       gameStateSnapshot: baseState(),
-      unitGraphicsById: new Map(),
+      unitSpritesById: new Map(),
       bombGraphicsById: new Map(),
-      softBlockGraphicsById: new Map(),
+      softBlockSpritesById: new Map(),
       onError: vi.fn(),
     });
 
@@ -103,9 +103,9 @@ describe('playResolveTurnEvents — validation', () => {
     const result = playResolveTurnEvents([{ type: 'bombCountdownUpdated', bombId: 1 }], {
       scene: mockScene as never,
       gameStateSnapshot: baseState(),
-      unitGraphicsById: new Map(),
+      unitSpritesById: new Map(),
       bombGraphicsById: new Map(),
-      softBlockGraphicsById: new Map(),
+      softBlockSpritesById: new Map(),
       onError,
     });
 
@@ -122,9 +122,9 @@ describe('playResolveTurnEvents — validation', () => {
       {
         scene: mockScene as never,
         gameStateSnapshot: baseState(),
-        unitGraphicsById: new Map(),
+        unitSpritesById: new Map(),
         bombGraphicsById: new Map(),
-        softBlockGraphicsById: new Map(),
+        softBlockSpritesById: new Map(),
         onError,
       }
     );
@@ -142,9 +142,9 @@ describe('playResolveTurnEvents — validation', () => {
       {
         scene: mockScene as never,
         gameStateSnapshot: baseState(),
-        unitGraphicsById: new Map(),
+        unitSpritesById: new Map(),
         bombGraphicsById: new Map(),
-        softBlockGraphicsById: new Map(),
+        softBlockSpritesById: new Map(),
         onError,
       }
     );
@@ -163,9 +163,9 @@ describe('playResolveTurnEvents — validation', () => {
     const result = playResolveTurnEvents([{ type: 'unitDamaged', unitId: 0x21, newHp: -1 }], {
       scene: mockScene as never,
       gameStateSnapshot: state,
-      unitGraphicsById: new Map(),
+      unitSpritesById: new Map(),
       bombGraphicsById: new Map(),
-      softBlockGraphicsById: new Map(),
+      softBlockSpritesById: new Map(),
       onError,
     });
 
@@ -186,9 +186,9 @@ describe('playResolveTurnEvents — validation', () => {
       {
         scene: mockScene as never,
         gameStateSnapshot: state,
-        unitGraphicsById: new Map(),
+        unitSpritesById: new Map(),
         bombGraphicsById: new Map(),
-        softBlockGraphicsById: new Map(),
+        softBlockSpritesById: new Map(),
         onError,
       }
     );
@@ -213,9 +213,9 @@ describe('playResolveTurnEvents — validation', () => {
       {
         scene: mockScene as never,
         gameStateSnapshot: state,
-        unitGraphicsById: new Map(),
+        unitSpritesById: new Map(),
         bombGraphicsById,
-        softBlockGraphicsById: new Map(),
+        softBlockSpritesById: new Map(),
         onError,
       }
     );
@@ -261,9 +261,9 @@ describe('playResolveTurnEvents — bombExploded (non-chain)', () => {
       {
         scene: mockScene as never,
         gameStateSnapshot: state,
-        unitGraphicsById: new Map(),
+        unitSpritesById: new Map(),
         bombGraphicsById,
-        softBlockGraphicsById: new Map(),
+        softBlockSpritesById: new Map(),
         onError: vi.fn(),
       }
     );
@@ -305,9 +305,9 @@ describe('playResolveTurnEvents — bombExploded (non-chain)', () => {
       {
         scene: mockScene as never,
         gameStateSnapshot: state,
-        unitGraphicsById: new Map(),
+        unitSpritesById: new Map(),
         bombGraphicsById,
-        softBlockGraphicsById: new Map(),
+        softBlockSpritesById: new Map(),
         onError,
       }
     );
@@ -350,9 +350,9 @@ describe('playResolveTurnEvents — chain reactions', () => {
       {
         scene: mockScene as never,
         gameStateSnapshot: state,
-        unitGraphicsById: new Map(),
+        unitSpritesById: new Map(),
         bombGraphicsById,
-        softBlockGraphicsById: new Map(),
+        softBlockSpritesById: new Map(),
         onError: vi.fn(),
       }
     );
@@ -399,9 +399,9 @@ describe('playResolveTurnEvents — chain reactions', () => {
       {
         scene: mockScene as never,
         gameStateSnapshot: state,
-        unitGraphicsById: new Map(),
+        unitSpritesById: new Map(),
         bombGraphicsById,
-        softBlockGraphicsById: new Map(),
+        softBlockSpritesById: new Map(),
         onError: vi.fn(),
       }
     );
@@ -447,9 +447,9 @@ describe('playResolveTurnEvents — occupant events', () => {
       {
         scene: mockScene as never,
         gameStateSnapshot: state,
-        unitGraphicsById: new Map([[0x21, unitGraphics as never]]),
+        unitSpritesById: new Map([[0x21, unitGraphics as never]]),
         bombGraphicsById: new Map([[1, makeBombGraphics()]]),
-        softBlockGraphicsById: new Map(),
+        softBlockSpritesById: new Map(),
         onError: vi.fn(),
       }
     );
@@ -484,9 +484,9 @@ describe('playResolveTurnEvents — occupant events', () => {
       {
         scene: mockScene as never,
         gameStateSnapshot: state,
-        unitGraphicsById: new Map([[0x21, unitGraphics as never]]),
+        unitSpritesById: new Map([[0x21, unitGraphics as never]]),
         bombGraphicsById: new Map(),
-        softBlockGraphicsById: new Map(),
+        softBlockSpritesById: new Map(),
         onError: vi.fn(),
       }
     );
@@ -574,29 +574,29 @@ describe('playResolveTurnEvents — render fidelity oracle', () => {
   ];
 
   it.each(cases)('$name', ({ initial, events, expected }) => {
-    const unitGraphicsById = new Map(initial.units.map(u => [u.id, createMockGraphics() as never]));
+    const unitSpritesById = new Map(initial.units.map(u => [u.id, createMockGraphics() as never]));
     const bombGraphicsById = new Map<number, BombGraphics>(
       initial.bombs.map(b => [b.id, makeBombGraphics()])
     );
-    const softBlockGraphicsById = new Map(
+    const softBlockSpritesById = new Map(
       initial.softBlocks.map(s => [s.id, createMockGraphics() as never])
     );
 
     const result = playResolveTurnEvents(events, {
       scene: mockScene as never,
       gameStateSnapshot: initial,
-      unitGraphicsById,
+      unitSpritesById,
       bombGraphicsById,
-      softBlockGraphicsById,
+      softBlockSpritesById,
       onError: vi.fn(),
     });
     expect(result.ok).toBe(true);
 
     fireAllDelayedCalls();
 
-    expect(
-      occupantsMatch(expected, unitGraphicsById, bombGraphicsById, softBlockGraphicsById)
-    ).toBe(true);
+    expect(occupantsMatch(expected, unitSpritesById, bombGraphicsById, softBlockSpritesById)).toBe(
+      true
+    );
   });
 
   it('discriminates: a leftover graphics entry that truth no longer has fails the oracle', () => {
@@ -610,9 +610,9 @@ describe('playResolveTurnEvents — render fidelity oracle', () => {
     playResolveTurnEvents([], {
       scene: mockScene as never,
       gameStateSnapshot: initial,
-      unitGraphicsById: new Map(),
+      unitSpritesById: new Map(),
       bombGraphicsById,
-      softBlockGraphicsById: new Map(),
+      softBlockSpritesById: new Map(),
       onError: vi.fn(),
     });
 
@@ -632,9 +632,9 @@ describe('playResolveTurnEvents — done promise', () => {
       {
         scene: mockScene as never,
         gameStateSnapshot: state,
-        unitGraphicsById: new Map(),
+        unitSpritesById: new Map(),
         bombGraphicsById: new Map([[1, makeBombGraphics()]]),
-        softBlockGraphicsById: new Map(),
+        softBlockSpritesById: new Map(),
         onError: vi.fn(),
       }
     );

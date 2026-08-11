@@ -53,7 +53,7 @@ Since the current sprites are still silhouettes, there isn't difference between 
 
 Each source file's canvas (64×64) is intentionally larger than the visible character: a fixed 16px band at the bottom is reserved for bleed-safe padding and optional visual flourishes (e.g. a weapon tip extending past the feet); the remaining space above is unused margin and varies per unit.
 
-`Bomb.png`/`SoftBlock.png` must be re-exported with Aseprite's "Trim Cels" option checked — the current files in the repo were exported without it, so their JSON reports the full untrimmed 64×64 canvas instead of real trim data. The actual artwork already has the correct 16px bottom band (verified: Bomb's visible content is 25×24, SoftBlock's is 30×22, both with an exact 16px gap to the canvas bottom) — only the export metadata needs regenerating, not the art.
+Sprites are exported **untrimmed** — the full 64×64 canvas is delivered as-is for every entity in the table below.
 
 Sprites use origin **(0.5, 1)** — horizontally centered, vertically anchored to the bottom of the untrimmed 64×64 canvas. Since that canvas always reserves a fixed 16px band at the bottom (`SPRITE_GROUND_MARGIN`), position each sprite so its anchor sits `SPRITE_GROUND_MARGIN` below the tile's bottom edge — this compensates for the reserved band uniformly across all units, so every sprite's feet rest on the tile floor regardless of its individual visible height.
 
@@ -70,9 +70,9 @@ Sprites use origin **(0.5, 1)** — horizontally centered, vertically anchored t
 | Bomb           | bomb              | Bomb.png (+ .json)               | atlas (aseprite) |
 | SoftBlock      | soft_block        | SoftBlock.png (+ .json)          | atlas (aseprite) |
 
-`Type: atlas (aseprite)` means loaded via `this.load.aseprite(key, pngPath, jsonPath)`, not `this.load.image`/`this.load.spritesheet` — the JSON carries per-frame trim data (`spriteSourceSize`), so the 64×64 padded canvas never leaks into gameplay positioning math. These loads belong in `MatchScene`'s `preload()` (it doesn't currently have one) — `MatchScene` is the only scene that needs these textures.
+`Type: atlas (aseprite)` means loaded via `this.load.aseprite(key, pngPath, jsonPath)`, not `this.load.image`/`this.load.spritesheet` — this matches Aseprite's export format (a PNG + a JSON sprite-sheet description), independent of trim. Since sprites are untrimmed, `spriteSourceSize` always equals the full 64×64 canvas; positioning relies on the fixed `SPRITE_GROUND_MARGIN` convention, not per-frame trim data. These loads belong in `MatchScene`'s `preload()` (it doesn't currently have one) — `MatchScene` is the only scene that needs these textures.
 
-Sprites render at their native trimmed size — no runtime scaling. The `40×32px`/`32×32px` figures above are art-authoring budgets for what to draw, not a `setDisplaySize` requirement.
+Sprites render at their native (untrimmed, 64×64) size — no runtime scaling. The `40×32px`/`32×32px` figures above describe the visible-content budget within that canvas, not a `setDisplaySize` requirement.
 
 All the other vector graphics not mentioned in above table should be retained, including the countdown of bombs.
 
@@ -82,9 +82,13 @@ The Bomb sprite replaces only the 💣 glyph inside the existing Bomb `Container
 
 ### Grid
 
-The Vector graphic `Grid` should be resize because `TILE_SIZE` is changed. It should be anchored top-left of `GameBoardRegion`, not centered — leaving unused space on the right and bottom edges only. Ignore that unused space for now.
+The Vector graphic `Grid` should be resize because `TILE_SIZE` is changed. It should be centered within `GameBoardRegion`, with unused space split evenly across all 4 margins.
 
 After the resizing and relocation of `Grid`, all the existing vector graphics and the replaced sprites should be resized and moved to new location accordingly. Bomb explosion rays and burning effect should also be adjusted as well.
+
+### Occupant Depth
+
+Since `Unit` sprites are taller than one tile, a unit standing on a lower row can visually overlap the sprite of an occupant on the row above it. Depth must reflect row position: an occupant on a lower row (larger Y) renders in front of one on a higher row (smaller Y) wherever they overlap. This applies uniformly across Units, SoftBlocks, and Bombs, and must be re-evaluated whenever an occupant's row changes (e.g. after a move), not just at initial render.
 
 ### TurnCommandPanel
 
@@ -108,7 +112,9 @@ The target is to make sure all the elements are still fit in the resized `MatchS
 
 ### Full-Screen Overlays
 
-`TurnBanner`, `VictoryCutscene`, and `SuddenDeathCutscene` all derive their layout purely from `this.scene.cameras.main.width`/`height` — no hardcoded canvas dimensions. Since `cameras.main` now resolves to the new 640×320 camera (see Scene Entry), all three render correctly at the new size with no code changes.
+`TurnBanner`, `VictoryCutscene`, and `SuddenDeathCutscene` all derive their layout purely from `this.scene.cameras.main.width`/`height` — no hardcoded canvas dimensions. Since `cameras.main` now resolves to the new 640×320 camera (see Scene Entry), all three fill the new viewport correctly with no code changes.
+
+`VictoryCutscene`'s fixed-pixel constants (banner height, title/subtitle font sizes, button dimensions) don't shrink automatically — apply the same resize recipe as `MatchSummaryPanel`: ~80% width / ~45% height (nearest multiple of 4), font sizes reduced by 4px. `VictoryCutscene` and `TurnBanner` share `TURN_BANNER_HEIGHT`/`TURN_BANNER_TEXT_COLOR` — resizing that constant affects both.
 
 `ErrorPanel` is explicitly out of scope for this spec — it positions itself with fixed pixel constants (`ERROR_PANEL_X`/`Y`/`WIDTH`/`HEIGHT`), not `cameras.main`, so it is *not* automatically fixed by the camera swap and will render clipped/off-viewport until a follow-up spec resizes it.
 
@@ -131,3 +137,5 @@ Update the obsolete part of `docs/design.md`, e.g., `TILE_SIZE` and the new came
 5. Given `TurnCommandPanel`, `TurnPanel`, `ConfirmDialog`, and `MatchSummaryPanel` are repositioned per this spec's Visual Spec section, then all remain fully clickable within their specified region/camera-center.
 6. Given a bomb explodes, when the blast rays and burn overlay render at the new 32px tile scale, then their size remains visually proportionate to the tile.
 7. Given a turn begins, a match ends, or sudden death triggers, when `TurnBanner`, `VictoryCutscene`, or `SuddenDeathCutscene` render, then each fills the new 640×320 camera viewport exactly (no clipping, no leftover space sized for the old 1280×720 canvas).
+8. Given a Unit, SoftBlock, or Bomb is rendered on the board, when the player clicks its tile, then the corresponding click handler fires — matching Phase 3 behavior, not just the Bomb-only case.
+9. Given two occupants on adjacent rows whose sprites visually overlap, when both render, then the occupant on the lower row (larger Y) is fully visible and the one above it is partially hidden behind it.

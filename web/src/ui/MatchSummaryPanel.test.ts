@@ -7,6 +7,7 @@ import {
   allTexts,
   textCalls,
   tweenConfigAt,
+  withCameraSize,
 } from '../test/sceneHelpers';
 import { makeState, makeCfg, makeUnit } from '../test/fixtures';
 import {
@@ -15,10 +16,15 @@ import {
   MATCH_SUMMARY_BUTTON_SIZE,
   MATCH_SUMMARY_BUTTON_LABEL,
   MATCH_SUMMARY_TEXT_FONT_SIZE,
-  LIFECYCLE_BUTTON_HEIGHT_SMALL,
+  MATCH_SUMMARY_BUTTON_HEIGHT,
   MATCH_SUMMARY_PANEL_HEIGHT,
+  MATCH_SUMMARY_PANEL_WIDTH,
   TEAM_COLORS,
-  TURN_PANEL_MARGIN,
+  TURN_PANEL_TOP_MARGIN,
+  TURN_PANEL_HEIGHT,
+  GAME_CONTROL_REGION_HEIGHT,
+  TURN_COMMAND_PANEL_HEIGHT,
+  TURN_COMMAND_PANEL_BOTTOM_MARGIN,
   CONFIRM_DIALOG_DIM_COLOR,
   CONFIRM_DIALOG_DIM_ALPHA,
   RESET_BUTTON_LABEL,
@@ -48,17 +54,17 @@ beforeEach(() => {
 });
 
 describe('MatchSummaryPanel button', () => {
-  it('draws a 48x48 rounded square at the top-right, mirroring TurnPanel margin, at DEPTH_TURN_COMMAND_PANEL', () => {
+  it('draws a 48x48 rounded square centered in the GameControlRegion gap between TurnPanel and TurnCommandPanel, at DEPTH_TURN_COMMAND_PANEL', () => {
     const { panel } = makePanel();
 
     panel.renderButton();
 
     const button = firstGraphics();
-    // Camera width is 1280 in the test mock (see test/setup.ts).
-    const expectedX = 1280 - TURN_PANEL_MARGIN - MATCH_SUMMARY_BUTTON_SIZE;
+    // (480,320)-based region math — see TurnPanel.ts/TurnCommandPanel.ts for the edges this
+    // sits between. Independent literals, not the same expression the code computes.
     expect(button.fillRoundedRect).toHaveBeenCalledWith(
-      expectedX,
-      TURN_PANEL_MARGIN,
+      536,
+      88,
       MATCH_SUMMARY_BUTTON_SIZE,
       MATCH_SUMMARY_BUTTON_SIZE,
       expect.any(Number)
@@ -70,6 +76,22 @@ describe('MatchSummaryPanel button', () => {
       MATCH_SUMMARY_BUTTON_LABEL,
       expect.objectContaining({})
     );
+  });
+
+  it('never overlaps TurnPanel or TurnCommandPanel', () => {
+    const { panel } = makePanel();
+
+    panel.renderButton();
+
+    const button = firstGraphics();
+    const call = button.fillRoundedRect.mock.calls[0]!;
+    const buttonTop = call[1] as number;
+    const buttonBottom = buttonTop + MATCH_SUMMARY_BUTTON_SIZE;
+    const turnPanelBottom = TURN_PANEL_TOP_MARGIN + TURN_PANEL_HEIGHT;
+    const turnCommandPanelTop =
+      GAME_CONTROL_REGION_HEIGHT - TURN_COMMAND_PANEL_HEIGHT - TURN_COMMAND_PANEL_BOTTOM_MARGIN;
+    expect(buttonTop).toBeGreaterThanOrEqual(turnPanelBottom);
+    expect(buttonBottom).toBeLessThanOrEqual(turnCommandPanelTop);
   });
 
   it('calls onButtonClicked when clicked while unlocked', () => {
@@ -92,6 +114,16 @@ describe('MatchSummaryPanel button', () => {
 });
 
 describe('MatchSummaryPanel.open', () => {
+  it('centers on the new 640x320 MatchScene camera, not the 1280x720 canvas', () => {
+    withCameraSize(640, 320, () => {
+      const { panel } = makePanel();
+
+      panel.open(makeState(), makeCfg());
+
+      expect(firstGraphics().fillRect).toHaveBeenCalledWith(0, 0, 640, 320);
+    });
+  });
+
   it('fades in a full-canvas scrim at DEPTH_MATCH_SUMMARY_PANEL, consistent with ConfirmDialog dim styling', () => {
     const { panel } = makePanel();
 
@@ -242,7 +274,7 @@ describe('MatchSummaryPanel.open', () => {
     expect(p2Badge!.fillRoundedRect).toHaveBeenCalled();
   });
 
-  it('resizes the 4 lifecycle buttons to LIFECYCLE_BUTTON_HEIGHT_SMALL (60% height) and bottom-aligns them in the content box', () => {
+  it('resizes the 4 lifecycle buttons to MATCH_SUMMARY_BUTTON_HEIGHT and bottom-aligns them in the content box', () => {
     const { panel } = makePanel();
 
     panel.open(makeState(), makeCfg());
@@ -250,14 +282,25 @@ describe('MatchSummaryPanel.open', () => {
     const [resolveG, , , backG] = allGraphics().slice(-4);
     const resolveCall = resolveG!.fillRoundedRect.mock.calls[0]!;
     const backCall = backG!.fillRoundedRect.mock.calls[0]!;
-    expect(resolveCall[3]).toBe(LIFECYCLE_BUTTON_HEIGHT_SMALL);
+    expect(resolveCall[3]).toBe(MATCH_SUMMARY_BUTTON_HEIGHT);
 
     // Camera height is 720; the content box is vertically centered around it. The Back button
     // (bottom-most) should end 12px above the box's bottom edge (y0 + MATCH_SUMMARY_PANEL_HEIGHT).
     const y0 = (720 - MATCH_SUMMARY_PANEL_HEIGHT) / 2;
     const boxBottom = y0 + MATCH_SUMMARY_PANEL_HEIGHT;
-    const backBottomEdge = (backCall[1] as number) + LIFECYCLE_BUTTON_HEIGHT_SMALL;
+    const backBottomEdge = (backCall[1] as number) + MATCH_SUMMARY_BUTTON_HEIGHT;
     expect(backBottomEdge).toBeCloseTo(boxBottom - 12, 5);
+  });
+
+  it('fits the resized button block within the resized panel width', () => {
+    const { panel } = makePanel();
+
+    panel.open(makeState(), makeCfg());
+
+    const [resolveG] = allGraphics().slice(-4);
+    const resolveCall = resolveG!.fillRoundedRect.mock.calls[0]!;
+    const buttonWidth = resolveCall[2] as number;
+    expect(buttonWidth).toBeLessThanOrEqual(MATCH_SUMMARY_PANEL_WIDTH);
   });
 });
 

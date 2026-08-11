@@ -1,3 +1,13 @@
+import { boardOffset } from '../rendering/boardOffset';
+
+// boardOffset is a shared module-level singleton (recomputed once per renderTerrain() call in
+// real usage) — reset it before every test so a non-default-size grid in one test can't leak
+// its offset into an unrelated test later in the same file.
+beforeEach(() => {
+  boardOffset.x = 0;
+  boardOffset.y = 0;
+});
+
 // Mock Path2D globally for jsdom (not implemented by jsdom)
 (globalThis as Record<string, unknown>).Path2D ??= class MockPath2D {
   addPath(): void {
@@ -65,9 +75,50 @@ export function createMockContainer(x = 0, y = 0) {
   };
 }
 
+// Fresh instance per add.sprite() call, seeded with real x/y constructor args so
+// ground-anchoring/tween tests can assert against actual position. width/height mirror the
+// real untrimmed 64x64 sprite canvas (see docs/frontend/p4-spec001-sprites.md).
+export function createMockSprite(x = 0, y = 0) {
+  return {
+    x,
+    y,
+    width: 64,
+    height: 64,
+    setOrigin: vi.fn().mockReturnThis(),
+    setDepth: vi.fn().mockReturnThis(),
+    setScrollFactor: vi.fn().mockReturnThis(),
+    setInteractive: vi.fn().mockReturnThis(),
+    disableInteractive: vi.fn().mockReturnThis(),
+    setTexture: vi.fn().mockReturnThis(),
+    setFrame: vi.fn().mockReturnThis(),
+    on: vi.fn().mockReturnThis(),
+    off: vi.fn().mockReturnThis(),
+    destroy: vi.fn(),
+  };
+}
+
+// Fresh instance per cameras.add() call, mirroring cameras.main's shape so UI components
+// that read `cameras.main.width/height` keep working unchanged after a makeMain swap.
+export function createMockCamera(x = 0, y = 0, width = 1280, height = 720, name = '') {
+  return {
+    x,
+    y,
+    width,
+    height,
+    name,
+    scrollX: 0,
+    scrollY: 0,
+    setScroll: vi.fn().mockReturnThis(),
+    centerOn: vi.fn(),
+    fadeOut: vi.fn(),
+    fadeIn: vi.fn(),
+    once: vi.fn(),
+  };
+}
+
 // Mock Phaser globals for unit tests (no real canvas/WebGL)
 const mockGameObjectFactory = {
-  sprite: vi.fn(),
+  sprite: vi.fn((x?: number, y?: number) => createMockSprite(x, y)),
   graphics: vi.fn(() => createMockGraphics()),
   text: vi.fn(() => createMockText()),
   container: vi.fn((x?: number, y?: number) => createMockContainer(x, y)),
@@ -76,19 +127,31 @@ const mockGameObjectFactory = {
   bitmapText: vi.fn(),
 };
 
+const mockCameraManager = {
+  main: createMockCamera(),
+  add: vi.fn(
+    (
+      x?: number,
+      y?: number,
+      width?: number,
+      height?: number,
+      makeMain?: boolean,
+      name?: string
+    ) => {
+      const cam = createMockCamera(x, y, width, height, name);
+      if (makeMain) {
+        mockCameraManager.main = cam;
+      }
+      return cam;
+    }
+  ),
+  remove: vi.fn(),
+};
+
 export const mockScene = {
   add: mockGameObjectFactory,
   make: mockGameObjectFactory,
-  cameras: {
-    main: {
-      width: 1280,
-      height: 720,
-      centerOn: vi.fn(),
-      fadeOut: vi.fn(),
-      fadeIn: vi.fn(),
-      once: vi.fn(),
-    },
-  },
+  cameras: mockCameraManager,
   scale: { width: 1280, height: 720 },
   scene: { restart: vi.fn(), start: vi.fn() },
   sys: { game: { config: { width: 1280, height: 720 } } },
@@ -97,10 +160,17 @@ export const mockScene = {
     image: vi.fn(),
     spritesheet: vi.fn(),
     atlas: vi.fn(),
+    aseprite: vi.fn(),
     audio: vi.fn(),
     json: vi.fn(),
     on: vi.fn(),
     once: vi.fn(),
+  },
+  // Any texture key resolves to one real frame (named after the key itself) plus '__BASE',
+  // mirroring a real single-frame aseprite atlas — so firstNonBaseFrame() works out of the box
+  // for every sprite key without per-test texture setup.
+  textures: {
+    get: vi.fn((key: string) => ({ frames: { __BASE: {}, [`${key}-frame`]: {} } })),
   },
   tweens: { add: vi.fn() },
   time: { addEvent: vi.fn(), delayedCall: vi.fn() },

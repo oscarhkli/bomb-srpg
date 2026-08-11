@@ -58,7 +58,7 @@ describe('drawGrowingBeam', () => {
 
     const cfg = tweenConfig();
     expect(cfg.targets.len).toBe(0);
-    expect(cfg.len).toBe(3 * TILE_SIZE); // 144px
+    expect(cfg.len).toBe(3 * TILE_SIZE); // 96px
     expect(cfg.duration).toBe(360);
   });
 
@@ -72,7 +72,7 @@ describe('drawGrowingBeam', () => {
     ) as unknown as ReturnType<typeof mockScene.add.graphics>;
     const cfg = tweenConfig();
 
-    cfg.targets.len = 48; // exactly the first third of 144px
+    cfg.targets.len = TILE_SIZE; // exactly the first third of 3*TILE_SIZE
     cfg.onUpdate();
 
     expect(g.clear).toHaveBeenCalledTimes(1);
@@ -80,9 +80,9 @@ describe('drawGrowingBeam', () => {
     // Pill-shaped (rounded rect), not a hard-edged rectangle — radius is half the beam width,
     // clamped to half the segment's own length so a short segment doesn't over-round.
     expect(g.fillRoundedRect).toHaveBeenCalledExactlyOnceWith(
-      24,
-      24 - BLAST_BEAM_WIDTH / 2,
-      48,
+      TILE_SIZE / 2,
+      TILE_SIZE / 2 - BLAST_BEAM_WIDTH / 2,
+      TILE_SIZE,
       BLAST_BEAM_WIDTH,
       BLAST_BEAM_WIDTH / 2
     );
@@ -98,33 +98,33 @@ describe('drawGrowingBeam', () => {
     ) as unknown as ReturnType<typeof mockScene.add.graphics>;
     const cfg = tweenConfig();
 
-    cfg.targets.len = 144;
+    cfg.targets.len = 3 * TILE_SIZE;
     cfg.onUpdate();
 
     expect(g.fillStyle).toHaveBeenNthCalledWith(1, BLAST_COLOR_INNER, BLAST_ALPHA);
     expect(g.fillRoundedRect).toHaveBeenNthCalledWith(
       1,
-      24,
-      24 - BLAST_BEAM_WIDTH / 2,
-      48,
+      TILE_SIZE / 2,
+      TILE_SIZE / 2 - BLAST_BEAM_WIDTH / 2,
+      TILE_SIZE,
       BLAST_BEAM_WIDTH,
       BLAST_BEAM_WIDTH / 2
     );
     expect(g.fillStyle).toHaveBeenNthCalledWith(2, BLAST_COLOR_MID, BLAST_ALPHA);
     expect(g.fillRoundedRect).toHaveBeenNthCalledWith(
       2,
-      24 + 48,
-      24 - BLAST_BEAM_WIDTH / 2,
-      48,
+      TILE_SIZE / 2 + TILE_SIZE,
+      TILE_SIZE / 2 - BLAST_BEAM_WIDTH / 2,
+      TILE_SIZE,
       BLAST_BEAM_WIDTH,
       BLAST_BEAM_WIDTH / 2
     );
     expect(g.fillStyle).toHaveBeenNthCalledWith(3, BLAST_COLOR_OUTER, BLAST_ALPHA);
     expect(g.fillRoundedRect).toHaveBeenNthCalledWith(
       3,
-      24 + 96,
-      24 - BLAST_BEAM_WIDTH / 2,
-      48,
+      TILE_SIZE / 2 + 2 * TILE_SIZE,
+      TILE_SIZE / 2 - BLAST_BEAM_WIDTH / 2,
+      TILE_SIZE,
       BLAST_BEAM_WIDTH,
       BLAST_BEAM_WIDTH / 2
     );
@@ -140,12 +140,12 @@ describe('drawGrowingBeam', () => {
     ) as unknown as ReturnType<typeof mockScene.add.graphics>;
     const cfg = tweenConfig();
 
-    cfg.targets.len = 10; // shorter than BLAST_BEAM_WIDTH (32), so radius must clamp to 10/2=5
+    cfg.targets.len = 10; // shorter than BLAST_BEAM_WIDTH (21), so radius must clamp to 10/2=5
     cfg.onUpdate();
 
     expect(g.fillRoundedRect).toHaveBeenCalledExactlyOnceWith(
-      24,
-      24 - BLAST_BEAM_WIDTH / 2,
+      TILE_SIZE / 2,
+      TILE_SIZE / 2 - BLAST_BEAM_WIDTH / 2,
       10,
       BLAST_BEAM_WIDTH,
       5

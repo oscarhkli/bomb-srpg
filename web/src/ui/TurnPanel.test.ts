@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mockScene } from '../test/setup';
 import { firstGraphics as headerGraphics } from '../test/sceneHelpers';
-import { TEAM_COLORS, SUDDEN_DEATH_COLOR } from '../constants';
+import { TEAM_COLORS, SUDDEN_DEATH_COLOR, TURN_PANEL_WIDTH, TURN_PANEL_HEIGHT } from '../constants';
 import TurnPanel from './TurnPanel';
 
 beforeEach(() => {
@@ -9,6 +9,21 @@ beforeEach(() => {
 });
 
 describe('TurnPanel', () => {
+  it('is top-center of GameControlRegion with a 2px top margin', () => {
+    const panel = new TurnPanel(mockScene as never);
+
+    panel.update(2, 30, 1);
+
+    // Independent literal — GameControlRegion is 480..640, TurnPanel is 96 wide: 512 centers it.
+    expect(headerGraphics().fillRoundedRect).toHaveBeenCalledWith(
+      512,
+      2,
+      TURN_PANEL_WIDTH,
+      TURN_PANEL_HEIGHT / 2,
+      4
+    );
+  });
+
   it('fills the header with TEAM_COLORS[activeTeam]', () => {
     const panel = new TurnPanel(mockScene as never);
 
