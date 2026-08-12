@@ -4,6 +4,21 @@
 import { mockScene, createMockText, createMockContainer } from './setup';
 import type { BombGraphics } from '../rendering/resolveTurnPlayer';
 
+// Temporarily swaps mockScene.cameras.main's width/height (a shared singleton, so a leaked
+// mutation would corrupt every later test in the file) — restored via finally even if `run` throws.
+export function withCameraSize<T>(width: number, height: number, run: () => T): T {
+  const prevWidth = mockScene.cameras.main.width;
+  const prevHeight = mockScene.cameras.main.height;
+  mockScene.cameras.main.width = width;
+  mockScene.cameras.main.height = height;
+  try {
+    return run();
+  } finally {
+    mockScene.cameras.main.width = prevWidth;
+    mockScene.cameras.main.height = prevHeight;
+  }
+}
+
 // Drains the microtask queue `times` times — enough for a chain of already-resolved mock
 // promises (`.then`/`await` hops) to settle. Cheap since nothing here is a real timer.
 export async function flush(times = 15): Promise<void> {
@@ -78,11 +93,13 @@ export function fireTextPointerEvent(
   (call[1] as () => void)();
 }
 
-export function pointerDownOf(g: ReturnType<typeof mockScene.add.graphics>): () => void {
+// Accepts any mock with an `on` spy — Graphics, Sprite, Container, etc. all register listeners
+// the same way.
+export function pointerDownOf(g: { on: { mock: { calls: unknown[][] } } }): () => void {
   return g.on.mock.calls.find(call => call[0] === 'pointerdown')?.[1] as () => void;
 }
 
-export function clickPointerdown(g: ReturnType<typeof mockScene.add.graphics>): void {
+export function clickPointerdown(g: { on: { mock: { calls: unknown[][] } } }): void {
   pointerDownOf(g)();
 }
 
@@ -123,4 +140,14 @@ export function makeBombGraphics(): BombGraphics {
     container: createMockContainer() as never,
     countdownText: createMockText() as never,
   };
+}
+
+export function spriteAt(index: number): ReturnType<typeof mockScene.add.sprite> {
+  return mockScene.add.sprite.mock.results[index]!.value as ReturnType<typeof mockScene.add.sprite>;
+}
+
+// Grid is always the first Graphics; sprite-based occupants (units/softBlocks) are tracked
+// separately via add.sprite(), in render order — occupant index 0 is sprite results[0].
+export function occupantSprite(index: number): ReturnType<typeof mockScene.add.sprite> {
+  return spriteAt(index);
 }

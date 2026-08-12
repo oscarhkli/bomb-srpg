@@ -5,7 +5,22 @@ export const TEAM_COLOR_FALLBACK = 0x4c4c4c;
 // Default fade in/out duration used across this UI.
 export const FADE_MS = 200;
 
-export const TILE_SIZE = 48;
+export const TILE_SIZE = 32;
+
+// Fixed bottom-padding band every sprite's untrimmed 64x64 canvas reserves; sprites use
+// origin (0.5, 1) offset by this amount below the tile's bottom edge.
+export const SPRITE_GROUND_MARGIN = 16;
+
+// MatchScene's second camera (see docs/frontend/p4-spec001-sprites.md) and the two regions
+// it's split into: GameBoardRegion (Grid/Units) on the left, GameControlRegion (TurnPanel/
+// TurnCommandPanel/MatchSummaryButton) on the right.
+export const MATCH_CAMERA_WIDTH = 640;
+export const MATCH_CAMERA_HEIGHT = 320;
+export const GAME_BOARD_REGION_WIDTH = 480;
+export const GAME_BOARD_REGION_HEIGHT = 320;
+export const GAME_CONTROL_REGION_X = GAME_BOARD_REGION_WIDTH;
+export const GAME_CONTROL_REGION_WIDTH = 160;
+export const GAME_CONTROL_REGION_HEIGHT = 320;
 
 export const TERRAIN_COLORS: Record<TerrainType, number> = {
   TerrainPlain: 0x4caf50, // green
@@ -17,8 +32,6 @@ export const TERRAIN_COLORS: Record<TerrainType, number> = {
 
 export const TERRAIN_BORDER_COLOR = 0x000000;
 
-export const UNIT_SIZE = 32;
-export const SOFTBLOCK_SIZE = 42;
 export const BOMB_SIZE = 24;
 
 export const TEAM_COLORS: Record<number, number> = {
@@ -26,8 +39,9 @@ export const TEAM_COLORS: Record<number, number> = {
   2: 0xf32d21, // red
 };
 
-export const SOFTBLOCK_COLOR = 0xe6e6e6;
-export const SOFTBLOCK_CORNER_RADIUS = 4;
+// Still used by MatchSettingsScene's UnitPage (formation-slot icons) via boardRenderer's
+// drawUnitSprite/drawArchetypeIcon — that Scene's vector rendering is untouched by this phase.
+export const UNIT_SIZE = 32;
 export const OCCUPANT_STROKE_COLOR = 0xffffff;
 export const OCCUPANT_ICON_RADIUS = 10;
 export const OCCUPANT_ICON_STROKE_WIDTH = 2;
@@ -55,9 +69,9 @@ export const PANEL_BUTTON_HEIGHT = 32;
 export const PANEL_BUTTON_BORDER_WIDTH = 2;
 export const PANEL_BUTTON_SPACING = 12;
 
-export const TURN_COMMAND_PANEL_WIDTH = 192;
+export const TURN_COMMAND_PANEL_WIDTH = 144;
 export const TURN_COMMAND_PANEL_HEIGHT = 144;
-export const TURN_COMMAND_PANEL_GUTTER = 16;
+export const TURN_COMMAND_PANEL_BOTTOM_MARGIN = 2;
 
 export const ALLOWED_TILE_MOVE_COLOR = 0x86c64f;
 export const ALLOWED_TILE_MOVE_ALPHA = 0.65;
@@ -77,6 +91,8 @@ export const UNIT_MOVE_TWEEN_DURATION = 500;
 // TurnPanel
 export const TURN_PANEL_WIDTH = 96;
 export const TURN_PANEL_HEIGHT = 48;
+// Top-center of GameControlRegion, 2px top margin.
+export const TURN_PANEL_TOP_MARGIN = 2;
 export const TURN_PANEL_MARGIN = 48;
 export const TURN_PANEL_PADDING = 8;
 export const TURN_PANEL_TEXT_COLOR = 0xeeeeee;
@@ -85,6 +101,8 @@ export const SUDDEN_DEATH_COLOR = 0xff0000;
 // Shared pill-button size for lifecycle-style buttons, distinct from PANEL_BUTTON_*.
 export const LIFECYCLE_BUTTON_WIDTH = 320;
 export const LIFECYCLE_BUTTON_HEIGHT = 72;
+// Smaller pill-button height shared by VictoryCutscene/SuddenDeathCutscene buttons.
+export const LIFECYCLE_BUTTON_HEIGHT_SMALL = 44;
 export const RESOLVE_BUTTON_LABEL = 'End this turn';
 
 // Error panel — fixed left-side panel so error text is always legible instead of overlapping
@@ -121,20 +139,24 @@ export const MATCH_SUMMARY_BUTTON_SIZE = 48;
 export const MATCH_SUMMARY_BUTTON_LABEL = '≡';
 export const MATCH_SUMMARY_BUTTON_TEXT_COLOR = 0xffffff;
 export const MATCH_SUMMARY_BUTTON_ICON_FONT_SIZE = 48;
-export const MATCH_SUMMARY_PANEL_WIDTH = 720;
-export const MATCH_SUMMARY_PANEL_HEIGHT = 640;
-export const MATCH_SUMMARY_TEXT_FONT_SIZE = 36;
+// Resized to fit the new 640x320 MatchScene camera: width ~80% and height ~45% of the Phase 3
+// values (nearest 4px), font -4px. MATCH_SUMMARY_BUTTON_SIZE (the outer toggle) is unaffected.
+export const MATCH_SUMMARY_PANEL_WIDTH = 576;
+export const MATCH_SUMMARY_PANEL_HEIGHT = 288;
+export const MATCH_SUMMARY_TEXT_FONT_SIZE = 32;
 export const MATCH_SUMMARY_TEXT_COLOR = 0xffffff;
 export const MATCH_SUMMARY_TOP_SECTION_RATIO = 0.15;
 export const MATCH_SUMMARY_MID_SECTION_RATIO = 0.35;
 // Vertical breathing room between the top (Stage/Max Turns) and mid (team stats) sections.
-export const MATCH_SUMMARY_SECTION_GAP = 24;
-// Smaller pill-button height shared by panel/cutscene buttons; same width as LIFECYCLE_BUTTON_WIDTH.
-export const LIFECYCLE_BUTTON_HEIGHT_SMALL = 44;
+export const MATCH_SUMMARY_SECTION_GAP = 12;
 // P1/P2 badge behind the mid-section's team headers, filled with that team's TEAM_COLORS entry.
-export const MATCH_SUMMARY_TEAM_BADGE_WIDTH = 96;
-export const MATCH_SUMMARY_TEAM_BADGE_HEIGHT = 48;
+export const MATCH_SUMMARY_TEAM_BADGE_WIDTH = 76;
+export const MATCH_SUMMARY_TEAM_BADGE_HEIGHT = 20;
 export const MATCH_SUMMARY_TEAM_BADGE_CORNER_RADIUS = 8;
+// Resolve/Reset/Surrender/Back buttons, resized independently of LIFECYCLE_BUTTON_WIDTH/HEIGHT_SMALL
+// (shared with VictoryCutscene, which this spec does not resize).
+export const MATCH_SUMMARY_BUTTON_WIDTH = 256;
+export const MATCH_SUMMARY_BUTTON_HEIGHT = 20;
 export const RESET_BUTTON_LABEL = 'Reset this turn';
 export const SURRENDER_BUTTON_LABEL = 'Surrender';
 export const BACK_BUTTON_LABEL = 'Back';

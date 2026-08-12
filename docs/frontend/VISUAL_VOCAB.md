@@ -36,6 +36,13 @@ Two different things, easy to confuse:
 
 - **TeamColor(team)** — shorthand for `TEAM_COLORS[team]` (constants.ts), with `TEAM_COLOR_FALLBACK` for unrecognized values.
 
+## Rendering
+
+- **canvas** — the fixed 1280×720 drawing surface (`this.scale.width`/`height`), shared by all Scenes.
+- **camera viewport** — a Camera's own rectangle on the canvas (`setViewport`/`add(x, y, w, h)`); a Scene can have more than one.
+- **draw** — producing output via a vector `Graphics` object.
+- **render** — the general term covering both `draw` (`Graphics`) and displaying a `Sprite`/`Image`.
+
 ## Typography
 
 - Default text: 12px, `0xffffff`, unless a spec states otherwise.

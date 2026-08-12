@@ -17,11 +17,16 @@ import {
   PANEL_BUTTON_SPACING,
   PANEL_BUTTON_WIDTH,
   TILE_SIZE,
-  TURN_COMMAND_PANEL_GUTTER,
+  GAME_CONTROL_REGION_HEIGHT,
+  GAME_CONTROL_REGION_X,
+  GAME_CONTROL_REGION_WIDTH,
+  TURN_COMMAND_PANEL_WIDTH,
   TURN_COMMAND_PANEL_HEIGHT,
+  TURN_COMMAND_PANEL_BOTTOM_MARGIN,
 } from '../constants';
 import { drawPillButton } from './pillButton';
 import { destroyAll } from './gameObjectUtils';
+import { boardOffset } from '../rendering/boardOffset';
 import type { Coordinate, TurnCmdType, TurnCommand, Unit } from '../types/api';
 
 export interface TurnCommandPanelCallbacks {
@@ -44,18 +49,11 @@ export default class TurnCommandPanel {
   private overlayTiles: Phaser.GameObjects.Graphics[] = [];
   private actionStack: ActionStackEntry[] = [];
   private currentUnit: Unit | undefined;
-  private gridWidthPx = 0;
-  private gridHeightPx = 0;
 
   constructor(
     private readonly scene: Phaser.Scene,
     private readonly callbacks: TurnCommandPanelCallbacks
   ) {}
-
-  setGridBounds(gridWidthPx: number, gridHeightPx: number): void {
-    this.gridWidthPx = gridWidthPx;
-    this.gridHeightPx = gridHeightPx;
-  }
 
   openFor(unit: Unit): void {
     this.closeImmediately();
@@ -73,8 +71,10 @@ export default class TurnCommandPanel {
   }
 
   private drawPanelButtons(unit: Unit): void {
-    const panelX = this.gridWidthPx + TURN_COMMAND_PANEL_GUTTER;
-    const panelY = this.gridHeightPx - TURN_COMMAND_PANEL_HEIGHT;
+    const panelX =
+      GAME_CONTROL_REGION_X + (GAME_CONTROL_REGION_WIDTH - TURN_COMMAND_PANEL_WIDTH) / 2;
+    const panelY =
+      GAME_CONTROL_REGION_HEIGHT - TURN_COMMAND_PANEL_HEIGHT - TURN_COMMAND_PANEL_BOTTOM_MARGIN;
 
     this.drawButton(panelX, panelY, 'Move', !unit.hasMoved, () => {
       void this.onActionButtonClick('move');
@@ -186,8 +186,8 @@ export default class TurnCommandPanel {
     tiles.forEach(position => {
       const g = this.scene.add.graphics();
       g.setDepth(DEPTH_ALLOWED_TILE_OVERLAY);
-      const x = position.x * TILE_SIZE;
-      const y = position.y * TILE_SIZE;
+      const x = position.x * TILE_SIZE + boardOffset.x;
+      const y = position.y * TILE_SIZE + boardOffset.y;
       g.fillStyle(fillColor, fillAlpha);
       g.fillRect(x, y, TILE_SIZE, TILE_SIZE);
 

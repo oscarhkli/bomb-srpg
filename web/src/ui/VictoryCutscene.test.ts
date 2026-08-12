@@ -7,6 +7,7 @@ import {
   graphicsAt,
   pointerDownOf,
   tweenConfigAt,
+  withCameraSize,
 } from '../test/sceneHelpers';
 import {
   TEAM_COLORS,
@@ -36,6 +37,16 @@ function completeFadeInAndButtonDelay(): void {
 }
 
 describe('VictoryCutscene', () => {
+  it('fills the new 640x320 MatchScene camera viewport exactly (no leftover 1280x720 sizing)', () => {
+    withCameraSize(640, 320, () => {
+      const cutscene = new VictoryCutscene(mockScene as never);
+
+      cutscene.play(1, { onRematch: vi.fn(), onReturnToSettings: vi.fn() });
+
+      expect(firstGraphics().fillRect).toHaveBeenCalledWith(0, 0, 640, 320);
+    });
+  });
+
   it.each([
     [1, TEAM_COLORS[1]],
     [2, TEAM_COLORS[2]],

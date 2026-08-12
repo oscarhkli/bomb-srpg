@@ -7,6 +7,8 @@ import {
   PANEL_BUTTON_FILL_ALPHA,
   PANEL_BUTTON_BORDER_COLOR,
   PANEL_BUTTON_BORDER_WIDTH,
+  PANEL_BUTTON_WIDTH,
+  PANEL_BUTTON_HEIGHT,
   DISABLED_BUTTON_COLOR,
   GAME_FONT_FAMILY,
   ALLOWED_TILE_MOVE_COLOR,
@@ -37,7 +39,6 @@ function makePanel(overrides: Partial<Record<string, unknown>> = {}) {
     ...overrides,
   };
   const panel = new TurnCommandPanel(mockScene as never, callbacks);
-  panel.setGridBounds(240, 240);
   return {
     panel,
     getAllowedTiles: callbacks.getAllowedTiles,
@@ -63,6 +64,23 @@ beforeEach(() => {
 });
 
 describe('TurnCommandPanel', () => {
+  it('is 144x144, bottom-center of GameControlRegion, with a 2px bottom margin', () => {
+    const { panel } = makePanel();
+
+    panel.openFor(makeUnit());
+
+    // Independent literals — GameControlRegion is 480..640x0..320, panel is 144x144: centers to
+    // x=488, bottom-aligns with a 2px margin to y=174.
+    const [moveButtonGraphics] = allGraphics();
+    expect(moveButtonGraphics!.fillRoundedRect).toHaveBeenCalledWith(
+      488,
+      174,
+      PANEL_BUTTON_WIDTH,
+      PANEL_BUTTON_HEIGHT,
+      expect.any(Number)
+    );
+  });
+
   it('draws three pill buttons styled per spec when opened for a fresh unit', () => {
     const { panel } = makePanel();
 

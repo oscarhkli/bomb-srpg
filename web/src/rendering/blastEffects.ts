@@ -12,15 +12,9 @@ import {
   BLAST_COLOR_MID,
   BLAST_COLOR_INNER,
 } from './constants';
+import { tileCenter } from './boardRenderer';
 
 export type CardinalDirection = 'N' | 'S' | 'E' | 'W';
-
-function tileCenter(position: Coordinate): { cx: number; cy: number } {
-  return {
-    cx: position.x * TILE_SIZE + TILE_SIZE / 2,
-    cy: position.y * TILE_SIZE + TILE_SIZE / 2,
-  };
-}
 
 // A 🔥 glyph at the tile center — placeholder for a formal sprite, so kept minimal
 export function drawFireShape(scene: Phaser.Scene, position: Coordinate): Phaser.GameObjects.Text {

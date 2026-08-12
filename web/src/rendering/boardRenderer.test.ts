@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mockScene } from '../test/setup';
 import {
   firstGraphics as terrainGraphics,
-  occupantGraphics,
+  occupantSprite,
   pointerDownOf,
 } from '../test/sceneHelpers';
 import {
@@ -15,13 +15,11 @@ import {
 import {
   TERRAIN_COLORS,
   TERRAIN_BORDER_COLOR,
-  TEAM_COLOR_FALLBACK,
   TEAM_COLORS,
   OCCUPANT_STROKE_COLOR,
-  SOFTBLOCK_COLOR,
-  SOFTBLOCK_CORNER_RADIUS,
+  TILE_SIZE,
+  SPRITE_GROUND_MARGIN,
 } from '../constants';
-import { BOMB_GLYPH } from './constants';
 import type { Bomb, GameState, SoftBlock, Tile, TerrainType, Unit } from '../types/api';
 import type { BombGraphics } from './resolveTurnPlayer';
 import {
@@ -43,9 +41,9 @@ function ctx(overrides: Partial<BoardRenderContext> = {}): BoardRenderContext {
     scene: mockScene as never,
     terrainObjects: [],
     occupantObjects: [],
-    unitGraphicsById: new Map(),
+    unitSpritesById: new Map(),
     bombGraphicsById: new Map<number, BombGraphics>(),
-    softBlockGraphicsById: new Map(),
+    softBlockSpritesById: new Map(),
     onUnitClicked: vi.fn(),
     ...overrides,
   };
@@ -67,8 +65,7 @@ function state(
   };
 }
 
-// Entry-order paint: terrain (grid = first Graphics) then occupants, matching create()'s sequence
-// so the occupantGraphics(i) = graphicsAt(i+1) indexing holds for the occupant assertions below.
+// Entry-order paint: terrain (grid = first Graphics) then occupants.
 function renderAll(c: BoardRenderContext, s: GameState): void {
   renderTerrain(c, s.grid);
   renderOccupants(c, s);
@@ -76,7 +73,7 @@ function renderAll(c: BoardRenderContext, s: GameState): void {
 
 describe('tileCenter', () => {
   it('returns the pixel center of a tile', () => {
-    expect(tileCenter({ x: 1, y: 0 })).toEqual({ cx: 72, cy: 24 });
+    expect(tileCenter({ x: 1, y: 0 })).toEqual({ cx: 48, cy: 16 });
   });
 });
 
@@ -95,11 +92,18 @@ describe('renderTerrain', () => {
       [plainTile(), plainTile(), plainTile()],
     ]);
 
+    // On this 3x2 grid, centered in GameBoardRegion (offsetX=192, offsetY=128).
     const grid = terrainGraphics();
     expect(grid.lineStyle).toHaveBeenCalledWith(1, TERRAIN_BORDER_COLOR);
     expect(grid.fillRect).toHaveBeenCalledTimes(6);
-    expect(grid.fillRect).toHaveBeenNthCalledWith(1, 0, 0, 48, 48);
-    expect(grid.fillRect).toHaveBeenNthCalledWith(6, 96, 48, 48, 48);
+    expect(grid.fillRect).toHaveBeenNthCalledWith(1, 0 + 192, 0 + 128, TILE_SIZE, TILE_SIZE);
+    expect(grid.fillRect).toHaveBeenNthCalledWith(
+      6,
+      2 * TILE_SIZE + 192,
+      TILE_SIZE + 128,
+      TILE_SIZE,
+      TILE_SIZE
+    );
     expect(grid.strokeRect).toHaveBeenCalledTimes(6);
   });
 
@@ -141,90 +145,73 @@ describe('renderTerrain', () => {
 });
 
 describe('renderOccupants — units', () => {
-  it('renders a live unit as a team-colored 32x32 square centered on its tile', () => {
+  it('renders a live unit as a sprite ground-anchored on its tile with origin (0.5, 1)', () => {
     renderAll(
       ctx(),
       state([[plainTile(), plainTile()]], { units: [unit({ position: { x: 1, y: 0 }, team: 1 })] })
     );
 
-    const g = occupantGraphics(0);
-    expect(g.fillStyle).toHaveBeenCalledWith(TEAM_COLORS[1]);
-    expect(g.fillRect).toHaveBeenCalledWith(56, 8, 32, 32);
+    // On this 1x2 grid, centered in GameBoardRegion (offsetX=208, offsetY=144).
+    const sprite = occupantSprite(0);
+    expect(sprite.x).toBe(1 * TILE_SIZE + TILE_SIZE / 2 + 208);
+    expect(sprite.y).toBe((0 + 1) * TILE_SIZE + SPRITE_GROUND_MARGIN + 144);
+    expect(sprite.setOrigin).toHaveBeenCalledWith(0.5, 1);
+  });
+
+  it('picks the texture key matching archetype + team', () => {
+    renderAll(ctx(), state([[plainTile()]], { units: [unit({ type: 'Bandit', team: 2 })] }));
+    expect(mockScene.add.sprite).toHaveBeenCalledWith(
+      expect.any(Number),
+      expect.any(Number),
+      'unit_bandit_red',
+      'unit_bandit_red-frame'
+    );
   });
 
   it('does not render a dead unit (hp 0)', () => {
     renderAll(ctx(), state([[plainTile()]], { units: [unit({ hp: 0 })] }));
-    // Only the grid Graphics was created.
-    expect(mockScene.add.graphics).toHaveBeenCalledTimes(1);
+    expect(mockScene.add.sprite).not.toHaveBeenCalled();
   });
 
-  it('warns and falls back to TEAM_COLOR_FALLBACK for an unconfigured team color', () => {
+  it('warns and falls back to the blue texture for an unconfigured team', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-    renderAll(ctx(), state([[plainTile()]], { units: [unit({ team: 99 })] }));
+    renderAll(ctx(), state([[plainTile()]], { units: [unit({ type: 'Bandit', team: 99 })] }));
 
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('99'));
-    expect(occupantGraphics(0).fillStyle).toHaveBeenCalledWith(TEAM_COLOR_FALLBACK);
+    expect(mockScene.add.sprite).toHaveBeenCalledWith(
+      expect.any(Number),
+      expect.any(Number),
+      'unit_bandit_blue',
+      'unit_bandit_blue-frame'
+    );
     warnSpy.mockRestore();
   });
 
-  it('registers the unit graphics in the map', () => {
+  it('registers the unit sprite in the map', () => {
     const c = ctx();
     renderAll(c, state([[plainTile()]], { units: [unit({ id: 7 })] }));
-    expect(c.unitGraphicsById.has(7)).toBe(true);
+    expect(c.unitSpritesById.has(7)).toBe(true);
   });
 
-  it('draws a circle icon for Bandit', () => {
-    renderAll(ctx(), state([[plainTile()]], { units: [unit({ type: 'Bandit' })] }));
-    const g = occupantGraphics(0);
-    expect(g.lineStyle).toHaveBeenCalledWith(2, OCCUPANT_STROKE_COLOR);
-    expect(g.strokeCircle).toHaveBeenCalledWith(24, 24, 10);
-  });
-
-  it('draws an apex-centered 3-point polygon for Witch', () => {
-    renderAll(ctx(), state([[plainTile()]], { units: [unit({ type: 'Witch' })] }));
-    const [points, closed] = occupantGraphics(0).strokePoints.mock.calls[0] as [
-      { x: number; y: number }[],
-      boolean,
-    ];
-    expect(points).toHaveLength(3);
-    expect(closed).toBe(true);
-    expect(points[0]!.x).toBe(24);
-  });
-
-  it('draws a 10-vertex star for King', () => {
-    renderAll(ctx(), state([[plainTile()]], { units: [unit({ type: 'King' })] }));
-    const [points] = occupantGraphics(0).strokePoints.mock.calls[0] as [{ x: number; y: number }[]];
-    expect(points).toHaveLength(10);
-  });
-
-  it('warns and draws no icon for an unrecognized archetype', () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-    renderAll(ctx(), state([[plainTile()]], { units: [unit({ type: 'Mystic' })] }));
-
-    const g = occupantGraphics(0);
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Mystic'));
-    expect(g.strokeCircle).not.toHaveBeenCalled();
-    expect(g.strokePoints).not.toHaveBeenCalled();
-    warnSpy.mockRestore();
-  });
-
-  it('makes a unit clickable over its full tile and invokes onUnitClicked on pointerdown', () => {
+  it('makes a unit clickable over its tile footprint (local space, independent of grid position) and invokes onUnitClicked on pointerdown', () => {
     const onUnitClicked = vi.fn();
     const u = unit({ id: 7, position: { x: 1, y: 0 } });
     renderAll(ctx({ onUnitClicked }), state([[plainTile(), plainTile()]], { units: [u] }));
 
-    const g = occupantGraphics(0);
-    expect(g.setInteractive).toHaveBeenCalledWith(
-      expect.objectContaining({ x: 48, y: 0, width: 48, height: 48 }),
+    const sprite = occupantSprite(0);
+    // Local-space hit rect: sprite is 64x64 (untrimmed canvas), origin (0.5, 1) — the tile
+    // footprint sits at x=[16,48), y=[16,48) regardless of the unit's grid position.
+    expect(sprite.setInteractive).toHaveBeenCalledWith(
+      expect.objectContaining({ x: 16, y: 16, width: TILE_SIZE, height: TILE_SIZE }),
       expect.any(Function)
     );
-    pointerDownOf(g)();
+    pointerDownOf(sprite)();
     expect(onUnitClicked).toHaveBeenCalledWith(u);
   });
 });
 
 describe('renderOccupants — softBlocks & bombs', () => {
-  it('renders a softBlock as a rounded rect and registers it in the map', () => {
+  it('renders a softBlock as a ground-anchored sprite and registers it in the map', () => {
     const c = ctx();
     renderAll(
       c,
@@ -233,22 +220,28 @@ describe('renderOccupants — softBlocks & bombs', () => {
       })
     );
 
-    const g = occupantGraphics(0);
-    expect(g.fillStyle).toHaveBeenCalledWith(SOFTBLOCK_COLOR);
-    expect(g.fillRoundedRect).toHaveBeenCalledWith(51, 3, 42, 42, SOFTBLOCK_CORNER_RADIUS);
-    expect(c.softBlockGraphicsById.has(3)).toBe(true);
+    // On this 1x2 grid, centered in GameBoardRegion (offsetX=208, offsetY=144).
+    const sprite = occupantSprite(0);
+    expect(mockScene.add.sprite).toHaveBeenCalledWith(
+      1 * TILE_SIZE + TILE_SIZE / 2 + 208,
+      (0 + 1) * TILE_SIZE + SPRITE_GROUND_MARGIN + 144,
+      'soft_block',
+      'soft_block-frame'
+    );
+    expect(sprite.setOrigin).toHaveBeenCalledWith(0.5, 1);
+    expect(c.softBlockSpritesById.has(3)).toBe(true);
   });
 
   it('logs on softBlock click', () => {
     const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
     const block = softBlock({ id: 3 });
     renderAll(ctx(), state([[plainTile()]], { softBlocks: [block] }));
-    pointerDownOf(occupantGraphics(0))();
+    pointerDownOf(occupantSprite(0))();
     expect(consoleSpy).toHaveBeenCalledWith('SoftBlock 3 is clicked', block);
     consoleSpy.mockRestore();
   });
 
-  it('renders a bomb as a 💣 glyph with countdown text parented in a single container and registers both in the map', () => {
+  it('renders a bomb as a sprite with countdown text parented in a single container and registers both in the map', () => {
     const c = ctx();
     renderAll(
       c,
@@ -257,10 +250,16 @@ describe('renderOccupants — softBlocks & bombs', () => {
       })
     );
 
-    expect(mockScene.add.text).toHaveBeenCalledWith(0, 0, BOMB_GLYPH, expect.objectContaining({}));
-    // Countdown text is added last, so it renders on top of the glyph.
+    expect(mockScene.add.sprite).toHaveBeenCalledWith(
+      0,
+      TILE_SIZE / 2 + SPRITE_GROUND_MARGIN,
+      'bomb',
+      'bomb-frame'
+    );
+    // Countdown text is added last, so it renders on top of the bomb sprite.
     expect(mockScene.add.text).toHaveBeenCalledWith(0, 0, '5', expect.objectContaining({}));
-    expect(mockScene.add.container).toHaveBeenCalledWith(72, 24, [
+    // tileCenter of {x:1,y:0} on this 1x2 grid, centered in GameBoardRegion: (256, 160).
+    expect(mockScene.add.container).toHaveBeenCalledWith(256, 160, [
       expect.anything(),
       expect.anything(),
     ]);
@@ -273,10 +272,15 @@ describe('renderBomb', () => {
     const c = ctx();
     renderBomb(c, bomb({ id: 42, position: { x: 0, y: 0 }, countdown: 2 }));
 
-    // No Graphics allocated for the bomb itself — it's rendered entirely as Text glyphs.
+    // No Graphics allocated for the bomb itself — glyph is a Sprite, countdown a Text.
     expect(mockScene.add.graphics).not.toHaveBeenCalled();
-    expect(mockScene.add.text).toHaveBeenCalledWith(0, 0, BOMB_GLYPH, expect.objectContaining({}));
-    expect(mockScene.add.container).toHaveBeenCalledWith(24, 24, [
+    expect(mockScene.add.sprite).toHaveBeenCalledWith(
+      0,
+      TILE_SIZE / 2 + SPRITE_GROUND_MARGIN,
+      'bomb',
+      'bomb-frame'
+    );
+    expect(mockScene.add.container).toHaveBeenCalledWith(TILE_SIZE / 2, TILE_SIZE / 2, [
       expect.anything(),
       expect.anything(),
     ]);
@@ -285,6 +289,7 @@ describe('renderBomb', () => {
   });
 });
 
+// Retained for MatchSettingsScene's UnitPage, which still draws vector unit icons.
 describe('drawUnitSprite', () => {
   it('fills a team-colored square of the given size and scales the archetype icon radius', () => {
     const c = ctx();
@@ -331,6 +336,16 @@ describe('drawArchetypeIcon', () => {
     expect(g.strokeCircle).toHaveBeenCalledWith(10, 10, 40);
   });
 
+  it('draws icons using OCCUPANT_STROKE_COLOR', () => {
+    const c = ctx();
+    renderTerrain(c, [[plainTile()]]);
+    const g = terrainGraphics();
+
+    drawArchetypeIcon(g as never, 'Bandit', 10, 10);
+
+    expect(g.lineStyle).toHaveBeenCalledWith(2, OCCUPANT_STROKE_COLOR);
+  });
+
   it("scales the King star's inner radius proportionally with an explicit radius", () => {
     const c = ctx();
     renderTerrain(c, [[plainTile()]]);
@@ -338,9 +353,7 @@ describe('drawArchetypeIcon', () => {
 
     drawArchetypeIcon(g as never, 'King', 0, 0, 40);
 
-    // Outer/inner ratio must stay 10:4 (OCCUPANT_ICON_RADIUS's default) at any size — a fixed
-    // 4px inner radius looked fine at the board's default 10px but rendered a thin, spiky star
-    // once callers (e.g. MatchSettingsScene) scaled the outer radius up.
+    // Outer/inner ratio must stay 10:4 (OCCUPANT_ICON_RADIUS's default) at any size.
     const [points] = g.strokePoints.mock.calls[0] as [{ x: number; y: number }[]];
     const distances = points.map(p => Math.hypot(p.x, p.y));
     const outer = Math.max(...distances);
@@ -354,13 +367,13 @@ describe('renderOccupants — teardown', () => {
   it('destroys prior occupant objects and clears the graphics maps on re-render', () => {
     const c = ctx();
     renderAll(c, state([[plainTile()]], { units: [unit({ id: 7 })] }));
-    const firstUnitGraphics = occupantGraphics(0);
-    expect(c.unitGraphicsById.has(7)).toBe(true);
+    const firstUnitSprite = occupantSprite(0);
+    expect(c.unitSpritesById.has(7)).toBe(true);
 
     renderOccupants(c, state([[plainTile()]]));
 
-    expect(firstUnitGraphics.destroy).toHaveBeenCalled();
-    expect(c.unitGraphicsById.has(7)).toBe(false);
+    expect(firstUnitSprite.destroy).toHaveBeenCalled();
+    expect(c.unitSpritesById.has(7)).toBe(false);
   });
 
   it('leaves the terrain layer untouched on an occupant swap', () => {

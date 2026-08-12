@@ -19,9 +19,9 @@ export interface BombGraphics {
 export interface ResolveTurnPlayerDeps {
   scene: Phaser.Scene;
   gameStateSnapshot: GameState;
-  unitGraphicsById: Map<number, Phaser.GameObjects.Graphics>;
+  unitSpritesById: Map<number, Phaser.GameObjects.Sprite>;
   bombGraphicsById: Map<number, BombGraphics>;
-  softBlockGraphicsById: Map<number, Phaser.GameObjects.Graphics>;
+  softBlockSpritesById: Map<number, Phaser.GameObjects.Sprite>;
   onError: (message: string) => void;
 }
 
@@ -248,8 +248,8 @@ export function playResolveTurnEvents(
       const position = deps.gameStateSnapshot.units.find(u => u.id === unitId)!.position;
       const offset = causerOffsetFor(position, explodedList);
       deps.scene.time.delayedCall(offset + FIRE_DURATION_MS, () => {
-        deps.unitGraphicsById.get(unitId!)?.destroy();
-        deps.unitGraphicsById.delete(unitId!);
+        deps.unitSpritesById.get(unitId!)?.destroy();
+        deps.unitSpritesById.delete(unitId!);
         fireByUnitId.get(unitId!)?.destroy();
         fireByUnitId.delete(unitId!);
       });
@@ -262,8 +262,8 @@ export function playResolveTurnEvents(
         const fire = drawFireShape(deps.scene, position);
         deps.scene.time.delayedCall(FIRE_DURATION_MS, () => {
           fire.destroy();
-          deps.softBlockGraphicsById.get(softBlockId!)?.destroy();
-          deps.softBlockGraphicsById.delete(softBlockId!);
+          deps.softBlockSpritesById.get(softBlockId!)?.destroy();
+          deps.softBlockSpritesById.delete(softBlockId!);
         });
       });
       endTimes.push(offset + FIRE_DURATION_MS);

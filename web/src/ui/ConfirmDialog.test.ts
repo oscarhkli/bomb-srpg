@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mockScene } from '../test/setup';
-import { allGraphics, clickPointerdown, firstText } from '../test/sceneHelpers';
+import { allGraphics, clickPointerdown, firstText, withCameraSize } from '../test/sceneHelpers';
 import {
   CONFIRM_DIALOG_DIM_ALPHA,
   CONFIRM_DIALOG_DIM_COLOR,
@@ -14,6 +14,22 @@ beforeEach(() => {
 });
 
 describe('ConfirmDialog', () => {
+  it('centers on the new 640x320 MatchScene camera, not the 1280x720 canvas', () => {
+    withCameraSize(640, 320, () => {
+      const dialog = new ConfirmDialog(mockScene as never);
+
+      dialog.show(vi.fn(), vi.fn(), 'Confirm?');
+
+      const [bg] = allGraphics();
+      expect(bg!.fillRect).toHaveBeenCalledWith(
+        640 / 2 - CONFIRM_DIALOG_WIDTH / 2,
+        320 / 2 - CONFIRM_DIALOG_HEIGHT / 2,
+        CONFIRM_DIALOG_WIDTH,
+        CONFIRM_DIALOG_HEIGHT
+      );
+    });
+  });
+
   it('renders a dimmed rect and a "Confirm?" prompt when shown', () => {
     const dialog = new ConfirmDialog(mockScene as never);
 

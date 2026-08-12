@@ -5,11 +5,13 @@ import {
   TEAM_COLOR_FALLBACK,
   TEAM_COLORS,
   TURN_PANEL_HEIGHT,
-  TURN_PANEL_MARGIN,
   TURN_PANEL_PADDING,
   SUDDEN_DEATH_COLOR,
   TURN_PANEL_TEXT_COLOR,
   TURN_PANEL_WIDTH,
+  TURN_PANEL_TOP_MARGIN,
+  GAME_CONTROL_REGION_X,
+  GAME_CONTROL_REGION_WIDTH,
 } from '../constants';
 import { destroyAll, colorToCss } from './gameObjectUtils';
 
@@ -26,8 +28,8 @@ export default class TurnPanel {
   update(turn: number, maxTurns: number, activeTeam: number): void {
     destroyAll(this.objects);
 
-    const x = TURN_PANEL_MARGIN;
-    const y = TURN_PANEL_MARGIN;
+    const x = GAME_CONTROL_REGION_X + (GAME_CONTROL_REGION_WIDTH - TURN_PANEL_WIDTH) / 2;
+    const y = TURN_PANEL_TOP_MARGIN;
 
     const header = this.scene.add.graphics();
     header.setDepth(DEPTH_TURN_COMMAND_PANEL);

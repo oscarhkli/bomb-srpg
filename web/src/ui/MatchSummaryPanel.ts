@@ -13,11 +13,18 @@ import {
   MATCH_SUMMARY_TOP_SECTION_RATIO,
   MATCH_SUMMARY_MID_SECTION_RATIO,
   MATCH_SUMMARY_SECTION_GAP,
-  LIFECYCLE_BUTTON_HEIGHT_SMALL,
+  MATCH_SUMMARY_BUTTON_WIDTH,
+  MATCH_SUMMARY_BUTTON_HEIGHT,
   MATCH_SUMMARY_TEAM_BADGE_WIDTH,
   MATCH_SUMMARY_TEAM_BADGE_HEIGHT,
   MATCH_SUMMARY_TEAM_BADGE_CORNER_RADIUS,
-  TURN_PANEL_MARGIN,
+  GAME_CONTROL_REGION_X,
+  GAME_CONTROL_REGION_WIDTH,
+  GAME_CONTROL_REGION_HEIGHT,
+  TURN_PANEL_TOP_MARGIN,
+  TURN_PANEL_HEIGHT,
+  TURN_COMMAND_PANEL_HEIGHT,
+  TURN_COMMAND_PANEL_BOTTOM_MARGIN,
   GAME_FONT_FAMILY,
   CONFIRM_DIALOG_DIM_COLOR,
   CONFIRM_DIALOG_DIM_ALPHA,
@@ -25,7 +32,6 @@ import {
   RESET_BUTTON_LABEL,
   SURRENDER_BUTTON_LABEL,
   BACK_BUTTON_LABEL,
-  LIFECYCLE_BUTTON_WIDTH,
   PANEL_BUTTON_SPACING,
   PANEL_BUTTON_FILL_COLOR,
   PANEL_BUTTON_FILL_ALPHA,
@@ -83,9 +89,13 @@ export default class MatchSummaryPanel {
 
   renderButton(): void {
     destroyAll(this.buttonObjects);
-    const { width } = this.scene.cameras.main;
-    const x = width - TURN_PANEL_MARGIN - MATCH_SUMMARY_BUTTON_SIZE;
-    const y = TURN_PANEL_MARGIN;
+    // Centered in the GameControlRegion gap between TurnPanel's bottom edge and
+    // TurnCommandPanel's top edge, so it never overlaps either.
+    const x = GAME_CONTROL_REGION_X + (GAME_CONTROL_REGION_WIDTH - MATCH_SUMMARY_BUTTON_SIZE) / 2;
+    const gapTop = TURN_PANEL_TOP_MARGIN + TURN_PANEL_HEIGHT;
+    const gapBottom =
+      GAME_CONTROL_REGION_HEIGHT - TURN_COMMAND_PANEL_HEIGHT - TURN_COMMAND_PANEL_BOTTOM_MARGIN;
+    const y = gapTop + (gapBottom - gapTop - MATCH_SUMMARY_BUTTON_SIZE) / 2;
 
     const g = this.scene.add.graphics();
     g.setDepth(DEPTH_TURN_COMMAND_PANEL);
@@ -227,7 +237,7 @@ export default class MatchSummaryPanel {
 
   // The button block is bottom-aligned against panelBottomY, not top-anchored below mid-section.
   private renderButtons(x0: number, panelBottomY: number, cfg: GameCfg): void {
-    const x = x0 + MATCH_SUMMARY_PANEL_WIDTH / 2 - LIFECYCLE_BUTTON_WIDTH / 2;
+    const x = x0 + MATCH_SUMMARY_PANEL_WIDTH / 2 - MATCH_SUMMARY_BUTTON_WIDTH / 2;
     const resetEnabled = cfg.allowResetTurn;
 
     const buttons: { label: string; style: PillButtonStyle; onClick: (() => void) | undefined }[] =
@@ -255,18 +265,18 @@ export default class MatchSummaryPanel {
       ];
 
     const blockHeight =
-      buttons.length * LIFECYCLE_BUTTON_HEIGHT_SMALL + (buttons.length - 1) * PANEL_BUTTON_SPACING;
+      buttons.length * MATCH_SUMMARY_BUTTON_HEIGHT + (buttons.length - 1) * PANEL_BUTTON_SPACING;
     const startY = panelBottomY - PANEL_BUTTON_SPACING - blockHeight;
 
     buttons.forEach(({ label, style, onClick }, i) => {
-      const y = verticalButtonY(startY, i, LIFECYCLE_BUTTON_HEIGHT_SMALL, PANEL_BUTTON_SPACING);
+      const y = verticalButtonY(startY, i, MATCH_SUMMARY_BUTTON_HEIGHT, PANEL_BUTTON_SPACING);
       this.panelObjects.push(
         ...drawPillButton(
           this.scene,
           x,
           y,
-          LIFECYCLE_BUTTON_WIDTH,
-          LIFECYCLE_BUTTON_HEIGHT_SMALL,
+          MATCH_SUMMARY_BUTTON_WIDTH,
+          MATCH_SUMMARY_BUTTON_HEIGHT,
           label,
           style,
           DEPTH_MATCH_SUMMARY_PANEL,
