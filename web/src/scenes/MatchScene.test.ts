@@ -168,10 +168,10 @@ describe('MatchScene', () => {
   });
 
   describe('camera setup', () => {
-    it('adds a 640x320 camera as main, scrolled to world origin, and removes the pre-existing default camera', async () => {
+    it('adds a 640x360 camera as main, scrolled to world origin, and removes the pre-existing default camera', async () => {
       // cameras.add(..., makeMain: true) only repoints `.main` — it never removes the scene's
       // auto-created default camera, so MatchScene must remove it explicitly or render through
-      // two overlapping cameras (the spec requires exactly one).
+      // two overlapping cameras.
       const defaultCamera = mockScene.cameras.main;
 
       await bootScene();
@@ -358,9 +358,9 @@ describe('MatchScene', () => {
 
     expect(submitTurnCommand).toHaveBeenCalledWith({ type: 'move', unitId: 7, target });
     // On this 1x2 grid, centered in GameBoardRegion: toCenter.cx=256 (moved one tile right from
-    // fromCenter.cx=224); groundY for row 0 is 192 (unaffected — same row).
+    // fromCenter.cx=224); groundY for row 0 is 212 (unaffected — same row).
     expect(mockScene.tweens.add).toHaveBeenCalledWith(
-      expect.objectContaining({ targets: unitGraphics, x: 256, y: 192, ease: 'Linear' })
+      expect.objectContaining({ targets: unitGraphics, x: 256, y: 212, ease: 'Linear' })
     );
   });
 
@@ -399,8 +399,8 @@ describe('MatchScene', () => {
     expect(submitTurnCommand).toHaveBeenCalledWith({ type: 'placeBomb', unitId: 7, target });
     // In-place render (renderBomb), not a wholesale swap: a bomb container is drawn at the
     // target tile center (tileCenter of {x:1,y:0} on this 1x2 grid, centered in GameBoardRegion
-    // => 256,160) and the initial unit graphics survives.
-    expect(mockScene.add.container).toHaveBeenCalledWith(256, 160, expect.any(Array));
+    // => 256,180) and the initial unit graphics survives.
+    expect(mockScene.add.container).toHaveBeenCalledWith(256, 180, expect.any(Array));
     expect(unitGraphics.destroy).not.toHaveBeenCalled();
   });
 
@@ -538,9 +538,9 @@ describe('MatchScene', () => {
     await flush();
 
     // On this 1x2 grid, centered in GameBoardRegion: fromCenter.cx=224, toCenter.cx=256 (moved
-    // one tile right, delta +32); groundY for row 0 is 192 (unaffected — same row).
+    // one tile right, delta +32); groundY for row 0 is 212 (unaffected — same row).
     expect(mockScene.tweens.add).toHaveBeenCalledWith(
-      expect.objectContaining({ targets: unitGraphics, x: 256, y: 192, ease: 'Linear' })
+      expect.objectContaining({ targets: unitGraphics, x: 256, y: 212, ease: 'Linear' })
     );
     expect(mockScene.add.text).not.toHaveBeenCalledWith(
       expect.any(Number),
@@ -576,9 +576,9 @@ describe('MatchScene', () => {
 
     // The tween follows the server's `to` (x:2), not the requested x:1, and no error is raised —
     // the client renders the server's authoritative event verbatim. On this 1x3 grid, centered
-    // in GameBoardRegion: toCenter.cx=272 (vs. the requested tile's 240); groundY row 0 is 192.
+    // in GameBoardRegion: toCenter.cx=272 (vs. the requested tile's 240); groundY row 0 is 212.
     expect(mockScene.tweens.add).toHaveBeenCalledWith(
-      expect.objectContaining({ targets: unitGraphics, x: 272, y: 192, ease: 'Linear' })
+      expect.objectContaining({ targets: unitGraphics, x: 272, y: 212, ease: 'Linear' })
     );
     expect(mockScene.add.text).not.toHaveBeenCalledWith(
       expect.any(Number),
@@ -1043,8 +1043,8 @@ describe('MatchScene', () => {
         onComplete: () => void;
       };
       expect(tweenCfg.targets).toBe(bombContainer);
-      // tileCenter of {x:1,y:0} on this 1x2 grid, centered in GameBoardRegion: cy = 0*32+16+144
-      expect(tweenCfg.y).toBe(160);
+      // tileCenter of {x:1,y:0} on this 1x2 grid, centered in GameBoardRegion: cy = 0*32+16+164
+      expect(tweenCfg.y).toBe(180);
       expect(tweenCfg.duration).toBe(SUDDEN_DEATH_BOMB_DROP_DURATION_MS);
       expect(bombContainer.setDepth).toHaveBeenCalledWith(DEPTH_SUDDEN_DEATH_BOMB);
 

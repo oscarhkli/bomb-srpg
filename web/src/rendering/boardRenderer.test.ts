@@ -92,15 +92,15 @@ describe('renderTerrain', () => {
       [plainTile(), plainTile(), plainTile()],
     ]);
 
-    // On this 3x2 grid, centered in GameBoardRegion (offsetX=192, offsetY=128).
+    // On this 3x2 grid, centered in GameBoardRegion (offsetX=192, offsetY=148).
     const grid = terrainGraphics();
     expect(grid.lineStyle).toHaveBeenCalledWith(1, TERRAIN_BORDER_COLOR);
     expect(grid.fillRect).toHaveBeenCalledTimes(6);
-    expect(grid.fillRect).toHaveBeenNthCalledWith(1, 0 + 192, 0 + 128, TILE_SIZE, TILE_SIZE);
+    expect(grid.fillRect).toHaveBeenNthCalledWith(1, 0 + 192, 0 + 148, TILE_SIZE, TILE_SIZE);
     expect(grid.fillRect).toHaveBeenNthCalledWith(
       6,
       2 * TILE_SIZE + 192,
-      TILE_SIZE + 128,
+      TILE_SIZE + 148,
       TILE_SIZE,
       TILE_SIZE
     );
@@ -151,10 +151,10 @@ describe('renderOccupants — units', () => {
       state([[plainTile(), plainTile()]], { units: [unit({ position: { x: 1, y: 0 }, team: 1 })] })
     );
 
-    // On this 1x2 grid, centered in GameBoardRegion (offsetX=208, offsetY=144).
+    // On this 1x2 grid, centered in GameBoardRegion (offsetX=208, offsetY=164).
     const sprite = occupantSprite(0);
     expect(sprite.x).toBe(1 * TILE_SIZE + TILE_SIZE / 2 + 208);
-    expect(sprite.y).toBe((0 + 1) * TILE_SIZE + SPRITE_GROUND_MARGIN + 144);
+    expect(sprite.y).toBe((0 + 1) * TILE_SIZE + SPRITE_GROUND_MARGIN + 164);
     expect(sprite.setOrigin).toHaveBeenCalledWith(0.5, 1);
   });
 
@@ -220,11 +220,11 @@ describe('renderOccupants — softBlocks & bombs', () => {
       })
     );
 
-    // On this 1x2 grid, centered in GameBoardRegion (offsetX=208, offsetY=144).
+    // On this 1x2 grid, centered in GameBoardRegion (offsetX=208, offsetY=164).
     const sprite = occupantSprite(0);
     expect(mockScene.add.sprite).toHaveBeenCalledWith(
       1 * TILE_SIZE + TILE_SIZE / 2 + 208,
-      (0 + 1) * TILE_SIZE + SPRITE_GROUND_MARGIN + 144,
+      (0 + 1) * TILE_SIZE + SPRITE_GROUND_MARGIN + 164,
       'soft_block',
       'soft_block-frame'
     );
@@ -258,8 +258,8 @@ describe('renderOccupants — softBlocks & bombs', () => {
     );
     // Countdown text is added last, so it renders on top of the bomb sprite.
     expect(mockScene.add.text).toHaveBeenCalledWith(0, 0, '5', expect.objectContaining({}));
-    // tileCenter of {x:1,y:0} on this 1x2 grid, centered in GameBoardRegion: (256, 160).
-    expect(mockScene.add.container).toHaveBeenCalledWith(256, 160, [
+    // tileCenter of {x:1,y:0} on this 1x2 grid, centered in GameBoardRegion: (256, 180).
+    expect(mockScene.add.container).toHaveBeenCalledWith(256, 180, [
       expect.anything(),
       expect.anything(),
     ]);

@@ -15,12 +15,12 @@ export const SPRITE_GROUND_MARGIN = 16;
 // it's split into: GameBoardRegion (Grid/Units) on the left, GameControlRegion (TurnPanel/
 // TurnCommandPanel/MatchSummaryButton) on the right.
 export const MATCH_CAMERA_WIDTH = 640;
-export const MATCH_CAMERA_HEIGHT = 320;
+export const MATCH_CAMERA_HEIGHT = 360;
 export const GAME_BOARD_REGION_WIDTH = 480;
-export const GAME_BOARD_REGION_HEIGHT = 320;
+export const GAME_BOARD_REGION_HEIGHT = 360;
 export const GAME_CONTROL_REGION_X = GAME_BOARD_REGION_WIDTH;
 export const GAME_CONTROL_REGION_WIDTH = 160;
-export const GAME_CONTROL_REGION_HEIGHT = 320;
+export const GAME_CONTROL_REGION_HEIGHT = 360;
 
 export const TERRAIN_COLORS: Record<TerrainType, number> = {
   TerrainPlain: 0x4caf50, // green
@@ -139,7 +139,7 @@ export const MATCH_SUMMARY_BUTTON_SIZE = 48;
 export const MATCH_SUMMARY_BUTTON_LABEL = '≡';
 export const MATCH_SUMMARY_BUTTON_TEXT_COLOR = 0xffffff;
 export const MATCH_SUMMARY_BUTTON_ICON_FONT_SIZE = 48;
-// Resized to fit the new 640x320 MatchScene camera: width ~80% and height ~45% of the Phase 3
+// Resized to fit the new 640x360 MatchScene camera: width ~80% and height ~45% of the Phase 3
 // values (nearest 4px), font -4px. MATCH_SUMMARY_BUTTON_SIZE (the outer toggle) is unaffected.
 export const MATCH_SUMMARY_PANEL_WIDTH = 576;
 export const MATCH_SUMMARY_PANEL_HEIGHT = 288;
