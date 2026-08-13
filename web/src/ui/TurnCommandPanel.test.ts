@@ -69,12 +69,12 @@ describe('TurnCommandPanel', () => {
 
     panel.openFor(makeUnit());
 
-    // Independent literals — GameControlRegion is 480..640x0..320, panel is 144x144: centers to
-    // x=488, bottom-aligns with a 2px margin to y=174.
+    // Independent literals — GameControlRegion is 480..640x0..360, panel is 144x144: centers to
+    // x=488, bottom-aligns with a 2px margin to y=214.
     const [moveButtonGraphics] = allGraphics();
     expect(moveButtonGraphics!.fillRoundedRect).toHaveBeenCalledWith(
       488,
-      174,
+      214,
       PANEL_BUTTON_WIDTH,
       PANEL_BUTTON_HEIGHT,
       expect.any(Number)

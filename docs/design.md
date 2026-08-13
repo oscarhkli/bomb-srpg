@@ -131,8 +131,8 @@ Surrender: `POST /surrender` (either team, any time).
 - **Game Framework**: Phaser 4.2.0 (breaking changes from v3: renderer, filter system, tint mechanism). Latest stable build compatible with procedural Graphics API.
 - **Test Runner**: Vitest integrates with Vite, reuses Vite's config, maintains Jest-compatible APIs for rapid iteration.
 - **Linting & Formatting**: ESLint + @typescript-eslint for static analysis, Prettier for deterministic code style.
-- **Logical Resolution**: Canvas is `1280x720` (16×9 aspect ratio). As of Phase 4.1, `MatchScene` additionally renders through its own second `640x320` camera (viewport at canvas origin, scrolled to world origin) — the canvas itself is unchanged, pending a future phase that resizes it directly.
-- **Tile Size**: `32px` per cell (Phase 4.1; was `48px` through Phase 3).
+- **Logical Resolution**: Canvas is `1280x720` (16×9 aspect ratio). As of Phase 4.2, `MatchScene` additionally renders through its own second `640x360` camera (viewport at canvas origin, scrolled to world origin) — the canvas itself is unchanged, pending a future phase that resizes it directly.
+- **Tile Size**: `32px` per cell.
 - **Mock Mode**: TitleScene includes an offline-play button for development (test game flow without backend connectivity).
 - **Input Model**: Click-only interaction for Phase 3 (keyboard shortcuts deferred to Phase 5+ polish pass).
 - **Retro Art Strategy**: As of Phase 4.1, Units, Bombs, and SoftBlocks in `MatchScene` render as pixel-art `Sprite`s loaded via `this.load.aseprite(...)` (see `docs/frontend/p4-spec001-sprites.md`). Tiles and Explosions remain procedural `Graphics`:

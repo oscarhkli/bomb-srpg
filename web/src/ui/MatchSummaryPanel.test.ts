@@ -60,11 +60,11 @@ describe('MatchSummaryPanel button', () => {
     panel.renderButton();
 
     const button = firstGraphics();
-    // (480,320)-based region math — see TurnPanel.ts/TurnCommandPanel.ts for the edges this
+    // (480,360)-based region math — see TurnPanel.ts/TurnCommandPanel.ts for the edges this
     // sits between. Independent literals, not the same expression the code computes.
     expect(button.fillRoundedRect).toHaveBeenCalledWith(
       536,
-      88,
+      108,
       MATCH_SUMMARY_BUTTON_SIZE,
       MATCH_SUMMARY_BUTTON_SIZE,
       expect.any(Number)
@@ -114,13 +114,13 @@ describe('MatchSummaryPanel button', () => {
 });
 
 describe('MatchSummaryPanel.open', () => {
-  it('centers on the new 640x320 MatchScene camera, not the 1280x720 canvas', () => {
-    withCameraSize(640, 320, () => {
+  it('centers on the new 640x360 MatchScene camera, not the 1280x720 canvas', () => {
+    withCameraSize(640, 360, () => {
       const { panel } = makePanel();
 
       panel.open(makeState(), makeCfg());
 
-      expect(firstGraphics().fillRect).toHaveBeenCalledWith(0, 0, 640, 320);
+      expect(firstGraphics().fillRect).toHaveBeenCalledWith(0, 0, 640, 360);
     });
   });
 

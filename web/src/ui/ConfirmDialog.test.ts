@@ -14,8 +14,8 @@ beforeEach(() => {
 });
 
 describe('ConfirmDialog', () => {
-  it('centers on the new 640x320 MatchScene camera, not the 1280x720 canvas', () => {
-    withCameraSize(640, 320, () => {
+  it('centers on the new 640x360 MatchScene camera, not the 1280x720 canvas', () => {
+    withCameraSize(640, 360, () => {
       const dialog = new ConfirmDialog(mockScene as never);
 
       dialog.show(vi.fn(), vi.fn(), 'Confirm?');
@@ -23,7 +23,7 @@ describe('ConfirmDialog', () => {
       const [bg] = allGraphics();
       expect(bg!.fillRect).toHaveBeenCalledWith(
         640 / 2 - CONFIRM_DIALOG_WIDTH / 2,
-        320 / 2 - CONFIRM_DIALOG_HEIGHT / 2,
+        360 / 2 - CONFIRM_DIALOG_HEIGHT / 2,
         CONFIRM_DIALOG_WIDTH,
         CONFIRM_DIALOG_HEIGHT
       );

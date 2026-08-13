@@ -87,8 +87,8 @@ describe('TurnBanner', () => {
     );
   });
 
-  it('fills the new 640x320 MatchScene camera viewport exactly (no leftover 1280x720 sizing)', () => {
-    withCameraSize(640, 320, () => {
+  it('fills the new 640x360 MatchScene camera viewport exactly (no leftover 1280x720 sizing)', () => {
+    withCameraSize(640, 360, () => {
       const banner = new TurnBanner(mockScene as never);
 
       void banner.play(1);

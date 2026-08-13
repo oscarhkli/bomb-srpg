@@ -96,10 +96,9 @@ function groundY(position: Coordinate): number {
   return (position.y + 1) * TILE_SIZE + SPRITE_GROUND_MARGIN + boardOffset.y;
 }
 
-// Depth offset that sorts occupants by row without disturbing the wider depth-band scheme
-// (DEPTH_GRID < DEPTH_BLAST < DEPTH_OCCUPANT < DEPTH_FIRE < ...) — small enough that even a
-// very tall board stays well under the next band. Exported so callers that move/re-anchor an
-// occupant after initial render (movement tweens, sudden-death bomb drops) stay consistent.
+// occupantDepth returns a small per-row offset so occupants sort visually by row within the
+// DEPTH_OCCUPANT band. Exported for movement tweens and sudden-death bomb drops that re-anchor
+// an occupant's depth after initial render.
 export function occupantDepth(position: Coordinate): number {
   return DEPTH_OCCUPANT + position.y * 0.01;
 }

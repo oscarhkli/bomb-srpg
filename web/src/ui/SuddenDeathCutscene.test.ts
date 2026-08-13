@@ -25,13 +25,13 @@ function pulseCall(): { duration?: number; yoyo?: boolean; repeat?: number } {
 }
 
 describe('SuddenDeathCutscene', () => {
-  it('fills the new 640x320 MatchScene camera viewport exactly (no leftover 1280x720 sizing)', () => {
-    withCameraSize(640, 320, () => {
+  it('fills the new 640x360 MatchScene camera viewport exactly (no leftover 1280x720 sizing)', () => {
+    withCameraSize(640, 360, () => {
       const cutscene = new SuddenDeathCutscene(mockScene as never);
 
       void cutscene.play([], () => Promise.resolve());
 
-      expect(overlayGraphics().fillRect).toHaveBeenCalledWith(0, 0, 640, 320);
+      expect(overlayGraphics().fillRect).toHaveBeenCalledWith(0, 0, 640, 360);
     });
   });
 
