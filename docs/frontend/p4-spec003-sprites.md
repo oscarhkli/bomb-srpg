@@ -1,20 +1,24 @@
 ---
-title: "Phase 4.3: Adopt Dual Grid System for MatchScene Tile Map
+title: "Phase 4.3: Adopt Pixel Art Stage Backgrounds for MatchScene
 ---
 
-# Phase 4.3: Adopt Dual Grid System for MatchScene Tile Map
+# Phase 4.3: Adopt Pixel Art Stage Backgrounds for MatchScene
 
 ## Context
 
-In Phase 3 we introduced `grid` which is the vector graphical representation. This spec introduces the drafted pixel art sprites of all 3 existing stages. This also adopts [dual-grid tilemap](https://www.lexaloffle.com/bbs/?tid=143710) mechanism.
+In Phase 3, `grid`'s terrain was rendered as colored vector rectangles (see `VISUAL_VOCAB.md` → Board). This spec replaces that rendering with the drafted pixel art Stage backgrounds for all 3 existing `StagePreset`s.
+
+`grid` (`GameState.grid`, `Tile[][]`) itself is untouched — it stays the source of the board's dimensions (`setBoardOffset`) and occupant positioning. Only the per-tile vector drawing that used to visualize it is retired.
 
 ## Goal
 
-- `MatchScene` displays pixel art assets of `grid` of all 3 stages.
+- `MatchScene` displays the pixel-art Stage background matching the match's `StagePreset`.
+- Retire the vector terrain rendering it replaces.
 
 ## Non-Goal
 
 - Resize the Canvas of entire game - this should be done when all Scenes' resizings are done.
+- A "toggle grid line" feature. A future spec may add a spatial-reference line overlay; it is a distinct feature from the terrain-color rendering retired here and is designed fresh when written.
 
 ## Scene Entry
 
@@ -26,9 +30,9 @@ No change from spec002.
 
 ## Visual Spec
 
-Unlike `Occupants`, Stage sprites are exported **trimmed** — the full canvas is delivered for every entity in the table below.
+Unlike `Occupants`, Stage sprites are exported **trimmed**, but with the play area centered in the source canvas — the delivered art needs no padding compensation.
 
-Sprites use origin **(0.5, 0.5)** — centered anchored of the canvas.
+Sprites use origin **(0.5, 0.5)**, anchored at the canvas center.
 
 | Entity           | Texture Key    | Path (relative to `sprites/`)       | Type             |
 | ---------------- | -------------- | ----------------------------------- | ---------------- |
@@ -36,16 +40,27 @@ Sprites use origin **(0.5, 0.5)** — centered anchored of the canvas.
 | Stage (Standard) | stage_standard | stages/Stage-Standard.png (+ .json) | atlas (aseprite) |
 | Stage (Divided)  | stage_divided  | stages/Stage-Divided.png (+ .json)  | atlas (aseprite) |
 
-We adopt dual-grid tilemap. Splitting grid into visual layer and logical layer. Since logical layer stays 9x9x32 square pixels as of today but visual layer could be larger, on design perspective this visual layer, so both layer should align at center instead of using a hardcoded 16px offset.
+The active texture key is looked up by the match's `StagePreset.Name` (`gameCfg.stagePreset`), the same pattern `UNIT_TEXTURE_KEYS` uses for archetype+team (`p4-spec001-sprites.md`). These loads belong in `MatchScene.preload()`, added to the existing `SPRITE_MANIFEST`.
 
-> Note: Agent should correct the naming of visual layer and logical layer.
+`grid`'s tile dimensions come from the match's `StagePreset`; the Stage background image may be a different size to allow decorative bleed beyond the playable area. The background and `grid` are center-aligned — not offset by a fixed pixel constant — so this holds regardless of a preset's dimensions or a background's canvas size.
 
-The visual layer should be render slightly higher depth than the logical layer, so that the visual layer can hide the logical layer but not the other images.
+The background renders at a lower depth than all occupants (Units, Bombs, SoftBlocks). Occupants remain separate sprites positioned per grid cell; the background carries no per-cell logic.
 
-> Note: Agent should analyze if we should not render the logical layer at all.
+### Terrain Retirement
+
+`renderGrid()`'s per-tile fill/stroke loop, and the `TERRAIN_COLORS`/`TERRAIN_BORDER_COLOR` constants it used, are dead code once the Stage background replaces them — delete both during implementation (same precedent as `p4-spec001-sprites.md`'s `UNIT_SIZE` retirement).
+
+`DEPTH_GRID` is renamed `DEPTH_STAGE_BACKGROUND` — it now names one background `Image`'s depth, not a per-tile terrain layer.
+
+## Documentation
+
+Update `docs/design.md`'s Retro Art Strategy note (currently: "Tiles: Colored rectangles with borders") to reflect that Stage terrain now renders as a pixel-art background image, not procedural `Graphics`.
 
 ---
 
 ## Acceptance Criteria
 
-1. Given `MatchScene` has loaded a match, when the scene renders, then grid display its pixel-art sprite textures instead of the Phase 3 vector-graphics placeholders.
+1. Given `MatchScene` has loaded a match, when the scene renders, then the Stage background displays the pixel-art sprite matching the match's `StagePreset`, and no `TERRAIN_COLORS` fill/stroke renders.
+2. Given a `StagePreset`'s `grid` dimensions or a Stage background's own canvas size, when the background renders, then it is center-aligned to `grid` regardless of either size.
+3. Given occupants (Units, Bombs, SoftBlocks) are rendered, when the scene renders, then the Stage background renders behind all of them.
+4. Given `MatchScene` is re-entered (new match or scene restart), when the scene renders, then the previous Stage background is destroyed and replaced, not left stacked or stale.

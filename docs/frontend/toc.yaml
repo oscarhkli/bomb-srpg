@@ -52,7 +52,7 @@ specs:
     category: Sprites
     completion-date: 2026-08-13
   - file: p4-spec003-sprites.md
-    status: Draft
+    status: Ready
     category: Sprites
     completion-date:
   - file: p5-spec020-match.md
