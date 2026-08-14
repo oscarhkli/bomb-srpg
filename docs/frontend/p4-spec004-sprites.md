@@ -70,7 +70,7 @@ This list is not exhaustive — do a full code scan for final cleanup, including
 
 ## Scene Exit
 
-On shutdown (leaving `MatchSettingsScene` — match ends, or the player backs out), remove the camera added in Scene Entry before the scene restarts for a new match. Otherwise re-entering `MatchSettingsScene` leaves a stale camera reference and/or stacks a duplicate camera each time.
+No explicit camera teardown needed: Phaser's `CameraManager` already destroys every camera on the scene's `shutdown` event, so re-entering `MatchSettingsScene` never stacks a duplicate.
 
 ---
 
@@ -81,3 +81,7 @@ On shutdown (leaving `MatchSettingsScene` — match ends, or the player backs ou
 3. Given `MatchSettingsScene`'s halved layout, when the scene renders at 640×360, then no `UnitPage`/`StagePage` content is clipped or overflows the camera viewport.
 4. Given a `UnitCard` and an occupied `UnitSlot`, when they render, then `UnitCard` shows no background square behind its sprite, and `UnitSlot` shows a 2px `TeamColor(team)` border instead of a filled background.
 5. Given a player reaches `MatchSettingsScene` without `MatchScene` ever having been visited in that session, when `UnitPage` renders, then unit sprites still display correctly (not blank/missing textures).
+
+## Log
+
+Implementation issues found during the build (non spec gaps) are tracked in [p4-spec004-sprites-log.md](./p4-spec004-sprites-log.md).

@@ -104,6 +104,7 @@ export function createMockSprite(x = 0, y = 0) {
     disableInteractive: vi.fn().mockReturnThis(),
     setTexture: vi.fn().mockReturnThis(),
     setFrame: vi.fn().mockReturnThis(),
+    setDisplaySize: vi.fn().mockReturnThis(),
     on: vi.fn().mockReturnThis(),
     off: vi.fn().mockReturnThis(),
     destroy: vi.fn(),
@@ -185,6 +186,7 @@ export const mockScene = {
   // for every sprite key without per-test texture setup.
   textures: {
     get: vi.fn((key: string) => ({ frames: { __BASE: {}, [`${key}-frame`]: {} } })),
+    exists: vi.fn((_key: string) => false),
     // Symmetric by default so setOrigin(0.5, 0.5) holds unless a test overrides it.
     // width/height are the trimmed size; realWidth/realHeight are the untrimmed canvas.
     getFrame: vi.fn(() => ({

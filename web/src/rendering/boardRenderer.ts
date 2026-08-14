@@ -9,10 +9,6 @@ import {
   SPRITE_GROUND_MARGIN,
   DEPTH_STAGE_BACKGROUND,
   DEPTH_OCCUPANT,
-  UNIT_SIZE,
-  OCCUPANT_STROKE_COLOR,
-  OCCUPANT_ICON_RADIUS,
-  OCCUPANT_ICON_STROKE_WIDTH,
 } from '../constants';
 import type { Bomb, Coordinate, GameState, SoftBlock, Tile, Unit } from '../types/api';
 
@@ -113,18 +109,24 @@ export function occupantDepth(position: Coordinate): number {
   return DEPTH_OCCUPANT + position.y * 0.01;
 }
 
+// Archetype + team -> texture key, falling back to that archetype's blue variant (or
+// unit_fighter_blue) for an unconfigured team. Shared with UnitPage's sprite rendering.
+export function resolveUnitTextureKey(archetype: string, team: number, context = ''): string {
+  const textureKey = UNIT_TEXTURE_KEYS[archetype]?.[team];
+  if (!textureKey) {
+    console.warn(
+      `${context}No sprite for archetype "${archetype}"/team ${team}, falling back to blue`
+    );
+  }
+  return textureKey ?? UNIT_TEXTURE_KEYS[archetype]?.[1] ?? 'unit_fighter_blue';
+}
+
 function renderUnits(ctx: BoardRenderContext, units: Unit[]): void {
   units
     .filter(unit => unit.hp > 0)
     .forEach(unit => {
       const { cx } = tileCenter(unit.position);
-      const textureKey = UNIT_TEXTURE_KEYS[unit.type]?.[unit.team];
-      if (!textureKey) {
-        console.warn(
-          `Unit ${unit.id} has no sprite for archetype "${unit.type}"/team ${unit.team}, falling back to blue`
-        );
-      }
-      const key = textureKey ?? UNIT_TEXTURE_KEYS[unit.type]?.[1] ?? 'unit_fighter_blue';
+      const key = resolveUnitTextureKey(unit.type, unit.team, `Unit ${unit.id} `);
       const frame = firstNonBaseFrame(ctx.scene, key);
       const sprite = ctx.scene.add.sprite(cx, groundY(unit.position), key, frame);
       sprite.setOrigin(0.5, 1);
@@ -218,83 +220,4 @@ export function tileCenter(position: Coordinate): { cx: number; cy: number } {
     cx: position.x * TILE_SIZE + TILE_SIZE / 2 + boardOffset.x,
     cy: position.y * TILE_SIZE + TILE_SIZE / 2 + boardOffset.y,
   };
-}
-
-// Paints a unit sprite (team-colored square + archetype icon) into a caller-owned Graphics.
-// Kept for MatchSettingsScene's UnitPage, which still uses vector unit icons.
-export function drawUnitSprite(
-  g: Phaser.GameObjects.Graphics,
-  cx: number,
-  cy: number,
-  size: number,
-  archetype: string,
-  teamColor: number,
-  cornerRadius = 0
-): void {
-  g.fillStyle(teamColor);
-  if (cornerRadius > 0) {
-    g.fillRoundedRect(cx - size / 2, cy - size / 2, size, size, cornerRadius);
-  } else {
-    g.fillRect(cx - size / 2, cy - size / 2, size, size);
-  }
-  drawArchetypeIcon(g, archetype, cx, cy, (size * OCCUPANT_ICON_RADIUS) / UNIT_SIZE);
-}
-
-export function drawArchetypeIcon(
-  g: Phaser.GameObjects.Graphics,
-  archetype: string,
-  cx: number,
-  cy: number,
-  radius: number = OCCUPANT_ICON_RADIUS
-): void {
-  g.lineStyle(OCCUPANT_ICON_STROKE_WIDTH, OCCUPANT_STROKE_COLOR);
-  switch (archetype) {
-    case 'Bandit':
-      g.strokeCircle(cx, cy, radius);
-      break;
-    case 'Witch':
-      g.strokePoints(regularPolygonPoints(cx, cy, 3, radius), true);
-      break;
-    case 'Fighter':
-      g.strokePoints(regularPolygonPoints(cx, cy, 5, radius), true);
-      break;
-    case 'King':
-      g.strokePoints(starPoints(cx, cy, 5, radius, radius * 0.4), true);
-      break;
-    default:
-      console.warn(`Unrecognized archetype "${archetype}", drawing no icon`);
-  }
-}
-
-// Vertices of a regular polygon centered at (cx, cy), first vertex pointing straight up.
-function regularPolygonPoints(
-  cx: number,
-  cy: number,
-  sides: number,
-  radius: number
-): Phaser.Math.Vector2[] {
-  return Array.from({ length: sides }, (_, i) => {
-    const angle = -Math.PI / 2 + (i * 2 * Math.PI) / sides;
-    return new Phaser.Math.Vector2(cx + radius * Math.cos(angle), cy + radius * Math.sin(angle));
-  });
-}
-
-// Vertices of a 5-pointed star centered at (cx, cy), alternating outer/inner radius,
-// first vertex pointing straight up.
-function starPoints(
-  cx: number,
-  cy: number,
-  points: number,
-  outerRadius: number,
-  innerRadius: number
-): Phaser.Math.Vector2[] {
-  const vertices: Phaser.Math.Vector2[] = [];
-  for (let i = 0; i < points * 2; i++) {
-    const radius = i % 2 === 0 ? outerRadius : innerRadius;
-    const angle = -Math.PI / 2 + (i * Math.PI) / points;
-    vertices.push(
-      new Phaser.Math.Vector2(cx + radius * Math.cos(angle), cy + radius * Math.sin(angle))
-    );
-  }
-  return vertices;
 }

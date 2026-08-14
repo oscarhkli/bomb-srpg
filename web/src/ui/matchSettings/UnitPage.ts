@@ -10,7 +10,8 @@ import {
   occupiedCount,
 } from './formation';
 import type { PageBounds, SettingsPage, SettingsPageNav } from './SettingsPage';
-import { drawUnitSprite } from '../../rendering/boardRenderer';
+import { resolveUnitTextureKey } from '../../rendering/boardRenderer';
+import { firstNonBaseFrame } from '../../rendering/spriteFrames';
 import { drawPillButton, attachRectClickHandler, type PillButtonStyle } from '../pillButton';
 import { colorToCss, destroyAll, centeredRowStartX } from '../gameObjectUtils';
 import {
@@ -49,7 +50,7 @@ import {
   PANEL_BUTTON_BORDER_WIDTH,
 } from '../../constants';
 
-type GameObj = Phaser.GameObjects.Graphics | Phaser.GameObjects.Text;
+type GameObj = Phaser.GameObjects.Graphics | Phaser.GameObjects.Text | Phaser.GameObjects.Sprite;
 
 const NEXT_BUTTON_STYLE: PillButtonStyle = {
   fillColor: PANEL_BUTTON_FILL_COLOR,
@@ -93,6 +94,22 @@ export default class UnitPage implements SettingsPage {
 
   private teamColor(): number {
     return TEAM_COLORS[this.playerIndex] ?? TEAM_COLOR_FALLBACK;
+  }
+
+  // Renders an archetype's pixel-art sprite bottom-anchored at (cx, bottomY), scaled to fit size.
+  private renderUnitIcon(
+    scene: Phaser.Scene,
+    archetype: string,
+    cx: number,
+    bottomY: number,
+    size: number
+  ): Phaser.GameObjects.Sprite {
+    const key = resolveUnitTextureKey(archetype, this.playerIndex);
+    const frame = firstNonBaseFrame(scene, key);
+    const sprite = scene.add.sprite(cx, bottomY, key, frame);
+    sprite.setOrigin(0.5, 1);
+    sprite.setDisplaySize(size, size);
+    return sprite;
   }
 
   // Team 2 faces Team 1, so its slots render in the mirrored order (formation.ts).
@@ -208,17 +225,17 @@ export default class UnitPage implements SettingsPage {
       return;
     }
     const cx = x + UNIT_SLOT_SIZE / 2;
-    const cy = y + UNIT_SLOT_SIZE / 2;
     const teamColor = this.teamColor();
 
     const g = scene.add.graphics();
-    g.fillStyle(teamColor);
-    g.fillRoundedRect(x, y, UNIT_SLOT_SIZE, UNIT_SLOT_SIZE, SETTINGS_CORNER_RADIUS);
+    g.lineStyle(PANEL_BUTTON_BORDER_WIDTH, teamColor);
+    g.strokeRoundedRect(x, y, UNIT_SLOT_SIZE, UNIT_SLOT_SIZE, SETTINGS_CORNER_RADIUS);
     this.formationObjects.push(g);
 
     const occupant = this.slots[slotIndex];
     if (occupant !== undefined && occupant !== NO_UNIT) {
-      drawUnitSprite(g, cx, cy, UNIT_SLOT_SIZE, occupant, teamColor, SETTINGS_CORNER_RADIUS);
+      const sprite = this.renderUnitIcon(scene, occupant, cx, y + UNIT_SLOT_SIZE, UNIT_SLOT_SIZE);
+      this.formationObjects.push(sprite);
     }
 
     const label = scene.add.text(
@@ -231,8 +248,8 @@ export default class UnitPage implements SettingsPage {
         color: colorToCss(0xffffff),
       }
     );
-    // The label must render above the sprite (they overlap) — the sprite (drawUnitSprite, above)
-    // is left at Phaser's default depth (0).
+    // The label must render above the sprite (they overlap) — the sprite is left at Phaser's
+    // default depth (0).
     label.setDepth(DEPTH_UNIT_SLOT_LABEL);
     this.formationObjects.push(label);
 
@@ -296,16 +313,15 @@ export default class UnitPage implements SettingsPage {
     g.strokeRoundedRect(x, y, UNIT_CARD_WIDTH, UNIT_CARD_HEIGHT, SETTINGS_CORNER_RADIUS);
     this.archetypeObjects.push(g);
 
-    const spriteCy = y + UNIT_CARD_PADDING + UNIT_CARD_SPRITE_SIZE / 2;
-    drawUnitSprite(
-      g,
-      cx,
-      spriteCy,
-      UNIT_CARD_SPRITE_SIZE,
+    const spriteBottom = y + UNIT_CARD_PADDING + UNIT_CARD_SPRITE_SIZE;
+    const sprite = this.renderUnitIcon(
+      scene,
       archetype.name,
-      this.teamColor(),
-      SETTINGS_CORNER_RADIUS
+      cx,
+      spriteBottom,
+      UNIT_CARD_SPRITE_SIZE
     );
+    this.archetypeObjects.push(sprite);
 
     const nameY = y + UNIT_CARD_PADDING + UNIT_CARD_SPRITE_SIZE + UNIT_CARD_NAME_GAP;
     const nameText = scene.add.text(cx, nameY, archetype.name, {

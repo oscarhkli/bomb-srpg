@@ -14,7 +14,14 @@ import { makeCfg } from '../test/fixtures';
 import { getCatalog, createMatchRoom, initRoom, createMatch } from '../engine/api';
 import MatchSettingsScene, { type MatchSettingsSceneData } from './MatchSettingsScene';
 import { NO_UNIT } from '../ui/matchSettings/formation';
-import { TEAM_COLORS, NEXT_BUTTON_LABEL, START_MATCH_BUTTON_LABEL } from '../constants';
+import { UNIT_SPRITE_MANIFEST } from '../rendering/spriteManifest';
+import {
+  TEAM_COLORS,
+  NEXT_BUTTON_LABEL,
+  START_MATCH_BUTTON_LABEL,
+  MATCH_CAMERA_WIDTH,
+  MATCH_CAMERA_HEIGHT,
+} from '../constants';
 import type { Archetype, Catalog, GameCfg } from '../types/api';
 
 vi.mock('../engine/api');
@@ -68,6 +75,60 @@ function nextButtonGraphics(g: ReturnType<typeof allGraphics>): (typeof g)[numbe
 
 beforeEach(() => {
   vi.clearAllMocks();
+});
+
+describe('MatchSettingsScene — preload', () => {
+  it('loads every unit sprite texture not already in the cache', () => {
+    vi.mocked(mockScene.textures.exists).mockReturnValue(false);
+    const scene = new MatchSettingsScene();
+
+    scene.preload();
+
+    expect(mockScene.load.aseprite).toHaveBeenCalledWith(
+      'unit_fighter_blue',
+      'assets/sprites/units/Fighter-Blue.png',
+      'assets/sprites/units/Fighter-Blue.json'
+    );
+    expect(mockScene.load.aseprite).toHaveBeenCalledTimes(UNIT_SPRITE_MANIFEST.length);
+  });
+
+  it('skips a unit texture already present in the texture cache', () => {
+    vi.mocked(mockScene.textures.exists).mockImplementation(key => key === 'unit_fighter_blue');
+    const scene = new MatchSettingsScene();
+
+    scene.preload();
+
+    expect(mockScene.load.aseprite).not.toHaveBeenCalledWith(
+      'unit_fighter_blue',
+      expect.anything(),
+      expect.anything()
+    );
+    expect(mockScene.load.aseprite).toHaveBeenCalledTimes(UNIT_SPRITE_MANIFEST.length - 1);
+  });
+});
+
+describe('MatchSettingsScene — camera setup', () => {
+  it('adds a 640x360 camera as main, scrolled to world origin, and removes the pre-existing default camera', async () => {
+    mockCatalog();
+    const defaultCamera = mockScene.cameras.main;
+
+    await bootScene();
+
+    expect(mockScene.cameras.add).toHaveBeenCalledWith(
+      0,
+      0,
+      MATCH_CAMERA_WIDTH,
+      MATCH_CAMERA_HEIGHT,
+      true,
+      expect.any(String)
+    );
+    const added = mockScene.cameras.add.mock.results[0]!.value as ReturnType<
+      typeof mockScene.cameras.add
+    >;
+    expect(mockScene.cameras.main).toBe(added);
+    expect(added.setScroll).toHaveBeenCalledWith(0, 0);
+    expect(mockScene.cameras.remove).toHaveBeenCalledWith(defaultCamera);
+  });
 });
 
 describe('MatchSettingsScene — catalog loading', () => {
@@ -133,7 +194,7 @@ describe('MatchSettingsScene — UnitPage 1 (default entry)', () => {
     expect(textCalls().some(c => c[2] === 'P1')).toBe(true);
 
     for (let i = 0; i < N; i++) {
-      expect(cardGraphics(g, i).fillStyle).toHaveBeenCalledWith(TEAM_COLORS[1]);
+      expect(cardGraphics(g, i).fillStyle).not.toHaveBeenCalledWith(TEAM_COLORS[1]);
     }
     expect(textCalls().some(c => c[2] === 'Fighter')).toBe(true);
     expect(textCalls().some(c => c[2] === 'Witch')).toBe(true);
@@ -147,12 +208,12 @@ describe('MatchSettingsScene — UnitPage 1 (default entry)', () => {
     });
     await bootScene({ gameCfg });
 
-    const g = currentPageGraphics();
-    // slot array-index 1 (order number 2) is at SLOT_DISPLAY_ORDER_P1 displayPos 1.
-    const slot1 = slotGraphics(g, 1);
-    // Witch's icon is a 3-point triangle (drawArchetypeIcon).
-    const [points] = slot1.strokePoints.mock.calls[0] as [{ x: number; y: number }[]];
-    expect(points).toHaveLength(3);
+    expect(mockScene.add.sprite).toHaveBeenCalledWith(
+      expect.any(Number),
+      expect.any(Number),
+      'unit_witch_blue',
+      'unit_witch_blue-frame'
+    );
   });
 
   it('King (order number 1, the middle slot) has no click handler and cannot be removed (AC 5)', async () => {
