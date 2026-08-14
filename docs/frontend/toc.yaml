@@ -56,9 +56,9 @@ specs:
     category: Sprites
     completion-date: 2026-08-14
   - file: p4-spec004-sprites.md
-    status: Ready
+    status: Done
     category: Sprites
-    completion-date:
+    completion-date: 2026-08-14
   - file: p5-spec020-match.md
     status: Parked Draft
     category: match
