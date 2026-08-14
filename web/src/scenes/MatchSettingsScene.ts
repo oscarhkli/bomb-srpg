@@ -7,12 +7,15 @@ import StagePage from '../ui/matchSettings/StagePage';
 import type { PageBounds, SettingsPage, SettingsPageNav } from '../ui/matchSettings/SettingsPage';
 import type { MatchSceneData } from './MatchScene';
 import type { Catalog, GameCfg } from '../types/api';
+import { UNIT_SPRITE_MANIFEST, SPRITE_ASSET_BASE } from '../rendering/spriteManifest';
 import {
   SETTINGS_SCENE_MARGIN,
   SETTINGS_REGION_HEIGHT,
   SETTINGS_HEADER_SPACER,
   BACK_BUTTON_SIZE,
   FADE_MS,
+  MATCH_CAMERA_WIDTH,
+  MATCH_CAMERA_HEIGHT,
 } from '../constants';
 
 export interface MatchSettingsSceneData {
@@ -45,6 +48,15 @@ export default class MatchSettingsScene extends Phaser.Scene {
     super('MatchSettingsScene');
   }
 
+  preload(): void {
+    for (const { key, png, json } of UNIT_SPRITE_MANIFEST) {
+      if (this.textures.exists(key)) {
+        continue;
+      }
+      this.load.aseprite(key, `${SPRITE_ASSET_BASE}${png}`, `${SPRITE_ASSET_BASE}${json}`);
+    }
+  }
+
   create(data: MatchSettingsSceneData = {}): void {
     const gen = this.generation;
     this.gameCfg = data.gameCfg ?? defaultGameCfg();
@@ -52,6 +64,19 @@ export default class MatchSettingsScene extends Phaser.Scene {
     this.currentPageIndex = 0;
     this.isTransitioning = false;
     this.errorPanel = new ErrorPanel(this);
+
+    const defaultCamera = this.cameras.main;
+    const settingsCamera = this.cameras.add(
+      0,
+      0,
+      MATCH_CAMERA_WIDTH,
+      MATCH_CAMERA_HEIGHT,
+      true,
+      'matchSettings'
+    );
+    settingsCamera.setScroll(0, 0);
+    this.cameras.remove(defaultCamera);
+
     this.events.once('shutdown', () => {
       this.generation++;
     });

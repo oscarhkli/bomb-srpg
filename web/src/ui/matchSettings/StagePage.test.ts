@@ -130,12 +130,12 @@ describe('StagePage — StagesPanel', () => {
     const bounds = bodyBounds();
     p.renderBody(mockScene as never, bounds);
 
-    // 2 cards x 160px + 1 gap x 12px = 332px row width, centered within (bounds.width*0.6 - 24)px
-    // of content (12px padding each side of the StagesPanel's 60%-width half).
+    // 2 cards x 80px + 1 gap x 6px = 166px row width, centered within (bounds.width*0.6 - 12)px
+    // of content (6px padding each side of the StagesPanel's 60%-width half).
     const panelWidth = bounds.width * 0.6;
-    const contentX = bounds.x + 12;
-    const contentWidth = panelWidth - 24;
-    const expectedX = contentX + (contentWidth - 332) / 2;
+    const contentX = bounds.x + 6;
+    const contentWidth = panelWidth - 12;
+    const expectedX = contentX + (contentWidth - 166) / 2;
 
     const [firstCardGraphics] = allGraphics();
     const [x] = firstCardGraphics!.fillRoundedRect.mock.calls[0] as [number, number];
@@ -318,7 +318,7 @@ describe('StagePage — StartMatchButton', () => {
     p.renderNav(mockScene as never, b);
 
     const [x] = firstGraphics().fillRoundedRect.mock.calls[0] as [number, number];
-    expect(x).toBe(b.x + b.width - 144);
+    expect(x).toBe(b.x + b.width - 72);
   });
 });
 

@@ -1,6 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mockScene } from '../../test/setup';
-import { allGraphics, allTexts, clickPointerdown, pointerDownOf } from '../../test/sceneHelpers';
+import {
+  allGraphics,
+  allTexts,
+  allSprites,
+  clickPointerdown,
+  pointerDownOf,
+} from '../../test/sceneHelpers';
 import { makeCfg } from '../../test/fixtures';
 import { TEAM_COLORS, NEXT_BUTTON_LABEL, DISABLED_BUTTON_COLOR } from '../../constants';
 import type { Archetype, GameCfg } from '../../types/api';
@@ -146,6 +152,64 @@ describe('UnitPage — FormationPanel', () => {
   });
 });
 
+describe('UnitPage — UnitSlot sprites', () => {
+  it('draws a 2px TeamColor border, no fill, for an empty slot', () => {
+    const p = page(1, makeCfg({ p1Teams: ['King'] }));
+    p.renderBody(mockScene as never, bodyBounds());
+
+    // SLOT_DISPLAY_ORDER_P1 displayPos 0 -> slotIndex 3 (empty).
+    const g = allGraphics()[0]!;
+    expect(g.fillStyle).not.toHaveBeenCalled();
+    expect(g.lineStyle).toHaveBeenCalledWith(2, TEAM_COLORS[1]);
+    expect(g.strokeRoundedRect).toHaveBeenCalled();
+  });
+
+  it('renders an occupant as a sprite using the archetype + team texture key', () => {
+    const p = page(1, makeCfg({ p1Teams: ['King', 'Fighter'] }));
+    p.renderBody(mockScene as never, bodyBounds());
+
+    expect(mockScene.add.sprite).toHaveBeenCalledWith(
+      expect.any(Number),
+      expect.any(Number),
+      'unit_fighter_blue',
+      'unit_fighter_blue-frame'
+    );
+  });
+
+  it("anchors the occupant sprite's bottom edge to the slot's bottom edge", () => {
+    const p = page(1, makeCfg({ p1Teams: ['King', 'Fighter'] }));
+    const bounds = bodyBounds();
+    p.renderBody(mockScene as never, bounds);
+
+    const sprite = allSprites()[0]!;
+    expect(sprite.setOrigin).toHaveBeenCalledWith(0.5, 1);
+  });
+});
+
+describe('UnitPage — UnitCard sprites', () => {
+  it('renders no team-colored background, only the panel fill/border', () => {
+    const p = page(1, makeCfg({ p1Teams: ['King'] }));
+    p.renderBody(mockScene as never, bodyBounds());
+
+    const cardGraphics = allGraphics()[5]!;
+    expect(cardGraphics.fillStyle).not.toHaveBeenCalledWith(TEAM_COLORS[1]);
+  });
+
+  it('renders the archetype as a sprite anchored to the sprite slot bottom edge', () => {
+    const p = page(1, makeCfg({ p1Teams: ['King'] }));
+    p.renderBody(mockScene as never, bodyBounds());
+
+    expect(mockScene.add.sprite).toHaveBeenCalledWith(
+      expect.any(Number),
+      expect.any(Number),
+      'unit_fighter_blue',
+      'unit_fighter_blue-frame'
+    );
+    const sprite = allSprites()[0]!;
+    expect(sprite.setOrigin).toHaveBeenCalledWith(0.5, 1);
+  });
+});
+
 describe('UnitPage — Panel stacking', () => {
   it('renders ArchetypesPanel below FormationPanel (not a side-by-side column)', () => {
     const p = page(1, makeCfg({ p1Teams: ['King'] }));
@@ -164,11 +228,11 @@ describe('UnitPage — Panel stacking', () => {
     const bounds = bodyBounds();
     p.renderBody(mockScene as never, bounds);
 
-    // 5 slots x 96px + 4 gaps x 12px = 528px row width, centered in a 1184px-wide panel.
+    // 5 slots x 48px + 4 gaps x 6px = 264px row width, centered in a 1184px-wide panel.
     const firstSlotGraphics = allGraphics()[0]!;
-    const [slotX] = firstSlotGraphics.fillRoundedRect.mock.calls[0] as [number, number];
+    const [slotX] = firstSlotGraphics.strokeRoundedRect.mock.calls[0] as [number, number];
 
-    expect(slotX).toBe(bounds.x + (bounds.width - 528) / 2);
+    expect(slotX).toBe(bounds.x + (bounds.width - 264) / 2);
   });
 
   it('centers a partial ArchetypesPanel row on its own card count, not a full 4-column block', () => {
@@ -176,11 +240,11 @@ describe('UnitPage — Panel stacking', () => {
     const bounds = bodyBounds();
     p.renderBody(mockScene as never, bounds);
 
-    // 2 archetypes x 180px + 1 gap x 12px = 372px row width, centered as its own pair.
+    // 2 archetypes x 90px + 1 gap x 6px = 186px row width, centered as its own pair.
     const firstCardGraphics = allGraphics()[5]!;
     const [cardX] = firstCardGraphics.fillRoundedRect.mock.calls[0] as [number, number];
 
-    expect(cardX).toBe(bounds.x + (bounds.width - 372) / 2);
+    expect(cardX).toBe(bounds.x + (bounds.width - 186) / 2);
   });
 });
 
@@ -221,7 +285,7 @@ describe('UnitPage — NextButton', () => {
     const nextButtonGraphics = allGraphics()[0]!;
     const [x] = nextButtonGraphics.fillRoundedRect.mock.calls[0] as [number, number];
 
-    expect(x).toBe(bounds.x + bounds.width - 144);
+    expect(x).toBe(bounds.x + bounds.width - 72);
   });
 
   it('re-renders (enabling) NextButton after a put-on crosses the 2-unit threshold', () => {

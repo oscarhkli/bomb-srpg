@@ -7,13 +7,7 @@ import {
   makeSoftBlock as softBlock,
   makeBomb as bomb,
 } from '../test/fixtures';
-import {
-  TEAM_COLORS,
-  OCCUPANT_STROKE_COLOR,
-  TILE_SIZE,
-  SPRITE_GROUND_MARGIN,
-  DEPTH_STAGE_BACKGROUND,
-} from '../constants';
+import { TILE_SIZE, SPRITE_GROUND_MARGIN, DEPTH_STAGE_BACKGROUND } from '../constants';
 import type { Bomb, GameState, SoftBlock, Tile, Unit } from '../types/api';
 import type { BombGraphics } from './resolveTurnPlayer';
 import {
@@ -22,8 +16,7 @@ import {
   renderOccupants,
   renderBomb,
   tileCenter,
-  drawUnitSprite,
-  drawArchetypeIcon,
+  resolveUnitTextureKey,
   type BoardRenderContext,
 } from './boardRenderer';
 
@@ -319,65 +312,18 @@ describe('renderBomb', () => {
   });
 });
 
-// Retained for MatchSettingsScene's UnitPage, which still draws vector unit icons.
-describe('drawUnitSprite', () => {
-  it('fills a team-colored square of the given size and scales the archetype icon radius', () => {
-    const g = mockScene.add.graphics();
-
-    drawUnitSprite(g as never, 48, 48, 96, 'Bandit', TEAM_COLORS[1]!);
-
-    expect(g.fillStyle).toHaveBeenCalledWith(TEAM_COLORS[1]);
-    expect(g.fillRect).toHaveBeenCalledWith(0, 0, 96, 96);
-    // radius scales with size: 96 * (10/32) = 30
-    expect(g.strokeCircle).toHaveBeenCalledWith(48, 48, 30);
+describe('resolveUnitTextureKey', () => {
+  it('resolves the texture key matching archetype + team', () => {
+    expect(resolveUnitTextureKey('Bandit', 2)).toBe('unit_bandit_red');
   });
 
-  it('fills a rounded-corner square when cornerRadius is given', () => {
-    const g = mockScene.add.graphics();
+  it('warns and falls back to the blue texture for an unconfigured team', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 
-    drawUnitSprite(g as never, 48, 48, 96, 'Bandit', TEAM_COLORS[1]!, 8);
+    expect(resolveUnitTextureKey('Bandit', 99)).toBe('unit_bandit_blue');
 
-    expect(g.fillRoundedRect).toHaveBeenCalledWith(0, 0, 96, 96, 8);
-  });
-});
-
-describe('drawArchetypeIcon', () => {
-  it('defaults to OCCUPANT_ICON_RADIUS when no radius is given', () => {
-    const g = mockScene.add.graphics();
-
-    drawArchetypeIcon(g as never, 'Bandit', 10, 10);
-
-    expect(g.strokeCircle).toHaveBeenCalledWith(10, 10, 10);
-  });
-
-  it('honors an explicit radius', () => {
-    const g = mockScene.add.graphics();
-
-    drawArchetypeIcon(g as never, 'Bandit', 10, 10, 40);
-
-    expect(g.strokeCircle).toHaveBeenCalledWith(10, 10, 40);
-  });
-
-  it('draws icons using OCCUPANT_STROKE_COLOR', () => {
-    const g = mockScene.add.graphics();
-
-    drawArchetypeIcon(g as never, 'Bandit', 10, 10);
-
-    expect(g.lineStyle).toHaveBeenCalledWith(2, OCCUPANT_STROKE_COLOR);
-  });
-
-  it("scales the King star's inner radius proportionally with an explicit radius", () => {
-    const g = mockScene.add.graphics();
-
-    drawArchetypeIcon(g as never, 'King', 0, 0, 40);
-
-    // Outer/inner ratio must stay 10:4 (OCCUPANT_ICON_RADIUS's default) at any size.
-    const [points] = g.strokePoints.mock.calls[0] as [{ x: number; y: number }[]];
-    const distances = points.map(p => Math.hypot(p.x, p.y));
-    const outer = Math.max(...distances);
-    const inner = Math.min(...distances);
-    expect(outer).toBeCloseTo(40);
-    expect(inner).toBeCloseTo(16);
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('99'));
+    warnSpy.mockRestore();
   });
 });
 

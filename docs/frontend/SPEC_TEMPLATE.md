@@ -14,6 +14,8 @@ Copy this skeleton for each new scene spec. Remove optional sections that don't 
 
 Why this scene exists. What state the game is in when the player reaches it.
 
+> **Shared vocabulary:** This spec relies on shared terms and design conventions — `Page`, `region`, `Panel`, `fadeTransition`, `BackButton`, `TeamBadge`, the `render*`/`draw*` split, etc. — defined in [`VISUAL_VOCAB.md`](./VISUAL_VOCAB.md). Read it first.
+
 ## Goal
 
 - Bullet list of what this scene must do.

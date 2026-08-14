@@ -9,11 +9,11 @@ export const TILE_SIZE = 32;
 // origin (0.5, 1) offset by this amount below the tile's bottom edge.
 export const SPRITE_GROUND_MARGIN = 16;
 
-// MatchScene's second camera (see docs/frontend/p4-spec001-sprites.md) and the two regions
-// it's split into: GameBoardRegion (Grid/Units) on the left, GameControlRegion (TurnPanel/
-// TurnCommandPanel/MatchSummaryButton) on the right.
+// Shared 640x360 viewport size for MatchScene's and MatchSettingsScene's own second camera.
 export const MATCH_CAMERA_WIDTH = 640;
 export const MATCH_CAMERA_HEIGHT = 360;
+// GameBoardRegion (Grid/Units) on the left, GameControlRegion (TurnPanel/TurnCommandPanel/
+// MatchSummaryButton) on the right — MatchScene's own split of MATCH_CAMERA_WIDTH/HEIGHT.
 export const GAME_BOARD_REGION_WIDTH = 480;
 export const GAME_BOARD_REGION_HEIGHT = 360;
 export const GAME_CONTROL_REGION_X = GAME_BOARD_REGION_WIDTH;
@@ -26,13 +26,6 @@ export const TEAM_COLORS: Record<number, number> = {
   1: 0x212df3, // blue
   2: 0xf32d21, // red
 };
-
-// Still used by MatchSettingsScene's UnitPage (formation-slot icons) via boardRenderer's
-// drawUnitSprite/drawArchetypeIcon — that Scene's vector rendering is untouched by this phase.
-export const UNIT_SIZE = 32;
-export const OCCUPANT_STROKE_COLOR = 0xffffff;
-export const OCCUPANT_ICON_RADIUS = 10;
-export const OCCUPANT_ICON_STROKE_WIDTH = 2;
 
 // Depth (z-order) bands — explicit rather than relying on Phaser's creation-order default,
 // since overlays/panels/dialogs must render above the board contents.
@@ -153,90 +146,94 @@ export const CONFIRM_TEXT_RESET = 'All turn actions will reset. Confirm?';
 export const CONFIRM_TEXT_SURRENDER = 'Confirm to surrender?';
 
 // MatchSettingsScene — chrome shared by every Page.
-export const SETTINGS_SCENE_MARGIN = 24;
+export const SETTINGS_SCENE_MARGIN = 12;
 // Both HeaderRegion and NavRegion are this tall.
-export const SETTINGS_REGION_HEIGHT = 84;
+export const SETTINGS_REGION_HEIGHT = 42;
 // Gap between BackButton and the active Page's title in HeaderRegion.
-export const SETTINGS_HEADER_SPACER = 48;
+export const SETTINGS_HEADER_SPACER = 24;
 // Default text size for this scene (page titles, UnitCard stats/name).
-export const SETTINGS_TEXT_FONT_SIZE = 24;
+export const SETTINGS_TEXT_FONT_SIZE = 20;
 // Corner radius shared by this scene's rounded shapes (BackButton, UnitSlot, UnitCard).
-export const SETTINGS_CORNER_RADIUS = 8;
+export const SETTINGS_CORNER_RADIUS = 4;
 
-export const BACK_BUTTON_SIZE = 64;
+export const BACK_BUTTON_SIZE = 32;
 export const BACK_BUTTON_COLOR = 0x4c4c4c;
 // U+2B90, a symbol not an emoji — can tofu on sparse font coverage.
 export const BACK_BUTTON_GLYPH = '⮐';
-export const BACK_BUTTON_GLYPH_FONT_SIZE = 36;
+export const BACK_BUTTON_GLYPH_FONT_SIZE = 32;
 
 // UnitPage's TeamBadge (header): P{X} on a TeamColor rounded-rect.
-export const UNIT_PAGE_TEAM_BADGE_WIDTH = 96;
-export const UNIT_PAGE_TEAM_BADGE_HEIGHT = 48;
-export const UNIT_PAGE_TEAM_BADGE_CORNER_RADIUS = 8;
+export const UNIT_PAGE_TEAM_BADGE_WIDTH = 48;
+export const UNIT_PAGE_TEAM_BADGE_HEIGHT = 24;
+export const UNIT_PAGE_TEAM_BADGE_CORNER_RADIUS = 4;
 // Gap between the TeamBadge and the "Unit Selection" title text.
-export const UNIT_PAGE_TITLE_GAP = 8;
+export const UNIT_PAGE_TITLE_GAP = 4;
 
 // FormationPanel — the top band of UnitPage's body, full width.
 export const FORMATION_PANEL_HEIGHT_RATIO = 0.35;
-export const UNIT_FORMATION_HEADER_FONT_SIZE = 36;
-export const UNIT_SLOT_SIZE = 96;
-export const UNIT_SLOT_SPACING = 12;
-export const UNIT_SLOT_ORDER_LABEL_INSET = 4;
-export const UNIT_SLOT_ORDER_LABEL_FONT_SIZE = 24;
+export const UNIT_FORMATION_HEADER_FONT_SIZE = 32;
+export const UNIT_SLOT_SIZE = 48;
+export const UNIT_SLOT_SPACING = 6;
+export const UNIT_SLOT_ORDER_LABEL_INSET = 2;
+export const UNIT_SLOT_ORDER_LABEL_FONT_SIZE = 20;
 // The order-number label must render above the slot's unit sprite (they overlap); the sprite
 // itself is left at Phaser's default depth (0).
 export const DEPTH_UNIT_SLOT_LABEL = 1;
 
 // ArchetypesPanel / UnitCard
-export const UNIT_CARD_WIDTH = 180;
-export const UNIT_CARD_HEIGHT = 200;
-export const UNIT_CARD_PADDING = 12;
-export const UNIT_CARD_SPACING = 12;
-export const UNIT_CARD_SPRITE_SIZE = 96;
+export const UNIT_CARD_WIDTH = 90;
+export const UNIT_CARD_HEIGHT = 100;
+export const UNIT_CARD_PADDING = 6;
+export const UNIT_CARD_SPACING = 6;
+export const UNIT_CARD_SPRITE_SIZE = 48;
 // Vertical gap between the sprite's bottom edge and the name text below it.
-export const UNIT_CARD_NAME_GAP = 16;
+export const UNIT_CARD_NAME_GAP = 8;
 // Vertical gap between each subsequent text line (name -> stats -> skill).
-export const UNIT_CARD_LINE_GAP = 32;
+export const UNIT_CARD_LINE_GAP = 16;
 // Extra gap between archetype.speed and the 💣 glyph on UnitCard's stat line.
-export const UNIT_CARD_STAT_GLYPH_GAP = 12;
+export const UNIT_CARD_STAT_GLYPH_GAP = 6;
 export const ARCHETYPES_PER_ROW = 4;
 
 // NavRegion buttons (NextButton / StartMatchButton).
-export const SETTINGS_NAV_BUTTON_WIDTH = 144;
-export const SETTINGS_NAV_BUTTON_HEIGHT = 96;
+export const SETTINGS_NAV_BUTTON_WIDTH = 72;
+export const SETTINGS_NAV_BUTTON_HEIGHT = 48;
 export const NEXT_BUTTON_LABEL = 'NEXT →';
 export const START_MATCH_BUTTON_LABEL = 'Start Match';
 
 // StagePage — StagesPanel / StageDetailPanel split the body region 60/40.
 export const STAGES_PANEL_WIDTH_RATIO = 0.6;
 export const STAGE_DETAIL_PANEL_WIDTH_RATIO = 0.4;
-export const STAGE_PANEL_PADDING = 12;
+export const STAGE_PANEL_PADDING = 6;
 
 // StagesPanel / StageCard
-export const STAGE_CARD_SIZE = 160;
-export const STAGE_CARD_PADDING = 12;
-export const STAGE_CARD_SPACING = 12;
-export const STAGE_CARD_NAME_FONT_SIZE = 36;
-export const STAGE_CARD_SELECTED_BORDER_WIDTH = 4;
+export const STAGE_CARD_SIZE = 80;
+export const STAGE_CARD_PADDING = 6;
+export const STAGE_CARD_SPACING = 6;
+// Sized to STAGE_CARD_SIZE's own halving (80px), not the flat -4px font rule — that rule
+// left "Standard"/"Divided" overflowing an 80px card.
+export const STAGE_CARD_NAME_FONT_SIZE = 16;
+// A literal halve (4->2) would collide with PANEL_BUTTON_BORDER_WIDTH (2, unhalved) and make
+// selected/unselected StageCards indistinguishable — rounded up instead.
+export const STAGE_CARD_SELECTED_BORDER_WIDTH = 3;
 
 // StageDetailPanel / InnerPanel
 export const STAGE_DETAIL_INNER_PANEL_SIZE_RATIO = 0.8;
-export const STAGE_DETAIL_INNER_PANEL_PADDING = 12;
-export const STAGE_DETAIL_ROW_FONT_SIZE = 24;
-export const STAGE_DETAIL_ROW_GAP = 12;
+export const STAGE_DETAIL_INNER_PANEL_PADDING = 6;
+export const STAGE_DETAIL_ROW_FONT_SIZE = 20;
+export const STAGE_DETAIL_ROW_GAP = 6;
 export const STAGE_DETAIL_DESCRIPTION_LINES = 2;
 // Horizontal offset of the width/height numbers from the centered "x" glyph on that row.
-export const STAGE_DETAIL_WIDTH_HEIGHT_GAP = 12;
+export const STAGE_DETAIL_WIDTH_HEIGHT_GAP = 6;
 
 // MaxTurnsSelector — inside StageDetailPanel's InnerPanel.
 export const MAX_TURNS_ARROW_LEFT_LABEL = '❰';
 export const MAX_TURNS_ARROW_RIGHT_LABEL = '❱';
 // Fixed inset of each arrow from InnerPanel's nearest edge.
-export const MAX_TURNS_ARROW_INSET = 24;
+export const MAX_TURNS_ARROW_INSET = 12;
 export const MAX_TURNS_RECOMMENDED_GLYPH = '🌟';
-export const MAX_TURNS_RECOMMENDED_FONT_SIZE = 16;
+export const MAX_TURNS_RECOMMENDED_FONT_SIZE = 12;
 // Fixed slot for the recommended glyph so toggling it never shifts the layout.
-export const MAX_TURNS_RECOMMENDED_GLYPH_GAP = 20;
+export const MAX_TURNS_RECOMMENDED_GLYPH_GAP = 10;
 
 // TitleScene
 export const TITLE_TOP_MARGIN = 48;

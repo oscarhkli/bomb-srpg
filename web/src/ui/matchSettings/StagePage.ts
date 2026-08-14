@@ -165,7 +165,7 @@ export default class StagePage implements SettingsPage {
       fontSize: `${STAGE_CARD_NAME_FONT_SIZE}px`,
       color: colorToCss(0xffffff),
       align: 'center',
-      wordWrap: { width: STAGE_CARD_SIZE - STAGE_CARD_PADDING * 2 },
+      wordWrap: { width: STAGE_CARD_SIZE - STAGE_CARD_PADDING * 2, useAdvancedWrap: true },
     });
     nameText.setOrigin(0.5);
     this.stagesPanelObjects.push(nameText);

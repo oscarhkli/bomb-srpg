@@ -135,7 +135,7 @@ Surrender: `POST /surrender` (either team, any time).
 - **Tile Size**: `32px` per cell.
 - **Mock Mode**: TitleScene includes an offline-play button for development (test game flow without backend connectivity).
 - **Input Model**: Click-only interaction for Phase 3 (keyboard shortcuts deferred to Phase 5+ polish pass).
-- **Retro Art Strategy**: Units, Bombs, and SoftBlocks in `MatchScene` render as pixel-art `Sprite`s (`this.load.aseprite(...)`). Tiles render as a pixel-art Stage background `Image`, one per `StagePreset`, keyed off `gameCfg.stagePreset`. Explosions remain a procedural `Graphics` tile-color flash. `MatchSettingsScene`'s `UnitPage` still uses vector rendering (`drawUnitSprite`/`drawArchetypeIcon`).
+- **Retro Art Strategy**: Units, Bombs, and SoftBlocks in `MatchScene` render as pixel-art `Sprite`s (`this.load.aseprite(...)`). Tiles render as a pixel-art Stage background `Image`, one per `StagePreset`, keyed off `gameCfg.stagePreset`. Explosions remain a procedural `Graphics` tile-color flash. `MatchSettingsScene`'s `UnitPage` reuses the same unit `Sprite`s.
 
 
 ## File Structure (WIP)

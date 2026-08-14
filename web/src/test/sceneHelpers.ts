@@ -148,6 +148,12 @@ export function occupantSprite(index: number): ReturnType<typeof mockScene.add.s
   return spriteAt(index);
 }
 
+export function allSprites(): ReturnType<typeof mockScene.add.sprite>[] {
+  return mockScene.add.sprite.mock.results.map(
+    r => r.value as ReturnType<typeof mockScene.add.sprite>
+  );
+}
+
 export function stageBackgroundImage(): ReturnType<typeof mockScene.add.image> {
   return mockScene.add.image.mock.results[0]!.value as ReturnType<typeof mockScene.add.image>;
 }
