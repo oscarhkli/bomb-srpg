@@ -135,10 +135,7 @@ Surrender: `POST /surrender` (either team, any time).
 - **Tile Size**: `32px` per cell.
 - **Mock Mode**: TitleScene includes an offline-play button for development (test game flow without backend connectivity).
 - **Input Model**: Click-only interaction for Phase 3 (keyboard shortcuts deferred to Phase 5+ polish pass).
-- **Retro Art Strategy**: As of Phase 4.1, Units, Bombs, and SoftBlocks in `MatchScene` render as pixel-art `Sprite`s loaded via `this.load.aseprite(...)` (see `docs/frontend/p4-spec001-sprites.md`). Tiles and Explosions remain procedural `Graphics`:
-  - **Tiles**: Colored rectangles with borders.
-  - **Explosions**: Tile color flash effect (simple visual feedback).
-  - Vector rendering (`drawUnitSprite`/`drawArchetypeIcon`) is retained for `MatchSettingsScene`'s `UnitPage`, which is out of scope for Phase 4.1.
+- **Retro Art Strategy**: Units, Bombs, and SoftBlocks in `MatchScene` render as pixel-art `Sprite`s (`this.load.aseprite(...)`). Tiles render as a pixel-art Stage background `Image`, one per `StagePreset`, keyed off `gameCfg.stagePreset`. Explosions remain a procedural `Graphics` tile-color flash. `MatchSettingsScene`'s `UnitPage` still uses vector rendering (`drawUnitSprite`/`drawArchetypeIcon`).
 
 
 ## File Structure (WIP)

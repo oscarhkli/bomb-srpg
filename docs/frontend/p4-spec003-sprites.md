@@ -30,9 +30,9 @@ No change from spec002.
 
 ## Visual Spec
 
-Unlike `Occupants`, Stage sprites are exported **trimmed**, but with the play area centered in the source canvas — the delivered art needs no padding compensation.
+Unlike `Occupants`, Stage sprites are exported **trimmed** — the delivered art's trim is not guaranteed to be centered within the untrimmed source canvas (`sourceSize`/`spriteSourceSize`), so origin cannot assume a symmetric crop.
 
-Sprites use origin **(0.5, 0.5)**, anchored at the canvas center.
+Origin is computed per-sprite from the loaded frame's trim data, landing on the trimmed content's own center rather than a fixed **(0.5, 0.5)**, which would only be correct for a symmetric crop.
 
 | Entity           | Texture Key    | Path (relative to `sprites/`)       | Type             |
 | ---------------- | -------------- | ----------------------------------- | ---------------- |
@@ -64,3 +64,7 @@ Update `docs/design.md`'s Retro Art Strategy note (currently: "Tiles: Colored re
 2. Given a `StagePreset`'s `grid` dimensions or a Stage background's own canvas size, when the background renders, then it is center-aligned to `grid` regardless of either size.
 3. Given occupants (Units, Bombs, SoftBlocks) are rendered, when the scene renders, then the Stage background renders behind all of them.
 4. Given `MatchScene` is re-entered (new match or scene restart), when the scene renders, then the previous Stage background is destroyed and replaced, not left stacked or stale.
+
+## Log
+
+Implementation issues found during the build (non spec gaps) are tracked in [p4-spec003-sprites-log.md](./p4-spec003-sprites-log.md).

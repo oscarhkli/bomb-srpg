@@ -1,29 +1,24 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mockScene } from '../test/setup';
+import { occupantSprite, stageBackgroundImage, pointerDownOf } from '../test/sceneHelpers';
 import {
-  firstGraphics as terrainGraphics,
-  occupantSprite,
-  pointerDownOf,
-} from '../test/sceneHelpers';
-import {
-  tileOf,
   plainTile,
   makeUnit as unit,
   makeSoftBlock as softBlock,
   makeBomb as bomb,
 } from '../test/fixtures';
 import {
-  TERRAIN_COLORS,
-  TERRAIN_BORDER_COLOR,
   TEAM_COLORS,
   OCCUPANT_STROKE_COLOR,
   TILE_SIZE,
   SPRITE_GROUND_MARGIN,
+  DEPTH_STAGE_BACKGROUND,
 } from '../constants';
-import type { Bomb, GameState, SoftBlock, Tile, TerrainType, Unit } from '../types/api';
+import type { Bomb, GameState, SoftBlock, Tile, Unit } from '../types/api';
 import type { BombGraphics } from './resolveTurnPlayer';
 import {
-  renderTerrain,
+  establishBoardLayout,
+  renderStageBackground,
   renderOccupants,
   renderBomb,
   tileCenter,
@@ -65,9 +60,9 @@ function state(
   };
 }
 
-// Entry-order paint: terrain (grid = first Graphics) then occupants.
+// Entry-order paint: board layout, then occupants.
 function renderAll(c: BoardRenderContext, s: GameState): void {
-  renderTerrain(c, s.grid);
+  establishBoardLayout(s.grid);
   renderOccupants(c, s);
 }
 
@@ -77,70 +72,105 @@ describe('tileCenter', () => {
   });
 });
 
-describe('renderTerrain', () => {
+describe('establishBoardLayout', () => {
   it('returns the grid dimensions', () => {
-    const dims = renderTerrain(ctx(), [
+    const dims = establishBoardLayout([
       [plainTile(), plainTile(), plainTile()],
       [plainTile(), plainTile(), plainTile()],
     ]);
     expect(dims).toEqual({ cols: 3, rows: 2 });
   });
+});
 
-  it('draws every tile at its world position with terrain fill and a border', () => {
-    renderTerrain(ctx(), [
+describe('renderStageBackground', () => {
+  it('renders the texture key matching the stage preset name', () => {
+    establishBoardLayout([[plainTile()]]);
+    renderStageBackground(ctx(), [[plainTile()]], 'Standard');
+
+    expect(mockScene.add.image).toHaveBeenLastCalledWith(
+      expect.any(Number),
+      expect.any(Number),
+      'stage_standard',
+      expect.any(String)
+    );
+  });
+
+  it('centers on the grid regardless of grid size, using boardOffset', () => {
+    const c = ctx();
+    // 3x2 grid, centered in GameBoardRegion (offsetX=192, offsetY=148).
+    establishBoardLayout([
       [plainTile(), plainTile(), plainTile()],
       [plainTile(), plainTile(), plainTile()],
     ]);
-
-    // On this 3x2 grid, centered in GameBoardRegion (offsetX=192, offsetY=148).
-    const grid = terrainGraphics();
-    expect(grid.lineStyle).toHaveBeenCalledWith(1, TERRAIN_BORDER_COLOR);
-    expect(grid.fillRect).toHaveBeenCalledTimes(6);
-    expect(grid.fillRect).toHaveBeenNthCalledWith(1, 0 + 192, 0 + 148, TILE_SIZE, TILE_SIZE);
-    expect(grid.fillRect).toHaveBeenNthCalledWith(
-      6,
-      2 * TILE_SIZE + 192,
-      TILE_SIZE + 148,
-      TILE_SIZE,
-      TILE_SIZE
+    renderStageBackground(
+      c,
+      [
+        [plainTile(), plainTile(), plainTile()],
+        [plainTile(), plainTile(), plainTile()],
+      ],
+      'Plain'
     );
-    expect(grid.strokeRect).toHaveBeenCalledTimes(6);
+
+    const cx = 192 + (3 * TILE_SIZE) / 2;
+    const cy = 148 + (2 * TILE_SIZE) / 2;
+    expect(mockScene.add.image).toHaveBeenLastCalledWith(cx, cy, 'stage_plain', expect.any(String));
   });
 
-  it('fills each terrain type with its TERRAIN_COLORS value', () => {
-    const types: TerrainType[] = [
-      'TerrainPlain',
-      'TerrainBlock',
-      'TerrainTower',
-      'TerrainWater',
-      'TerrainLava',
-    ];
-    renderTerrain(ctx(), [types.map(tileOf)]);
+  it('sets origin to the frame center and depth DEPTH_STAGE_BACKGROUND when the trim is symmetric', () => {
+    renderStageBackground(ctx(), [[plainTile()]], 'Plain');
 
-    const grid = terrainGraphics();
-    types.forEach((type, i) => {
-      expect(grid.fillStyle).toHaveBeenNthCalledWith(i + 1, TERRAIN_COLORS[type]);
+    const bg = stageBackgroundImage();
+    expect(bg.setOrigin).toHaveBeenCalledWith(0.5, 0.5);
+    expect(bg.setDepth).toHaveBeenCalledWith(DEPTH_STAGE_BACKGROUND);
+  });
+
+  it('computes origin from the trimmed content center, not the untrimmed canvas center', () => {
+    // Actual Stage-Plain.json trim data: a 320x320 visible crop offset (64, 64) within a
+    // 640x640 untrimmed canvas — not centered, so origin must not default to (0.5, 0.5).
+    mockScene.textures.getFrame.mockReturnValueOnce({
+      x: 64,
+      y: 64,
+      width: 320,
+      height: 320,
+      realWidth: 640,
+      realHeight: 640,
     });
+
+    renderStageBackground(ctx(), [[plainTile()]], 'Plain');
+
+    const bg = stageBackgroundImage();
+    expect(bg.setOrigin).toHaveBeenCalledWith(0.35, 0.35);
   });
 
-  it('tracks the grid graphics in terrainObjects, not occupantObjects', () => {
+  it('tracks the background image in terrainObjects, not occupantObjects', () => {
     const c = ctx();
-    renderTerrain(c, [[plainTile()]]);
+    renderStageBackground(c, [[plainTile()]], 'Plain');
 
     expect(c.terrainObjects).toHaveLength(1);
-    expect(c.terrainObjects[0]).toBe(terrainGraphics());
+    expect(c.terrainObjects[0]).toBe(stageBackgroundImage());
     expect(c.occupantObjects).toHaveLength(0);
   });
 
-  it('destroys the prior terrain on a repeat entry so re-running create() does not leak grids', () => {
+  it('destroys the prior background on a repeat entry so re-running create() does not stack', () => {
     const c = ctx();
-    renderTerrain(c, [[plainTile()]]);
-    const firstGrid = terrainGraphics();
+    renderStageBackground(c, [[plainTile()]], 'Plain');
+    const firstBg = stageBackgroundImage();
 
-    renderTerrain(c, [[plainTile()]]);
+    renderStageBackground(c, [[plainTile()]], 'Plain');
 
-    expect(firstGrid.destroy).toHaveBeenCalled();
+    expect(firstBg.destroy).toHaveBeenCalled();
     expect(c.terrainObjects).toHaveLength(1);
+  });
+
+  it('warns and skips rendering for an unrecognized stage preset name', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const c = ctx();
+
+    renderStageBackground(c, [[plainTile()]], 'Nonexistent');
+
+    expect(mockScene.add.image).not.toHaveBeenCalled();
+    expect(c.terrainObjects).toHaveLength(0);
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Nonexistent'));
   });
 });
 
@@ -292,9 +322,7 @@ describe('renderBomb', () => {
 // Retained for MatchSettingsScene's UnitPage, which still draws vector unit icons.
 describe('drawUnitSprite', () => {
   it('fills a team-colored square of the given size and scales the archetype icon radius', () => {
-    const c = ctx();
-    renderTerrain(c, [[plainTile()]]);
-    const g = terrainGraphics();
+    const g = mockScene.add.graphics();
 
     drawUnitSprite(g as never, 48, 48, 96, 'Bandit', TEAM_COLORS[1]!);
 
@@ -305,9 +333,7 @@ describe('drawUnitSprite', () => {
   });
 
   it('fills a rounded-corner square when cornerRadius is given', () => {
-    const c = ctx();
-    renderTerrain(c, [[plainTile()]]);
-    const g = terrainGraphics();
+    const g = mockScene.add.graphics();
 
     drawUnitSprite(g as never, 48, 48, 96, 'Bandit', TEAM_COLORS[1]!, 8);
 
@@ -317,9 +343,7 @@ describe('drawUnitSprite', () => {
 
 describe('drawArchetypeIcon', () => {
   it('defaults to OCCUPANT_ICON_RADIUS when no radius is given', () => {
-    const c = ctx();
-    renderTerrain(c, [[plainTile()]]);
-    const g = terrainGraphics();
+    const g = mockScene.add.graphics();
 
     drawArchetypeIcon(g as never, 'Bandit', 10, 10);
 
@@ -327,9 +351,7 @@ describe('drawArchetypeIcon', () => {
   });
 
   it('honors an explicit radius', () => {
-    const c = ctx();
-    renderTerrain(c, [[plainTile()]]);
-    const g = terrainGraphics();
+    const g = mockScene.add.graphics();
 
     drawArchetypeIcon(g as never, 'Bandit', 10, 10, 40);
 
@@ -337,9 +359,7 @@ describe('drawArchetypeIcon', () => {
   });
 
   it('draws icons using OCCUPANT_STROKE_COLOR', () => {
-    const c = ctx();
-    renderTerrain(c, [[plainTile()]]);
-    const g = terrainGraphics();
+    const g = mockScene.add.graphics();
 
     drawArchetypeIcon(g as never, 'Bandit', 10, 10);
 
@@ -347,9 +367,7 @@ describe('drawArchetypeIcon', () => {
   });
 
   it("scales the King star's inner radius proportionally with an explicit radius", () => {
-    const c = ctx();
-    renderTerrain(c, [[plainTile()]]);
-    const g = terrainGraphics();
+    const g = mockScene.add.graphics();
 
     drawArchetypeIcon(g as never, 'King', 0, 0, 40);
 
@@ -378,14 +396,14 @@ describe('renderOccupants — teardown', () => {
 
   it('leaves the terrain layer untouched on an occupant swap', () => {
     const c = ctx();
-    renderTerrain(c, [[plainTile()]]);
-    const grid = terrainGraphics();
+    renderStageBackground(c, [[plainTile()]], 'Plain');
+    const bg = stageBackgroundImage();
     renderOccupants(c, state([[plainTile()]], { units: [unit({ id: 7 })] }));
 
-    // Swap the occupants again — the grid must survive both rebuilds.
+    // Swap the occupants again — the background must survive both rebuilds.
     renderOccupants(c, state([[plainTile()]]));
 
-    expect(grid.destroy).not.toHaveBeenCalled();
-    expect(c.terrainObjects).toEqual([grid]);
+    expect(bg.destroy).not.toHaveBeenCalled();
+    expect(c.terrainObjects).toEqual([bg]);
   });
 });
