@@ -25,7 +25,7 @@ Specs will be written prior to development—partly handcrafted, and partly gene
 | [Phase 3.11: Title Scene](p3-spec011-title.md) | TitleScene | Done | 2026-07-23 |
 | [Phase 4.1: Swapping Sprites for Existing Vector Graphics in MatchScene](p4-spec001-sprites.md) | Sprites | Done | 2026-08-11 |
 | [Phase 4.2: Resize Height in MatchScene and Related Components](p4-spec002-sprites.md) | Sprites | Done | 2026-08-13 |
-| [Phase 4.3: Adopt Dual Grid System for MatchScene Tile Map](p4-spec003-sprites.md) | Sprites | Draft | — |
+| [Phase 4.3: Adopt Pixel Art Stage Backgrounds for MatchScene](p4-spec003-sprites.md) | Sprites | Done | 2026-08-14 |
 | [Phase 5.x: Render Camera Navigation](p5-spec020-match.md) | match | Parked Draft | — |
 <!-- END SPEC TABLE -->
 

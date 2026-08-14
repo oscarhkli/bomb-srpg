@@ -37,10 +37,8 @@ export function firstGraphics(): ReturnType<typeof mockScene.add.graphics> {
   return graphicsAt(0);
 }
 
-// The grid is always the first Graphics created; occupants (units/softBlocks/bombs) follow in
-// array order, so occupant index 0 is overall results[1].
 export function occupantGraphics(index: number): ReturnType<typeof mockScene.add.graphics> {
-  return graphicsAt(index + 1);
+  return graphicsAt(index);
 }
 
 export function allGraphics(): ReturnType<typeof mockScene.add.graphics>[] {
@@ -146,8 +144,10 @@ export function spriteAt(index: number): ReturnType<typeof mockScene.add.sprite>
   return mockScene.add.sprite.mock.results[index]!.value as ReturnType<typeof mockScene.add.sprite>;
 }
 
-// Grid is always the first Graphics; sprite-based occupants (units/softBlocks) are tracked
-// separately via add.sprite(), in render order — occupant index 0 is sprite results[0].
 export function occupantSprite(index: number): ReturnType<typeof mockScene.add.sprite> {
   return spriteAt(index);
+}
+
+export function stageBackgroundImage(): ReturnType<typeof mockScene.add.image> {
+  return mockScene.add.image.mock.results[0]!.value as ReturnType<typeof mockScene.add.image>;
 }

@@ -1,8 +1,8 @@
 import { boardOffset } from '../rendering/boardOffset';
 
-// boardOffset is a shared module-level singleton (recomputed once per renderTerrain() call in
-// real usage) — reset it before every test so a non-default-size grid in one test can't leak
-// its offset into an unrelated test later in the same file.
+// boardOffset is a shared module-level singleton (recomputed once per establishBoardLayout()
+// call in real usage) — reset it before every test so a non-default-size grid in one test can't
+// leak its offset into an unrelated test later in the same file.
 beforeEach(() => {
   boardOffset.x = 0;
   boardOffset.y = 0;
@@ -75,6 +75,19 @@ export function createMockContainer(x = 0, y = 0) {
   };
 }
 
+// Fresh instance per add.image() call, seeded with real x/y constructor args so
+// centering tests can assert against actual position.
+export function createMockImage(x = 0, y = 0) {
+  return {
+    x,
+    y,
+    setOrigin: vi.fn().mockReturnThis(),
+    setDepth: vi.fn().mockReturnThis(),
+    setScrollFactor: vi.fn().mockReturnThis(),
+    destroy: vi.fn(),
+  };
+}
+
 // Fresh instance per add.sprite() call, seeded with real x/y constructor args so
 // ground-anchoring/tween tests can assert against actual position. width/height mirror the
 // real untrimmed 64x64 sprite canvas (see docs/frontend/p4-spec001-sprites.md).
@@ -119,6 +132,7 @@ export function createMockCamera(x = 0, y = 0, width = 1280, height = 720, name 
 // Mock Phaser globals for unit tests (no real canvas/WebGL)
 const mockGameObjectFactory = {
   sprite: vi.fn((x?: number, y?: number) => createMockSprite(x, y)),
+  image: vi.fn((x?: number, y?: number) => createMockImage(x, y)),
   graphics: vi.fn(() => createMockGraphics()),
   text: vi.fn(() => createMockText()),
   container: vi.fn((x?: number, y?: number) => createMockContainer(x, y)),
@@ -171,6 +185,16 @@ export const mockScene = {
   // for every sprite key without per-test texture setup.
   textures: {
     get: vi.fn((key: string) => ({ frames: { __BASE: {}, [`${key}-frame`]: {} } })),
+    // Symmetric by default so setOrigin(0.5, 0.5) holds unless a test overrides it.
+    // width/height are the trimmed size; realWidth/realHeight are the untrimmed canvas.
+    getFrame: vi.fn(() => ({
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      realWidth: 100,
+      realHeight: 100,
+    })),
   },
   tweens: { add: vi.fn() },
   time: { addEvent: vi.fn(), delayedCall: vi.fn() },

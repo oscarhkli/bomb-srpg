@@ -24,7 +24,8 @@ import SuddenDeathCutscene from '../ui/SuddenDeathCutscene';
 import VictoryCutscene from '../ui/VictoryCutscene';
 import { playResolveTurnEvents, type BombGraphics } from '../rendering/resolveTurnPlayer';
 import {
-  renderTerrain,
+  establishBoardLayout,
+  renderStageBackground,
   renderOccupants,
   renderBomb,
   tileCenter,
@@ -73,6 +74,9 @@ const SPRITE_MANIFEST: { key: string; png: string; json: string }[] = [
   { key: 'unit_witch_red', png: 'units/Witch-Red.png', json: 'units/Witch-Red.json' },
   { key: 'bomb', png: 'Bomb.png', json: 'Bomb.json' },
   { key: 'soft_block', png: 'SoftBlock.png', json: 'SoftBlock.json' },
+  { key: 'stage_plain', png: 'stages/Stage-Plain.png', json: 'stages/Stage-Plain.json' },
+  { key: 'stage_standard', png: 'stages/Stage-Standard.png', json: 'stages/Stage-Standard.json' },
+  { key: 'stage_divided', png: 'stages/Stage-Divided.png', json: 'stages/Stage-Divided.json' },
 ];
 const SPRITE_ASSET_BASE = 'assets/sprites/';
 
@@ -81,8 +85,11 @@ export default class MatchScene extends Phaser.Scene {
   private playerTokens!: [string, string];
   private gameState!: GameState;
   private gameCfg!: GameCfg;
-  // The terrain (grid) is painted once per scene entry into this persistent layer; tileType is
-  // immutable for a match, so no operation rebuilds it. occupantObjects is the swappable layer.
+  // Tracks whether this entry's own fetch has landed, since gameState/gameCfg are never reset.
+  private gameStateLoaded = false;
+  private gameCfgLoaded = false;
+  // The Stage background is painted once per scene entry into this persistent layer;
+  // occupantObjects is the swappable layer.
   private terrainObjects: Phaser.GameObjects.GameObject[] = [];
   private occupantObjects: Phaser.GameObjects.GameObject[] = [];
   private unitSpritesById = new Map<number, Phaser.GameObjects.Sprite>();
@@ -127,6 +134,8 @@ export default class MatchScene extends Phaser.Scene {
     this.interactionsEnabled = false;
     this.summaryPanelOpen = false;
     this.lifecycleConfirmOpen = false;
+    this.gameStateLoaded = false;
+    this.gameCfgLoaded = false;
     // cameras.add(..., makeMain: true) only repoints `.main` — the pre-existing default camera
     // must be removed explicitly or MatchScene renders through two overlapping cameras.
     const defaultCamera = this.cameras.main;
@@ -176,10 +185,9 @@ export default class MatchScene extends Phaser.Scene {
         if (gen !== this.generation) {
           return;
         }
-        // Paint the immutable terrain layer once, then the occupants. renderTerrain() centers
-        // the grid within GameBoardRegion (boardOffset) — the camera is scrolled to (0, 0).
-        renderTerrain(this.boardCtx(), state.grid);
+        establishBoardLayout(state.grid);
         this.renderBoard(state);
+        this.tryRenderStageBackground();
         this.matchSummaryPanel.renderButton();
         this.refreshTurnPanelIfReady();
         void this.beginTurn();
@@ -197,6 +205,8 @@ export default class MatchScene extends Phaser.Scene {
           return;
         }
         this.gameCfg = cfg;
+        this.gameCfgLoaded = true;
+        this.tryRenderStageBackground();
         this.refreshTurnPanelIfReady();
       })
       .catch(() => {
@@ -212,7 +222,7 @@ export default class MatchScene extends Phaser.Scene {
   // gameState and gameCfg are fetched via two independent promise chains (kept separate so
   // MatchScene's initial render doesn't wait on both round-trips), so either may resolve first.
   private refreshTurnPanelIfReady(): void {
-    if (this.gameState && this.gameCfg) {
+    if (this.gameStateLoaded && this.gameCfgLoaded) {
       this.turnPanel.update(this.gameState.turn, this.gameCfg.maxTurns, this.gameState.activeTeam);
     }
   }
@@ -696,7 +706,16 @@ export default class MatchScene extends Phaser.Scene {
   // Destroy-and-repaint the occupant layer from server truth; terrain is never touched.
   private renderBoard(state: GameState): void {
     this.gameState = state;
+    this.gameStateLoaded = true;
     renderOccupants(this.boardCtx(), state);
+  }
+
+  // No-ops until both gameState and gameCfg have loaded this entry, then renders once.
+  private tryRenderStageBackground(): void {
+    if (!this.gameStateLoaded || !this.gameCfgLoaded) {
+      return;
+    }
+    renderStageBackground(this.boardCtx(), this.gameState.grid, this.gameCfg.stagePreset);
   }
 
   // The renderer draws occupants and wires their clicks; the scene keeps ownership of state and

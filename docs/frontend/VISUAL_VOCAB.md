@@ -43,6 +43,14 @@ Two different things, easy to confuse:
 - **draw** — producing output via a vector `Graphics` object.
 - **render** — the general term covering both `draw` (`Graphics`) and displaying a `Sprite`/`Image`.
 
+## Board
+
+- **Tile** — one cell's data (`type`, occupant metadata) in `grid` (`engine/models.go`). Not itself a rendered object.
+- **`grid`** — the match's full `Tile[][]` matrix (`GameState.grid`, `Grid[Y][X]`). Purely logical: sizes `boardOffset` and occupant positions; has no standalone visual representation of its own since p4-spec003-sprites.md retired its per-tile vector rendering.
+- **`StagePreset`** — the backend-defined stage template (`engine/models.go`: `Name`, `Width`/`Height`, `LayoutGrid`, etc.) that determines a match's `grid` dimensions and contents. Selected via `gameCfg.stagePreset`.
+- **Stage background** — the single pixel-art image representing a `StagePreset`'s terrain (`p4-spec003-sprites.md`), center-aligned to `grid`.
+- Avoid **"tilemap"** — this project doesn't use Phaser's `Tilemap`/`TilemapLayer` API; the Stage background is one plain `Image`, not a tile-composited layer. Using the word invites confusion with that unrelated Phaser system.
+
 ## Typography
 
 - Default text: 12px, `0xffffff`, unless a spec states otherwise.

@@ -7,9 +7,7 @@ import type { BombGraphics } from './resolveTurnPlayer';
 import {
   TILE_SIZE,
   SPRITE_GROUND_MARGIN,
-  TERRAIN_COLORS,
-  TERRAIN_BORDER_COLOR,
-  DEPTH_GRID,
+  DEPTH_STAGE_BACKGROUND,
   DEPTH_OCCUPANT,
   UNIT_SIZE,
   OCCUPANT_STROKE_COLOR,
@@ -39,18 +37,54 @@ const UNIT_TEXTURE_KEYS: Record<string, Record<number, string>> = {
   Witch: { 1: 'unit_witch_blue', 2: 'unit_witch_red' },
 };
 
-// Paints the immutable terrain (grid) layer; returns its dimensions for sizing dependent UI.
-// Idempotent — destroys any prior terrain first so scene re-entry doesn't leak graphics.
-export function renderTerrain(
-  ctx: BoardRenderContext,
-  grid: Tile[][]
-): { cols: number; rows: number } {
-  destroyAll(ctx.terrainObjects);
+// StagePreset.Name -> texture key
+const STAGE_TEXTURE_KEYS: Record<string, string> = {
+  Plain: 'stage_plain',
+  Standard: 'stage_standard',
+  Divided: 'stage_divided',
+};
+
+// Computes board layout (boardOffset) from grid dimensions, ahead of occupant positioning;
+// returns them for sizing dependent UI. Must run before renderStageBackground(), which centers
+// on the boardOffset this sets.
+export function establishBoardLayout(grid: Tile[][]): { cols: number; rows: number } {
   const cols = grid[0]?.length ?? 0;
   const rows = grid.length;
   setBoardOffset(cols, rows);
-  renderGrid(ctx, grid);
   return { cols, rows };
+}
+
+// Targets the trimmed content's own center (Frame.x/width), scaled against the untrimmed
+// canvas (Frame.realWidth) — a trimmed export may crop asymmetrically, so origin can't
+// assume (0.5, 0.5).
+function trimmedContentOrigin(scene: Phaser.Scene, key: string, frame: string): [number, number] {
+  const f = scene.textures.getFrame(key, frame);
+  return [(f.x + f.width / 2) / f.realWidth, (f.y + f.height / 2) / f.realHeight];
+}
+
+// Paints the Stage background image matching stagePresetName, centered on the grid regardless of
+// either's size. Idempotent — destroys any prior background first so re-entry doesn't stack.
+// Assumes establishBoardLayout(grid) already ran this entry (boardOffset must be current).
+export function renderStageBackground(
+  ctx: BoardRenderContext,
+  grid: Tile[][],
+  stagePresetName: string
+): void {
+  destroyAll(ctx.terrainObjects);
+  const cols = grid[0]?.length ?? 0;
+  const rows = grid.length;
+  const key = STAGE_TEXTURE_KEYS[stagePresetName];
+  if (!key) {
+    console.warn(`No Stage background texture for preset "${stagePresetName}"`);
+    return;
+  }
+  const frame = firstNonBaseFrame(ctx.scene, key);
+  const cx = boardOffset.x + (cols * TILE_SIZE) / 2;
+  const cy = boardOffset.y + (rows * TILE_SIZE) / 2;
+  const bg = ctx.scene.add.image(cx, cy, key, frame);
+  bg.setOrigin(...trimmedContentOrigin(ctx.scene, key, frame));
+  bg.setDepth(DEPTH_STAGE_BACKGROUND);
+  ctx.terrainObjects.push(bg);
 }
 
 // Destroy-and-rebuild the occupant layer (units, softBlocks, bombs) from truth. This is the
@@ -64,30 +98,6 @@ export function renderOccupants(ctx: BoardRenderContext, state: GameState): void
   renderUnits(ctx, state.units);
   renderSoftBlocks(ctx, state.softBlocks);
   state.bombs.forEach(bomb => renderBomb(ctx, bomb));
-}
-
-function renderGrid(ctx: BoardRenderContext, grid: Tile[][]): void {
-  const g = ctx.scene.add.graphics();
-  g.setDepth(DEPTH_GRID);
-  ctx.terrainObjects.push(g);
-  g.lineStyle(1, TERRAIN_BORDER_COLOR);
-  for (let row = 0; row < grid.length; row++) {
-    const rowTiles = grid[row];
-    if (!rowTiles) {
-      continue;
-    }
-    for (let col = 0; col < rowTiles.length; col++) {
-      const tile = rowTiles[col];
-      if (!tile) {
-        continue;
-      }
-      const x = col * TILE_SIZE + boardOffset.x;
-      const y = row * TILE_SIZE + boardOffset.y;
-      g.fillStyle(TERRAIN_COLORS[tile.type]);
-      g.fillRect(x, y, TILE_SIZE, TILE_SIZE);
-      g.strokeRect(x, y, TILE_SIZE, TILE_SIZE);
-    }
-  }
 }
 
 // Ground-anchored world Y for a sprite on the given tile: the tile's bottom edge, plus the

@@ -1,6 +1,6 @@
 import { TILE_SIZE } from '../constants';
 
-// Depth bands local to blast/fire rendering — between DEPTH_GRID(0) and DEPTH_OCCUPANT(10)
+// Depth bands local to blast/fire rendering — between DEPTH_STAGE_BACKGROUND(0) and DEPTH_OCCUPANT(10)
 // in the shared web/src/constants.ts (blast under occupants; fire above occupants, since it
 // renders "on top of the blast and unit/softblock").
 export const DEPTH_BLAST = 5;

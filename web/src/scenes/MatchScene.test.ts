@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi, type MockInstance } from 'vitest';
 import { mockScene } from '../test/setup';
 import {
-  firstGraphics as terrainGraphics,
+  stageBackgroundImage,
   occupantGraphics,
   occupantSprite,
   lastGraphics,
@@ -302,10 +302,8 @@ describe('MatchScene', () => {
 
     await bootScene();
 
-    // No occupant Graphics exists for the dead unit: only the grid, MatchSummaryButton, and
-    // TurnPanel header(s) — TurnPanel renders once when gameCfg resolves and again inside
-    // beginTurn()'s per-turn refresh, so exactly 2 "header" graphics beyond grid+button.
-    expect(mockScene.add.graphics).toHaveBeenCalledTimes(4);
+    // No occupant Graphics for the dead unit: MatchSummaryButton + 2 TurnPanel header refreshes.
+    expect(mockScene.add.graphics).toHaveBeenCalledTimes(3);
   });
 
   it('shows an error message in the error panel when getMatchState rejects, without rendering the board', async () => {
@@ -465,7 +463,7 @@ describe('MatchScene', () => {
 
     await bootScene();
 
-    const gridGraphics = terrainGraphics();
+    const gridGraphics = stageBackgroundImage();
     const unitGraphics = occupantSprite(0);
     await submitViaUI(unitGraphics, 0);
     await flush();
@@ -608,7 +606,7 @@ describe('MatchScene', () => {
 
     await bootScene();
 
-    const gridGraphics = terrainGraphics(); // painted once at scene entry
+    const gridGraphics = stageBackgroundImage(); // painted once at scene entry
     const unitGraphics = occupantSprite(0);
     const refetchesBefore = vi.mocked(getMatchState).mock.calls.length;
 
@@ -785,6 +783,29 @@ describe('MatchScene', () => {
       '12',
       expect.objectContaining({})
     );
+  });
+
+  it('renders the Stage background matching gameCfg.stagePreset once both state and config have loaded', async () => {
+    queueMatchStates(makeState({ grid: [[plainTile()]] }));
+    vi.mocked(getMatchConfig).mockResolvedValue(makeCfg({ stagePreset: 'Divided' }));
+
+    await bootScene();
+
+    expect(mockScene.add.image).toHaveBeenCalledWith(
+      expect.any(Number),
+      expect.any(Number),
+      'stage_divided',
+      expect.any(String)
+    );
+  });
+
+  it('does not render a Stage background while gameCfg is still loading', async () => {
+    queueMatchStates(makeState({ grid: [[plainTile()]] }));
+    vi.mocked(getMatchConfig).mockReturnValue(new Promise<GameCfg>(() => undefined));
+
+    await bootScene();
+
+    expect(mockScene.add.image).not.toHaveBeenCalled();
   });
 
   async function setUpEmptyBoardAndClickResolve(activeTeam = 1): Promise<void> {
@@ -1367,6 +1388,129 @@ describe('MatchScene', () => {
         centerOnCallsBeforeStaleResolve
       );
     });
+
+    it('does not flash the previous match Stage background while the rematch gameCfg is still loading', async () => {
+      vi.mocked(getMatchConfig).mockResolvedValueOnce(makeCfg({ stagePreset: 'Plain' }));
+      queueMatchStates(makeState({ grid: [[plainTile()]] }));
+
+      const scene = new MatchScene();
+      scene.create({ roomId: 'room-abc', playerTokens: ['t1', 't2'] });
+      await flush();
+
+      expect(mockScene.add.image).toHaveBeenLastCalledWith(
+        expect.any(Number),
+        expect.any(Number),
+        'stage_plain',
+        expect.any(String)
+      );
+      const imageCallsBeforeRematch = mockScene.add.image.mock.calls.length;
+
+      // Rematch with a different StagePreset, holding getMatchConfig() open so getMatchState()
+      // resolves first — the last match's gameCfg must not be read as this entry's.
+      fireShutdown();
+      let resolveFreshCfg: (cfg: GameCfg) => void = () => undefined;
+      vi.mocked(getMatchConfig).mockReturnValueOnce(
+        new Promise<GameCfg>(resolve => {
+          resolveFreshCfg = resolve;
+        })
+      );
+      queueMatchStates(makeState({ grid: [[plainTile()]] }));
+      scene.create({ roomId: 'room-abc', playerTokens: ['t1', 't2'], isRematch: true });
+      await flush();
+
+      // gameState resolved for the new entry, but no repaint happened yet — no stale 'Plain'.
+      expect(mockScene.add.image.mock.calls.length).toBe(imageCallsBeforeRematch);
+
+      resolveFreshCfg(makeCfg({ stagePreset: 'Divided' }));
+      await flush();
+
+      expect(mockScene.add.image).toHaveBeenLastCalledWith(
+        expect.any(Number),
+        expect.any(Number),
+        'stage_divided',
+        expect.any(String)
+      );
+    });
+
+    it('does not repaint using the previous match state while a rematch entry gameState fetch is still loading', async () => {
+      vi.mocked(getMatchConfig).mockResolvedValueOnce(makeCfg({ stagePreset: 'Plain' }));
+      queueMatchStates(makeState({ grid: [[plainTile()]] }));
+
+      const scene = new MatchScene();
+      scene.create({ roomId: 'room-abc', playerTokens: ['t1', 't2'] });
+      await flush();
+
+      const imageCallsBeforeRematch = mockScene.add.image.mock.calls.length;
+      expect(imageCallsBeforeRematch).toBeGreaterThan(0);
+
+      // Rematch with a different StagePreset, holding getMatchState() open so getMatchConfig()
+      // resolves first — the last match's gameState must not be read as this entry's.
+      fireShutdown();
+      let resolveFreshState: (state: GameState) => void = () => undefined;
+      vi.mocked(getMatchState).mockReturnValueOnce(
+        new Promise<GameState>(resolve => {
+          resolveFreshState = resolve;
+        })
+      );
+      vi.mocked(getMatchConfig).mockResolvedValueOnce(makeCfg({ stagePreset: 'Divided' }));
+      scene.create({ roomId: 'room-abc', playerTokens: ['t1', 't2'], isRematch: true });
+      await flush();
+
+      // gameCfg resolved for the new entry, but no repaint happened yet — no stale grid.
+      expect(mockScene.add.image.mock.calls.length).toBe(imageCallsBeforeRematch);
+
+      resolveFreshState(makeState({ grid: [[plainTile()]] }));
+      await flush();
+
+      expect(mockScene.add.image).toHaveBeenLastCalledWith(
+        expect.any(Number),
+        expect.any(Number),
+        'stage_divided',
+        expect.any(String)
+      );
+    });
+
+    it('does not display the previous match maxTurns while a rematch entry gameCfg is still loading', async () => {
+      vi.mocked(getMatchConfig).mockResolvedValueOnce(makeCfg({ maxTurns: 12 }));
+      queueMatchStates(makeState({ grid: [[plainTile()]] }));
+
+      const scene = new MatchScene();
+      scene.create({ roomId: 'room-abc', playerTokens: ['t1', 't2'] });
+      await flush();
+
+      // Rematch with a different maxTurns, holding getMatchConfig() open so getMatchState()
+      // resolves first — the last match's gameCfg must not be read as this entry's.
+      fireShutdown();
+      let resolveFreshCfg: (cfg: GameCfg) => void = () => undefined;
+      vi.mocked(getMatchConfig).mockReturnValueOnce(
+        new Promise<GameCfg>(resolve => {
+          resolveFreshCfg = resolve;
+        })
+      );
+      queueMatchStates(makeState({ grid: [[plainTile()]] }));
+      const textCallsBeforeRematch = mockScene.add.text.mock.calls.length;
+      scene.create({ roomId: 'room-abc', playerTokens: ['t1', 't2'], isRematch: true });
+      await flush();
+
+      // Only the stale '12' would repaint here — the fresh gameCfg hasn't resolved yet.
+      const textCallsDuringRematch = mockScene.add.text.mock.calls.slice(textCallsBeforeRematch);
+      expect(textCallsDuringRematch).not.toContainEqual([
+        expect.any(Number),
+        expect.any(Number),
+        '12',
+        expect.objectContaining({}),
+      ]);
+
+      resolveFreshCfg(makeCfg({ maxTurns: 20 }));
+      await flush();
+
+      expect(mockScene.add.text).toHaveBeenCalledWith(
+        expect.any(Number),
+        expect.any(Number),
+        '20',
+        expect.objectContaining({})
+      );
+    });
   });
 
   describe('Reset flow (ResetTurnButton)', () => {
@@ -1381,7 +1525,7 @@ describe('MatchScene', () => {
       mockScene.cameras.main.fadeIn.mockClear();
 
       const unitGraphics = occupantSprite(0);
-      const grid = terrainGraphics();
+      const grid = stageBackgroundImage();
 
       clickSummaryPanelButton('reset');
       const [, yesButtonGraphics] = lastGraphics(3);

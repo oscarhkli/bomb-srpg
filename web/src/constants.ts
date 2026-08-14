@@ -1,5 +1,3 @@
-import type { TerrainType } from './types/api';
-
 // Fallback color for an unconfigured/unknown team ID.
 export const TEAM_COLOR_FALLBACK = 0x4c4c4c;
 // Default fade in/out duration used across this UI.
@@ -22,16 +20,6 @@ export const GAME_CONTROL_REGION_X = GAME_BOARD_REGION_WIDTH;
 export const GAME_CONTROL_REGION_WIDTH = 160;
 export const GAME_CONTROL_REGION_HEIGHT = 360;
 
-export const TERRAIN_COLORS: Record<TerrainType, number> = {
-  TerrainPlain: 0x4caf50, // green
-  TerrainBlock: 0x9e9e9e, // grey
-  TerrainTower: 0x795548, // brown
-  TerrainWater: 0x2196f3, // blue
-  TerrainLava: 0xff9800, // orange
-};
-
-export const TERRAIN_BORDER_COLOR = 0x000000;
-
 export const BOMB_SIZE = 24;
 
 export const TEAM_COLORS: Record<number, number> = {
@@ -48,7 +36,7 @@ export const OCCUPANT_ICON_STROKE_WIDTH = 2;
 
 // Depth (z-order) bands — explicit rather than relying on Phaser's creation-order default,
 // since overlays/panels/dialogs must render above the board contents.
-export const DEPTH_GRID = 0;
+export const DEPTH_STAGE_BACKGROUND = 0;
 export const DEPTH_OCCUPANT = 10;
 export const DEPTH_ALLOWED_TILE_OVERLAY = 20;
 export const DEPTH_TURN_COMMAND_PANEL = 30;
