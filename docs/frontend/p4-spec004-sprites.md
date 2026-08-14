@@ -31,24 +31,27 @@ MatchSettingsScene's `create()` adds the second 640×360 camera described in Lay
 ### Dimensions
 
 - Instead of 1280×720 canvas, the canvas size will be adjusted to **640x360px** in future phase. This way the browser will scale the canvas up to HD or even 4K cleaner.
-- Since we don't want to ruin the other Scenes that we won't touch at this stage, instead of resizing in current spec, create a second camera for `MatchScene` with a **640x360px** viewport positioned at **(0, 0)** on the canvas, scrolled to world origin **(0, 0)**.
-- Draw a border line with width 4px on both `MatchScene` and `MatchSettingsScene` to help visualizing the **640x360px** viewport. Note that this is a temp component and will be remove once the canvas resizing is finished.
+- Since we don't want to ruin the other Scenes that we won't touch at this stage, instead of resizing the canvas in this spec, mirror `p4-spec001-sprites.md`'s approach: add a second camera to `MatchSettingsScene` with a **640x360px** viewport positioned at **(0, 0)**, scrolled to world origin **(0, 0)**.
 
-Camera stays at default zoom (1) — the 640×360 viewport - no zoom multiplier is needed.
+Camera stays at default zoom (1) — the 640×360 viewport needs no zoom multiplier.
 
 ## Visual Spec
 
 ### General Resizing
 
-Resize and relocate **everything** in `MatchSettingScene` and its child components to `50%`.
+Halve every existing absolute layout constant in `MatchSettingsScene` and its child components (positions, sizes, spacing) to fit the new 640×360 viewport — e.g. `UNIT_SLOT_SIZE` 96px → 48px. Font sizes follow `p4-spec001-sprites.md`'s convention instead: reduce by a flat **4px**, not a percentage — e.g. `SETTINGS_TEXT_FONT_SIZE` 24px → 20px.
 
-> Note: Agent should tell if I have to explicitly spec every components how we should do the resize. Should we refer to PR #41?
+Sprites and other pixel-art assets scale down to fit their halved container. Non-pixel-perfect scaling is acceptable — current sprites are prototype silhouettes to be replaced by final pixel art in a later spec; this spec only needs the layout to function correctly at the new resolution.
 
-### Sprites Use in UnitPage
+Within `UnitCard`/`UnitSlot`, keep the sprite's `p4-spec001-sprites.md` origin `(0.5, 1)` and anchor its bottom edge to the container's bottom edge, rather than vertically centering it. Empty space above the sprite is acceptable at this stage.
+
+### Sprite Use in UnitPage
 
 All the Archetypes and Units rendering under `UnitPage` and the subsequent components should adopt pixel art sprites.
 
-Since there is no portrait sprites for the archetypes, for fast prototyping, adopt the sprites from `MatchScene`. Remove the the team rounded square in `UnitCard` but keep the same spacing - Sprite has its own background color. Remove the background color of `UnitSlot`. Instead, add a **2px** border with `TeamColor`.
+Since there are no portrait sprites for the archetypes, for fast prototyping, adopt the sprites from `MatchScene`. `UnitPage` renders before `MatchScene` in the normal flow, so `MatchSettingsScene` must guarantee unit sprite textures are loaded before `UnitPage` renders — it can't assume `MatchScene`'s texture cache is already populated.
+
+Remove the team rounded square in `UnitCard` but keep the same spacing — the sprite's own team-colored silhouette (Blue/Red per archetype) already conveys team identity, making a separate colored background redundant. Remove the background color of `UnitSlot`. Instead, add a **2px** border with `TeamColor(team)`.
 
 The spec of Unit stays unchanged as `p4-spec001-sprites.md`.
 
@@ -56,14 +59,14 @@ Note that this spec only replaces `Archetype` and `Unit` and does not replaces e
 
 ### Retire Vector Graphic Rendering Features
 
-Since the app doesn't use vector graphic drawing for Archtypes, some existing func and const can be retired.
+Since the app doesn't use vector graphic drawing for Archetypes, some existing func and const can be retired.
 
 - drawArchetypeIcon
 - drawUnitSprite
 - regularPolygonPoints
 - starPoints
 
-Do a code scan for final cleanup.
+This list is not exhaustive — do a full code scan for final cleanup, including any tests asserting on this vector-drawing behavior and any constants that existed solely to parameterize these functions.
 
 ## Scene Exit
 
@@ -75,3 +78,6 @@ On shutdown (leaving `MatchSettingsScene` — match ends, or the player backs ou
 
 1. Given `MatchSettingsScene` has loaded the page, when the scene renders, then all Units display their pixel-art sprite textures instead of the Phase 3 vector-graphics placeholders.
 2. Given the second 640×360 camera is added for `MatchSettingsScene`, when `TitleScene` is visited, then their layout and clickable regions are unaffected (still full-canvas, pixel-identical to Phase 3).
+3. Given `MatchSettingsScene`'s halved layout, when the scene renders at 640×360, then no `UnitPage`/`StagePage` content is clipped or overflows the camera viewport.
+4. Given a `UnitCard` and an occupied `UnitSlot`, when they render, then `UnitCard` shows no background square behind its sprite, and `UnitSlot` shows a 2px `TeamColor(team)` border instead of a filled background.
+5. Given a player reaches `MatchSettingsScene` without `MatchScene` ever having been visited in that session, when `UnitPage` renders, then unit sprites still display correctly (not blank/missing textures).
