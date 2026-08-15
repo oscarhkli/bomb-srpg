@@ -15,13 +15,7 @@ import { getCatalog, createMatchRoom, initRoom, createMatch } from '../engine/ap
 import MatchSettingsScene, { type MatchSettingsSceneData } from './MatchSettingsScene';
 import { NO_UNIT } from '../ui/matchSettings/formation';
 import { UNIT_SPRITE_MANIFEST } from '../rendering/spriteManifest';
-import {
-  TEAM_COLORS,
-  NEXT_BUTTON_LABEL,
-  START_MATCH_BUTTON_LABEL,
-  MATCH_CAMERA_WIDTH,
-  MATCH_CAMERA_HEIGHT,
-} from '../constants';
+import { TEAM_COLORS, NEXT_BUTTON_LABEL, START_MATCH_BUTTON_LABEL } from '../constants';
 import type { Archetype, Catalog, GameCfg } from '../types/api';
 
 vi.mock('../engine/api');
@@ -108,26 +102,15 @@ describe('MatchSettingsScene — preload', () => {
 });
 
 describe('MatchSettingsScene — camera setup', () => {
-  it('adds a 640x360 camera as main, scrolled to world origin, and removes the pre-existing default camera', async () => {
+  it('renders through the single default main camera, with no cameras.add call', async () => {
     mockCatalog();
     const defaultCamera = mockScene.cameras.main;
 
     await bootScene();
 
-    expect(mockScene.cameras.add).toHaveBeenCalledWith(
-      0,
-      0,
-      MATCH_CAMERA_WIDTH,
-      MATCH_CAMERA_HEIGHT,
-      true,
-      expect.any(String)
-    );
-    const added = mockScene.cameras.add.mock.results[0]!.value as ReturnType<
-      typeof mockScene.cameras.add
-    >;
-    expect(mockScene.cameras.main).toBe(added);
-    expect(added.setScroll).toHaveBeenCalledWith(0, 0);
-    expect(mockScene.cameras.remove).toHaveBeenCalledWith(defaultCamera);
+    expect(mockScene.cameras.add).not.toHaveBeenCalled();
+    expect(mockScene.cameras.remove).not.toHaveBeenCalled();
+    expect(mockScene.cameras.main).toBe(defaultCamera);
   });
 });
 

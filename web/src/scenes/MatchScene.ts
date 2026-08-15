@@ -42,8 +42,6 @@ import {
   CONFIRM_TEXT_RESET,
   CONFIRM_TEXT_SURRENDER,
   FADE_MS,
-  MATCH_CAMERA_WIDTH,
-  MATCH_CAMERA_HEIGHT,
 } from '../constants';
 import type {
   Coordinate,
@@ -119,19 +117,6 @@ export default class MatchScene extends Phaser.Scene {
     this.lifecycleConfirmOpen = false;
     this.gameStateLoaded = false;
     this.gameCfgLoaded = false;
-    // cameras.add(..., makeMain: true) only repoints `.main` — the pre-existing default camera
-    // must be removed explicitly or MatchScene renders through two overlapping cameras.
-    const defaultCamera = this.cameras.main;
-    const matchCamera = this.cameras.add(
-      0,
-      0,
-      MATCH_CAMERA_WIDTH,
-      MATCH_CAMERA_HEIGHT,
-      true,
-      'match'
-    );
-    matchCamera.setScroll(0, 0);
-    this.cameras.remove(defaultCamera);
     this.events.once('shutdown', () => {
       this.generation++;
     });

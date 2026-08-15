@@ -113,7 +113,7 @@ export function createMockSprite(x = 0, y = 0) {
 
 // Fresh instance per cameras.add() call, mirroring cameras.main's shape so UI components
 // that read `cameras.main.width/height` keep working unchanged after a makeMain swap.
-export function createMockCamera(x = 0, y = 0, width = 1280, height = 720, name = '') {
+export function createMockCamera(x = 0, y = 0, width = 640, height = 360, name = '') {
   return {
     x,
     y,
@@ -167,9 +167,9 @@ export const mockScene = {
   add: mockGameObjectFactory,
   make: mockGameObjectFactory,
   cameras: mockCameraManager,
-  scale: { width: 1280, height: 720 },
+  scale: { width: 640, height: 360 },
   scene: { restart: vi.fn(), start: vi.fn() },
-  sys: { game: { config: { width: 1280, height: 720 } } },
+  sys: { game: { config: { width: 640, height: 360 } } },
   load: {
     font: vi.fn(),
     image: vi.fn(),
@@ -207,7 +207,7 @@ export const mockScene = {
     keyboard: { addKey: vi.fn(), createCursorKeys: vi.fn(() => ({})) },
   },
   children: { getAll: vi.fn(() => []) },
-  game: { config: { width: 1280, height: 720 } },
+  game: { config: { width: 640, height: 360 } },
 };
 
 // @ts-expect-error - global mock for tests
@@ -287,7 +287,7 @@ const mockContext = {
   closePath: vi.fn(),
   fillText: vi.fn(),
   measureText: vi.fn(() => ({ width: 0 })),
-  canvas: { width: 1280, height: 720 },
+  canvas: { width: 640, height: 360 },
   globalAlpha: 1,
   globalCompositeOperation: 'source-over',
   clip: vi.fn(),

@@ -6,11 +6,13 @@ import TitleScene from './scenes/TitleScene';
 
 new Phaser.Game({
   type: Phaser.AUTO,
-  width: 1280,
-  height: 720,
+  width: 640,
+  height: 360,
   parent: 'app',
+  pixelArt: true,
   scale: {
-    mode: Phaser.Scale.FIT,
+    mode: Phaser.Scale.NONE,
+    zoom: Phaser.Scale.ZOOM_2X,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
   // TitleScene first = auto-starts on load.

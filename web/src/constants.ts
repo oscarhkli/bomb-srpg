@@ -9,11 +9,8 @@ export const TILE_SIZE = 32;
 // origin (0.5, 1) offset by this amount below the tile's bottom edge.
 export const SPRITE_GROUND_MARGIN = 16;
 
-// Shared 640x360 viewport size for MatchScene's and MatchSettingsScene's own second camera.
-export const MATCH_CAMERA_WIDTH = 640;
-export const MATCH_CAMERA_HEIGHT = 360;
 // GameBoardRegion (Grid/Units) on the left, GameControlRegion (TurnPanel/TurnCommandPanel/
-// MatchSummaryButton) on the right — MatchScene's own split of MATCH_CAMERA_WIDTH/HEIGHT.
+// MatchSummaryButton) on the right — MatchScene's own split of the 640x360 canvas.
 export const GAME_BOARD_REGION_WIDTH = 480;
 export const GAME_BOARD_REGION_HEIGHT = 360;
 export const GAME_CONTROL_REGION_X = GAME_BOARD_REGION_WIDTH;
@@ -236,13 +233,13 @@ export const MAX_TURNS_RECOMMENDED_FONT_SIZE = 12;
 export const MAX_TURNS_RECOMMENDED_GLYPH_GAP = 10;
 
 // TitleScene
-export const TITLE_TOP_MARGIN = 48;
-export const TITLE_FONT_SIZE = 48;
-export const TITLE_GAME_MODE_FONT_SIZE = 24;
-export const TITLE_COPYRIGHT_BOTTOM_MARGIN = 12;
-export const TITLE_COPYRIGHT_FONT_SIZE = 16;
+export const TITLE_TOP_MARGIN = 24;
+export const TITLE_FONT_SIZE = 44;
+export const TITLE_GAME_MODE_FONT_SIZE = 20;
+export const TITLE_COPYRIGHT_BOTTOM_MARGIN = 6;
+export const TITLE_COPYRIGHT_FONT_SIZE = 12;
 // Hover indicator: the 💣 renders this many px left of the hovered game mode option.
-export const TITLE_HOVER_BOMB_GAP = 24;
+export const TITLE_HOVER_BOMB_GAP = 12;
 
 // VictoryCutscene — above every other overlay, since it's the terminal screen.
 export const DEPTH_VICTORY_CUTSCENE = 80;

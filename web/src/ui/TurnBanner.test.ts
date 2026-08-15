@@ -1,10 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mockScene } from '../test/setup';
-import {
-  firstGraphics as bannerGraphics,
-  firstText as bannerText,
-  withCameraSize,
-} from '../test/sceneHelpers';
+import { firstGraphics as bannerGraphics, firstText as bannerText } from '../test/sceneHelpers';
 import { TEAM_COLORS, FADE_MS, TURN_BANNER_HOLD_MS, DEPTH_TURN_BANNER } from '../constants';
 import TurnBanner from './TurnBanner';
 
@@ -87,19 +83,17 @@ describe('TurnBanner', () => {
     );
   });
 
-  it('fills the new 640x360 MatchScene camera viewport exactly (no leftover 1280x720 sizing)', () => {
-    withCameraSize(640, 360, () => {
-      const banner = new TurnBanner(mockScene as never);
+  it('fills the 640x360 camera viewport exactly', () => {
+    const banner = new TurnBanner(mockScene as never);
 
-      void banner.play(1);
+    void banner.play(1);
 
-      expect(bannerGraphics().fillRect).toHaveBeenCalledWith(
-        0,
-        expect.any(Number),
-        640,
-        expect.any(Number)
-      );
-    });
+    expect(bannerGraphics().fillRect).toHaveBeenCalledWith(
+      0,
+      expect.any(Number),
+      640,
+      expect.any(Number)
+    );
   });
 
   it('destroys the banner and resolves play() once the full fade sequence completes', async () => {
