@@ -14,8 +14,6 @@ import {
   SETTINGS_HEADER_SPACER,
   BACK_BUTTON_SIZE,
   FADE_MS,
-  MATCH_CAMERA_WIDTH,
-  MATCH_CAMERA_HEIGHT,
 } from '../constants';
 
 export interface MatchSettingsSceneData {
@@ -64,18 +62,6 @@ export default class MatchSettingsScene extends Phaser.Scene {
     this.currentPageIndex = 0;
     this.isTransitioning = false;
     this.errorPanel = new ErrorPanel(this);
-
-    const defaultCamera = this.cameras.main;
-    const settingsCamera = this.cameras.add(
-      0,
-      0,
-      MATCH_CAMERA_WIDTH,
-      MATCH_CAMERA_HEIGHT,
-      true,
-      'matchSettings'
-    );
-    settingsCamera.setScroll(0, 0);
-    this.cameras.remove(defaultCamera);
 
     this.events.once('shutdown', () => {
       this.generation++;

@@ -38,8 +38,6 @@ import {
   DEPTH_OCCUPANT,
   SUDDEN_DEATH_BOMB_DROP_DURATION_MS,
   CONFIRM_TEXT_RESET,
-  MATCH_CAMERA_WIDTH,
-  MATCH_CAMERA_HEIGHT,
 } from '../constants';
 
 vi.mock('../engine/api');
@@ -168,41 +166,14 @@ describe('MatchScene', () => {
   });
 
   describe('camera setup', () => {
-    it('adds a 640x360 camera as main, scrolled to world origin, and removes the pre-existing default camera', async () => {
-      // cameras.add(..., makeMain: true) only repoints `.main` — it never removes the scene's
-      // auto-created default camera, so MatchScene must remove it explicitly or render through
-      // two overlapping cameras.
+    it('renders through the single default main camera, with no cameras.add call', async () => {
       const defaultCamera = mockScene.cameras.main;
 
       await bootScene();
 
-      expect(mockScene.cameras.add).toHaveBeenCalledWith(
-        0,
-        0,
-        MATCH_CAMERA_WIDTH,
-        MATCH_CAMERA_HEIGHT,
-        true,
-        expect.any(String)
-      );
-      const added = mockScene.cameras.add.mock.results[0]!.value as ReturnType<
-        typeof mockScene.cameras.add
-      >;
-      expect(mockScene.cameras.main).toBe(added);
-      expect(added.setScroll).toHaveBeenCalledWith(0, 0);
-      expect(mockScene.cameras.remove).toHaveBeenCalledWith(defaultCamera);
-    });
-
-    it('never accumulates un-removed cameras across repeated scene entries', async () => {
-      await bootScene();
-      const firstCamera = mockScene.cameras.main;
-
-      fireShutdown();
-      await bootScene();
-
-      // Each create() removes whatever camera was main beforehand, so the prior entry's camera
-      // is always paired with a removal — net active cameras never grow across re-entries.
-      expect(mockScene.cameras.add).toHaveBeenCalledTimes(2);
-      expect(mockScene.cameras.remove).toHaveBeenCalledWith(firstCamera);
+      expect(mockScene.cameras.add).not.toHaveBeenCalled();
+      expect(mockScene.cameras.remove).not.toHaveBeenCalled();
+      expect(mockScene.cameras.main).toBe(defaultCamera);
     });
   });
 
@@ -1097,7 +1068,7 @@ describe('MatchScene', () => {
       >;
 
       // restY (tileCenter of {x:1,y:0}) is 24; the start position must sit BOMB_SIZE above it
-      // (-24), not `restY - cameras.main.height` (-696 for the default 720px-tall mock camera) —
+      // (-24), not `restY - cameras.main.height` (-336 for the default 360px-tall mock camera) —
       // a fixed camera-height offset only clears the screen for tiles near the top of the board.
       expect(bombContainer.y).toBe(-24);
     });

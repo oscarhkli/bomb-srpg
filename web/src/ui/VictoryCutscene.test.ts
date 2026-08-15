@@ -7,7 +7,6 @@ import {
   graphicsAt,
   pointerDownOf,
   tweenConfigAt,
-  withCameraSize,
 } from '../test/sceneHelpers';
 import {
   TEAM_COLORS,
@@ -37,14 +36,12 @@ function completeFadeInAndButtonDelay(): void {
 }
 
 describe('VictoryCutscene', () => {
-  it('fills the new 640x360 MatchScene camera viewport exactly (no leftover 1280x720 sizing)', () => {
-    withCameraSize(640, 360, () => {
-      const cutscene = new VictoryCutscene(mockScene as never);
+  it('fills the 640x360 camera viewport exactly', () => {
+    const cutscene = new VictoryCutscene(mockScene as never);
 
-      cutscene.play(1, { onRematch: vi.fn(), onReturnToSettings: vi.fn() });
+    cutscene.play(1, { onRematch: vi.fn(), onReturnToSettings: vi.fn() });
 
-      expect(firstGraphics().fillRect).toHaveBeenCalledWith(0, 0, 640, 360);
-    });
+    expect(firstGraphics().fillRect).toHaveBeenCalledWith(0, 0, 640, 360);
   });
 
   it.each([
@@ -78,15 +75,15 @@ describe('VictoryCutscene', () => {
 
     cutscene.play(2, { onRematch: vi.fn(), onReturnToSettings: vi.fn() });
 
-    // Camera width is 1280 in the test mock, so 5% left of center (640) is 576.
+    // Camera width is 640 in the test mock, so 5% left of center (320) is 288.
     expect(mockScene.add.text).toHaveBeenCalledWith(
-      576,
+      288,
       expect.any(Number),
       'Winner...',
       expect.objectContaining({ fontSize: '36px' })
     );
     expect(mockScene.add.text).toHaveBeenCalledWith(
-      640,
+      320,
       expect.any(Number),
       'Player 2!',
       expect.objectContaining({ fontSize: '48px' })
@@ -102,7 +99,7 @@ describe('VictoryCutscene', () => {
     cutscene.play(1, { onRematch: vi.fn(), onReturnToSettings: vi.fn() });
 
     const scrim = firstGraphics();
-    expect(scrim.fillRect).toHaveBeenCalledWith(0, 0, 1280, 720);
+    expect(scrim.fillRect).toHaveBeenCalledWith(0, 0, 640, 360);
     expect(scrim.setScrollFactor).toHaveBeenCalledWith(0);
     expect(scrim.setDepth).toHaveBeenCalledWith(DEPTH_VICTORY_CUTSCENE);
   });

@@ -7,7 +7,6 @@ import {
   allTexts,
   textCalls,
   tweenConfigAt,
-  withCameraSize,
 } from '../test/sceneHelpers';
 import { makeState, makeCfg, makeUnit } from '../test/fixtures';
 import {
@@ -114,14 +113,12 @@ describe('MatchSummaryPanel button', () => {
 });
 
 describe('MatchSummaryPanel.open', () => {
-  it('centers on the new 640x360 MatchScene camera, not the 1280x720 canvas', () => {
-    withCameraSize(640, 360, () => {
-      const { panel } = makePanel();
+  it('centers on the 640x360 camera', () => {
+    const { panel } = makePanel();
 
-      panel.open(makeState(), makeCfg());
+    panel.open(makeState(), makeCfg());
 
-      expect(firstGraphics().fillRect).toHaveBeenCalledWith(0, 0, 640, 360);
-    });
+    expect(firstGraphics().fillRect).toHaveBeenCalledWith(0, 0, 640, 360);
   });
 
   it('fades in a full-canvas scrim at DEPTH_MATCH_SUMMARY_PANEL, consistent with ConfirmDialog dim styling', () => {
@@ -134,7 +131,7 @@ describe('MatchSummaryPanel.open', () => {
       CONFIRM_DIALOG_DIM_COLOR,
       CONFIRM_DIALOG_DIM_ALPHA
     );
-    expect(scrim.fillRect).toHaveBeenCalledWith(0, 0, 1280, 720);
+    expect(scrim.fillRect).toHaveBeenCalledWith(0, 0, 640, 360);
     expect(scrim.setDepth).toHaveBeenCalledWith(DEPTH_MATCH_SUMMARY_PANEL);
     expect(scrim.setScrollFactor).toHaveBeenCalledWith(0);
     const tweenCall = tweenConfigAt(0) as { alpha: number; duration: number };
@@ -284,9 +281,9 @@ describe('MatchSummaryPanel.open', () => {
     const backCall = backG!.fillRoundedRect.mock.calls[0]!;
     expect(resolveCall[3]).toBe(MATCH_SUMMARY_BUTTON_HEIGHT);
 
-    // Camera height is 720; the content box is vertically centered around it. The Back button
+    // Camera height is 360; the content box is vertically centered around it. The Back button
     // (bottom-most) should end 12px above the box's bottom edge (y0 + MATCH_SUMMARY_PANEL_HEIGHT).
-    const y0 = (720 - MATCH_SUMMARY_PANEL_HEIGHT) / 2;
+    const y0 = (360 - MATCH_SUMMARY_PANEL_HEIGHT) / 2;
     const boxBottom = y0 + MATCH_SUMMARY_PANEL_HEIGHT;
     const backBottomEdge = (backCall[1] as number) + MATCH_SUMMARY_BUTTON_HEIGHT;
     expect(backBottomEdge).toBeCloseTo(boxBottom - 12, 5);

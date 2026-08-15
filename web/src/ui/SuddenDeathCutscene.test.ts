@@ -4,7 +4,6 @@ import {
   firstGraphics as overlayGraphics,
   tweenConfigAt,
   fireDelayedCall,
-  withCameraSize,
 } from '../test/sceneHelpers';
 import { makeBombPlacedEvent } from '../test/fixtures';
 import {
@@ -25,14 +24,12 @@ function pulseCall(): { duration?: number; yoyo?: boolean; repeat?: number } {
 }
 
 describe('SuddenDeathCutscene', () => {
-  it('fills the new 640x360 MatchScene camera viewport exactly (no leftover 1280x720 sizing)', () => {
-    withCameraSize(640, 360, () => {
-      const cutscene = new SuddenDeathCutscene(mockScene as never);
+  it('fills the 640x360 camera viewport exactly', () => {
+    const cutscene = new SuddenDeathCutscene(mockScene as never);
 
-      void cutscene.play([], () => Promise.resolve());
+    void cutscene.play([], () => Promise.resolve());
 
-      expect(overlayGraphics().fillRect).toHaveBeenCalledWith(0, 0, 640, 360);
-    });
+    expect(overlayGraphics().fillRect).toHaveBeenCalledWith(0, 0, 640, 360);
   });
 
   it('renders a full-canvas overlay filled with SUDDEN_DEATH_COLOR at DEPTH_SUDDEN_DEATH_OVERLAY', () => {
