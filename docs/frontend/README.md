@@ -29,7 +29,9 @@ Specs will be written prior to development—partly handcrafted, and partly gene
 | [Phase 4.4: Swapping Sprites for Existing Vector Graphics in MatchSettingsScene](p4-spec004-sprites.md) | Sprites | Done | 2026-08-14 |
 | [Phase 4.5: Resize Canvas to 640x360](p4-spec005-canvas.md) | Canvas | Done | 2026-08-15 |
 | [Phase 4.6: Swapping Sprites for Buttons in TurnCommandPanel and ConfirmDialog in MatchScene](p4-spec006-sprites.md) | Sprites | Done | 2026-08-16 |
-| [Phase 5.x: Render Camera Navigation](p5-spec020-match.md) | match | Parked Draft | — |
+| [Phase 4.7: Auto Resize Canvas](p4-spec007-canvas.md) | Canvas | Draft | — |
+| [Phase 4.8: Swapping Sprites for Existing Vector Graphics in MatchSummaryPanel](p4-spec008-sprites.md) | Sprites | Draft | — |
+| [Phase 4.9: Refine UX in MatchScene on TurnCommand Buttons](p4-spec009-sprites.md) | Sprites | Draft | — |
 <!-- END SPEC TABLE -->
 
 ## Workflow

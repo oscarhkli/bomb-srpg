@@ -1,8 +1,8 @@
 ---
-title: "Phase 4.7: Auto Resize Canvas"
+title: "Phase 4.9: Refine UX in MatchScene on TurnCommand Buttons"
 ---
 
-# Phase 4.7: Auto Resize Canvas
+# Phase 4.9: Refine UX in MatchScene on TurnCommand Buttons
 
 **Skip everything below - copy-and-paste only.**
 

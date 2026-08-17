@@ -75,3 +75,7 @@ specs:
     status: Draft
     category: Sprites
     completion-date:
+  - file: p4-spec009-sprites.md
+    status: Draft
+    category: Sprites
+    completion-date:

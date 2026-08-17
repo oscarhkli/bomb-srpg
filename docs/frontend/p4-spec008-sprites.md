@@ -4,7 +4,7 @@ title: "Phase 4.8: Swapping Sprites for Existing Vector Graphics in MatchSummary
 
 # Phase 4.8: Swapping Sprites for Existing Vector Graphics in MatchSummaryPanel
 
-**Skip all the things below - copy-and-paste only.**
+**Skip everything below - copy-and-paste only.**
 
 ## Context
 
