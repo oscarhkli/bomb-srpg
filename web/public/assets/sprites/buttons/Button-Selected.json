@@ -1,0 +1,20 @@
+{ "frames": [
+   {
+    "filename": "Button #Selected.aseprite",
+    "frame": { "x": 0, "y": 0, "w": 134, "h": 44 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 61, "y": 45, "w": 134, "h": 44 },
+    "sourceSize": { "w": 254, "h": 128 },
+    "duration": 100
+   }
+ ],
+ "meta": {
+  "app": "https://www.aseprite.org/",
+  "version": "1.x-dev",
+  "image": "Button-Selected.png",
+  "format": "RGBA8888",
+  "size": { "w": 134, "h": 44 },
+  "scale": "1"
+ }
+}

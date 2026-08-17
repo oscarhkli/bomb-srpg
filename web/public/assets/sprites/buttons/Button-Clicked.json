@@ -1,0 +1,20 @@
+{ "frames": [
+   {
+    "filename": "Button #Clicked.aseprite",
+    "frame": { "x": 0, "y": 0, "w": 129, "h": 37 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 63, "y": 49, "w": 129, "h": 37 },
+    "sourceSize": { "w": 254, "h": 128 },
+    "duration": 100
+   }
+ ],
+ "meta": {
+  "app": "https://www.aseprite.org/",
+  "version": "1.x-dev",
+  "image": "Button-Clicked.png",
+  "format": "RGBA8888",
+  "size": { "w": 129, "h": 37 },
+  "scale": "1"
+ }
+}

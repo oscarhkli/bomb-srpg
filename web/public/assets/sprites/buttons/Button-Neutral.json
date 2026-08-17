@@ -1,0 +1,20 @@
+{ "frames": [
+   {
+    "filename": "Button #Neutral.aseprite",
+    "frame": { "x": 0, "y": 0, "w": 130, "h": 40 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 63, "y": 47, "w": 130, "h": 40 },
+    "sourceSize": { "w": 254, "h": 128 },
+    "duration": 100
+   }
+ ],
+ "meta": {
+  "app": "https://www.aseprite.org/",
+  "version": "1.x-dev",
+  "image": "Button-Neutral.png",
+  "format": "RGBA8888",
+  "size": { "w": 130, "h": 40 },
+  "scale": "1"
+ }
+}
