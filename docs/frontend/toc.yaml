@@ -64,8 +64,8 @@ specs:
     category: Canvas
     completion-date: 2026-08-15
   - file: p4-spec006-sprites.md
-    status: Draft
-    category: Canvas
+    status: Ready
+    category: Sprites
     completion-date:
   - file: p5-spec020-match.md
     status: Parked Draft
