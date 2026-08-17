@@ -99,7 +99,8 @@ Refer to [Frontend README](frontend/README.md)
 - [x] Silhouette Adoption for Archetypes / Units / Bombs / SoftBlocks
 - [x] Tilemap
 - [x] Resize canvas and camera
-- [ ] UI Controls
+- [ ] Responsive layout
+- [ ] UI controls
   - [ ] MatchScene
   - [ ] MatchSettingsScene
   - [ ] TitleScene

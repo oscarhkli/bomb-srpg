@@ -39,7 +39,7 @@ export function verticalButtonY(
 }
 
 // Draws a pill-shape button (rounded rect + border + centered label) per the shared styling
-// used by TurnCommandPanel's Move/Bomb/Back buttons and ConfirmDialog's Yes/No buttons.
+// used by MatchSummaryPanel, VictoryCutscene, UnitPage, and StagePage.
 // Returns the created GameObjects so the caller can track them for later destroy().
 export function drawPillButton(
   scene: Phaser.Scene,

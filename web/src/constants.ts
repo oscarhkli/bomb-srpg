@@ -42,14 +42,23 @@ export const DISABLED_BUTTON_COLOR = 0x999999;
 export const PANEL_BUTTON_FILL_COLOR = 0x583f0e;
 export const PANEL_BUTTON_FILL_ALPHA = 0.2;
 export const PANEL_BUTTON_BORDER_COLOR = 0xdc9e23;
-export const PANEL_BUTTON_WIDTH = 46;
-export const PANEL_BUTTON_HEIGHT = 32;
 export const PANEL_BUTTON_BORDER_WIDTH = 2;
 export const PANEL_BUTTON_SPACING = 12;
 
-export const TURN_COMMAND_PANEL_WIDTH = 144;
-export const TURN_COMMAND_PANEL_HEIGHT = 144;
-export const TURN_COMMAND_PANEL_BOTTOM_MARGIN = 2;
+// SpriteButton (TurnCommandPanel/ConfirmDialog) — texture keys per state/label.
+export const BUTTON_TEXTURE_NEUTRAL = 'button_neutral';
+export const BUTTON_TEXTURE_SELECTED = 'button_selected';
+export const BUTTON_TEXTURE_CLICKED = 'button_clicked';
+export const BUTTON_LABEL_MOVE = 'button_label_move';
+export const BUTTON_LABEL_BOMB = 'button_label_bomb';
+export const BUTTON_LABEL_BACK = 'button_label_back';
+export const BUTTON_LABEL_YES = 'button_label_yes';
+export const BUTTON_LABEL_NO = 'button_label_no';
+// Clicked state's downward Label shift, and the vertical gap between stacked SpriteButtons.
+export const SPRITE_BUTTON_CLICKED_LABEL_OFFSET_Y = 2;
+export const SPRITE_BUTTON_ROW_SPACING = 4;
+
+export const TURN_COMMAND_PANEL_BOTTOM_MARGIN = 40;
 
 export const ALLOWED_TILE_MOVE_COLOR = 0x86c64f;
 export const ALLOWED_TILE_MOVE_ALPHA = 0.65;

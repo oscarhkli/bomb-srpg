@@ -23,7 +23,6 @@ import {
   GAME_CONTROL_REGION_HEIGHT,
   TURN_PANEL_TOP_MARGIN,
   TURN_PANEL_HEIGHT,
-  TURN_COMMAND_PANEL_HEIGHT,
   TURN_COMMAND_PANEL_BOTTOM_MARGIN,
   GAME_FONT_FAMILY,
   CONFIRM_DIALOG_DIM_COLOR,
@@ -49,6 +48,7 @@ import {
   verticalButtonY,
   type PillButtonStyle,
 } from './pillButton';
+import { turnCommandPanelHeight } from './TurnCommandPanel';
 import type { GameCfg, GameState } from '../types/api';
 
 export interface MatchSummaryPanelCallbacks {
@@ -94,7 +94,9 @@ export default class MatchSummaryPanel {
     const x = GAME_CONTROL_REGION_X + (GAME_CONTROL_REGION_WIDTH - MATCH_SUMMARY_BUTTON_SIZE) / 2;
     const gapTop = TURN_PANEL_TOP_MARGIN + TURN_PANEL_HEIGHT;
     const gapBottom =
-      GAME_CONTROL_REGION_HEIGHT - TURN_COMMAND_PANEL_HEIGHT - TURN_COMMAND_PANEL_BOTTOM_MARGIN;
+      GAME_CONTROL_REGION_HEIGHT -
+      turnCommandPanelHeight(this.scene) -
+      TURN_COMMAND_PANEL_BOTTOM_MARGIN;
     const y = gapTop + (gapBottom - gapTop - MATCH_SUMMARY_BUTTON_SIZE) / 2;
 
     const g = this.scene.add.graphics();

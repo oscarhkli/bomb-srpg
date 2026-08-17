@@ -1,0 +1,14 @@
+---
+title: "p4-spec006-sprites Log"
+---
+
+# Known Issues
+
+Found via manual browser walkthrough (`make web-dev` + `make run-server`) after implementation, not by unit tests. This is a bug in the client-layer implementation, not a gap in `p4-spec006-sprites.md` — logged here for traceability since that spec is what surfaced it.
+
+1. **`SpriteButton`'s hit area was centered on the Container's local origin instead of top-left-based, shifting the real testable region a full button-size away from the visible button (left and up).** `Container.displayOriginX/Y` is hard-locked by Phaser to `width/2, height/2` (a Container is always "origin 0.5" for input purposes) and gets added to the pointer's local coordinate before it's tested against the hit-area shape (`node_modules/phaser/src/input/InputManager.js`'s `pointWithinHitArea`). The hit area was built as `new Rectangle(-width/2, -height/2, width, height)` (centered), which combined with Phaser's automatic `+width/2, +height/2` shift moved the effective testable region to `[x - width, x]` instead of `[x - width/2, x + width/2]`. Fixed by using `new Rectangle(0, 0, width, height)` (top-left-based), matching the convention Phaser's own docs use (e.g. `new Circle(32, 32, 32)` for a centered 64px sprite). Added a regression test in `spriteButton.test.ts` asserting the hit area's literal coordinates.
+   **Status: Solved.**
+2. **Blind spot in `spriteButton.test.ts`'s original coverage:** the mocked `Container`/`Image` in `test/setup.ts` don't simulate Phaser's real `displayOriginX/Y` hit-test math, so no unit test could have caught this — only a real Phaser renderer exercises that code path. Worth keeping in mind for any future Container-based interactive component: the mock can verify *what* `setInteractive()` was called with, but not whether those coordinates are actually correct against Phaser's real hit-testing semantics.
+   **Status: Deferred.** No mock changes made to simulate real hit-test coordinate math; manual browser verification remains the interim substitute for this class of bug.
+3. **`SpriteButton.setEnabled()` hand-rolls the same `Rectangle` + `Rectangle.Contains` interactive-wiring line that `attachRectClickHandler` (`pillButton.ts`) already centralizes**, instead of calling that helper. Not unified because `attachRectClickHandler` only exists to serve `drawPillButton`'s callers (`MatchSummaryPanel`, `VictoryCutscene`, `UnitPage`, `StagePage`); every one of those is expected to eventually migrate off pillButtons onto some Button component, at which point `pillButton.ts`/`attachRectClickHandler` will likely be deleted rather than kept as a shared utility. Unifying now would mean designing a shared abstraction around a helper slated for removal.
+   **Status: Deferred.** Revisit once the pillButton migration is underway — design the real shared shape then, from the full set of button families, rather than guessing it from `SpriteButton` alone.
