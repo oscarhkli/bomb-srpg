@@ -8,23 +8,18 @@ import {
   ALLOWED_TILE_MOVE_SELECTED_COLOR,
   DEPTH_ALLOWED_TILE_OVERLAY,
   DEPTH_TURN_COMMAND_PANEL,
-  DISABLED_BUTTON_COLOR,
-  PANEL_BUTTON_BORDER_COLOR,
-  PANEL_BUTTON_BORDER_WIDTH,
-  PANEL_BUTTON_FILL_ALPHA,
-  PANEL_BUTTON_FILL_COLOR,
-  PANEL_BUTTON_HEIGHT,
-  PANEL_BUTTON_SPACING,
-  PANEL_BUTTON_WIDTH,
+  BUTTON_LABEL_MOVE,
+  BUTTON_LABEL_BOMB,
+  BUTTON_LABEL_BACK,
+  SPRITE_BUTTON_ROW_SPACING,
   TILE_SIZE,
   GAME_CONTROL_REGION_HEIGHT,
   GAME_CONTROL_REGION_X,
   GAME_CONTROL_REGION_WIDTH,
-  TURN_COMMAND_PANEL_WIDTH,
-  TURN_COMMAND_PANEL_HEIGHT,
   TURN_COMMAND_PANEL_BOTTOM_MARGIN,
 } from '../constants';
-import { drawPillButton } from './pillButton';
+import SpriteButton, { buttonFrameSize } from './spriteButton';
+import { verticalButtonY } from './pillButton';
 import { destroyAll } from './gameObjectUtils';
 import { boardOffset } from '../rendering/boardOffset';
 import type { Coordinate, TurnCmdType, TurnCommand, Unit } from '../types/api';
@@ -44,8 +39,17 @@ type ActionStackEntry =
   | { kind: 'allowedTilesShown'; turnCmdType: TurnCmdType }
   | { kind: 'confirmPending'; turnCmdType: TurnCmdType; target: Coordinate };
 
+const BUTTON_COUNT = 3; // Move, Bomb, Back
+
+// Total stacked height of the panel's 3 SpriteButtons; MatchSummaryPanel reads this to
+// position its own button in the gap above the panel.
+export function turnCommandPanelHeight(scene: Phaser.Scene): number {
+  const { height } = buttonFrameSize(scene);
+  return BUTTON_COUNT * height + (BUTTON_COUNT - 1) * SPRITE_BUTTON_ROW_SPACING;
+}
+
 export default class TurnCommandPanel {
-  private panelObjects: Phaser.GameObjects.GameObject[] = [];
+  private panelObjects: SpriteButton[] = [];
   private overlayTiles: Phaser.GameObjects.Graphics[] = [];
   private actionStack: ActionStackEntry[] = [];
   private currentUnit: Unit | undefined;
@@ -71,57 +75,59 @@ export default class TurnCommandPanel {
   }
 
   private drawPanelButtons(unit: Unit): void {
-    const panelX =
-      GAME_CONTROL_REGION_X + (GAME_CONTROL_REGION_WIDTH - TURN_COMMAND_PANEL_WIDTH) / 2;
-    const panelY =
-      GAME_CONTROL_REGION_HEIGHT - TURN_COMMAND_PANEL_HEIGHT - TURN_COMMAND_PANEL_BOTTOM_MARGIN;
+    const centerX = GAME_CONTROL_REGION_X + GAME_CONTROL_REGION_WIDTH / 2;
+    const { height: buttonHeight } = buttonFrameSize(this.scene);
+    const stackHeight = turnCommandPanelHeight(this.scene);
+    const panelBottomY = GAME_CONTROL_REGION_HEIGHT - TURN_COMMAND_PANEL_BOTTOM_MARGIN;
+    const firstCenterY = panelBottomY - stackHeight + buttonHeight / 2;
 
-    this.drawButton(panelX, panelY, 'Move', !unit.hasMoved, () => {
-      void this.onActionButtonClick('move');
-    });
     this.drawButton(
-      panelX + PANEL_BUTTON_WIDTH + PANEL_BUTTON_SPACING,
-      panelY,
-      'Bomb',
+      centerX,
+      firstCenterY,
+      BUTTON_LABEL_MOVE,
+      !unit.hasMoved,
+      buttonHeight,
+      0,
+      () => {
+        void this.onActionButtonClick('move');
+      }
+    );
+    this.drawButton(
+      centerX,
+      firstCenterY,
+      BUTTON_LABEL_BOMB,
       !unit.hasUsedSkill,
+      buttonHeight,
+      1,
       () => {
         void this.onActionButtonClick('placeBomb');
       }
     );
-    this.drawButton(
-      panelX + PANEL_BUTTON_WIDTH + PANEL_BUTTON_SPACING,
-      panelY + PANEL_BUTTON_HEIGHT + PANEL_BUTTON_SPACING,
-      'Back',
-      true,
-      () => this.onBackButtonClick()
+    this.drawButton(centerX, firstCenterY, BUTTON_LABEL_BACK, true, buttonHeight, 2, () =>
+      this.onBackButtonClick()
     );
   }
 
   private drawButton(
-    x: number,
-    y: number,
-    label: string,
+    centerX: number,
+    firstCenterY: number,
+    labelKey: string,
     enabled: boolean,
+    buttonHeight: number,
+    row: number,
     onClick: () => void
   ): void {
-    const style = {
-      fillColor: enabled ? PANEL_BUTTON_FILL_COLOR : DISABLED_BUTTON_COLOR,
-      fillAlpha: PANEL_BUTTON_FILL_ALPHA,
-      borderColor: enabled ? PANEL_BUTTON_BORDER_COLOR : DISABLED_BUTTON_COLOR,
-      borderWidth: PANEL_BUTTON_BORDER_WIDTH,
-    };
-    const objects = drawPillButton(
-      this.scene,
-      x,
-      y,
-      PANEL_BUTTON_WIDTH,
-      PANEL_BUTTON_HEIGHT,
-      label,
-      style,
-      DEPTH_TURN_COMMAND_PANEL,
-      enabled ? onClick : undefined
+    const y = verticalButtonY(firstCenterY, row, buttonHeight, SPRITE_BUTTON_ROW_SPACING);
+    this.panelObjects.push(
+      new SpriteButton(this.scene, {
+        x: centerX,
+        y,
+        labelKey,
+        depth: DEPTH_TURN_COMMAND_PANEL,
+        enabled,
+        onClick,
+      })
     );
-    this.panelObjects.push(...objects);
   }
 
   // Disabled while ConfirmDialog is open — "No" is the only rollback path.

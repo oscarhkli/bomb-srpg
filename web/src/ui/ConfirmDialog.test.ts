@@ -1,11 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mockScene } from '../test/setup';
-import { allGraphics, clickPointerdown, firstText } from '../test/sceneHelpers';
+import { allContainers, allGraphics, clickPointerdown, firstText } from '../test/sceneHelpers';
 import {
   CONFIRM_DIALOG_DIM_ALPHA,
   CONFIRM_DIALOG_DIM_COLOR,
   CONFIRM_DIALOG_WIDTH,
   CONFIRM_DIALOG_HEIGHT,
+  BUTTON_LABEL_YES,
+  BUTTON_LABEL_NO,
 } from '../constants';
 import ConfirmDialog from './ConfirmDialog';
 
@@ -64,12 +66,38 @@ describe('ConfirmDialog', () => {
     );
   });
 
+  it('stacks Yes above No, both SpriteButtons, centered on the dialog', () => {
+    const dialog = new ConfirmDialog(mockScene as never);
+
+    dialog.show(vi.fn(), vi.fn(), 'Confirm?');
+
+    expect(allContainers()).toHaveLength(2);
+    expect(mockScene.add.image).toHaveBeenCalledWith(
+      0,
+      0,
+      BUTTON_LABEL_YES,
+      `${BUTTON_LABEL_YES}-frame`
+    );
+    expect(mockScene.add.image).toHaveBeenCalledWith(
+      0,
+      0,
+      BUTTON_LABEL_NO,
+      `${BUTTON_LABEL_NO}-frame`
+    );
+    const [yesContainer, noContainer] = allContainers();
+    const centerX = mockScene.add.container.mock.calls[0]![0]!;
+    expect(mockScene.add.container).toHaveBeenNthCalledWith(1, centerX, expect.any(Number));
+    expect(mockScene.add.container).toHaveBeenNthCalledWith(2, centerX, expect.any(Number));
+    expect(noContainer!.y).toBeGreaterThan(yesContainer!.y);
+  });
+
   it('pins every dialog element to the camera viewport (scrollFactor 0) so it stays screen-centered regardless of camera scroll', () => {
     const dialog = new ConfirmDialog(mockScene as never);
 
     dialog.show(vi.fn(), vi.fn(), 'Confirm?');
 
     allGraphics().forEach(g => expect(g.setScrollFactor).toHaveBeenCalledWith(0));
+    allContainers().forEach(c => expect(c.setScrollFactor).toHaveBeenCalledWith(0));
     expect(firstText().setScrollFactor).toHaveBeenCalledWith(0);
   });
 
@@ -80,9 +108,8 @@ describe('ConfirmDialog', () => {
 
     dialog.show(onYes, onNo, 'Confirm?');
 
-    // graphics results: [0]=dim bg, [1]=Yes button graphics, [2]=No button graphics
-    const [, yesButtonGraphics] = allGraphics();
-    clickPointerdown(yesButtonGraphics!);
+    const [yesButtonContainer] = allContainers();
+    clickPointerdown(yesButtonContainer!);
 
     expect(onYes).toHaveBeenCalledOnce();
     expect(onNo).not.toHaveBeenCalled();
@@ -96,8 +123,8 @@ describe('ConfirmDialog', () => {
 
     dialog.show(onYes, onNo, 'Confirm?');
 
-    const [, , noButtonGraphics] = allGraphics();
-    clickPointerdown(noButtonGraphics!);
+    const [, noButtonContainer] = allContainers();
+    clickPointerdown(noButtonContainer!);
 
     expect(onNo).toHaveBeenCalledOnce();
     expect(onYes).not.toHaveBeenCalled();
@@ -111,6 +138,7 @@ describe('ConfirmDialog', () => {
     dialog.hide();
 
     allGraphics().forEach(g => expect(g.destroy).toHaveBeenCalled());
+    allContainers().forEach(c => expect(c.destroy).toHaveBeenCalled());
     expect(dialog.isOpen).toBe(false);
   });
 });

@@ -1,8 +1,10 @@
 ---
-title: "Phase 4.6: Swapping Sprites for Buttons in TurnCommandPanel and ConfirmDialog in MatchScene"
+title: "Phase 4.7: Auto Resize Canvas"
 ---
 
-# Phase 4.6: Swapping Sprites for Buttons in TurnCommandPanel and ConfirmDialog in MatchScene
+# Phase 4.7: Auto Resize Canvas
+
+**Skip all the things below - copy-and-paste only.**
 
 ## Context
 

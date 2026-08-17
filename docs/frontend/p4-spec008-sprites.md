@@ -1,8 +1,10 @@
 ---
-title: "Phase 4.6: Swapping Sprites for Buttons in TurnCommandPanel and ConfirmDialog in MatchScene"
+title: "Phase 4.8: Swapping Sprites for Existing Vector Graphics in MatchSummaryPanel"
 ---
 
-# Phase 4.6: Swapping Sprites for Buttons in TurnCommandPanel and ConfirmDialog in MatchScene
+# Phase 4.8: Swapping Sprites for Existing Vector Graphics in MatchSummaryPanel
+
+**Skip all the things below - copy-and-paste only.**
 
 ## Context
 

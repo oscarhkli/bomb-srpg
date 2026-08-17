@@ -1,22 +1,22 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mockScene } from '../test/setup';
-import { allGraphics, allTexts, clickPointerdown } from '../test/sceneHelpers';
-import { makeUnit } from '../test/fixtures';
+import { allContainers, allGraphics, clickPointerdown } from '../test/sceneHelpers';
 import {
-  PANEL_BUTTON_FILL_COLOR,
-  PANEL_BUTTON_FILL_ALPHA,
-  PANEL_BUTTON_BORDER_COLOR,
-  PANEL_BUTTON_BORDER_WIDTH,
-  PANEL_BUTTON_WIDTH,
-  PANEL_BUTTON_HEIGHT,
-  DISABLED_BUTTON_COLOR,
-  GAME_FONT_FAMILY,
+  GAME_CONTROL_REGION_X,
+  GAME_CONTROL_REGION_WIDTH,
+  GAME_CONTROL_REGION_HEIGHT,
+  TURN_COMMAND_PANEL_BOTTOM_MARGIN,
+  SPRITE_BUTTON_ROW_SPACING,
+  BUTTON_LABEL_MOVE,
+  BUTTON_LABEL_BOMB,
+  BUTTON_LABEL_BACK,
   ALLOWED_TILE_MOVE_COLOR,
   ALLOWED_TILE_MOVE_ALPHA,
   ALLOWED_TILE_BOMB_COLOR,
 } from '../constants';
 import TurnCommandPanel from './TurnCommandPanel';
 import type { Coordinate, TurnCmdType } from '../types/api';
+import { makeUnit } from '../test/fixtures';
 
 function makePanel(overrides: Partial<Record<string, unknown>> = {}) {
   const defaultGetAllowedTiles = vi.fn<
@@ -64,76 +64,67 @@ beforeEach(() => {
 });
 
 describe('TurnCommandPanel', () => {
-  it('is 144x144, bottom-center of GameControlRegion, with a 2px bottom margin', () => {
+  it('stacks Move/Bomb/Back centered in GameControlRegion, bottom-anchored with a 40px margin', () => {
     const { panel } = makePanel();
 
     panel.openFor(makeUnit());
 
-    // Independent literals — GameControlRegion is 480..640x0..360, panel is 144x144: centers to
-    // x=488, bottom-aligns with a 2px margin to y=214.
-    const [moveButtonGraphics] = allGraphics();
-    expect(moveButtonGraphics!.fillRoundedRect).toHaveBeenCalledWith(
-      488,
-      214,
-      PANEL_BUTTON_WIDTH,
-      PANEL_BUTTON_HEIGHT,
-      expect.any(Number)
+    // GameControlRegion is 480..640 wide (centerX=560); the mocked button_neutral frame is
+    // 100x100, so the 3-row stack (with 4px gaps) is 308 tall, bottom-anchored 40px above y=360.
+    const centerX = GAME_CONTROL_REGION_X + GAME_CONTROL_REGION_WIDTH / 2;
+    const buttonHeight = 100;
+    const stackHeight = 3 * buttonHeight + 2 * SPRITE_BUTTON_ROW_SPACING;
+    const panelBottomY = GAME_CONTROL_REGION_HEIGHT - TURN_COMMAND_PANEL_BOTTOM_MARGIN;
+    const firstCenterY = panelBottomY - stackHeight + buttonHeight / 2;
+
+    expect(mockScene.add.container).toHaveBeenNthCalledWith(1, centerX, firstCenterY);
+    expect(mockScene.add.container).toHaveBeenNthCalledWith(
+      2,
+      centerX,
+      firstCenterY + buttonHeight + SPRITE_BUTTON_ROW_SPACING
+    );
+    expect(mockScene.add.container).toHaveBeenNthCalledWith(
+      3,
+      centerX,
+      firstCenterY + 2 * (buttonHeight + SPRITE_BUTTON_ROW_SPACING)
     );
   });
 
-  it('draws three pill buttons styled per spec when opened for a fresh unit', () => {
+  it('draws three SpriteButtons with the Move/Bomb/Back labels when opened for a fresh unit', () => {
     const { panel } = makePanel();
 
     panel.openFor(makeUnit());
 
-    const graphics = allGraphics();
-    expect(graphics).toHaveLength(3); // moveButton, placeBombButton, backButton
-    graphics.forEach(g => {
-      expect(g.fillStyle).toHaveBeenCalledWith(PANEL_BUTTON_FILL_COLOR, PANEL_BUTTON_FILL_ALPHA);
-      expect(g.lineStyle).toHaveBeenCalledWith(
-        PANEL_BUTTON_BORDER_WIDTH,
-        PANEL_BUTTON_BORDER_COLOR,
-        1
-      );
-    });
-
-    expect(allTexts()).toHaveLength(3);
-    expect(mockScene.add.text).toHaveBeenCalledWith(
-      expect.any(Number),
-      expect.any(Number),
-      'Move',
-      expect.objectContaining({ fontFamily: GAME_FONT_FAMILY })
+    expect(allContainers()).toHaveLength(3);
+    expect(mockScene.add.image).toHaveBeenCalledWith(
+      0,
+      0,
+      BUTTON_LABEL_MOVE,
+      `${BUTTON_LABEL_MOVE}-frame`
     );
-    expect(mockScene.add.text).toHaveBeenCalledWith(
-      expect.any(Number),
-      expect.any(Number),
-      'Bomb',
-      expect.objectContaining({ fontFamily: GAME_FONT_FAMILY })
+    expect(mockScene.add.image).toHaveBeenCalledWith(
+      0,
+      0,
+      BUTTON_LABEL_BOMB,
+      `${BUTTON_LABEL_BOMB}-frame`
     );
-    expect(mockScene.add.text).toHaveBeenCalledWith(
-      expect.any(Number),
-      expect.any(Number),
-      'Back',
-      expect.objectContaining({ fontFamily: GAME_FONT_FAMILY })
+    expect(mockScene.add.image).toHaveBeenCalledWith(
+      0,
+      0,
+      BUTTON_LABEL_BACK,
+      `${BUTTON_LABEL_BACK}-frame`
     );
   });
 
-  it('renders moveButton disabled (gray, non-interactive) when unit.hasMoved is true', () => {
+  it('renders moveButton disabled (desaturated, non-interactive) when unit.hasMoved is true', () => {
     const { panel } = makePanel();
 
     panel.openFor(makeUnit({ hasMoved: true }));
 
-    const [moveButtonGraphics] = allGraphics();
-    expect(moveButtonGraphics!.fillStyle).toHaveBeenCalledWith(
-      DISABLED_BUTTON_COLOR,
-      PANEL_BUTTON_FILL_ALPHA
-    );
-    expect(moveButtonGraphics!.lineStyle).toHaveBeenCalledWith(
-      PANEL_BUTTON_BORDER_WIDTH,
-      DISABLED_BUTTON_COLOR,
-      1
-    );
-    expect(moveButtonGraphics!.setInteractive).not.toHaveBeenCalled();
+    const [moveButtonContainer] = allContainers();
+    expect(moveButtonContainer!.disableInteractive).toHaveBeenCalled();
+    expect(moveButtonContainer!.filters.internal.addColorMatrix).toHaveBeenCalled();
+    expect(moveButtonContainer!.on).not.toHaveBeenCalledWith('pointerdown', expect.any(Function));
   });
 
   it('renders placeBombButton disabled when unit.hasUsedSkill is true', () => {
@@ -141,23 +132,18 @@ describe('TurnCommandPanel', () => {
 
     panel.openFor(makeUnit({ hasUsedSkill: true }));
 
-    const [, placeBombButtonGraphics] = allGraphics();
-    expect(placeBombButtonGraphics!.fillStyle).toHaveBeenCalledWith(
-      DISABLED_BUTTON_COLOR,
-      PANEL_BUTTON_FILL_ALPHA
-    );
-    expect(placeBombButtonGraphics!.setInteractive).not.toHaveBeenCalled();
+    const [, placeBombButtonContainer] = allContainers();
+    expect(placeBombButtonContainer!.disableInteractive).toHaveBeenCalled();
   });
 
   it('hides the panel when backButton is clicked with nothing to roll back', () => {
     const { panel } = makePanel();
     panel.openFor(makeUnit());
 
-    const [, , backButtonGraphics] = allGraphics();
-    clickPointerdown(backButtonGraphics!);
+    const [, , backButtonContainer] = allContainers();
+    clickPointerdown(backButtonContainer!);
 
-    allGraphics().forEach(g => expect(g.destroy).toHaveBeenCalled());
-    allTexts().forEach(t => expect(t.destroy).toHaveBeenCalled());
+    allContainers().forEach(c => expect(c.destroy).toHaveBeenCalled());
   });
 
   it('closeImmediately destroys every panel object', () => {
@@ -166,18 +152,17 @@ describe('TurnCommandPanel', () => {
 
     panel.closeImmediately();
 
-    allGraphics().forEach(g => expect(g.destroy).toHaveBeenCalled());
-    allTexts().forEach(t => expect(t.destroy).toHaveBeenCalled());
+    allContainers().forEach(c => expect(c.destroy).toHaveBeenCalled());
   });
 
   it('re-opening for a different unit closes the previous panel first', () => {
     const { panel } = makePanel();
     panel.openFor(makeUnit({ id: 1 }));
-    const firstButtons = allGraphics();
+    const firstButtons = allContainers();
 
     panel.openFor(makeUnit({ id: 2 }));
 
-    firstButtons.forEach(g => expect(g.destroy).toHaveBeenCalled());
+    firstButtons.forEach(c => expect(c.destroy).toHaveBeenCalled());
   });
 
   it('fetches and renders allowedTiles with move styling when moveButton is clicked', async () => {
@@ -191,13 +176,13 @@ describe('TurnCommandPanel', () => {
     const unit = makeUnit({ id: 5 });
     panel.openFor(unit);
 
-    const [moveButtonGraphics] = allGraphics();
-    clickPointerdown(moveButtonGraphics!);
+    const [moveButtonContainer] = allContainers();
+    clickPointerdown(moveButtonContainer!);
     await Promise.resolve();
     await Promise.resolve();
 
     expect(getAllowedTiles).toHaveBeenCalledWith(5, 'move');
-    const overlayGraphics = allGraphics().slice(3); // after the 3 panel buttons
+    const overlayGraphics = allGraphics();
     expect(overlayGraphics).toHaveLength(2);
     overlayGraphics.forEach(g => {
       expect(g.fillStyle).toHaveBeenCalledWith(ALLOWED_TILE_MOVE_COLOR, ALLOWED_TILE_MOVE_ALPHA);
@@ -209,20 +194,20 @@ describe('TurnCommandPanel', () => {
     const { panel } = makePanel({ getAllowedTiles: vi.fn().mockResolvedValue(tiles) });
     panel.openFor(makeUnit());
 
-    const [moveButtonGraphics, , backButtonGraphics] = allGraphics();
-    clickPointerdown(moveButtonGraphics!);
+    const [moveButtonContainer, , backButtonContainer] = allContainers();
+    clickPointerdown(moveButtonContainer!);
     await Promise.resolve();
     await Promise.resolve();
 
-    const overlayGraphics = allGraphics().slice(3);
+    const overlayGraphics = allGraphics();
     expect(overlayGraphics).toHaveLength(1);
 
-    clickPointerdown(backButtonGraphics!);
+    clickPointerdown(backButtonContainer!);
 
     overlayGraphics.forEach(g => expect(g.destroy).toHaveBeenCalled());
     // The panel's own 3 buttons are untouched — only the overlay was popped, not the whole panel.
-    [moveButtonGraphics, backButtonGraphics].forEach(g =>
-      expect(g!.destroy).not.toHaveBeenCalled()
+    [moveButtonContainer, backButtonContainer].forEach(c =>
+      expect(c!.destroy).not.toHaveBeenCalled()
     );
   });
 
@@ -234,13 +219,13 @@ describe('TurnCommandPanel', () => {
     const unit = makeUnit({ id: 5 });
     panel.openFor(unit);
 
-    const [, placeBombButtonGraphics] = allGraphics();
-    clickPointerdown(placeBombButtonGraphics!);
+    const [, placeBombButtonContainer] = allContainers();
+    clickPointerdown(placeBombButtonContainer!);
     await Promise.resolve();
     await Promise.resolve();
 
     expect(getAllowedTiles).toHaveBeenCalledWith(5, 'placeBomb');
-    const [overlayGraphics] = allGraphics().slice(3);
+    const [overlayGraphics] = allGraphics();
     expect(overlayGraphics!.fillStyle).toHaveBeenCalledWith(
       ALLOWED_TILE_BOMB_COLOR,
       expect.any(Number)
@@ -253,13 +238,13 @@ describe('TurnCommandPanel', () => {
     });
     panel.openFor(makeUnit());
 
-    const [moveButtonGraphics] = allGraphics();
-    clickPointerdown(moveButtonGraphics!);
+    const [moveButtonContainer] = allContainers();
+    clickPointerdown(moveButtonContainer!);
     await Promise.resolve();
     await Promise.resolve();
 
     expect(onError).toHaveBeenCalledWith('network down');
-    expect(allGraphics()).toHaveLength(3); // only the 3 panel buttons, no overlay
+    expect(allGraphics()).toHaveLength(0); // no overlay tiles drawn
   });
 
   it('calls showConfirm with a target-bound onYes; invoking it calls onConfirmedSubmit', async () => {
@@ -270,12 +255,12 @@ describe('TurnCommandPanel', () => {
     const unit = makeUnit({ id: 9 });
     panel.openFor(unit);
 
-    const [moveButtonGraphics] = allGraphics();
-    clickPointerdown(moveButtonGraphics!);
+    const [moveButtonContainer] = allContainers();
+    clickPointerdown(moveButtonContainer!);
     await Promise.resolve();
     await Promise.resolve();
 
-    const [overlayTileGraphics] = allGraphics().slice(3);
+    const [overlayTileGraphics] = allGraphics();
     clickPointerdown(overlayTileGraphics!);
 
     expect(showConfirm).toHaveBeenCalledWith(expect.any(Function), expect.any(Function));
@@ -297,12 +282,12 @@ describe('TurnCommandPanel', () => {
     });
     panel.openFor(makeUnit({ id: 9 }));
 
-    const [moveButtonGraphics] = allGraphics();
-    clickPointerdown(moveButtonGraphics!);
+    const [moveButtonContainer] = allContainers();
+    clickPointerdown(moveButtonContainer!);
     await Promise.resolve();
     await Promise.resolve();
 
-    const [firstTile, secondTile] = allGraphics().slice(3);
+    const [firstTile, secondTile] = allGraphics();
     clickPointerdown(firstTile!);
     expect(showConfirm).toHaveBeenCalledTimes(1);
 
@@ -319,12 +304,12 @@ describe('TurnCommandPanel', () => {
     const unit = makeUnit({ id: 9 });
     panel.openFor(unit);
 
-    const [moveButtonGraphics] = allGraphics();
-    clickPointerdown(moveButtonGraphics!);
+    const [moveButtonContainer] = allContainers();
+    clickPointerdown(moveButtonContainer!);
     await Promise.resolve();
     await Promise.resolve();
 
-    const [overlayTileGraphics] = allGraphics().slice(3);
+    const [overlayTileGraphics] = allGraphics();
     clickPointerdown(overlayTileGraphics!);
 
     const { onNo } = latestConfirmCallbacks(showConfirm);
@@ -336,8 +321,9 @@ describe('TurnCommandPanel', () => {
     // (not this class) is what makes the re-fetch a no-op network-wise in the real app.
     expect(getAllowedTiles).toHaveBeenCalledTimes(2);
     expect(overlayTileGraphics!.destroy).toHaveBeenCalled();
-    const newOverlayGraphics = allGraphics().slice(4).at(-1);
+    const newOverlayGraphics = allGraphics().at(-1);
     expect(newOverlayGraphics).toBeDefined();
+    expect(newOverlayGraphics).not.toBe(overlayTileGraphics);
   });
 
   describe('isLocked guard (spec003-log issue #4 / spec008 interaction lock contract)', () => {
@@ -346,9 +332,9 @@ describe('TurnCommandPanel', () => {
       const { panel, getAllowedTiles } = makePanel({ isLocked });
       panel.openFor(makeUnit());
 
-      const [moveButtonGraphics, placeBombButtonGraphics] = allGraphics();
-      clickPointerdown(moveButtonGraphics!);
-      clickPointerdown(placeBombButtonGraphics!);
+      const [moveButtonContainer, placeBombButtonContainer] = allContainers();
+      clickPointerdown(moveButtonContainer!);
+      clickPointerdown(placeBombButtonContainer!);
       await Promise.resolve();
       await Promise.resolve();
 
@@ -360,13 +346,13 @@ describe('TurnCommandPanel', () => {
       const isLocked = vi.fn(() => false);
       const { panel } = makePanel({ isLocked, getAllowedTiles: vi.fn().mockResolvedValue(tiles) });
       panel.openFor(makeUnit());
-      const [, , backButtonGraphics] = allGraphics();
+      const [, , backButtonContainer] = allContainers();
 
       isLocked.mockReturnValue(true);
-      clickPointerdown(backButtonGraphics!);
+      clickPointerdown(backButtonContainer!);
 
       // Still open — a locked Back click must be a no-op, not close/pop the panel.
-      allGraphics().forEach(g => expect(g.destroy).not.toHaveBeenCalled());
+      allContainers().forEach(c => expect(c.destroy).not.toHaveBeenCalled());
     });
 
     it('ignores an allowed-tile click while locked', async () => {
@@ -377,11 +363,11 @@ describe('TurnCommandPanel', () => {
         getAllowedTiles: vi.fn().mockResolvedValue([target]),
       });
       panel.openFor(makeUnit());
-      const [moveButtonGraphics] = allGraphics();
-      clickPointerdown(moveButtonGraphics!);
+      const [moveButtonContainer] = allContainers();
+      clickPointerdown(moveButtonContainer!);
       await Promise.resolve();
       await Promise.resolve();
-      const [overlayTileGraphics] = allGraphics().slice(3);
+      const [overlayTileGraphics] = allGraphics();
 
       isLocked.mockReturnValue(true);
       clickPointerdown(overlayTileGraphics!);

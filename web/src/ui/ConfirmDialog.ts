@@ -6,19 +6,17 @@ import {
   CONFIRM_DIALOG_WIDTH,
   DEPTH_CONFIRM_DIALOG,
   GAME_FONT_FAMILY,
-  PANEL_BUTTON_BORDER_COLOR,
-  PANEL_BUTTON_BORDER_WIDTH,
-  PANEL_BUTTON_FILL_ALPHA,
-  PANEL_BUTTON_FILL_COLOR,
-  PANEL_BUTTON_HEIGHT,
-  PANEL_BUTTON_WIDTH,
+  BUTTON_LABEL_YES,
+  BUTTON_LABEL_NO,
+  SPRITE_BUTTON_ROW_SPACING,
 } from '../constants';
-import { drawPillButton } from './pillButton';
+import SpriteButton, { buttonFrameSize } from './spriteButton';
+import { verticalButtonY } from './pillButton';
 
 const DIALOG_MARGIN = 12;
 
 export default class ConfirmDialog {
-  private objects: Phaser.GameObjects.GameObject[] = [];
+  private objects: { destroy(): void }[] = [];
 
   constructor(private readonly scene: Phaser.Scene) {}
 
@@ -49,49 +47,42 @@ export default class ConfirmDialog {
     promptText.setScrollFactor(0);
     this.objects.push(promptText);
 
-    const buttonY = y + CONFIRM_DIALOG_HEIGHT - PANEL_BUTTON_HEIGHT - DIALOG_MARGIN;
-    const buttonStyle = {
-      fillColor: PANEL_BUTTON_FILL_COLOR,
-      fillAlpha: PANEL_BUTTON_FILL_ALPHA,
-      borderColor: PANEL_BUTTON_BORDER_COLOR,
-      borderWidth: PANEL_BUTTON_BORDER_WIDTH,
-    };
+    const centerX = width / 2;
+    const { height: buttonHeight } = buttonFrameSize(this.scene);
+    const stackHeight = 2 * buttonHeight + SPRITE_BUTTON_ROW_SPACING;
+    const firstCenterY = y + CONFIRM_DIALOG_HEIGHT - DIALOG_MARGIN - stackHeight + buttonHeight / 2;
 
     this.objects.push(
-      ...drawPillButton(
-        this.scene,
-        x + DIALOG_MARGIN,
-        buttonY,
-        PANEL_BUTTON_WIDTH,
-        PANEL_BUTTON_HEIGHT,
-        'Yes',
-        buttonStyle,
-        DEPTH_CONFIRM_DIALOG,
-        () => {
-          this.hide();
-          onYes();
-        },
-        0
-      )
+      this.createButton(centerX, firstCenterY, BUTTON_LABEL_YES, () => {
+        this.hide();
+        onYes();
+      })
     );
 
     this.objects.push(
-      ...drawPillButton(
-        this.scene,
-        x + CONFIRM_DIALOG_WIDTH - PANEL_BUTTON_WIDTH - DIALOG_MARGIN,
-        buttonY,
-        PANEL_BUTTON_WIDTH,
-        PANEL_BUTTON_HEIGHT,
-        'No',
-        buttonStyle,
-        DEPTH_CONFIRM_DIALOG,
+      this.createButton(
+        centerX,
+        verticalButtonY(firstCenterY, 1, buttonHeight, SPRITE_BUTTON_ROW_SPACING),
+        BUTTON_LABEL_NO,
         () => {
           this.hide();
           onNo();
-        },
-        0
+        }
       )
     );
+  }
+
+  private createButton(x: number, y: number, labelKey: string, onClick: () => void): SpriteButton {
+    const button = new SpriteButton(this.scene, {
+      x,
+      y,
+      labelKey,
+      depth: DEPTH_CONFIRM_DIALOG,
+      enabled: true,
+      onClick,
+    });
+    button.container.setScrollFactor(0);
+    return button;
   }
 
   hide(): void {

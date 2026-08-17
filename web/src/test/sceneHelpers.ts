@@ -86,6 +86,44 @@ export function clickPointerdown(g: { on: { mock: { calls: unknown[][] } } }): v
   pointerDownOf(g)();
 }
 
+// Finds and invokes a mock's listener for an arbitrary pointer event (pointerover, pointerout,
+// pointerup, pointerupoutside, ...).
+export function firePointerEvent(g: { on: { mock: { calls: unknown[][] } } }, event: string): void {
+  const call = g.on.mock.calls.find(c => c[0] === event);
+  if (!call) {
+    throw new Error(`no listener registered for "${event}"`);
+  }
+  (call[1] as () => void)();
+}
+
+export function containerAt(index: number): ReturnType<typeof mockScene.add.container> {
+  return mockScene.add.container.mock.results[index]!.value as ReturnType<
+    typeof mockScene.add.container
+  >;
+}
+
+export function allContainers(): ReturnType<typeof mockScene.add.container>[] {
+  return mockScene.add.container.mock.results.map(
+    r => r.value as ReturnType<typeof mockScene.add.container>
+  );
+}
+
+// Last `n` Container instances created so far, in creation order — mirrors lastGraphics(n) for
+// the SpriteButton-backed TurnCommandPanel/ConfirmDialog buttons.
+export function lastContainers(n: number): ReturnType<typeof mockScene.add.container>[] {
+  return allContainers().slice(-n);
+}
+
+export function imageAt(index: number): ReturnType<typeof mockScene.add.image> {
+  return mockScene.add.image.mock.results[index]!.value as ReturnType<typeof mockScene.add.image>;
+}
+
+export function allImages(): ReturnType<typeof mockScene.add.image>[] {
+  return mockScene.add.image.mock.results.map(
+    r => r.value as ReturnType<typeof mockScene.add.image>
+  );
+}
+
 export function tweenConfigAt(index: number): unknown {
   return mockScene.tweens.add.mock.calls[index]![0];
 }

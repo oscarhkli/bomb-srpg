@@ -28,7 +28,7 @@ Specs will be written prior to development—partly handcrafted, and partly gene
 | [Phase 4.3: Adopt Pixel Art Stage Backgrounds for MatchScene](p4-spec003-sprites.md) | Sprites | Done | 2026-08-14 |
 | [Phase 4.4: Swapping Sprites for Existing Vector Graphics in MatchSettingsScene](p4-spec004-sprites.md) | Sprites | Done | 2026-08-14 |
 | [Phase 4.5: Resize Canvas to 640x360](p4-spec005-canvas.md) | Canvas | Done | 2026-08-15 |
-| [Phase 4.6: Swapping Sprites for Buttons in TurnCommandPanel and ConfirmDialog in MatchScene](p4-spec006-sprites.md) | Sprites | Ready | — |
+| [Phase 4.6: Swapping Sprites for Buttons in TurnCommandPanel and ConfirmDialog in MatchScene](p4-spec006-sprites.md) | Sprites | Done | 2026-08-16 |
 | [Phase 5.x: Render Camera Navigation](p5-spec020-match.md) | match | Parked Draft | — |
 <!-- END SPEC TABLE -->
 

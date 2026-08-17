@@ -22,7 +22,6 @@ import {
   TURN_PANEL_TOP_MARGIN,
   TURN_PANEL_HEIGHT,
   GAME_CONTROL_REGION_HEIGHT,
-  TURN_COMMAND_PANEL_HEIGHT,
   TURN_COMMAND_PANEL_BOTTOM_MARGIN,
   CONFIRM_DIALOG_DIM_COLOR,
   CONFIRM_DIALOG_DIM_ALPHA,
@@ -33,6 +32,7 @@ import {
   DISABLED_BUTTON_COLOR,
 } from '../constants';
 import MatchSummaryPanel from './MatchSummaryPanel';
+import { turnCommandPanelHeight } from './TurnCommandPanel';
 
 function makePanel(overrides: Partial<Record<string, unknown>> = {}) {
   const callbacks = {
@@ -50,6 +50,16 @@ function makePanel(overrides: Partial<Record<string, unknown>> = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // button_neutral's real trimmed frame size (130x40) — this file's own gap-math tests need a
+  // realistic button height, not the generic 100x100 default other tests rely on.
+  mockScene.textures.getFrame.mockReturnValue({
+    x: 0,
+    y: 0,
+    width: 130,
+    height: 40,
+    realWidth: 130,
+    realHeight: 40,
+  });
 });
 
 describe('MatchSummaryPanel button', () => {
@@ -63,7 +73,7 @@ describe('MatchSummaryPanel button', () => {
     // sits between. Independent literals, not the same expression the code computes.
     expect(button.fillRoundedRect).toHaveBeenCalledWith(
       536,
-      108,
+      97,
       MATCH_SUMMARY_BUTTON_SIZE,
       MATCH_SUMMARY_BUTTON_SIZE,
       expect.any(Number)
@@ -88,7 +98,9 @@ describe('MatchSummaryPanel button', () => {
     const buttonBottom = buttonTop + MATCH_SUMMARY_BUTTON_SIZE;
     const turnPanelBottom = TURN_PANEL_TOP_MARGIN + TURN_PANEL_HEIGHT;
     const turnCommandPanelTop =
-      GAME_CONTROL_REGION_HEIGHT - TURN_COMMAND_PANEL_HEIGHT - TURN_COMMAND_PANEL_BOTTOM_MARGIN;
+      GAME_CONTROL_REGION_HEIGHT -
+      turnCommandPanelHeight(mockScene as never) -
+      TURN_COMMAND_PANEL_BOTTOM_MARGIN;
     expect(buttonTop).toBeGreaterThanOrEqual(turnPanelBottom);
     expect(buttonBottom).toBeLessThanOrEqual(turnCommandPanelTop);
   });

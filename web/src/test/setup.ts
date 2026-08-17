@@ -67,8 +67,19 @@ export function createMockContainer(x = 0, y = 0) {
   return {
     x,
     y,
+    add: vi.fn().mockReturnThis(),
+    setSize: vi.fn().mockReturnThis(),
     setDepth: vi.fn().mockReturnThis(),
+    setScrollFactor: vi.fn().mockReturnThis(),
     setInteractive: vi.fn().mockReturnThis(),
+    disableInteractive: vi.fn().mockReturnThis(),
+    enableFilters: vi.fn().mockReturnThis(),
+    filters: {
+      internal: {
+        addColorMatrix: vi.fn(() => ({ colorMatrix: { desaturate: vi.fn() } })),
+        clear: vi.fn(),
+      },
+    },
     on: vi.fn().mockReturnThis(),
     off: vi.fn().mockReturnThis(),
     destroy: vi.fn(),
@@ -84,6 +95,7 @@ export function createMockImage(x = 0, y = 0) {
     setOrigin: vi.fn().mockReturnThis(),
     setDepth: vi.fn().mockReturnThis(),
     setScrollFactor: vi.fn().mockReturnThis(),
+    setTexture: vi.fn().mockReturnThis(),
     destroy: vi.fn(),
   };
 }

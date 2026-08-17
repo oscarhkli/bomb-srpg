@@ -17,8 +17,24 @@ export const UNIT_SPRITE_MANIFEST: SpriteManifestEntry[] = [
   { key: 'unit_witch_red', png: 'units/Witch-Red.png', json: 'units/Witch-Red.json' },
 ];
 
+export const BUTTON_SPRITE_MANIFEST: SpriteManifestEntry[] = [
+  { key: 'button_neutral', png: 'buttons/Button-Neutral.png', json: 'buttons/Button-Neutral.json' },
+  {
+    key: 'button_selected',
+    png: 'buttons/Button-Selected.png',
+    json: 'buttons/Button-Selected.json',
+  },
+  { key: 'button_clicked', png: 'buttons/Button-Clicked.png', json: 'buttons/Button-Clicked.json' },
+  { key: 'button_label_move', png: 'buttons/Button-Move.png', json: 'buttons/Button-Move.json' },
+  { key: 'button_label_bomb', png: 'buttons/Button-Bomb.png', json: 'buttons/Button-Bomb.json' },
+  { key: 'button_label_back', png: 'buttons/Button-Back.png', json: 'buttons/Button-Back.json' },
+  { key: 'button_label_yes', png: 'buttons/Button-Yes.png', json: 'buttons/Button-Yes.json' },
+  { key: 'button_label_no', png: 'buttons/Button-No.png', json: 'buttons/Button-No.json' },
+];
+
 export const SPRITE_MANIFEST: SpriteManifestEntry[] = [
   ...UNIT_SPRITE_MANIFEST,
+  ...BUTTON_SPRITE_MANIFEST,
   { key: 'bomb', png: 'Bomb.png', json: 'Bomb.json' },
   { key: 'soft_block', png: 'SoftBlock.png', json: 'SoftBlock.json' },
   { key: 'stage_plain', png: 'stages/Stage-Plain.png', json: 'stages/Stage-Plain.json' },
