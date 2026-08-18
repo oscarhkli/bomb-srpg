@@ -292,6 +292,36 @@ func TestInitGameState_Suite(t *testing.T) {
 			expectedTotalUnits: 3,
 		},
 		{
+			name: "Success: Multiple Boss type Archetypes",
+			cfg: GameCfg{
+				StagePreset: "Plain",
+				P1Teams:     []string{"Prologue", "Prologue"},
+				P2Teams:     []string{"King", "Fighter"},
+			},
+			expectError:        false,
+			expectedTotalUnits: 4,
+		},
+		{
+			name: "Failure: Player 1 With Boss type Archetype and King concurrently",
+			cfg: GameCfg{
+				StagePreset: "Plain",
+				P1Teams:     []string{"King", "Prologue", "Fighter"},
+				P2Teams:     []string{"King", "Fighter"},
+			},
+			expectError:   true,
+			errorContains: "Player 1 must have either Boss or King",
+		},
+		{
+			name: "Failure: Player 2 With Boss type Archetype and King concurrently",
+			cfg: GameCfg{
+				StagePreset: "Plain",
+				P1Teams:     []string{"King", "Fighter"},
+				P2Teams:     []string{"King", "Prologue", "Fighter"},
+			},
+			expectError:   true,
+			errorContains: "Player 2 must have either Boss or King",
+		},
+		{
 			name: "Failure: Player 1 With Boss type Archetype alone, but Player 2 has 1 unit",
 			cfg: GameCfg{
 				StagePreset: "Plain",

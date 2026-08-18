@@ -2,6 +2,7 @@ package engine
 
 import (
 	"fmt"
+	"slices"
 )
 
 const NoUnit string = "NO_UNIT"
@@ -48,7 +49,11 @@ func initGameState(gameCfg GameCfg) (*GameState, error) {
 		return nil, fmt.Errorf("%w: stage preset '%s' not found", ErrInvalidStagePreset, gameCfg.StagePreset)
 	}
 
-	if !hasBoss(gameCfg.P1Teams) {
+	p1HasBoss := hasBoss(gameCfg.P1Teams)
+	if p1HasBoss && slices.Contains(gameCfg.P1Teams, "King") {
+		return nil, fmt.Errorf("%w: Player 1 must have either Boss or King, got %v", ErrInvalidTeamSize, gameCfg.P1Teams)
+	}
+	if !p1HasBoss {
 		if t := teamSize(gameCfg.P1Teams); t < 2 || t > 5 {
 			return nil, fmt.Errorf("%w: Player 1 must have between 2 and 5 units, got %d", ErrInvalidTeamSize, t)
 		}
@@ -57,7 +62,11 @@ func initGameState(gameCfg GameCfg) (*GameState, error) {
 		}
 	}
 
-	if !hasBoss(gameCfg.P2Teams) {
+	p2HasBoss := hasBoss(gameCfg.P2Teams)
+	if p2HasBoss && slices.Contains(gameCfg.P2Teams, "King") {
+		return nil, fmt.Errorf("%w: Player 2 must have either Boss or King, got %v", ErrInvalidTeamSize, gameCfg.P2Teams)
+	}
+	if !p2HasBoss {
 		if t := teamSize(gameCfg.P2Teams); t < 2 || t > 5 {
 			return nil, fmt.Errorf("%w: Player 2 must have between 2 and 5 units, got %d", ErrInvalidTeamSize, t)
 		}
