@@ -19,6 +19,10 @@ export const GAME_CONTROL_REGION_HEIGHT = 360;
 
 export const BOMB_SIZE = 24;
 
+// Below either threshold the canvas zoom drops to x1.
+export const CANVAS_ZOOM_BREAKPOINT_WIDTH = 1360;
+export const CANVAS_ZOOM_BREAKPOINT_HEIGHT = 848;
+
 export const TEAM_COLORS: Record<number, number> = {
   1: 0x212df3, // blue
   2: 0xf32d21, // red
