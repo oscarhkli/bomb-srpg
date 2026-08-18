@@ -234,7 +234,7 @@ global.Phaser = {
   AUTO: 0,
   CANVAS: 1,
   WEBGL: 2,
-  Scale: { FIT: 3, CENTER_BOTH: 4 },
+  Scale: { NONE: 0, FIT: 3, CENTER_BOTH: 4, NO_ZOOM: 1, ZOOM_2X: 2 },
   Physics: { Arcade: {} },
   Tilemaps: {},
   Math: {

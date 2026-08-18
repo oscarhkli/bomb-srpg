@@ -4,105 +4,34 @@ title: "Phase 4.7: Auto Resize Canvas"
 
 # Phase 4.7: Auto Resize Canvas
 
-**Skip everything below - copy-and-paste only.**
-
 ## Context
 
-This spec replace the vector graphic of the buttons in `TurnCommandPanel` and `ConfirmDialog` in MatchScene by Pixel Art sprites. Also, it adjusts the layout according to the sprites.
+Phase 4.5 defines the 1280×720 canvas with x2 zoom. While it works great in a 4K screen, it fits badly in a smaller screen like MacBook or Phone. This specs adds a responsive layout so that it could resize to 640x360 with x1 zoom for smaller window size.
 
 > **Shared vocabulary:** This spec relies on shared terms and design conventions — `Page`, `region`, `Panel`, `fadeTransition`, `BackButton`, `TeamBadge`, the `render*`/`draw*` split, etc. — defined in [`VISUAL_VOCAB.md`](./VISUAL_VOCAB.md). Read it first.
 
 ## Goal
 
-- `MatchScene` displays pixel art assets of buttons in `TurnCommandPanel` and `ConfirmDialog`.
-- Add visual effects to the swapped buttons.
+- To provide a smaller UI for smaller window size.
 
 ## Non-Goal
 
-- Complete Pixel Art adoption for `TurnCommandPanel` and `ConfirmDialog`
+- To resize contiuously in response to the window size.
+- Resize to values other than x1 or x2.
 
-## Scene Entry
+### Scale Manager
 
-No change from spec005.
-
----
-
-## Sprites
-
-Sprites are exported **trimmed** — the delivered art's trim is not guaranteed to be centered within the untrimmed source canvas (`sourceSize`/`spriteSourceSize`), so origin cannot assume a symmetric crop.
-
-| Entity            | Texture Key       | Path (relative to `sprites/`)         | Type             | Remarks                           |
-| ----------------- | ----------------- | ------------------------------------- | ---------------- | --------------------------------- |
-| Button (Neutral)  | button_neutral    | buttons/Button-Neutral.png (+ .json)  | atlas (aseprite) |                                   |
-| Button (Selected) | button_selected   | buttons/Button-Selected.png (+ .json) | atlas (aseprite) | 2px taller and wider on each side |
-| Button (Clicked)  | button_clicked    | buttons/Button-Clicked.png (+ .json)  | atlas (aseprite) |                                   |
-| Label (Move)      | button_label_move | buttons/Button-Move.png (+ .json)     | atlas (aseprite) |                                   |
-| Label (Bomb)      | button_label_bomb | buttons/Button-Bomb.png (+ .json)     | atlas (aseprite) |                                   |
-| Label (Back)      | button_label_back | buttons/Button-Back.png (+ .json)     | atlas (aseprite) |                                   |
-| Label (Yes)       | button_label_yes  | buttons/Button-Yes.png (+ .json)      | atlas (aseprite) |                                   |
-| Label (No)        | button_label_no   | buttons/Button-No.png (+ .json)       | atlas (aseprite) |                                   |
-
-Buttons are all composite component, meaning Button and Label are stacked using a container to form a component, with Label has a slight higher depth. The Container is the button's interactive hit-area — Button and Label themselves are not individually interactive.
-
-### Alignment
-
-Button and Label are trimmed from the same Aseprite source canvas. Both GameObjects are added to the Container at local `(0, 0)` with `origin (0.5, 0.5)`. Phaser positions a trimmed atlas frame using its trim offset (`spriteSourceSize`/`sourceSize`) as if the full untrimmed canvas were still present, so Label renders exactly where it was hand-drawn relative to Button — no manual per-label offset is needed, and this holds across every Button state (Neutral/Selected/Clicked) despite their differing trimmed sizes.
-
-The Clicked state's 2px downward Label shift (see below) is an explicit runtime offset layered on top of this baseline, not part of the trim alignment itself.
-
-### Visual Effects
-
-In addition to the click handler in the vector graphic version, more visual handling will be added.
-
-### Neutral
-
-Used when the button is in neutral state. The frontend should render `button_neutral`.
-
-### Disabled
-
-Used when the button is in disabled state (same as the current conditions used in vector graphic version). It shares the sprites as `Neutral`, with `colorMatrix.desaturate()` for the whole container so that button and label are both in its greyscale color.
-
-### Selected
-
-Used when the button is not in disabled state and User is selecting / mouseover the button. The frontend should render `button_selected`.
-
-### Clicked
-
-Used when the button is not in disabled state and User clicks / pressed / mousedown the button. The frontend should render `button_clicked`. Note that to align with the button, label should shift **2px** downwards when entering this state, and return to the original position when the button is not clicked.
-
-> Future work: once a second button family (not using this sprite set) needs the same Neutral/Disabled/Selected/Clicked state machine, extract it into `VISUAL_VOCAB.md` as a named pattern (texture-swap rules, the 2px Clicked label-shift, desaturate-on-disabled) instead of restating it per spec. Not needed yet — `TurnCommandPanel`/`ConfirmDialog` are the only adopters so far.
-
-## Visual Spec for TurnCommand Panel
-
-- `TurnCommandPanel` should now be 100% width. Height is not defined - letting the Buttons the expand its height.
-- `TurnCommandPanel` should stay **40px** above the edge of the canvas.
-- No more padding on the 4 sides of `TurnCommandPanel`.
-- Instead of placing in 2x2, all buttons inside should be stacked 1 per row, center aligned.
-  - Move
-  - Bomb
-  - Back
-- Each button inside should leave a `4px` vertical space separated — enough that a hovered button's Selected size (2px taller on each side) never overlaps its neighbor.
-
-## Visual Spec for ConfirmDialog
-
-- Instead of placing in 1 row, 2 buttons inside should be stacked 1 per row, center aligned.
-  - Yes
-  - No
-- Each button inside should leave a `4px` vertical space separated — enough that a hovered button's Selected size (2px taller on each side) never overlaps its neighbor.
-- `NoButton` should be placed at the bottom of `ConfirmDialog`.
+- The Base resolution stays at 640×360.
+- Zoom should depend on the window size.
+  - If window width is smaller than **1360px** or window height is smaller than **848px**, the Zoom should be `Phaser.Scale.NO_ZOOM`.
+  - Otherwise, the Zoom should be `Phaser.Scale.ZOOM_2X`.
+  - These thresholds carry a margin above the raw 1280×720 canvas size for breathing room; exact values may be tuned during implementation.
+- `autoCenter: CENTER_BOTH` stays, centering the canvas within the window at whichever zoom is active.
 
 ---
 
 ## Acceptance Criteria
 
-1. Given `MatchScene` has loaded a match, when the unit is clicked, then all buttons in `TurnCommandPanel` display their pixel-art sprite textures instead of the Phase 3 vector-graphics placeholders.
-2. Given a button in `TurnCommandPanel`, when the button is disabled due to some reasons, then the button with the label should turn in its greyscale color.
-3. Given a button in `TurnCommandPanel`, when the button is not disabled and selected, then the button with the label should change the sprite to mimic glow effect.
-4. Given a button in `TurnCommandPanel`, when the button is not disabled and clicked, then the button with the label should change the sprite to mimic click effect, and label should shift **2px** downwards.
-5. Given `MatchScene` has loaded a match, when `ConfirmDialog` pops up, then all buttons in `ConfirmDialog` display their pixel-art sprite textures instead of the Phase 3 vector-graphics placeholders.
-6. Given a button in `ConfirmDialog`, when the button is not disabled and selected, then the button with the label should change the sprite to mimic glow effect.
-7. Given a button in `ConfirmDialog`, when the button is not disabled and clicked, then the button with the label should change the sprite to mimic click effect, and label should shift **2px** downwards.
-
-## Log
-
-Implementation issues found during the build (non spec gaps) are tracked in [p4-spec006-sprites-log.md](./p4-spec006-sprites-log.md).
+1. Given the game boots, when the canvas mounts, then its base resolution is 640×360, and the same width/height threshold used for resize (Acceptance Criteria 2–3) is applied immediately — so the initial zoom reflects the actual window size at load (1280×720 / x2 zoom when at or above 1360×848, otherwise 640×360 / x1 zoom).
+2. Given the browser window is resized, when a resize event reports window width below 1360px or window height below 848px, then the canvas display size changes to 640x360 (x1 zoom). The zoom only actually re-applies when the computed value differs from the current one, so repeated resize events within the same band are no-ops.
+3. Given the canvas is displaying at x1 zoom, when a resize event reports window width and height at or above 1360×848, then the canvas display size changes back to 1280x720 (x2 zoom), by the same no-op rule as Acceptance Criteria 2.

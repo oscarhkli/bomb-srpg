@@ -68,9 +68,9 @@ specs:
     category: Sprites
     completion-date: 2026-08-16
   - file: p4-spec007-canvas.md
-    status: Draft
+    status: Done
     category: Canvas
-    completion-date:
+    completion-date: 2028-08-16
   - file: p4-spec008-sprites.md
     status: Draft
     category: Sprites
