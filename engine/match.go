@@ -422,13 +422,16 @@ func (m *Match) handleDelayedBatchDamage(
 
 // evaluateVictoryConditions defines each team's
 // - Goal (win condition met):
-// 	 - a living Boss for a Boss-type team, or a living King plus a living Ordinary unit for a King-type team
+//   - a living Boss for a Boss-type team, or a living King plus a living Ordinary unit for a King-type team
+//
 // - Wiped (loss condition met):
 //   - all Bosses dead, or King and all Ordinary units dead) status
+//
 // Then resolves the outcome:
 //   - Both teams meet Goal: match continues.
 //   - Just One team meets Goal, or holds a living King against a Wiped opponent: that team wins.
 //   - Neither team qualifies: draw.
+//
 // Returns MatchInProgress, 1, 2, or MatchDrawn.
 func (m *Match) evaluateVictoryConditions() int {
 	p1HasBoss, p1BossAlive := false, false
