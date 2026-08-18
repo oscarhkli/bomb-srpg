@@ -146,6 +146,7 @@ type Archetype struct {
 	BaseHP       int
 	PresetSkills SkillType
 	Selectable   bool
+	Boss         bool
 }
 
 // MarshalJSON serializes Archetype struct to JSON that client needs

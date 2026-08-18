@@ -38,6 +38,12 @@ func TestGetArchetype(t *testing.T) {
 			expectedName:   "Bandit",
 		},
 		{
+			name:           "Existing archetype Prologue",
+			inputName:      "Prologue",
+			expectedExists: true,
+			expectedName:   "Prologue",
+		},
+		{
 			name:           "Non-existing archetype",
 			inputName:      "NonExistent",
 			expectedExists: false,
@@ -86,6 +92,9 @@ func TestStatBoundaries(t *testing.T) {
 			}
 			if archetype.BaseHP < 0 {
 				t.Errorf("BaseHP for %s should be non-negative, got %d", name, archetype.BaseHP)
+			}
+			if archetype.Boss && archetype.Selectable {
+				t.Errorf("Boss is not Selectable, got Selectable Boss %s", name)
 			}
 		})
 	}
