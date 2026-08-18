@@ -2200,7 +2200,7 @@ func TestHandleGetMatchConfig(t *testing.T) {
 		testMux("GET /api/match-rooms/{roomID}/match/config", h.HandleGetMatchConfig).ServeHTTP(rr, req)
 
 		assertObjectContract(t, rr.Body.Bytes(),
-			[]string{"stagePreset", "p1Teams", "p2Teams", "maxTurns", "allowResetTurn"}, nil)
+			[]string{"vsCom", "stagePreset", "p1Teams", "p2Teams", "maxTurns", "allowResetTurn"}, nil)
 	})
 }
 

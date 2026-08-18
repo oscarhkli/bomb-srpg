@@ -48,19 +48,22 @@ func initGameState(gameCfg GameCfg) (*GameState, error) {
 		return nil, fmt.Errorf("%w: stage preset '%s' not found", ErrInvalidStagePreset, gameCfg.StagePreset)
 	}
 
-	if t := teamSize(gameCfg.P1Teams); t < 2 || t > 5 {
-		return nil, fmt.Errorf("%w: Player 1 must have between 2 and 5 units, got %d", ErrInvalidTeamSize, t)
-	}
-	if t := teamSize(gameCfg.P2Teams); t < 2 || t > 5 {
-		return nil, fmt.Errorf("%w: Player 2 must have between 2 and 5 units, got %d", ErrInvalidTeamSize, t)
+	if !hasBoss(gameCfg.P1Teams) {
+		if t := teamSize(gameCfg.P1Teams); t < 2 || t > 5 {
+			return nil, fmt.Errorf("%w: Player 1 must have between 2 and 5 units, got %d", ErrInvalidTeamSize, t)
+		}
+		if !hasExactlyOneAndFirstIsKing(gameCfg.P1Teams) {
+			return nil, fmt.Errorf("%w: Player 1 must have exactly one King as the first unit", ErrMissingKing)
+		}
 	}
 
-	// Only 1 king each team allowed, and must be the first unit if present
-	if !hasExactlyOneAndFirstIsKing(gameCfg.P1Teams) {
-		return nil, fmt.Errorf("%w: Player 1 must have exactly one King as the first unit", ErrMissingKing)
-	}
-	if !hasExactlyOneAndFirstIsKing(gameCfg.P2Teams) {
-		return nil, fmt.Errorf("%w: Player 2 must have exactly one King as the first unit", ErrMissingKing)
+	if !hasBoss(gameCfg.P2Teams) {
+		if t := teamSize(gameCfg.P2Teams); t < 2 || t > 5 {
+			return nil, fmt.Errorf("%w: Player 2 must have between 2 and 5 units, got %d", ErrInvalidTeamSize, t)
+		}
+		if !hasExactlyOneAndFirstIsKing(gameCfg.P2Teams) {
+			return nil, fmt.Errorf("%w: Player 2 must have exactly one King as the first unit", ErrMissingKing)
+		}
 	}
 
 	grid, err := compileGrid(stagePreset)
@@ -126,6 +129,16 @@ func compileGrid(preset StagePreset) ([][]Tile, error) {
 		}
 	}
 	return grid, nil
+}
+
+func hasBoss(team []string) bool {
+	for _, t := range team {
+		archetype, ok := GetArchetype(t)
+		if ok && archetype.Boss {
+			return true
+		}
+	}
+	return false
 }
 
 func hasExactlyOneAndFirstIsKing(team []string) bool {

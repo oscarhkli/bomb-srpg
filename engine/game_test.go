@@ -251,6 +251,66 @@ func TestInitGameState_Suite(t *testing.T) {
 			expectError:        false,
 			expectedTotalUnits: 4,
 		},
+		{
+			name: "Success: Player 1 With Boss type Archetype but not King",
+			cfg: GameCfg{
+				StagePreset: "Plain",
+				P1Teams:     []string{"Prologue", "Fighter"},
+				P2Teams:     []string{"King", "Fighter"},
+			},
+			expectError:        false,
+			expectedTotalUnits: 4,
+		},
+		{
+			name: "Success: Player 2 With Boss type Archetype but not King",
+			cfg: GameCfg{
+				StagePreset: "Plain",
+				P1Teams:     []string{"King", "Fighter"},
+				P2Teams:     []string{"Prologue", "Fighter"},
+			},
+			expectError:        false,
+			expectedTotalUnits: 4,
+		},
+		{
+			name: "Success: Player 1 With Boss type Archetype alone",
+			cfg: GameCfg{
+				StagePreset: "Plain",
+				P1Teams:     []string{"Prologue"},
+				P2Teams:     []string{"King", "Fighter"},
+			},
+			expectError:        false,
+			expectedTotalUnits: 3,
+		},
+		{
+			name: "Success: Player 2 With Boss type Archetype alone",
+			cfg: GameCfg{
+				StagePreset: "Plain",
+				P1Teams:     []string{"King", "Fighter"},
+				P2Teams:     []string{"Prologue"},
+			},
+			expectError:        false,
+			expectedTotalUnits: 3,
+		},
+		{
+			name: "Failure: Player 1 With Boss type Archetype alone, but Player 2 has 1 unit",
+			cfg: GameCfg{
+				StagePreset: "Plain",
+				P1Teams:     []string{"Prologue"},
+				P2Teams:     []string{"King"},
+			},
+			expectError:   true,
+			errorContains: "Player 2 must have between 2 and 5 units",
+		},
+		{
+			name: "Success: Player 2 With Boss type Archetype alone, but Player 1 has 1 unit",
+			cfg: GameCfg{
+				StagePreset: "Plain",
+				P1Teams:     []string{"King"},
+				P2Teams:     []string{"Prologue"},
+			},
+			expectError:   true,
+			errorContains: "Player 1 must have between 2 and 5 units",
+		},
 	}
 
 	for _, tt := range tests {

@@ -52,6 +52,7 @@ export function makeSoftBlock(overrides: Partial<SoftBlock> = {}): SoftBlock {
 
 export function makeCfg(overrides: Partial<GameCfg> = {}): GameCfg {
   return {
+    vsCom: false,
     stagePreset: 'Plain',
     p1Teams: [],
     p2Teams: [],

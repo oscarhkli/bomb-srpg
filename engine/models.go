@@ -240,6 +240,7 @@ type Bomb struct {
 
 // GameCfg holds all configuration for a match.
 type GameCfg struct {
+	VSCom                       bool     `json:"vsCom"`          // True = VS COM Mode
 	StagePreset                 string   `json:"stagePreset"`    // Stage preset name (e.g., "Plain")
 	P1Teams                     []string `json:"p1Teams"`        // Archetype names for Player 1 (1-5 units, first must be King)
 	P2Teams                     []string `json:"p2Teams"`        // Archetype names for Player 2 (1-5 units, first must be King)

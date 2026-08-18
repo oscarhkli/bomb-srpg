@@ -336,6 +336,7 @@ describe('api.ts', () => {
 
   describe('getMatchConfig', () => {
     const fixture: GameCfg = makeCfg({
+      vsCom: false,
       stagePreset: 'Plain',
       p1Teams: ['Bomber'],
       p2Teams: ['Bomber'],
