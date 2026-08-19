@@ -19,7 +19,7 @@ Phase 3.6 concludes a match and returns to Match Settings Scene, which is a blan
 - Start the app from `MatchSettingsScene` - stick with `DevBootScene` -> `MatchScene` until `p3-spec010-stage.md`.
 - Enter `MatchScene` via `MatchSettingsScene`.
 - Polished animations or tweens.
-- VS COM or Online multi-player mode of `MatchSettingsScene`.
+- VS CPU or Online multi-player mode of `MatchSettingsScene`.
 - Strict mode in Unit Selection.
 
 ## Scene Entry
@@ -44,7 +44,7 @@ Because this fetch is async and fired on scene load, guard against scene shutdow
 
 Overall, the scene should leave **24px** margin for all 4 sides.
 
-There could be more/fewer `Pages` in future, esp. once we add modes like VS COM or Online, so don't hardcode it as 3 only.
+There could be more/fewer `Pages` in future, esp. once we add modes like VS CPU or Online, so don't hardcode it as 3 only.
 
 `MatchSettingsScene` divides into 3 `regions`:
 
@@ -84,7 +84,7 @@ In the `NavRegion`, render a **144Wx96Hpx** pill-shaped button (`NextButton`) �
 - Render a header `Formation` on the top left, in font size **36px**, font color `0xffffff`.
 - In the next line, Render 5 **96x96px** rounded squares as a row, named `UnitSlot`, filled with team's `TeamColor`, with **12px** spacing. The row is horizontally centered within `FormationPanel`.
   - Each `UnitSlot` shows an `order number` at its top-left corner (4px inset, font size **24px**, color `0xffffff`), assigned top-to-bottom in the order **4 → 2 → 1 → 3 → 5 for Team 1**, and **5 → 3 → 1 → 2 → 4 for Team 2**. This is the 1-based display order of `gameCfg.p{X}Teams` (code stays 0-based). The reason of the 2 ordering is the the team placement of Team 1 and 2 are mirrored (facing each other). Refer to `@engine/presets.go` `stagePresetsRegistry()` `P1StartingPositions`, `P2StartingPositions` for this order.
-  - The middle `UnitSlot` (order number **1**) is `King`-only. Render a **96x96px** King sprite in the team's `TeamColor`. The unit sprite must render *below* the `order number` (lower depth), since they overlap.
+  - The middle `UnitSlot` (order number **1**) is `King`-only. Render a **96x96px** King sprite in the team's `TeamColor`. The unit sprite must render _below_ the `order number` (lower depth), since they overlap.
     - **Reuse note:** `renderUnits()` in `@web/src/rendering/boardRenderer.ts` is board-coupled (derives position from `unit.position`, hardcodes `UNIT_SIZE` 32px, board depth, and board click handlers), so it can't be reused as-is for a **96px** off-board sprite. Extract the per-unit drawing into a helper taking an explicit `(cx, cy, size)` and team color (e.g. `drawUnitSprite`) that both the board and this `Page` call. `drawArchetypeIcon()` already fits the `draw*` convention (see [Unit Card](#unit-card)); pass it the slot's own `Graphics` and scale the icon to `size` rather than the fixed `OCCUPANT_ICON_RADIUS` (10px), which would look tiny at 96px.
   - [User Interaction](#user-interaction-and-visual-effect-of-unit-page) explains how "put on / take off units" is triggered. When a `Unit` is put on a `UnitSlot`, that slot renders the `Unit` the same way `King` is rendered in the middle slot.
 - If `MatchSettingsScene.gameCfg` contains `p{X}Teams`, render it accordingly.

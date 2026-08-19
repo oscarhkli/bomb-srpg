@@ -99,7 +99,7 @@ Refer to [Frontend README](frontend/README.md)
 - [x] Silhouette Adoption for Archetypes / Units / Bombs / SoftBlocks
 - [x] Tilemap
 - [x] Resize canvas and camera
-- [ ] Responsive layout
+- [x] Responsive layout
 - [ ] UI controls
   - [ ] MatchScene
   - [ ] MatchSettingsScene
@@ -110,6 +110,21 @@ Refer to [Frontend README](frontend/README.md)
 - [ ] Animated sprites
 - [ ] Static sprite for effects in match
 - [ ] LoadingScene
+
+## Phase 4c: Add Basic Computer Player with AI
+
+- **Goal:** Introduce a MVP version of single-player mode against an automated opponent.
+- **Scope:** Heuristic-based enemy unit logic running inside an asynchronous backend goroutine worker.
+- **DoD:** A player can play a match against a local AI opponent that automatically calculates and executes its movements when its turn segment activates.
+
+### TODO
+
+- [x] New Archetype type Boss (Prologue)
+- [x] New Match Settings and Victory Condition Evaluation for Boss
+- [ ] Frontend
+  - [ ] Prologue stage (Human with 5 units vs 1 Boss)
+- [ ] goroutine setup to decouple resolve-response from CPU computation
+- [ ] Finite State Machine for 1 CPU decision making
 
 ## Phase 5a: UI Refinement (Polish Pass)
 
@@ -125,7 +140,7 @@ Refer to [Frontend README](frontend/README.md)
 
 - **Goal:** Introduce a single-player mode against an automated opponent.
 - **Scope:** Heuristic-based enemy unit logic running inside an asynchronous backend goroutine worker.
-- **DoD:** A player can play a match against a local AI opponent that automatically calculates and executes its movements when its turn segment activates.
+- **DoD:** A player can play a full match against a local AI opponent that automatically calculates and executes its movements when its turn segment activates.
 
 ### TODO
 

@@ -19,7 +19,7 @@ Phase 3.9 introduced Match Settings Scene with `UnitPage`. This spec renders the
 ## Non-Goal
 
 - Polished animations or tweens.
-- VS COM or Online multi-player mode of `MatchSettingsScene`.
+- VS CPU or Online multi-player mode of `MatchSettingsScene`.
 
 ## Scene Entry
 
@@ -78,7 +78,7 @@ Inside `InnerPanel`, render 4 rows of text using `stagePreset.name`, `stagePrese
   - If a `StageCard` is clicked, the `StageCard` is selected. The other `StageCard` should be unselected.
   - `StagesDetailPanel` should get the infomation from `stagePresets` and replace all the information inside.
   - `maxTurns` is a cyclic selection component (`MaxTurnsSelector`). The available selections are: `💣`, `15`, `20`, `30`, `45`, `60`. Note that `💣` means `0` in behind.
-    - Selecting *any* `StageCard` — including re-selecting one whose `maxTurns` was previously customized — always resets `MaxTurnsSelector` to `stagePreset.maxTurns` (that stage's recommended value), discarding any prior customization for that stage. Unlike the other components, it never restores the value from `MatchSettingsScene.gameCfg`.
+    - Selecting _any_ `StageCard` — including re-selecting one whose `maxTurns` was previously customized — always resets `MaxTurnsSelector` to `stagePreset.maxTurns` (that stage's recommended value), discarding any prior customization for that stage. Unlike the other components, it never restores the value from `MatchSettingsScene.gameCfg`.
       - This applies on `StagePage`'s initial mount too, not just on click: the selector always starts at the selected `StageCard`'s `stagePreset.maxTurns`, even if `MatchSettingsScene.gameCfg.maxTurns` holds a previously customized value (e.g. from a prior visit to this page). Only the selected `StageCard` itself is restored from `gameCfg` (via `gameCfg.stagePreset`) on mount.
     - Add a click handler for `❰` - clicking this will shift the selection left, e.g., `20 -> 15`. Note that it's cyclic, i.e., `💣 -> 60`.
     - Add a click handler for `❱` - clicking this will shift the selection right, e.g., `15 -> 20`. Note that it's cyclic, i.e., `60 -> 💣`.
