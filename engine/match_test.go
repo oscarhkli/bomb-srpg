@@ -851,8 +851,8 @@ func TestMatch_StartTurn_NotTriggeringSuddenDeath(t *testing.T) {
 		m.TrueState.Turn = 100
 		m.WorkingState.Turn = 100
 		m.WorkingState.ActiveTeam = 2
-		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1, Position: Coordinate{0, 0}, Type: king}
-		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1, Position: Coordinate{0, 1}, Type: king}
+		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1, Position: Coordinate{0, 0}, Type: king, Role: RoleKing}
+		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1, Position: Coordinate{0, 1}, Type: king, Role: RoleKing}
 		m.WorkingState.Units[u3] = &Unit{ID: u3, Team: 1, HP: 1, Position: Coordinate{0, 7}, Type: fighter}
 		m.WorkingState.Units[u4] = &Unit{ID: u4, Team: 2, HP: 1, Position: Coordinate{0, 8}, Type: fighter}
 
@@ -893,8 +893,8 @@ func TestMatch_StartTurn_SuddenDeath(t *testing.T) {
 		m := newTestMatch(4, 3)
 		m.TrueState.Turn = 101
 
-		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1, Position: Coordinate{0, 0}, Type: king}
-		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1, Position: Coordinate{0, 1}, Type: king}
+		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1, Position: Coordinate{0, 0}, Type: king, Role: RoleKing}
+		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1, Position: Coordinate{0, 1}, Type: king, Role: RoleKing}
 		m.WorkingState.Units[u3] = &Unit{ID: u3, Team: 1, HP: 1, Position: Coordinate{3, 0}, Type: fighter}
 		m.WorkingState.Units[u4] = &Unit{ID: u4, Team: 2, HP: 1, Position: Coordinate{3, 1}, Type: fighter}
 		m.WorkingState.Grid[0][0].OccupantType = OccupantUnit
@@ -926,8 +926,8 @@ func TestMatch_StartTurn_SuddenDeath(t *testing.T) {
 		m := newTestMatch(1, 9)
 		m.TrueState.Turn = 101
 		bID := NewBombID(100, 1, u1)
-		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1, Position: Coordinate{0, 0}, Type: king}
-		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1, Position: Coordinate{0, 1}, Type: king}
+		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1, Position: Coordinate{0, 0}, Type: king, Role: RoleKing}
+		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1, Position: Coordinate{0, 1}, Type: king, Role: RoleKing}
 		m.WorkingState.Units[u3] = &Unit{ID: u3, Team: 1, HP: 1, Position: Coordinate{0, 7}, Type: fighter}
 		m.WorkingState.Units[u4] = &Unit{ID: u4, Team: 2, HP: 1, Position: Coordinate{0, 8}, Type: fighter}
 		m.WorkingState.Bombs[bID] = &Bomb{ID: bID, OwnerID: u2, Position: Coordinate{0, 3}}
@@ -964,8 +964,8 @@ func TestMatch_StartTurn_SuddenDeath(t *testing.T) {
 	t.Run("stage has no available tile", func(t *testing.T) {
 		m := newTestMatch(1, 5)
 		m.TrueState.Turn = 101
-		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1, Position: Coordinate{0, 0}, Type: king}
-		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1, Position: Coordinate{0, 1}, Type: king}
+		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1, Position: Coordinate{0, 0}, Type: king, Role: RoleKing}
+		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1, Position: Coordinate{0, 1}, Type: king, Role: RoleKing}
 		m.WorkingState.Units[u3] = &Unit{ID: u3, Team: 1, HP: 1, Position: Coordinate{0, 3}, Type: fighter}
 		m.WorkingState.Units[u4] = &Unit{ID: u4, Team: 2, HP: 1, Position: Coordinate{0, 4}, Type: fighter}
 		m.WorkingState.Grid[0][0].OccupantType = OccupantUnit
@@ -1014,8 +1014,8 @@ func TestMatch_ResolveTurn_ExplosionAndBlast(t *testing.T) {
 		u4 := NewUnitID(2, 1)
 		b1 := NewBombID(1, 1, u1)
 		b2 := NewBombID(1, 2, u2)
-		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1, Type: king}
-		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1, Type: king}
+		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1, Type: king, Role: RoleKing}
+		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1, Type: king, Role: RoleKing}
 		m.WorkingState.Units[u3] = &Unit{ID: u3, Team: 1, HP: 1, Type: fighter}
 		m.WorkingState.Units[u4] = &Unit{ID: u4, Team: 2, HP: 1, Type: fighter}
 		m.WorkingState.Bombs[b1] = &Bomb{ID: b1, Countdown: 3, Range: 2, Position: Coordinate{5, 5}}
@@ -1238,8 +1238,8 @@ func TestMatch_ResolveTurn_TimelineSystemTransitions(t *testing.T) {
 	t.Run("Empty turn resolution executes smoothly with zero structural mutations", func(t *testing.T) {
 		m := newTestMatch(16, 16)
 
-		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1, Type: king, HasMoved: true}
-		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1, Type: king, HasUsedSkill: true}
+		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1, Type: king, Role: RoleKing, HasMoved: true}
+		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1, Type: king, Role: RoleKing, HasUsedSkill: true}
 		m.WorkingState.Units[u3] = &Unit{ID: u3, Team: 1, HP: 1, Type: fighter, HasMoved: true, HasUsedSkill: true}
 		m.WorkingState.Units[u4] = &Unit{ID: u4, Team: 2, HP: 1, Type: fighter}
 
@@ -1270,8 +1270,8 @@ func TestMatch_ResolveTurn_TimelineSystemTransitions(t *testing.T) {
 		m.WorkingState.Turn = 1
 		m.WorkingState.ActiveTeam = 1
 
-		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 2, Type: king}
-		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 2, Type: king}
+		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 2, Type: king, Role: RoleKing}
+		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 2, Type: king, Role: RoleKing}
 		m.WorkingState.Units[u3] = &Unit{ID: u3, Team: 1, HP: 2, Type: fighter}
 		m.WorkingState.Units[u4] = &Unit{ID: u4, Team: 2, HP: 2, Type: fighter}
 
@@ -1301,21 +1301,22 @@ func TestMatch_ResolveTurn_TimelineSystemTransitions(t *testing.T) {
 
 // AddUnit adds a unit to the match's WorkingState and syncs the grid.
 // Test-only helper.
-func (m *Match) AddUnit(team, idx int, arch Archetype, pos Coordinate, hp int) *Unit {
+func (m *Match) AddUnit(team, idx int, archetype Archetype, role UnitRole, pos Coordinate, hp int) *Unit {
 	id := NewUnitID(team, idx)
 	u := &Unit{
 		ID:           id,
-		Type:         arch,
+		Type:         archetype,
 		Position:     pos,
-		Speed:        arch.BaseSpeed,
-		BombMaxRange: arch.BombMaxRange,
-		BombMinRange: arch.BombMinRange,
-		BombPower:    arch.BombPower,
-		MaxBombCount: arch.MaxBombCount,
+		Speed:        archetype.BaseSpeed,
+		BombMaxRange: archetype.BombMaxRange,
+		BombMinRange: archetype.BombMinRange,
+		BombPower:    archetype.BombPower,
+		MaxBombCount: archetype.MaxBombCount,
 		BombUsed:     0,
 		Team:         team,
 		HP:           hp,
-		Skills:       arch.PresetSkills,
+		Skills:       archetype.PresetSkills,
+		Role:         role,
 	}
 	m.WorkingState.Units[id] = u
 	m.WorkingState.Grid[pos.Y][pos.X] = Tile{
@@ -1397,7 +1398,7 @@ func newTestMatchWithTeams(t *testing.T, p1, p2 teamFormation) *Match {
 			if *tf.King {
 				hp = 1
 			}
-			m.AddUnit(team, x, king, Coordinate{x, row}, hp)
+			m.AddUnit(team, x, king, RoleKing, Coordinate{x, row}, hp)
 			x++
 		} else {
 			for _, alive := range tf.BossesAlive {
@@ -1405,7 +1406,7 @@ func newTestMatchWithTeams(t *testing.T, p1, p2 teamFormation) *Match {
 				if alive {
 					hp = 1
 				}
-				m.AddUnit(team, x, boss, Coordinate{x, row}, hp)
+				m.AddUnit(team, x, boss, RoleBoss, Coordinate{x, row}, hp)
 				x++
 			}
 		}
@@ -1414,7 +1415,7 @@ func newTestMatchWithTeams(t *testing.T, p1, p2 teamFormation) *Match {
 			if alive {
 				hp = 1
 			}
-			m.AddUnit(team, x, fighter, Coordinate{x, row}, hp)
+			m.AddUnit(team, x, fighter, RoleNormal, Coordinate{x, row}, hp)
 			x++
 		}
 	}

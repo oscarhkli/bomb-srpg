@@ -62,7 +62,6 @@ func archetypesRegistry() []Archetype {
 			BaseHP:       1,
 			PresetSkills: SkillNone,
 			Selectable:   false,
-			Boss:         true,
 		},
 	}
 }

@@ -2,7 +2,6 @@ package engine
 
 import (
 	"fmt"
-	"slices"
 )
 
 const NoUnit string = "NO_UNIT"
@@ -33,10 +32,10 @@ func InitGame(gameCfg GameCfg) (*Match, error) {
 	}, nil
 }
 
-func teamSize(team []string) int {
+func teamSize(team []TeamSlot) int {
 	count := 0
 	for _, v := range team {
-		if v != NoUnit {
+		if v.Archetype != NoUnit {
 			count++
 		}
 	}
@@ -49,30 +48,11 @@ func initGameState(gameCfg GameCfg) (*GameState, error) {
 		return nil, fmt.Errorf("%w: stage preset '%s' not found", ErrInvalidStagePreset, gameCfg.StagePreset)
 	}
 
-	p1HasBoss := hasBoss(gameCfg.P1Teams)
-	if p1HasBoss && slices.Contains(gameCfg.P1Teams, "King") {
-		return nil, fmt.Errorf("%w: Player 1 must have either Boss or King, got %v", ErrInvalidTeamSize, gameCfg.P1Teams)
+	if err := validateTeamComposition(gameCfg.P1Slots, "Player 1"); err != nil {
+		return nil, err
 	}
-	if !p1HasBoss {
-		if t := teamSize(gameCfg.P1Teams); t < 2 || t > 5 {
-			return nil, fmt.Errorf("%w: Player 1 must have between 2 and 5 units, got %d", ErrInvalidTeamSize, t)
-		}
-		if !hasExactlyOneAndFirstIsKing(gameCfg.P1Teams) {
-			return nil, fmt.Errorf("%w: Player 1 must have exactly one King as the first unit", ErrMissingKing)
-		}
-	}
-
-	p2HasBoss := hasBoss(gameCfg.P2Teams)
-	if p2HasBoss && slices.Contains(gameCfg.P2Teams, "King") {
-		return nil, fmt.Errorf("%w: Player 2 must have either Boss or King, got %v", ErrInvalidTeamSize, gameCfg.P2Teams)
-	}
-	if !p2HasBoss {
-		if t := teamSize(gameCfg.P2Teams); t < 2 || t > 5 {
-			return nil, fmt.Errorf("%w: Player 2 must have between 2 and 5 units, got %d", ErrInvalidTeamSize, t)
-		}
-		if !hasExactlyOneAndFirstIsKing(gameCfg.P2Teams) {
-			return nil, fmt.Errorf("%w: Player 2 must have exactly one King as the first unit", ErrMissingKing)
-		}
+	if err := validateTeamComposition(gameCfg.P2Slots, "Player 2"); err != nil {
+		return nil, err
 	}
 
 	grid, err := compileGrid(stagePreset)
@@ -82,11 +62,11 @@ func initGameState(gameCfg GameCfg) (*GameState, error) {
 
 	units := map[UnitID]*Unit{}
 
-	err = createUnits(units, grid, gameCfg.P1Teams, stagePreset.P1StartingPositions, 1, gameCfg)
+	err = createUnits(units, grid, gameCfg.P1Slots, stagePreset.P1StartingPositions, 1, gameCfg)
 	if err != nil {
 		return nil, err
 	}
-	err = createUnits(units, grid, gameCfg.P2Teams, stagePreset.P2StartingPositions, 2, gameCfg)
+	err = createUnits(units, grid, gameCfg.P2Slots, stagePreset.P2StartingPositions, 2, gameCfg)
 	if err != nil {
 		return nil, err
 	}
@@ -140,23 +120,43 @@ func compileGrid(preset StagePreset) ([][]Tile, error) {
 	return grid, nil
 }
 
-func hasBoss(team []string) bool {
+// validateTeamComposition enforces roster-shape rules for a single team:
+// a Boss-role team is 1-5 units with no King, a King-role team is 2-5 units led by King.
+func validateTeamComposition(slots []TeamSlot, playerLabel string) error {
+	hasBoss := hasRole(slots, RoleBoss)
+	if hasBoss && hasRole(slots, RoleKing) {
+		return fmt.Errorf("%w: %s must have either Boss or King, got %v", ErrInvalidTeamFormation, playerLabel, slots)
+	}
+
+	minTeamSize := 2
+	if hasBoss {
+		minTeamSize = 1
+	}
+	if t := teamSize(slots); t < minTeamSize || t > 5 {
+		return fmt.Errorf("%w: %s must have between %d and 5 units, got %d", ErrInvalidTeamSize, playerLabel, minTeamSize, t)
+	}
+	if !hasBoss && !hasExactlyOneAndFirstIsKing(slots) {
+		return fmt.Errorf("%w: %s must have exactly one King as the first unit", ErrMissingKing, playerLabel)
+	}
+	return nil
+}
+
+func hasRole(team []TeamSlot, role UnitRole) bool {
 	for _, t := range team {
-		archetype, ok := GetArchetype(t)
-		if ok && archetype.Boss {
+		if t.Role == role {
 			return true
 		}
 	}
 	return false
 }
 
-func hasExactlyOneAndFirstIsKing(team []string) bool {
-	if len(team) == 0 || team[0] != "King" {
+func hasExactlyOneAndFirstIsKing(team []TeamSlot) bool {
+	if len(team) == 0 || team[0].Role != RoleKing {
 		return false
 	}
 
 	for i := 1; i < len(team); i++ {
-		if team[i] == "King" {
+		if team[i].Role == RoleKing {
 			return false
 		}
 	}
@@ -166,18 +166,18 @@ func hasExactlyOneAndFirstIsKing(team []string) bool {
 func createUnits(
 	units map[UnitID]*Unit,
 	grid [][]Tile,
-	teams []string,
+	teams []TeamSlot,
 	startingPositions [5]Coordinate,
 	teamID int,
 	gameCfg GameCfg,
 ) error {
-	for i, archetypeName := range teams {
-		if archetypeName == NoUnit { // allowing non-full team in a specific location
+	for i, ts := range teams {
+		if ts.Archetype == NoUnit { // allowing non-full team in a specific location
 			continue
 		}
-		archetype, exists := GetArchetype(archetypeName)
+		archetype, exists := GetArchetype(ts.Archetype)
 		if !exists {
-			return fmt.Errorf("%w: archetype '%s' for Player %d not found", ErrUnknownArchetype, archetypeName, teamID)
+			return fmt.Errorf("%w: archetype '%s' for Player %d not found", ErrUnknownArchetype, ts.Archetype, teamID)
 		}
 		id := NewUnitID(teamID, i) // Player 1 units have IDs starting from 8, Player 2 units have IDs starting from 16
 		units[id] = &Unit{
@@ -193,6 +193,7 @@ func createUnits(
 			Team:         teamID,
 			HP:           archetype.BaseHP,
 			Skills:       archetype.PresetSkills,
+			Role:         ts.Role,
 		}
 
 		grid[startingPositions[i].Y][startingPositions[i].X].OccupantType = OccupantUnit
@@ -251,6 +252,7 @@ func (gs *GameState) DeepCopy() *GameState {
 				Team:         unit.Team,
 				HP:           unit.HP,
 				Skills:       unit.Skills,
+				Role:         unit.Role,
 			}
 		}
 	}

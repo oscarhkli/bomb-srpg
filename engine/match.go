@@ -440,20 +440,20 @@ func (m *Match) evaluateVictoryConditions() int {
 	p2KingAlive, p2OrdinaryAlive := false, false
 
 	for _, unit := range m.WorkingState.Units {
-		p1HasBoss = p1HasBoss || (unit.Team == 1 && unit.Type.Boss)
-		p2HasBoss = p2HasBoss || (unit.Team == 2 && unit.Type.Boss)
+		p1HasBoss = p1HasBoss || (unit.Team == 1 && unit.Role == RoleBoss)
+		p2HasBoss = p2HasBoss || (unit.Team == 2 && unit.Role == RoleBoss)
 
 		if unit.HP <= 0 {
 			continue
 		}
 		if unit.Team == 1 {
-			p1KingAlive = p1KingAlive || (unit.Type.Name == "King")
-			p1BossAlive = p1BossAlive || (unit.Type.Boss)
-			p1OrdinaryAlive = p1OrdinaryAlive || (unit.Type.Name != "King" && !unit.Type.Boss)
+			p1KingAlive = p1KingAlive || (unit.Role == RoleKing)
+			p1BossAlive = p1BossAlive || (unit.Role == RoleBoss)
+			p1OrdinaryAlive = p1OrdinaryAlive || (unit.Role != RoleKing && unit.Role != RoleBoss)
 		} else {
-			p2KingAlive = p2KingAlive || (unit.Type.Name == "King")
-			p2BossAlive = p2BossAlive || (unit.Type.Boss)
-			p2OrdinaryAlive = p2OrdinaryAlive || (unit.Type.Name != "King" && !unit.Type.Boss)
+			p2KingAlive = p2KingAlive || (unit.Role == RoleKing)
+			p2BossAlive = p2BossAlive || (unit.Role == RoleBoss)
+			p2OrdinaryAlive = p2OrdinaryAlive || (unit.Role != RoleKing && unit.Role != RoleBoss)
 		}
 	}
 

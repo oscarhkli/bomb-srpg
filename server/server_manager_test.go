@@ -278,8 +278,8 @@ func TestServerStateManager_ReadOnlyMethodsDoNotUpdateLastActivity(t *testing.T)
 func validGameCfg() engine.GameCfg {
 	return engine.GameCfg{
 		StagePreset: "Plain",
-		P1Teams:     []string{"King", "Fighter"},
-		P2Teams:     []string{"King", "Witch"},
+		P1Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Fighter", Role: engine.RoleNormal}},
+		P2Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Witch", Role: engine.RoleNormal}},
 		MaxTurns:    10,
 	}
 }

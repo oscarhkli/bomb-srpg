@@ -93,9 +93,6 @@ func TestStatBoundaries(t *testing.T) {
 			if archetype.BaseHP < 0 {
 				t.Errorf("BaseHP for %s should be non-negative, got %d", name, archetype.BaseHP)
 			}
-			if archetype.Boss && archetype.Selectable {
-				t.Errorf("Boss is not Selectable, got Selectable Boss %s", name)
-			}
 		})
 	}
 }
@@ -233,8 +230,8 @@ func TestStagePrests_Sanity(t *testing.T) {
 		t.Run(s.Name, func(t *testing.T) {
 			gs, err := initGameState(GameCfg{
 				StagePreset: s.Name,
-				P1Teams:     []string{"King", "Fighter"}, // we don't care this value in this test, as long as it can create a GameState
-				P2Teams:     []string{"King", "Fighter"}, // same as above
+				P1Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}}, // we don't care this value in this test, as long as it can create a GameState
+				P2Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}}, // same as above
 			})
 
 			if err != nil {

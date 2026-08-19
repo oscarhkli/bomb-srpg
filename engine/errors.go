@@ -21,6 +21,7 @@ var (
 	ErrMissingKing          = errors.New("missing king")
 	ErrInvalidStageLayout   = errors.New("invalid stage layout")
 	ErrInvalidTerrain       = errors.New("invalid terrain")
+	ErrInvalidUnitRole      = errors.New("invalid unit role")
 	ErrUnknownArchetype     = errors.New("unknown archetype")
 
 	ErrOutOfBounds = errors.New("out of bounds")

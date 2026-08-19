@@ -12,8 +12,50 @@ func main() {
 		StagePreset:    "Plain",
 		MaxTurns:       30,
 		AllowResetTurn: true,
-		P1Teams:        []string{"King", "Witch", "Bandit", "Fighter", "Fighter"},
-		P2Teams:        []string{"King", "Witch", "Bandit", "Fighter", "Fighter"},
+		P1Slots: []engine.TeamSlot{
+			{
+				Archetype: "King",
+				Role:      engine.RoleKing,
+			},
+			{
+				Archetype: "Witch",
+				Role:      engine.RoleNormal,
+			},
+			{
+				Archetype: "Bandit",
+				Role:      engine.RoleNormal,
+			},
+			{
+				Archetype: "Fighter",
+				Role:      engine.RoleNormal,
+			},
+			{
+				Archetype: "Fighter",
+				Role:      engine.RoleNormal,
+			},
+		},
+		P2Slots: []engine.TeamSlot{
+			{
+				Archetype: "King",
+				Role:      engine.RoleKing,
+			},
+			{
+				Archetype: "Witch",
+				Role:      engine.RoleNormal,
+			},
+			{
+				Archetype: "Bandit",
+				Role:      engine.RoleNormal,
+			},
+			{
+				Archetype: "Fighter",
+				Role:      engine.RoleNormal,
+			},
+			{
+				Archetype: "Fighter",
+				Role:      engine.RoleNormal,
+			},
+		},
 	}
 
 	match, err := engine.InitGame(gameCfg)

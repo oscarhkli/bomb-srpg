@@ -19,8 +19,8 @@ func TestInitGameState_Suite(t *testing.T) {
 			name: "Success: Full Teams (5 vs 5) with Plain Stage",
 			cfg: GameCfg{
 				StagePreset: "Plain",
-				P1Teams:     []string{"King", "Fighter", "Witch", "Fighter", "Fighter"},
-				P2Teams:     []string{"King", "Fighter", "Witch", "Bandit", "Witch"},
+				P1Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}, {Archetype: "Witch", Role: RoleNormal}, {Archetype: "Fighter", Role: RoleNormal}, {Archetype: "Fighter", Role: RoleNormal}},
+				P2Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}, {Archetype: "Witch", Role: RoleNormal}, {Archetype: "Bandit", Role: RoleNormal}, {Archetype: "Witch", Role: RoleNormal}},
 			},
 			expectError:        false,
 			expectedTotalUnits: 10, // 5 for each player
@@ -29,8 +29,8 @@ func TestInitGameState_Suite(t *testing.T) {
 			name: "Success: Minimum Teams (2 vs 2) with Plain Stage",
 			cfg: GameCfg{
 				StagePreset: "Plain",
-				P1Teams:     []string{"King", "Fighter"},
-				P2Teams:     []string{"King", "Fighter"},
+				P1Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
+				P2Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
 			},
 			expectError:        false,
 			expectedTotalUnits: 4, // 2 for each player
@@ -39,8 +39,8 @@ func TestInitGameState_Suite(t *testing.T) {
 			name: "Success: Mixed Teams (3 vs 2) with Standard Stage",
 			cfg: GameCfg{
 				StagePreset: "Standard",
-				P1Teams:     []string{"King", "Fighter", "Witch"},
-				P2Teams:     []string{"King", "Fighter"},
+				P1Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}, {Archetype: "Witch", Role: RoleNormal}},
+				P2Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
 			},
 			expectError:        false,
 			expectedTotalUnits: 5, // 3 for Player 1, 2 for Player 2
@@ -49,8 +49,8 @@ func TestInitGameState_Suite(t *testing.T) {
 			name: "Success: With NO_UNIT",
 			cfg: GameCfg{
 				StagePreset: "Plain",
-				P1Teams:     []string{"King", NoUnit, "Fighter"},
-				P2Teams:     []string{"King", "Fighter"},
+				P1Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: NoUnit}, {Archetype: "Fighter", Role: RoleNormal}},
+				P2Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
 			},
 			expectError:        false,
 			expectedTotalUnits: 4, // 2 for each player
@@ -59,8 +59,8 @@ func TestInitGameState_Suite(t *testing.T) {
 			name: "Failure: Player 1 has no King",
 			cfg: GameCfg{
 				StagePreset: "Plain",
-				P1Teams:     []string{"Fighter", "Witch", "Fighter"},
-				P2Teams:     []string{"King", "Fighter"},
+				P1Slots:     []TeamSlot{{Archetype: "Fighter", Role: RoleNormal}, {Archetype: "Witch", Role: RoleNormal}, {Archetype: "Fighter", Role: RoleNormal}},
+				P2Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
 			},
 			expectError:   true,
 			errorContains: "Player 1 must have exactly one King as the first unit",
@@ -69,8 +69,8 @@ func TestInitGameState_Suite(t *testing.T) {
 			name: "Failure: Player 2 has no King",
 			cfg: GameCfg{
 				StagePreset: "Plain",
-				P1Teams:     []string{"King", "Fighter"},
-				P2Teams:     []string{"Fighter", "Witch"},
+				P1Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
+				P2Slots:     []TeamSlot{{Archetype: "Fighter", Role: RoleNormal}, {Archetype: "Witch", Role: RoleNormal}},
 			},
 			expectError:   true,
 			errorContains: "Player 2 must have exactly one King as the first unit",
@@ -79,8 +79,8 @@ func TestInitGameState_Suite(t *testing.T) {
 			name: "Failure: Player 1 has more than 1 King",
 			cfg: GameCfg{
 				StagePreset: "Plain",
-				P1Teams:     []string{"King", "King", "Fighter"},
-				P2Teams:     []string{"King", "Fighter"},
+				P1Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
+				P2Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
 			},
 			expectError:   true,
 			errorContains: "Player 1 must have exactly one King as the first unit",
@@ -89,8 +89,8 @@ func TestInitGameState_Suite(t *testing.T) {
 			name: "Failure: Player 2 has more than 1 King",
 			cfg: GameCfg{
 				StagePreset: "Plain",
-				P1Teams:     []string{"King", "Fighter"},
-				P2Teams:     []string{"King", "King", "Fighter"},
+				P1Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
+				P2Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
 			},
 			expectError:   true,
 			errorContains: "Player 2 must have exactly one King as the first unit",
@@ -99,8 +99,8 @@ func TestInitGameState_Suite(t *testing.T) {
 			name: "Failure: Player 1's King is not the first unit",
 			cfg: GameCfg{
 				StagePreset: "Plain",
-				P1Teams:     []string{"Fighter", "King", "Witch"},
-				P2Teams:     []string{"King", "Fighter"},
+				P1Slots:     []TeamSlot{{Archetype: "Fighter", Role: RoleNormal}, {Archetype: "King", Role: RoleKing}, {Archetype: "Witch", Role: RoleNormal}},
+				P2Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
 			},
 			expectError:   true,
 			errorContains: "Player 1 must have exactly one King as the first unit",
@@ -109,8 +109,8 @@ func TestInitGameState_Suite(t *testing.T) {
 			name: "Failure: Player 2's King is not the first unit",
 			cfg: GameCfg{
 				StagePreset: "Plain",
-				P1Teams:     []string{"King", "Fighter"},
-				P2Teams:     []string{"Fighter", "King", "Witch"},
+				P1Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
+				P2Slots:     []TeamSlot{{Archetype: "Fighter", Role: RoleNormal}, {Archetype: "King", Role: RoleKing}, {Archetype: "Witch", Role: RoleNormal}},
 			},
 			expectError:   true,
 			errorContains: "Player 2 must have exactly one King as the first unit",
@@ -119,8 +119,8 @@ func TestInitGameState_Suite(t *testing.T) {
 			name: "Failure: Player 1 has more than 5 units",
 			cfg: GameCfg{
 				StagePreset: "Plain",
-				P1Teams:     []string{"King", "Fighter", "Witch", "Bandit", "Witch", "Fighter"},
-				P2Teams:     []string{"King", "Fighter"},
+				P1Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}, {Archetype: "Witch", Role: RoleNormal}, {Archetype: "Bandit", Role: RoleNormal}, {Archetype: "Witch", Role: RoleNormal}, {Archetype: "Fighter", Role: RoleNormal}},
+				P2Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
 			},
 			expectError:   true,
 			errorContains: "Player 1 must have between 2 and 5 units",
@@ -129,8 +129,8 @@ func TestInitGameState_Suite(t *testing.T) {
 			name: "Failure: Player 2 has more than 5 units",
 			cfg: GameCfg{
 				StagePreset: "Plain",
-				P1Teams:     []string{"King", "Fighter"},
-				P2Teams:     []string{"King", "Fighter", "Witch", "Bandit", "Witch", "Fighter"},
+				P1Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
+				P2Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}, {Archetype: "Witch", Role: RoleNormal}, {Archetype: "Bandit", Role: RoleNormal}, {Archetype: "Witch", Role: RoleNormal}, {Archetype: "Fighter", Role: RoleNormal}},
 			},
 			expectError:   true,
 			errorContains: "Player 2 must have between 2 and 5 units",
@@ -139,8 +139,8 @@ func TestInitGameState_Suite(t *testing.T) {
 			name: "Failure: Player 1 has 1 unit",
 			cfg: GameCfg{
 				StagePreset: "Plain",
-				P1Teams:     []string{"King"},
-				P2Teams:     []string{"King", "Fighter"},
+				P1Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}},
+				P2Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
 			},
 			expectError:   true,
 			errorContains: "Player 1 must have between 2 and 5 units",
@@ -149,8 +149,8 @@ func TestInitGameState_Suite(t *testing.T) {
 			name: "Failure: Player 2 has 1 unit",
 			cfg: GameCfg{
 				StagePreset: "Plain",
-				P1Teams:     []string{"King", "Fighter"},
-				P2Teams:     []string{"King"},
+				P1Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
+				P2Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}},
 			},
 			expectError:   true,
 			errorContains: "Player 2 must have between 2 and 5 units",
@@ -159,8 +159,8 @@ func TestInitGameState_Suite(t *testing.T) {
 			name: "Failure: Player 1 has no units",
 			cfg: GameCfg{
 				StagePreset: "Plain",
-				P1Teams:     []string{},
-				P2Teams:     []string{"King", "Fighter"},
+				P1Slots:     []TeamSlot{},
+				P2Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
 			},
 			expectError:   true,
 			errorContains: "Player 1 must have between 2 and 5 units",
@@ -169,8 +169,8 @@ func TestInitGameState_Suite(t *testing.T) {
 			name: "Failure: Player 2 has no units",
 			cfg: GameCfg{
 				StagePreset: "Plain",
-				P1Teams:     []string{"King", "Fighter"},
-				P2Teams:     []string{},
+				P1Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
+				P2Slots:     []TeamSlot{},
 			},
 			expectError:   true,
 			errorContains: "Player 2 must have between 2 and 5 units",
@@ -179,8 +179,8 @@ func TestInitGameState_Suite(t *testing.T) {
 			name: "Failure: Player 1 has an invalid archetype",
 			cfg: GameCfg{
 				StagePreset: "Plain",
-				P1Teams:     []string{"King", "InvalidArchetype"},
-				P2Teams:     []string{"King", "Fighter"},
+				P1Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "InvalidArchetype"}},
+				P2Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
 			},
 			expectError:   true,
 			errorContains: "archetype 'InvalidArchetype' for Player 1 not found",
@@ -189,8 +189,8 @@ func TestInitGameState_Suite(t *testing.T) {
 			name: "Failure: Player 2 has an invalid archetype",
 			cfg: GameCfg{
 				StagePreset: "Plain",
-				P1Teams:     []string{"King", "Fighter"},
-				P2Teams:     []string{"King", "InvalidArchetype"},
+				P1Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
+				P2Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "InvalidArchetype"}},
 			},
 			expectError:   true,
 			errorContains: "archetype 'InvalidArchetype' for Player 2 not found",
@@ -199,8 +199,8 @@ func TestInitGameState_Suite(t *testing.T) {
 			name: "Failure: Player 1 has 1 unit as NO_UNIT doesn't count",
 			cfg: GameCfg{
 				StagePreset: "Plain",
-				P1Teams:     []string{"King", NoUnit},
-				P2Teams:     []string{"King", "Fighter"},
+				P1Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: NoUnit}},
+				P2Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
 			},
 			expectError:   true,
 			errorContains: "Player 1 must have between 2 and 5 units",
@@ -209,8 +209,8 @@ func TestInitGameState_Suite(t *testing.T) {
 			name: "Failure: Invalid stage preset",
 			cfg: GameCfg{
 				StagePreset: "NonExistentStage",
-				P1Teams:     []string{"King", "Fighter"},
-				P2Teams:     []string{"King", "Fighter"},
+				P1Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
+				P2Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
 			},
 			expectError:   true,
 			errorContains: "stage preset 'NonExistentStage' not found",
@@ -219,8 +219,8 @@ func TestInitGameState_Suite(t *testing.T) {
 			name: "Success: With Global Overrides for Speed and Bomb Range Positive",
 			cfg: GameCfg{
 				StagePreset:                "Plain",
-				P1Teams:                    []string{"King", "Fighter"},
-				P2Teams:                    []string{"King", "Fighter"},
+				P1Slots:                    []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
+				P2Slots:                    []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
 				GlobalSpeedOverride:        10,
 				GlobalBombMaxRangeOverride: 5,
 			},
@@ -231,8 +231,8 @@ func TestInitGameState_Suite(t *testing.T) {
 			name: "Success: With Global Overrides for Speed and Bomb Range Zero (No Override)",
 			cfg: GameCfg{
 				StagePreset:                "Plain",
-				P1Teams:                    []string{"King", "Fighter"},
-				P2Teams:                    []string{"King", "Fighter"},
+				P1Slots:                    []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
+				P2Slots:                    []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
 				GlobalSpeedOverride:        0,
 				GlobalBombMaxRangeOverride: 0,
 			},
@@ -243,8 +243,8 @@ func TestInitGameState_Suite(t *testing.T) {
 			name: "Success: With Global Overrides for Speed and Bomb Range Negative (Treated as No Override)",
 			cfg: GameCfg{
 				StagePreset:                "Plain",
-				P1Teams:                    []string{"King", "Fighter"},
-				P2Teams:                    []string{"King", "Fighter"},
+				P1Slots:                    []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
+				P2Slots:                    []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
 				GlobalSpeedOverride:        -5,
 				GlobalBombMaxRangeOverride: -3,
 			},
@@ -255,8 +255,8 @@ func TestInitGameState_Suite(t *testing.T) {
 			name: "Success: Player 1 With Boss type Archetype but not King",
 			cfg: GameCfg{
 				StagePreset: "Plain",
-				P1Teams:     []string{"Prologue", "Fighter"},
-				P2Teams:     []string{"King", "Fighter"},
+				P1Slots:     []TeamSlot{{Archetype: "Prologue", Role: RoleBoss}, {Archetype: "Fighter", Role: RoleNormal}},
+				P2Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
 			},
 			expectError:        false,
 			expectedTotalUnits: 4,
@@ -265,8 +265,8 @@ func TestInitGameState_Suite(t *testing.T) {
 			name: "Success: Player 2 With Boss type Archetype but not King",
 			cfg: GameCfg{
 				StagePreset: "Plain",
-				P1Teams:     []string{"King", "Fighter"},
-				P2Teams:     []string{"Prologue", "Fighter"},
+				P1Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
+				P2Slots:     []TeamSlot{{Archetype: "Prologue", Role: RoleBoss}, {Archetype: "Fighter", Role: RoleNormal}},
 			},
 			expectError:        false,
 			expectedTotalUnits: 4,
@@ -275,8 +275,8 @@ func TestInitGameState_Suite(t *testing.T) {
 			name: "Success: Player 1 With Boss type Archetype alone",
 			cfg: GameCfg{
 				StagePreset: "Plain",
-				P1Teams:     []string{"Prologue"},
-				P2Teams:     []string{"King", "Fighter"},
+				P1Slots:     []TeamSlot{{Archetype: "Prologue", Role: RoleBoss}},
+				P2Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
 			},
 			expectError:        false,
 			expectedTotalUnits: 3,
@@ -285,8 +285,8 @@ func TestInitGameState_Suite(t *testing.T) {
 			name: "Success: Player 2 With Boss type Archetype alone",
 			cfg: GameCfg{
 				StagePreset: "Plain",
-				P1Teams:     []string{"King", "Fighter"},
-				P2Teams:     []string{"Prologue"},
+				P1Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
+				P2Slots:     []TeamSlot{{Archetype: "Prologue", Role: RoleBoss}},
 			},
 			expectError:        false,
 			expectedTotalUnits: 3,
@@ -295,8 +295,8 @@ func TestInitGameState_Suite(t *testing.T) {
 			name: "Success: Multiple Boss type Archetypes",
 			cfg: GameCfg{
 				StagePreset: "Plain",
-				P1Teams:     []string{"Prologue", "Prologue"},
-				P2Teams:     []string{"King", "Fighter"},
+				P1Slots:     []TeamSlot{{Archetype: "Prologue", Role: RoleBoss}, {Archetype: "Prologue", Role: RoleBoss}},
+				P2Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
 			},
 			expectError:        false,
 			expectedTotalUnits: 4,
@@ -305,8 +305,8 @@ func TestInitGameState_Suite(t *testing.T) {
 			name: "Failure: Player 1 With Boss type Archetype and King concurrently",
 			cfg: GameCfg{
 				StagePreset: "Plain",
-				P1Teams:     []string{"King", "Prologue", "Fighter"},
-				P2Teams:     []string{"King", "Fighter"},
+				P1Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Prologue", Role: RoleBoss}, {Archetype: "Fighter", Role: RoleNormal}},
+				P2Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
 			},
 			expectError:   true,
 			errorContains: "Player 1 must have either Boss or King",
@@ -315,8 +315,8 @@ func TestInitGameState_Suite(t *testing.T) {
 			name: "Failure: Player 2 With Boss type Archetype and King concurrently",
 			cfg: GameCfg{
 				StagePreset: "Plain",
-				P1Teams:     []string{"King", "Fighter"},
-				P2Teams:     []string{"King", "Prologue", "Fighter"},
+				P1Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
+				P2Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Prologue", Role: RoleBoss}, {Archetype: "Fighter", Role: RoleNormal}},
 			},
 			expectError:   true,
 			errorContains: "Player 2 must have either Boss or King",
@@ -325,8 +325,8 @@ func TestInitGameState_Suite(t *testing.T) {
 			name: "Failure: Player 1 With Boss type Archetype alone, but Player 2 has 1 unit",
 			cfg: GameCfg{
 				StagePreset: "Plain",
-				P1Teams:     []string{"Prologue"},
-				P2Teams:     []string{"King"},
+				P1Slots:     []TeamSlot{{Archetype: "Prologue", Role: RoleBoss}},
+				P2Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}},
 			},
 			expectError:   true,
 			errorContains: "Player 2 must have between 2 and 5 units",
@@ -335,11 +335,49 @@ func TestInitGameState_Suite(t *testing.T) {
 			name: "Success: Player 2 With Boss type Archetype alone, but Player 1 has 1 unit",
 			cfg: GameCfg{
 				StagePreset: "Plain",
-				P1Teams:     []string{"King"},
-				P2Teams:     []string{"Prologue"},
+				P1Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}},
+				P2Slots:     []TeamSlot{{Archetype: "Prologue", Role: RoleBoss}},
 			},
 			expectError:   true,
 			errorContains: "Player 1 must have between 2 and 5 units",
+		},
+		{
+			name: "Failure: Player 1 With Boss type Archetype, more than 5 units",
+			cfg: GameCfg{
+				StagePreset: "Plain",
+				P1Slots: []TeamSlot{
+					{Archetype: "Prologue", Role: RoleBoss}, {Archetype: "Prologue", Role: RoleBoss},
+					{Archetype: "Prologue", Role: RoleBoss}, {Archetype: "Prologue", Role: RoleBoss},
+					{Archetype: "Prologue", Role: RoleBoss}, {Archetype: "Prologue", Role: RoleBoss},
+				},
+				P2Slots: []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
+			},
+			expectError:   true,
+			errorContains: "Player 1 must have between 1 and 5 units",
+		},
+		{
+			name: "Success: Player 1 With Boss type Archetype, exactly 5 units",
+			cfg: GameCfg{
+				StagePreset: "Plain",
+				P1Slots: []TeamSlot{
+					{Archetype: "Prologue", Role: RoleBoss}, {Archetype: "Prologue", Role: RoleBoss},
+					{Archetype: "Prologue", Role: RoleBoss}, {Archetype: "Prologue", Role: RoleBoss},
+					{Archetype: "Prologue", Role: RoleBoss},
+				},
+				P2Slots: []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
+			},
+			expectError:        false,
+			expectedTotalUnits: 7,
+		},
+		{
+			name: "Failure: Player 1 With Boss type Archetype, empty team",
+			cfg: GameCfg{
+				StagePreset: "Plain",
+				P1Slots:     []TeamSlot{{Archetype: NoUnit, Role: RoleBoss}},
+				P2Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
+			},
+			expectError:   true,
+			errorContains: "Player 1 must have between 1 and 5 units",
 		},
 	}
 
@@ -553,8 +591,8 @@ func TestInitGameState_LayoutGridCompilation(t *testing.T) {
 func TestInitGame_AllGood(t *testing.T) {
 	gameCfg := GameCfg{
 		StagePreset: "Plain",
-		P1Teams:     []string{"King", "Fighter"},
-		P2Teams:     []string{"King", "Bandit"},
+		P1Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
+		P2Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Bandit", Role: RoleNormal}},
 	}
 	match, err := InitGame(gameCfg)
 	if err != nil {
@@ -571,8 +609,8 @@ func TestInitGame_AllGood(t *testing.T) {
 func TestInitGame_ErrorConditions(t *testing.T) {
 	invalidCfgs := GameCfg{
 		StagePreset: "NonExistentStage",
-		P1Teams:     []string{"King"},
-		P2Teams:     []string{"King"},
+		P1Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}},
+		P2Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}},
 	}
 	_, err := InitGame(invalidCfgs)
 

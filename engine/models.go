@@ -1,6 +1,9 @@
 package engine
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"fmt"
+)
 
 // TerrainType represents the base terrain of a tile.
 type TerrainType int
@@ -146,7 +149,6 @@ type Archetype struct {
 	BaseHP       int
 	PresetSkills SkillType
 	Selectable   bool
-	Boss         bool
 }
 
 // MarshalJSON serializes Archetype struct to JSON that client needs
@@ -163,6 +165,53 @@ func (a Archetype) MarshalJSON() ([]byte, error) {
 		BombMaxRange int      `json:"bombMaxRange"`
 		Skills       []string `json:"skills"`
 	}{a.Name, a.BaseSpeed, a.BombMaxRange, skills})
+}
+
+// UnitRoles defines if the Unit is King, Boss, or just a Normal Unit
+type UnitRole int
+
+const (
+	RoleNormal UnitRole = iota
+	RoleKing
+	RoleBoss
+)
+
+// String converts an UnitRole integer value into a human-readable text string.
+func (o UnitRole) String() string {
+	switch o {
+	case RoleNormal:
+		return "Normal"
+	case RoleKing:
+		return "King"
+	case RoleBoss:
+		return "Boss"
+	default:
+		return "Unknown"
+	}
+}
+
+// MarshalJSON serializes UnitRole struct to JSON that client needs
+func (o UnitRole) MarshalJSON() ([]byte, error) {
+	return json.Marshal(o.String())
+}
+
+// UnmarshalJSON deserializes UnitRole struct from JSON that client provides
+func (r *UnitRole) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	}
+	switch s {
+	case "Normal":
+		*r = RoleNormal
+	case "King":
+		*r = RoleKing
+	case "Boss":
+		*r = RoleBoss
+	default:
+		return fmt.Errorf("%w: %q", ErrInvalidUnitRole, s)
+	}
+	return nil
 }
 
 // UnitID encodes (TeamID << 4) | PlayerIndex. Max 15 teams, 15 units per team.
@@ -186,6 +235,7 @@ type Unit struct {
 	Team         int // 1 = P1, 2 = P2 / COM
 	HP           int // 1 = alive, 0 = dead; extensible for multi-HP units
 	Skills       SkillType
+	Role         UnitRole
 	HasMoved     bool
 	HasUsedSkill bool // True after placing bomb or using skill; resets each turn
 }
@@ -238,17 +288,23 @@ type Bomb struct {
 	Countdown int        `json:"countdown"` // Turns remaining until detonation; <0 for non-countdown bombs
 }
 
+// TeamSlot hold a the archetype and the role of a slot
+type TeamSlot struct {
+	Archetype string   `json:"archetype"`
+	Role      UnitRole `json:"role"` // "King" | "Boss" | "Normal"
+}
+
 // GameCfg holds all configuration for a match.
 type GameCfg struct {
-	VSCpu                       bool     `json:"vsCpu"`          // True = VS CPU Mode
-	StagePreset                 string   `json:"stagePreset"`    // Stage preset name (e.g., "Plain")
-	P1Teams                     []string `json:"p1Teams"`        // Archetype names for Player 1 (1-5 units, first must be King)
-	P2Teams                     []string `json:"p2Teams"`        // Archetype names for Player 2 (1-5 units, first must be King)
-	MaxTurns                    int      `json:"maxTurns"`       // Turn limit; 0 = instant sudden death
-	AllowResetTurn              bool     `json:"allowResetTurn"` // True = players can undo actions before committing
-	GlobalSpeedOverride         int      `json:"-"`              // Test override for all unit speeds (0 = disabled)
-	GlobalBombCountdownOverride int      `json:"-"`              // Test override for bomb countdown (0 = disabled)
-	GlobalBombMaxRangeOverride  int      `json:"-"`              // Test override for bomb max range (0 = disabled)
+	VSCpu                       bool       `json:"vsCpu"`       // True = VS CPU Mode
+	StagePreset                 string     `json:"stagePreset"` // Stage preset name (e.g., "Plain")
+	P1Slots                     []TeamSlot `json:"p1Slots"`
+	P2Slots                     []TeamSlot `json:"p2Slots"`
+	MaxTurns                    int        `json:"maxTurns"`       // Turn limit; 0 = instant sudden death
+	AllowResetTurn              bool       `json:"allowResetTurn"` // True = players can undo actions before committing
+	GlobalSpeedOverride         int        `json:"-"`              // Test override for all unit speeds (0 = disabled)
+	GlobalBombCountdownOverride int        `json:"-"`              // Test override for bomb countdown (0 = disabled)
+	GlobalBombMaxRangeOverride  int        `json:"-"`              // Test override for bomb max range (0 = disabled)
 }
 
 // GameState is the complete snapshot of a match at a point in time.
