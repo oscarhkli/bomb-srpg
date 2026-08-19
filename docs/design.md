@@ -137,6 +137,11 @@ Surrender: `POST /surrender` (either team, any time).
 - **Input Model**: Click-only interaction for Phase 3 (keyboard shortcuts deferred to Phase 5+ polish pass).
 - **Retro Art Strategy**: Units, Bombs, and SoftBlocks in `MatchScene` render as pixel-art `Sprite`s (`this.load.aseprite(...)`). Tiles render as a pixel-art Stage background `Image`, one per `StagePreset`, keyed off `gameCfg.stagePreset`. Explosions remain a procedural `Graphics` tile-color flash. `MatchSettingsScene`'s `UnitPage` reuses the same unit `Sprite`s.
 
+## 10. VS CPU
+
+- **VS-CPU Turn Handoff**: The CPU's turn runs in a goroutine kicked off after the human's `ResolveTurn()` commits, buffering its events on `Match.CPU` until the frontend polls them. See [VS-CPU Turn Sequence](diagrams/vs-cpu-turn-sequence.md) for the full handshake.
+- **Latency Masking**: CPU compute is decoupled from the human's `/resolve` response entirely — the request returns as soon as the human's turn commits, and the goroutine runs while the frontend is already playing that turn's resolve animation. CPU think time is only ever perceptible if it outlasts an animation the player was watching anyway, rather than requiring dedicated "AI is thinking" UX.
+- **Boss Prologue over Full VS-COM**: Rather than build general-purpose CPU heuristics for a full team, the first CPU opponent is a single `Archetype.Boss` unit against a 5-unit human team — a narrower rules surface (`evaluateVictoryConditions()` gained a Boss-type goal alongside the King-type one) that ships a playable single-player mode sooner. The Boss/Prologue shape isn't throwaway scaffolding: it doubles as the natural seed for a future Tutorial or Story Mode encounter.
 
 ## File Structure (WIP)
 
