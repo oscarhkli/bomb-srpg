@@ -131,7 +131,7 @@ export interface GameEvent {
 }
 
 export interface GameCfg {
-  vsCom: boolean;
+  vsCpu: boolean;
   stagePreset: string;
   p1Teams: string[]; // Archetype names (first = King)
   p2Teams: string[]; // Archetype names (first = King)

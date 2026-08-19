@@ -240,7 +240,7 @@ type Bomb struct {
 
 // GameCfg holds all configuration for a match.
 type GameCfg struct {
-	VSCom                       bool     `json:"vsCom"`          // True = VS COM Mode
+	VSCpu                       bool     `json:"vsCpu"`          // True = VS CPU Mode
 	StagePreset                 string   `json:"stagePreset"`    // Stage preset name (e.g., "Plain")
 	P1Teams                     []string `json:"p1Teams"`        // Archetype names for Player 1 (1-5 units, first must be King)
 	P2Teams                     []string `json:"p2Teams"`        // Archetype names for Player 2 (1-5 units, first must be King)
@@ -299,13 +299,29 @@ func (gs GameState) MarshalJSON() ([]byte, error) {
 	})
 }
 
+// CPUTurnPhase represents what CPU is operating in a Match. VS CPU only.
+type CPUTurnPhase int
+
+const (
+	TurnPhaseIdle     CPUTurnPhase = iota // CPU is idling, or no CPU involved at all
+	TurnPhasePlanning                     // CPU is planning
+	TurnPhaseReady                        // CPU has made the decision
+)
+
+// CPUState manages the TurnPhase state and pending GameEvent for VS CPU.
+type CPUState struct {
+	Phase         CPUTurnPhase
+	PendingEvents []GameEvent
+}
+
 // Match orchestrates a full game session: state, config, and event log.
 type Match struct {
 	GameCfg      GameCfg
 	TrueState    *GameState  // Committed state
 	WorkingState *GameState  // Sandbox for mid-turn planning
 	PlaybackLog  []GameEvent // Events since last ResolveTurn
-	WinnerTeamID int         // 0 = in progress, 1/2 = winner, -1 = draw
+	CPU          CPUState
+	WinnerTeamID int // 0 = in progress, 1/2 = winner, -1 = draw
 }
 
 const (

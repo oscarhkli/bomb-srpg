@@ -22,7 +22,7 @@ export interface MatchSettingsSceneData {
 
 function defaultGameCfg(): GameCfg {
   return {
-    vsCom: false,
+    vsCpu: false,
     stagePreset: 'Plain',
     p1Teams: ['King'],
     p2Teams: ['King'],
