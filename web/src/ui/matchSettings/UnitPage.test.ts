@@ -11,7 +11,7 @@ import { makeCfg } from '../../test/fixtures';
 import { TEAM_COLORS, NEXT_BUTTON_LABEL, DISABLED_BUTTON_COLOR } from '../../constants';
 import type { Archetype, GameCfg } from '../../types/api';
 import type { PageBounds, SettingsPageNav } from './SettingsPage';
-import { NO_UNIT } from './formation';
+import { NO_UNIT, serializeTeams } from './formation';
 import UnitPage from './UnitPage';
 
 beforeEach(() => {
@@ -81,7 +81,7 @@ describe('UnitPage — header', () => {
 
 describe('UnitPage — FormationPanel', () => {
   it('renders King in the middle slot (display position 2) with no click handler (AC 5)', () => {
-    const p = page(1, makeCfg({ p1Teams: ['King'] }));
+    const p = page(1, makeCfg({ p1Slots: serializeTeams(['King']) }));
     p.renderBody(mockScene as never, bodyBounds());
 
     // Graphics order: [formationHeader is text, slot(0)..slot(4) as graphics in display order]
@@ -91,7 +91,7 @@ describe('UnitPage — FormationPanel', () => {
   });
 
   it('places a clicked UnitCard on the lowest free slot (AC 6, 9)', () => {
-    const cfg = makeCfg({ p1Teams: ['King'] });
+    const cfg = makeCfg({ p1Slots: serializeTeams(['King']) });
     const p = page(1, cfg);
     p.renderBody(mockScene as never, bodyBounds());
 
@@ -99,22 +99,24 @@ describe('UnitPage — FormationPanel', () => {
     const cardGraphics = allGraphics()[5]!; // first UnitCard (Fighter)
     clickPointerdown(cardGraphics);
 
-    expect(cfg.p1Teams).toEqual(['King', 'Fighter']);
+    expect(cfg.p1Slots).toEqual(serializeTeams(['King', 'Fighter']));
   });
 
   it('does nothing when a UnitCard is clicked and every slot is full (AC 7)', () => {
-    const cfg = makeCfg({ p1Teams: ['King', 'Fighter', 'Witch', 'Witch', 'Fighter'] });
+    const cfg = makeCfg({
+      p1Slots: serializeTeams(['King', 'Fighter', 'Witch', 'Witch', 'Fighter']),
+    });
     const p = page(1, cfg);
     p.renderBody(mockScene as never, bodyBounds());
 
     const cardGraphics = allGraphics()[5]!;
     clickPointerdown(cardGraphics);
 
-    expect(cfg.p1Teams).toEqual(['King', 'Fighter', 'Witch', 'Witch', 'Fighter']);
+    expect(cfg.p1Slots).toEqual(serializeTeams(['King', 'Fighter', 'Witch', 'Witch', 'Fighter']));
   });
 
   it('frees a clicked non-King UnitSlot (AC 8)', () => {
-    const cfg = makeCfg({ p1Teams: ['King', 'Fighter'] });
+    const cfg = makeCfg({ p1Slots: serializeTeams(['King', 'Fighter']) });
     const p = page(1, cfg);
     p.renderBody(mockScene as never, bodyBounds());
 
@@ -122,11 +124,13 @@ describe('UnitPage — FormationPanel', () => {
     const slotIndex1Graphics = allGraphics()[1]!;
     clickPointerdown(slotIndex1Graphics);
 
-    expect(cfg.p1Teams).toEqual(['King']);
+    expect(cfg.p1Slots).toEqual(serializeTeams(['King']));
   });
 
   it('leaves non-contiguous gaps in gameCfg after put-on/take-off (AC 9)', () => {
-    const cfg = makeCfg({ p1Teams: ['King', 'Fighter', 'Witch', 'Witch', 'Fighter'] });
+    const cfg = makeCfg({
+      p1Slots: serializeTeams(['King', 'Fighter', 'Witch', 'Witch', 'Fighter']),
+    });
     const p = page(1, cfg);
     p.renderBody(mockScene as never, bodyBounds());
 
@@ -136,11 +140,11 @@ describe('UnitPage — FormationPanel', () => {
     p.renderBody(mockScene as never, bodyBounds());
     clickPointerdown(allGraphics()[3]!);
 
-    expect(cfg.p1Teams).toEqual(['King', NO_UNIT, NO_UNIT, 'Witch', 'Fighter']);
+    expect(cfg.p1Slots).toEqual(serializeTeams(['King', NO_UNIT, NO_UNIT, 'Witch', 'Fighter']));
   });
 
   it('frees the correct non-King UnitSlot for Player 2 (mirrored SLOT_DISPLAY_ORDER_P2)', () => {
-    const cfg = makeCfg({ p2Teams: ['King', 'Fighter', 'Witch'] });
+    const cfg = makeCfg({ p2Slots: serializeTeams(['King', 'Fighter', 'Witch']) });
     const p = page(2, cfg);
     p.renderBody(mockScene as never, bodyBounds());
 
@@ -148,13 +152,13 @@ describe('UnitPage — FormationPanel', () => {
     // P1 where displayPos 1 renders slotIndex 1.
     clickPointerdown(allGraphics()[1]!);
 
-    expect(cfg.p2Teams).toEqual(['King', 'Fighter']);
+    expect(cfg.p2Slots).toEqual(serializeTeams(['King', 'Fighter']));
   });
 });
 
 describe('UnitPage — UnitSlot sprites', () => {
   it('draws a 2px TeamColor border, no fill, for an empty slot', () => {
-    const p = page(1, makeCfg({ p1Teams: ['King'] }));
+    const p = page(1, makeCfg({ p1Slots: serializeTeams(['King']) }));
     p.renderBody(mockScene as never, bodyBounds());
 
     // SLOT_DISPLAY_ORDER_P1 displayPos 0 -> slotIndex 3 (empty).
@@ -165,7 +169,7 @@ describe('UnitPage — UnitSlot sprites', () => {
   });
 
   it('renders an occupant as a sprite using the archetype + team texture key', () => {
-    const p = page(1, makeCfg({ p1Teams: ['King', 'Fighter'] }));
+    const p = page(1, makeCfg({ p1Slots: serializeTeams(['King', 'Fighter']) }));
     p.renderBody(mockScene as never, bodyBounds());
 
     expect(mockScene.add.sprite).toHaveBeenCalledWith(
@@ -177,7 +181,7 @@ describe('UnitPage — UnitSlot sprites', () => {
   });
 
   it("anchors the occupant sprite's bottom edge to the slot's bottom edge", () => {
-    const p = page(1, makeCfg({ p1Teams: ['King', 'Fighter'] }));
+    const p = page(1, makeCfg({ p1Slots: serializeTeams(['King', 'Fighter']) }));
     const bounds = bodyBounds();
     p.renderBody(mockScene as never, bounds);
 
@@ -188,7 +192,7 @@ describe('UnitPage — UnitSlot sprites', () => {
 
 describe('UnitPage — UnitCard sprites', () => {
   it('renders no team-colored background, only the panel fill/border', () => {
-    const p = page(1, makeCfg({ p1Teams: ['King'] }));
+    const p = page(1, makeCfg({ p1Slots: serializeTeams(['King']) }));
     p.renderBody(mockScene as never, bodyBounds());
 
     const cardGraphics = allGraphics()[5]!;
@@ -196,7 +200,7 @@ describe('UnitPage — UnitCard sprites', () => {
   });
 
   it('renders the archetype as a sprite anchored to the sprite slot bottom edge', () => {
-    const p = page(1, makeCfg({ p1Teams: ['King'] }));
+    const p = page(1, makeCfg({ p1Slots: serializeTeams(['King']) }));
     p.renderBody(mockScene as never, bodyBounds());
 
     expect(mockScene.add.sprite).toHaveBeenCalledWith(
@@ -212,7 +216,7 @@ describe('UnitPage — UnitCard sprites', () => {
 
 describe('UnitPage — Panel stacking', () => {
   it('renders ArchetypesPanel below FormationPanel (not a side-by-side column)', () => {
-    const p = page(1, makeCfg({ p1Teams: ['King'] }));
+    const p = page(1, makeCfg({ p1Slots: serializeTeams(['King']) }));
     const bounds = bodyBounds();
     p.renderBody(mockScene as never, bounds);
 
@@ -224,7 +228,7 @@ describe('UnitPage — Panel stacking', () => {
   });
 
   it('centers the FormationPanel UnitSlot row within the panel width', () => {
-    const p = page(1, makeCfg({ p1Teams: ['King'] }));
+    const p = page(1, makeCfg({ p1Slots: serializeTeams(['King']) }));
     const bounds = bodyBounds();
     p.renderBody(mockScene as never, bounds);
 
@@ -236,7 +240,7 @@ describe('UnitPage — Panel stacking', () => {
   });
 
   it('centers a partial ArchetypesPanel row on its own card count, not a full 4-column block', () => {
-    const p = page(1, makeCfg({ p1Teams: ['King'] }));
+    const p = page(1, makeCfg({ p1Slots: serializeTeams(['King']) }));
     const bounds = bodyBounds();
     p.renderBody(mockScene as never, bounds);
 
@@ -250,7 +254,7 @@ describe('UnitPage — Panel stacking', () => {
 
 describe('UnitPage — NextButton', () => {
   it('renders as DisabledButton when only King is in FormationPanel (AC 10)', () => {
-    const p = page(1, makeCfg({ p1Teams: ['King'] }));
+    const p = page(1, makeCfg({ p1Slots: serializeTeams(['King']) }));
     p.renderNav(mockScene as never, navBounds());
 
     const nextButtonGraphics = allGraphics()[0]!;
@@ -263,7 +267,7 @@ describe('UnitPage — NextButton', () => {
 
   it('is clickable and calls nav.goNext with >= 2 units in FormationPanel (AC 11)', () => {
     const goNext = vi.fn();
-    const p = page(1, makeCfg({ p1Teams: ['King', 'Fighter'] }), nav({ goNext }));
+    const p = page(1, makeCfg({ p1Slots: serializeTeams(['King', 'Fighter']) }), nav({ goNext }));
     p.renderNav(mockScene as never, navBounds());
 
     clickPointerdown(allGraphics()[0]!);
@@ -278,7 +282,7 @@ describe('UnitPage — NextButton', () => {
   });
 
   it('positions NextButton flush against the NavRegion right edge', () => {
-    const p = page(1, makeCfg({ p1Teams: ['King', 'Fighter'] }));
+    const p = page(1, makeCfg({ p1Slots: serializeTeams(['King', 'Fighter']) }));
     const bounds = navBounds();
     p.renderNav(mockScene as never, bounds);
 
@@ -290,7 +294,7 @@ describe('UnitPage — NextButton', () => {
 
   it('re-renders (enabling) NextButton after a put-on crosses the 2-unit threshold', () => {
     const goNext = vi.fn();
-    const cfg = makeCfg({ p1Teams: ['King'] });
+    const cfg = makeCfg({ p1Slots: serializeTeams(['King']) });
     const p = page(1, cfg, nav({ goNext }));
     p.renderNav(mockScene as never, navBounds());
     p.renderBody(mockScene as never, bodyBounds());
@@ -333,7 +337,7 @@ describe('UnitPage — BackButton delegation', () => {
 
 describe('UnitPage — destroy', () => {
   it('destroys every header/body/nav GameObject it created', () => {
-    const p = page(1, makeCfg({ p1Teams: ['King', 'Fighter'] }));
+    const p = page(1, makeCfg({ p1Slots: serializeTeams(['King', 'Fighter']) }));
     p.renderHeaderTitle(mockScene as never, 200, 102);
     p.renderBody(mockScene as never, bodyBounds());
     p.renderNav(mockScene as never, navBounds());

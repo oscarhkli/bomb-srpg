@@ -116,8 +116,8 @@ describe('api.ts', () => {
     const req = {
       gameCfg: makeCfg({
         stagePreset: 'Plain',
-        p1Teams: ['King'],
-        p2Teams: ['King'],
+        p1Slots: [{ archetype: 'King', role: 'King' }],
+        p2Slots: [{ archetype: 'King', role: 'King' }],
         maxTurns: 10,
       }),
     };
@@ -338,8 +338,8 @@ describe('api.ts', () => {
     const fixture: GameCfg = makeCfg({
       vsCpu: false,
       stagePreset: 'Plain',
-      p1Teams: ['Bomber'],
-      p2Teams: ['Bomber'],
+      p1Slots: [{ archetype: 'King', role: 'King' }],
+      p2Slots: [{ archetype: 'King', role: 'King' }],
       maxTurns: 10,
     });
 

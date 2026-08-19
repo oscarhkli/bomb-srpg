@@ -13,7 +13,7 @@ import {
 import { makeCfg } from '../test/fixtures';
 import { getCatalog, createMatchRoom, initRoom, createMatch } from '../engine/api';
 import MatchSettingsScene, { type MatchSettingsSceneData } from './MatchSettingsScene';
-import { NO_UNIT } from '../ui/matchSettings/formation';
+import { NO_UNIT, serializeTeams } from '../ui/matchSettings/formation';
 import { UNIT_SPRITE_MANIFEST } from '../rendering/spriteManifest';
 import { TEAM_COLORS, NEXT_BUTTON_LABEL, START_MATCH_BUTTON_LABEL } from '../constants';
 import type { Archetype, Catalog, GameCfg } from '../types/api';
@@ -186,8 +186,8 @@ describe('MatchSettingsScene — UnitPage 1 (default entry)', () => {
   it('renders the carried gameCfg formation on entry (AC 4)', async () => {
     mockCatalog();
     const gameCfg = makeCfg({
-      p1Teams: ['King', 'Witch', NO_UNIT, NO_UNIT, NO_UNIT],
-      p2Teams: ['King'],
+      p1Slots: serializeTeams(['King', 'Witch', NO_UNIT, NO_UNIT, NO_UNIT]),
+      p2Slots: serializeTeams(['King']),
     });
     await bootScene({ gameCfg });
 
@@ -211,34 +211,39 @@ describe('MatchSettingsScene — UnitPage 1 (default entry)', () => {
 
   it('clicking a UnitCard places the archetype on the lowest free slot and updates gameCfg (AC 6, 9)', async () => {
     mockCatalog();
-    const gameCfg = makeCfg({ p1Teams: ['King'], p2Teams: ['King'] });
+    const gameCfg = makeCfg({
+      p1Slots: serializeTeams(['King']),
+      p2Slots: serializeTeams(['King']),
+    });
     await bootScene({ gameCfg });
 
     const g = currentPageGraphics();
     clickPointerdown(cardGraphics(g, 0)); // Fighter
 
-    expect(gameCfg.p1Teams).toEqual(['King', 'Fighter']);
+    expect(gameCfg.p1Slots).toEqual(serializeTeams(['King', 'Fighter']));
   });
 
   it('clicking a UnitCard does nothing when the formation is full (AC 7)', async () => {
     mockCatalog();
     const gameCfg = makeCfg({
-      p1Teams: ['King', 'Fighter', 'Witch', 'Fighter', 'Witch'],
-      p2Teams: ['King'],
+      p1Slots: serializeTeams(['King', 'Fighter', 'Witch', 'Fighter', 'Witch']),
+      p2Slots: serializeTeams(['King']),
     });
     await bootScene({ gameCfg });
 
     const g = currentPageGraphics();
     clickPointerdown(cardGraphics(g, 0));
 
-    expect(gameCfg.p1Teams).toEqual(['King', 'Fighter', 'Witch', 'Fighter', 'Witch']);
+    expect(gameCfg.p1Slots).toEqual(
+      serializeTeams(['King', 'Fighter', 'Witch', 'Fighter', 'Witch'])
+    );
   });
 
   it('clicking an occupied non-King slot frees it and updates gameCfg immediately (AC 8, 9)', async () => {
     mockCatalog();
     const gameCfg = makeCfg({
-      p1Teams: ['King', 'Fighter', NO_UNIT, 'Witch', 'Witch'],
-      p2Teams: ['King'],
+      p1Slots: serializeTeams(['King', 'Fighter', NO_UNIT, 'Witch', 'Witch']),
+      p2Slots: serializeTeams(['King']),
     });
     await bootScene({ gameCfg });
 
@@ -246,12 +251,14 @@ describe('MatchSettingsScene — UnitPage 1 (default entry)', () => {
     // Array index 1 (order number 2) is at SLOT_DISPLAY_ORDER_P1 displayPos 1.
     clickPointerdown(slotGraphics(g, 1));
 
-    expect(gameCfg.p1Teams).toEqual(['King', NO_UNIT, NO_UNIT, 'Witch', 'Witch']);
+    expect(gameCfg.p1Slots).toEqual(serializeTeams(['King', NO_UNIT, NO_UNIT, 'Witch', 'Witch']));
   });
 
   it('NextButton renders disabled when only King is present (AC 10)', async () => {
     mockCatalog();
-    await bootScene({ gameCfg: makeCfg({ p1Teams: ['King'], p2Teams: ['King'] }) });
+    await bootScene({
+      gameCfg: makeCfg({ p1Slots: serializeTeams(['King']), p2Slots: serializeTeams(['King']) }),
+    });
 
     const g = currentPageGraphics();
     expect(pointerDownOf(nextButtonGraphics(g))).toBeUndefined();
@@ -260,7 +267,10 @@ describe('MatchSettingsScene — UnitPage 1 (default entry)', () => {
 
   it('NextButton is enabled and fadeTransitions to UnitPage 2 once 2+ slots are filled (AC 11)', async () => {
     mockCatalog();
-    const gameCfg = makeCfg({ p1Teams: ['King', 'Fighter'], p2Teams: ['King'] });
+    const gameCfg = makeCfg({
+      p1Slots: serializeTeams(['King', 'Fighter']),
+      p2Slots: serializeTeams(['King']),
+    });
     await bootScene({ gameCfg });
 
     const g = currentPageGraphics();
@@ -300,7 +310,10 @@ describe('MatchSettingsScene — BackButton', () => {
 
   it('returns from UnitPage 2 to UnitPage 1 (AC 14)', async () => {
     mockCatalog();
-    const gameCfg = makeCfg({ p1Teams: ['King', 'Fighter'], p2Teams: ['King'] });
+    const gameCfg = makeCfg({
+      p1Slots: serializeTeams(['King', 'Fighter']),
+      p2Slots: serializeTeams(['King']),
+    });
     await bootAndAdvanceToPage2(gameCfg);
     vi.mocked(mockScene.cameras.main.fadeOut).mockClear();
 
@@ -317,7 +330,10 @@ describe('MatchSettingsScene — BackButton', () => {
 
   it('returns from StagePage to UnitPage 2 (AC 15)', async () => {
     mockCatalog();
-    const gameCfg = makeCfg({ p1Teams: ['King', 'Fighter'], p2Teams: ['King', 'Witch'] });
+    const gameCfg = makeCfg({
+      p1Slots: serializeTeams(['King', 'Fighter']),
+      p2Slots: serializeTeams(['King', 'Witch']),
+    });
     await bootAndAdvanceToPage2(gameCfg);
 
     // Now on UnitPage 2 with 2 slots filled — advance to StagePage.
@@ -339,7 +355,10 @@ describe('MatchSettingsScene — BackButton', () => {
 
   it('ignores a second NextButton click fired while the first transition is still fading (re-entrancy guard)', async () => {
     mockCatalog();
-    const gameCfg = makeCfg({ p1Teams: ['King', 'Fighter'], p2Teams: ['King'] });
+    const gameCfg = makeCfg({
+      p1Slots: serializeTeams(['King', 'Fighter']),
+      p2Slots: serializeTeams(['King']),
+    });
     await bootScene({ gameCfg });
     // Isolates the transition's own fadeIn from create()'s entry fadeIn.
     vi.mocked(mockScene.cameras.main.fadeIn).mockClear();
@@ -370,7 +389,10 @@ describe('MatchSettingsScene — StartMatchButton', () => {
 
   it('creates the room and match, then transitions to MatchScene with roomId + playerTokens (AC 1)', async () => {
     mockCatalog();
-    const gameCfg = makeCfg({ p1Teams: ['King', 'Fighter'], p2Teams: ['King', 'Witch'] });
+    const gameCfg = makeCfg({
+      p1Slots: serializeTeams(['King', 'Fighter']),
+      p2Slots: serializeTeams(['King', 'Witch']),
+    });
     await bootAndAdvanceToStagePage(gameCfg);
     vi.mocked(createMatchRoom).mockResolvedValue({ id: 'room-xyz' });
     vi.mocked(createMatch).mockResolvedValue({
@@ -396,7 +418,10 @@ describe('MatchSettingsScene — StartMatchButton', () => {
 
   it('shows an error and fades back in (without transitioning) when createMatch fails', async () => {
     mockCatalog();
-    const gameCfg = makeCfg({ p1Teams: ['King', 'Fighter'], p2Teams: ['King', 'Witch'] });
+    const gameCfg = makeCfg({
+      p1Slots: serializeTeams(['King', 'Fighter']),
+      p2Slots: serializeTeams(['King', 'Witch']),
+    });
     await bootAndAdvanceToStagePage(gameCfg);
     vi.mocked(createMatchRoom).mockRejectedValue(new Error('network error'));
 
@@ -412,7 +437,10 @@ describe('MatchSettingsScene — StartMatchButton', () => {
 
   it('ignores a second StartMatchButton click fired while the first is still in flight (re-entrancy guard)', async () => {
     mockCatalog();
-    const gameCfg = makeCfg({ p1Teams: ['King', 'Fighter'], p2Teams: ['King', 'Witch'] });
+    const gameCfg = makeCfg({
+      p1Slots: serializeTeams(['King', 'Fighter']),
+      p2Slots: serializeTeams(['King', 'Witch']),
+    });
     await bootAndAdvanceToStagePage(gameCfg);
     vi.mocked(createMatchRoom).mockResolvedValue({ id: 'room-xyz' });
     vi.mocked(createMatch).mockResolvedValue({

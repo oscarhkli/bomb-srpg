@@ -24,8 +24,8 @@ function defaultGameCfg(): GameCfg {
   return {
     vsCpu: false,
     stagePreset: 'Plain',
-    p1Teams: ['King'],
-    p2Teams: ['King'],
+    p1Slots: [{ archetype: 'King', role: 'King' }],
+    p2Slots: [{ archetype: 'King', role: 'King' }],
     maxTurns: 60,
     allowResetTurn: true,
   };

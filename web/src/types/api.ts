@@ -26,6 +26,8 @@ export type GameEvtType =
   | 'softBlockDestroyed'
   | 'matchEnded';
 
+export type UnitRole = 'Normal' | 'King' | 'Boss';
+
 export interface Coordinate {
   x: number;
   y: number;
@@ -77,6 +79,7 @@ export interface Unit {
   skills: SkillType[];
   hasMoved: boolean;
   hasUsedSkill: boolean;
+  role: UnitRole;
 }
 
 export interface Bomb {
@@ -130,11 +133,16 @@ export interface GameEvent {
   winnerTeamId?: number;
 }
 
+export interface TeamSlot {
+  archetype: string;
+  role: UnitRole;
+}
+
 export interface GameCfg {
   vsCpu: boolean;
   stagePreset: string;
-  p1Teams: string[]; // Archetype names (first = King)
-  p2Teams: string[]; // Archetype names (first = King)
+  p1Slots: TeamSlot[]; // first usually = King
+  p2Slots: TeamSlot[]; // first usually = King
   maxTurns: number; // 0 = instant sudden death
   allowResetTurn: boolean;
 }
