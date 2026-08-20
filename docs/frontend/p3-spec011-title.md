@@ -17,7 +17,7 @@ Entry scene when the app boots. Displays the game title and lets the Player choo
 ## Non-goal
 
 - Polished art (including the sprite logo).
-- Additional game modes (VS COM, online multiplayer).
+- Additional game modes (VS CPU, online multiplayer).
 
 ## Scene Entry
 

@@ -851,8 +851,8 @@ func TestMatch_StartTurn_NotTriggeringSuddenDeath(t *testing.T) {
 		m.TrueState.Turn = 100
 		m.WorkingState.Turn = 100
 		m.WorkingState.ActiveTeam = 2
-		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1, Position: Coordinate{0, 0}, Type: king}
-		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1, Position: Coordinate{0, 1}, Type: king}
+		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1, Position: Coordinate{0, 0}, Type: king, Role: RoleKing}
+		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1, Position: Coordinate{0, 1}, Type: king, Role: RoleKing}
 		m.WorkingState.Units[u3] = &Unit{ID: u3, Team: 1, HP: 1, Position: Coordinate{0, 7}, Type: fighter}
 		m.WorkingState.Units[u4] = &Unit{ID: u4, Team: 2, HP: 1, Position: Coordinate{0, 8}, Type: fighter}
 
@@ -893,8 +893,8 @@ func TestMatch_StartTurn_SuddenDeath(t *testing.T) {
 		m := newTestMatch(4, 3)
 		m.TrueState.Turn = 101
 
-		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1, Position: Coordinate{0, 0}, Type: king}
-		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1, Position: Coordinate{0, 1}, Type: king}
+		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1, Position: Coordinate{0, 0}, Type: king, Role: RoleKing}
+		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1, Position: Coordinate{0, 1}, Type: king, Role: RoleKing}
 		m.WorkingState.Units[u3] = &Unit{ID: u3, Team: 1, HP: 1, Position: Coordinate{3, 0}, Type: fighter}
 		m.WorkingState.Units[u4] = &Unit{ID: u4, Team: 2, HP: 1, Position: Coordinate{3, 1}, Type: fighter}
 		m.WorkingState.Grid[0][0].OccupantType = OccupantUnit
@@ -926,8 +926,8 @@ func TestMatch_StartTurn_SuddenDeath(t *testing.T) {
 		m := newTestMatch(1, 9)
 		m.TrueState.Turn = 101
 		bID := NewBombID(100, 1, u1)
-		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1, Position: Coordinate{0, 0}, Type: king}
-		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1, Position: Coordinate{0, 1}, Type: king}
+		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1, Position: Coordinate{0, 0}, Type: king, Role: RoleKing}
+		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1, Position: Coordinate{0, 1}, Type: king, Role: RoleKing}
 		m.WorkingState.Units[u3] = &Unit{ID: u3, Team: 1, HP: 1, Position: Coordinate{0, 7}, Type: fighter}
 		m.WorkingState.Units[u4] = &Unit{ID: u4, Team: 2, HP: 1, Position: Coordinate{0, 8}, Type: fighter}
 		m.WorkingState.Bombs[bID] = &Bomb{ID: bID, OwnerID: u2, Position: Coordinate{0, 3}}
@@ -964,8 +964,8 @@ func TestMatch_StartTurn_SuddenDeath(t *testing.T) {
 	t.Run("stage has no available tile", func(t *testing.T) {
 		m := newTestMatch(1, 5)
 		m.TrueState.Turn = 101
-		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1, Position: Coordinate{0, 0}, Type: king}
-		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1, Position: Coordinate{0, 1}, Type: king}
+		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1, Position: Coordinate{0, 0}, Type: king, Role: RoleKing}
+		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1, Position: Coordinate{0, 1}, Type: king, Role: RoleKing}
 		m.WorkingState.Units[u3] = &Unit{ID: u3, Team: 1, HP: 1, Position: Coordinate{0, 3}, Type: fighter}
 		m.WorkingState.Units[u4] = &Unit{ID: u4, Team: 2, HP: 1, Position: Coordinate{0, 4}, Type: fighter}
 		m.WorkingState.Grid[0][0].OccupantType = OccupantUnit
@@ -1014,8 +1014,8 @@ func TestMatch_ResolveTurn_ExplosionAndBlast(t *testing.T) {
 		u4 := NewUnitID(2, 1)
 		b1 := NewBombID(1, 1, u1)
 		b2 := NewBombID(1, 2, u2)
-		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1, Type: king}
-		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1, Type: king}
+		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1, Type: king, Role: RoleKing}
+		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1, Type: king, Role: RoleKing}
 		m.WorkingState.Units[u3] = &Unit{ID: u3, Team: 1, HP: 1, Type: fighter}
 		m.WorkingState.Units[u4] = &Unit{ID: u4, Team: 2, HP: 1, Type: fighter}
 		m.WorkingState.Bombs[b1] = &Bomb{ID: b1, Countdown: 3, Range: 2, Position: Coordinate{5, 5}}
@@ -1238,8 +1238,8 @@ func TestMatch_ResolveTurn_TimelineSystemTransitions(t *testing.T) {
 	t.Run("Empty turn resolution executes smoothly with zero structural mutations", func(t *testing.T) {
 		m := newTestMatch(16, 16)
 
-		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1, Type: king, HasMoved: true}
-		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1, Type: king, HasUsedSkill: true}
+		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1, Type: king, Role: RoleKing, HasMoved: true}
+		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1, Type: king, Role: RoleKing, HasUsedSkill: true}
 		m.WorkingState.Units[u3] = &Unit{ID: u3, Team: 1, HP: 1, Type: fighter, HasMoved: true, HasUsedSkill: true}
 		m.WorkingState.Units[u4] = &Unit{ID: u4, Team: 2, HP: 1, Type: fighter}
 
@@ -1270,8 +1270,8 @@ func TestMatch_ResolveTurn_TimelineSystemTransitions(t *testing.T) {
 		m.WorkingState.Turn = 1
 		m.WorkingState.ActiveTeam = 1
 
-		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 2, Type: king}
-		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 2, Type: king}
+		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 2, Type: king, Role: RoleKing}
+		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 2, Type: king, Role: RoleKing}
 		m.WorkingState.Units[u3] = &Unit{ID: u3, Team: 1, HP: 2, Type: fighter}
 		m.WorkingState.Units[u4] = &Unit{ID: u4, Team: 2, HP: 2, Type: fighter}
 
@@ -1301,21 +1301,22 @@ func TestMatch_ResolveTurn_TimelineSystemTransitions(t *testing.T) {
 
 // AddUnit adds a unit to the match's WorkingState and syncs the grid.
 // Test-only helper.
-func (m *Match) AddUnit(team, idx int, arch Archetype, pos Coordinate, hp int) *Unit {
+func (m *Match) AddUnit(team, idx int, archetype Archetype, role UnitRole, pos Coordinate, hp int) *Unit {
 	id := NewUnitID(team, idx)
 	u := &Unit{
 		ID:           id,
-		Type:         arch,
+		Type:         archetype,
 		Position:     pos,
-		Speed:        arch.BaseSpeed,
-		BombMaxRange: arch.BombMaxRange,
-		BombMinRange: arch.BombMinRange,
-		BombPower:    arch.BombPower,
-		MaxBombCount: arch.MaxBombCount,
+		Speed:        archetype.BaseSpeed,
+		BombMaxRange: archetype.BombMaxRange,
+		BombMinRange: archetype.BombMinRange,
+		BombPower:    archetype.BombPower,
+		MaxBombCount: archetype.MaxBombCount,
 		BombUsed:     0,
 		Team:         team,
 		HP:           hp,
-		Skills:       arch.PresetSkills,
+		Skills:       archetype.PresetSkills,
+		Role:         role,
 	}
 	m.WorkingState.Units[id] = u
 	m.WorkingState.Grid[pos.Y][pos.X] = Tile{
@@ -1358,10 +1359,20 @@ func (m *Match) AddSoftBlock(id int, pos Coordinate) *SoftBlock {
 	return sb
 }
 
-func newTestMatchWithFullTeam(t *testing.T, p1KingAlive, p2KingAlive bool, p1Alive, p2Alive [4]bool) *Match {
+// teamFormation describes one team's roster for victory-condition test setup.
+// King == nil selects a Boss-type team, built from BossesAlive instead.
+type teamFormation struct {
+	King               *bool
+	BossesAlive        []bool
+	OrdinaryUnitsAlive []bool // non-King, non-Boss Fighter units, either team type
+}
+
+func boolPtr(b bool) *bool { return &b }
+
+func newTestMatchWithTeams(t *testing.T, p1, p2 teamFormation) *Match {
 	t.Helper()
 
-	m := newTestMatch(5, 2)
+	m := newTestMatch(6, 2)
 	m.WorkingState.Turn = 1
 	m.WorkingState.ActiveTeam = 1
 
@@ -1370,38 +1381,47 @@ func newTestMatchWithFullTeam(t *testing.T, p1KingAlive, p2KingAlive bool, p1Ali
 		t.Fatalf("Archetype King does not exist")
 	}
 
+	boss, ok := GetArchetype("Prologue")
+	if !ok {
+		t.Fatalf("Archetype Prologue (Boss) does not exist")
+	}
+
 	fighter, ok := GetArchetype("Fighter")
 	if !ok {
 		t.Fatalf("Archetype Fighter does not exist")
 	}
 
-	p1KingHP := 1
-	if !p1KingAlive {
-		p1KingHP = 0
-	}
-	m.AddUnit(1, 0, king, Coordinate{0, 0}, p1KingHP)
-
-	p2KingHP := 1
-	if !p2KingAlive {
-		p2KingHP = 0
-	}
-	m.AddUnit(2, 0, king, Coordinate{0, 1}, p2KingHP)
-
-	for i, alive := range p1Alive {
-		hp := 1
-		if !alive {
-			hp = 0
+	buildTeam := func(team, row int, tf teamFormation) {
+		x := 0
+		if tf.King != nil {
+			hp := 0
+			if *tf.King {
+				hp = 1
+			}
+			m.AddUnit(team, x, king, RoleKing, Coordinate{x, row}, hp)
+			x++
+		} else {
+			for _, alive := range tf.BossesAlive {
+				hp := 0
+				if alive {
+					hp = 1
+				}
+				m.AddUnit(team, x, boss, RoleBoss, Coordinate{x, row}, hp)
+				x++
+			}
 		}
-		m.AddUnit(1, i+1, fighter, Coordinate{i + 1, 0}, hp)
+		for _, alive := range tf.OrdinaryUnitsAlive {
+			hp := 0
+			if alive {
+				hp = 1
+			}
+			m.AddUnit(team, x, fighter, RoleNormal, Coordinate{x, row}, hp)
+			x++
+		}
 	}
 
-	for i, alive := range p2Alive {
-		hp := 1
-		if !alive {
-			hp = 0
-		}
-		m.AddUnit(2, i+1, fighter, Coordinate{i + 1, 1}, hp)
-	}
+	buildTeam(1, 0, p1)
+	buildTeam(2, 1, p2)
 
 	m.TrueState = m.WorkingState.DeepCopy()
 
@@ -1411,132 +1431,209 @@ func newTestMatchWithFullTeam(t *testing.T, p1KingAlive, p2KingAlive bool, p1Ali
 func TestMatch_Resolve_VictoryCondition_Suite(t *testing.T) {
 	tests := []struct {
 		name                string
-		p1King              bool
-		p1NonKings          [4]bool
-		p2King              bool
-		p2NonKings          [4]bool
+		p1                  teamFormation
+		p2                  teamFormation
 		expectedWinningTeam int
 	}{
+		// King vs King
 		{
 			name:                "Standard gameplay state",
-			p1King:              true,
-			p1NonKings:          [4]bool{true, true, false, true},
-			p2King:              true,
-			p2NonKings:          [4]bool{true, true, false, false},
+			p1:                  teamFormation{King: boolPtr(true), OrdinaryUnitsAlive: []bool{true, true, false, true}},
+			p2:                  teamFormation{King: boolPtr(true), OrdinaryUnitsAlive: []bool{true, true, false, false}},
 			expectedWinningTeam: MatchInProgress,
 		},
 		// P1 Wins
 		{
 			name:                "P1 Wins: P2 misses non-king",
-			p1King:              true,
-			p1NonKings:          [4]bool{true, true, false, true},
-			p2King:              true,
-			p2NonKings:          [4]bool{false, false, false, false},
+			p1:                  teamFormation{King: boolPtr(true), OrdinaryUnitsAlive: []bool{true, true, false, true}},
+			p2:                  teamFormation{King: boolPtr(true), OrdinaryUnitsAlive: []bool{false, false, false, false}},
 			expectedWinningTeam: 1,
 		},
 		{
 			name:                "P1 Wins: P2 King dead",
-			p1King:              true,
-			p1NonKings:          [4]bool{true, true, false, true},
-			p2King:              false,
-			p2NonKings:          [4]bool{true, false, false, false},
+			p1:                  teamFormation{King: boolPtr(true), OrdinaryUnitsAlive: []bool{true, true, false, true}},
+			p2:                  teamFormation{King: boolPtr(false), OrdinaryUnitsAlive: []bool{true, false, false, false}},
 			expectedWinningTeam: 1,
 		},
 		{
 			name:                "P1 Wins: P2 wiped out",
-			p1King:              true,
-			p1NonKings:          [4]bool{true, true, false, true},
-			p2King:              false,
-			p2NonKings:          [4]bool{false, false, false, false},
+			p1:                  teamFormation{King: boolPtr(true), OrdinaryUnitsAlive: []bool{true, true, false, true}},
+			p2:                  teamFormation{King: boolPtr(false), OrdinaryUnitsAlive: []bool{false, false, false, false}},
 			expectedWinningTeam: 1,
 		},
 		{
 			name:                "P1 Wins: P1 lone king",
-			p1King:              true,
-			p1NonKings:          [4]bool{false, false, false, false},
-			p2King:              false,
-			p2NonKings:          [4]bool{false, false, false, false},
+			p1:                  teamFormation{King: boolPtr(true), OrdinaryUnitsAlive: []bool{false, false, false, false}},
+			p2:                  teamFormation{King: boolPtr(false), OrdinaryUnitsAlive: []bool{false, false, false, false}},
 			expectedWinningTeam: 1,
 		},
 		// P2 Wins
 		{
 			name:                "P2 Wins: P1 misses non-king",
-			p1King:              true,
-			p1NonKings:          [4]bool{false, false, false, false},
-			p2King:              true,
-			p2NonKings:          [4]bool{true, true, false, true},
+			p1:                  teamFormation{King: boolPtr(true), OrdinaryUnitsAlive: []bool{false, false, false, false}},
+			p2:                  teamFormation{King: boolPtr(true), OrdinaryUnitsAlive: []bool{true, true, false, true}},
 			expectedWinningTeam: 2,
 		},
 		{
 			name:                "P2 Wins: P1 King dead",
-			p1King:              false,
-			p1NonKings:          [4]bool{true, true, false, true},
-			p2King:              true,
-			p2NonKings:          [4]bool{true, false, false, false},
+			p1:                  teamFormation{King: boolPtr(false), OrdinaryUnitsAlive: []bool{true, true, false, true}},
+			p2:                  teamFormation{King: boolPtr(true), OrdinaryUnitsAlive: []bool{true, false, false, false}},
 			expectedWinningTeam: 2,
 		},
 		{
 			name:                "P2 Wins: P1 wiped out",
-			p1King:              false,
-			p1NonKings:          [4]bool{false, false, false, false},
-			p2King:              true,
-			p2NonKings:          [4]bool{true, true, false, true},
+			p1:                  teamFormation{King: boolPtr(false), OrdinaryUnitsAlive: []bool{false, false, false, false}},
+			p2:                  teamFormation{King: boolPtr(true), OrdinaryUnitsAlive: []bool{true, true, false, true}},
 			expectedWinningTeam: 2,
 		},
 		{
 			name:                "P2 Wins: P2 lone king",
-			p1King:              false,
-			p1NonKings:          [4]bool{false, false, false, false},
-			p2King:              true,
-			p2NonKings:          [4]bool{false, false, false, false},
+			p1:                  teamFormation{King: boolPtr(false), OrdinaryUnitsAlive: []bool{false, false, false, false}},
+			p2:                  teamFormation{King: boolPtr(true), OrdinaryUnitsAlive: []bool{false, false, false, false}},
 			expectedWinningTeam: 2,
 		},
 		// Draw Conditions
 		{
 			name:                "Draw: Both Kings dead",
-			p1King:              false,
-			p1NonKings:          [4]bool{false, true, false, false},
-			p2King:              false,
-			p2NonKings:          [4]bool{false, false, true, false},
+			p1:                  teamFormation{King: boolPtr(false), OrdinaryUnitsAlive: []bool{false, true, false, false}},
+			p2:                  teamFormation{King: boolPtr(false), OrdinaryUnitsAlive: []bool{false, false, true, false}},
 			expectedWinningTeam: MatchDrawn,
 		},
 		{
 			name:                "Draw: Both Kings dead, P2 wiped out",
-			p1King:              false,
-			p1NonKings:          [4]bool{false, true, false, false},
-			p2King:              false,
-			p2NonKings:          [4]bool{false, false, false, false},
+			p1:                  teamFormation{King: boolPtr(false), OrdinaryUnitsAlive: []bool{false, true, false, false}},
+			p2:                  teamFormation{King: boolPtr(false), OrdinaryUnitsAlive: []bool{false, false, false, false}},
 			expectedWinningTeam: MatchDrawn,
 		},
 		{
 			name:                "Draw: Both Kings dead, P1 wiped out",
-			p1King:              false,
-			p1NonKings:          [4]bool{false, false, false, false},
-			p2King:              false,
-			p2NonKings:          [4]bool{false, false, true, false},
+			p1:                  teamFormation{King: boolPtr(false), OrdinaryUnitsAlive: []bool{false, false, false, false}},
+			p2:                  teamFormation{King: boolPtr(false), OrdinaryUnitsAlive: []bool{false, false, true, false}},
 			expectedWinningTeam: MatchDrawn,
 		},
 		{
 			name:                "Draw: Everyone dead",
-			p1King:              false,
-			p1NonKings:          [4]bool{false, false, false, false},
-			p2King:              false,
-			p2NonKings:          [4]bool{false, false, false, false},
+			p1:                  teamFormation{King: boolPtr(false), OrdinaryUnitsAlive: []bool{false, false, false, false}},
+			p2:                  teamFormation{King: boolPtr(false), OrdinaryUnitsAlive: []bool{false, false, false, false}},
 			expectedWinningTeam: MatchDrawn,
 		},
 		{
 			name:                "Draw: Both Lone Kings dead",
-			p1King:              true,
-			p1NonKings:          [4]bool{false, false, false, false},
-			p2King:              true,
-			p2NonKings:          [4]bool{false, false, false, false},
+			p1:                  teamFormation{King: boolPtr(true), OrdinaryUnitsAlive: []bool{false, false, false, false}},
+			p2:                  teamFormation{King: boolPtr(true), OrdinaryUnitsAlive: []bool{false, false, false, false}},
 			expectedWinningTeam: MatchDrawn,
+		},
+		// Boss vs Boss
+		{
+			name:                "Standard: Both Boss teams alive",
+			p1:                  teamFormation{BossesAlive: []bool{true}},
+			p2:                  teamFormation{BossesAlive: []bool{true}},
+			expectedWinningTeam: MatchInProgress,
+		},
+		{
+			name:                "P2 Wins: P1 Boss dead",
+			p1:                  teamFormation{BossesAlive: []bool{false}},
+			p2:                  teamFormation{BossesAlive: []bool{true}},
+			expectedWinningTeam: 2,
+		},
+		{
+			name:                "P1 Wins: P2 Boss dead",
+			p1:                  teamFormation{BossesAlive: []bool{true}},
+			p2:                  teamFormation{BossesAlive: []bool{false}},
+			expectedWinningTeam: 1,
+		},
+		{
+			name:                "Draw: Both Bosses dead, regardless of ordinary units alive",
+			p1:                  teamFormation{BossesAlive: []bool{false}, OrdinaryUnitsAlive: []bool{true}},
+			p2:                  teamFormation{BossesAlive: []bool{false}, OrdinaryUnitsAlive: []bool{true, true}},
+			expectedWinningTeam: MatchDrawn,
+		},
+		// Boss(P1) vs King(P2)
+		{
+			name:                "Standard: P1 Boss alive vs P2 full team",
+			p1:                  teamFormation{BossesAlive: []bool{true}},
+			p2:                  teamFormation{King: boolPtr(true), OrdinaryUnitsAlive: []bool{true}},
+			expectedWinningTeam: MatchInProgress,
+		},
+		{
+			name:                "P1 Wins: P1 Boss alive vs P2 lone king",
+			p1:                  teamFormation{BossesAlive: []bool{true}},
+			p2:                  teamFormation{King: boolPtr(true), OrdinaryUnitsAlive: []bool{false}},
+			expectedWinningTeam: 1,
+		},
+		{
+			name:                "P1 Wins: P1 Boss alive vs P2 King dead",
+			p1:                  teamFormation{BossesAlive: []bool{true}},
+			p2:                  teamFormation{King: boolPtr(false), OrdinaryUnitsAlive: []bool{true}},
+			expectedWinningTeam: 1,
+		},
+		{
+			name:                "P2 Wins: P1 Boss dead vs P2 full team",
+			p1:                  teamFormation{BossesAlive: []bool{false}},
+			p2:                  teamFormation{King: boolPtr(true), OrdinaryUnitsAlive: []bool{true}},
+			expectedWinningTeam: 2,
+		},
+		{
+			name:                "P2 Wins: P1 Boss dead vs P2 lone king",
+			p1:                  teamFormation{BossesAlive: []bool{false}},
+			p2:                  teamFormation{King: boolPtr(true), OrdinaryUnitsAlive: []bool{false}},
+			expectedWinningTeam: 2,
+		},
+		{
+			name:                "Draw: P1 Boss dead vs P2 King dead",
+			p1:                  teamFormation{BossesAlive: []bool{false}},
+			p2:                  teamFormation{King: boolPtr(false), OrdinaryUnitsAlive: []bool{true}},
+			expectedWinningTeam: MatchDrawn,
+		},
+		// King(P1) vs Boss(P2)
+		{
+			name:                "Standard: P2 Boss alive vs P1 full team",
+			p1:                  teamFormation{King: boolPtr(true), OrdinaryUnitsAlive: []bool{true}},
+			p2:                  teamFormation{BossesAlive: []bool{true}},
+			expectedWinningTeam: MatchInProgress,
+		},
+		{
+			name:                "P2 Wins: P2 Boss alive vs P1 lone king",
+			p1:                  teamFormation{King: boolPtr(true), OrdinaryUnitsAlive: []bool{false}},
+			p2:                  teamFormation{BossesAlive: []bool{true}},
+			expectedWinningTeam: 2,
+		},
+		{
+			name:                "P2 Wins: P2 Boss alive vs P1 King dead",
+			p1:                  teamFormation{King: boolPtr(false), OrdinaryUnitsAlive: []bool{true}},
+			p2:                  teamFormation{BossesAlive: []bool{true}},
+			expectedWinningTeam: 2,
+		},
+		{
+			name:                "P1 Wins: P2 Boss dead vs P1 full team",
+			p1:                  teamFormation{King: boolPtr(true), OrdinaryUnitsAlive: []bool{true}},
+			p2:                  teamFormation{BossesAlive: []bool{false}},
+			expectedWinningTeam: 1,
+		},
+		{
+			name:                "P1 Wins: P2 Boss dead vs P1 lone king",
+			p1:                  teamFormation{King: boolPtr(true), OrdinaryUnitsAlive: []bool{false}},
+			p2:                  teamFormation{BossesAlive: []bool{false}},
+			expectedWinningTeam: 1,
+		},
+		{
+			name:                "Draw: P2 Boss dead vs P1 King dead",
+			p1:                  teamFormation{King: boolPtr(false), OrdinaryUnitsAlive: []bool{true}},
+			p2:                  teamFormation{BossesAlive: []bool{false}},
+			expectedWinningTeam: MatchDrawn,
+		},
+		// Multi-Boss
+		{
+			name:                "Standard: P1 multi-Boss, one alive keeps team going",
+			p1:                  teamFormation{BossesAlive: []bool{false, true}},
+			p2:                  teamFormation{King: boolPtr(true), OrdinaryUnitsAlive: []bool{true}},
+			expectedWinningTeam: MatchInProgress,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m := newTestMatchWithFullTeam(t, tt.p1King, tt.p2King, tt.p1NonKings, tt.p2NonKings)
+			m := newTestMatchWithTeams(t, tt.p1, tt.p2)
 
 			events := m.ResolveTurn()
 

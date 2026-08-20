@@ -52,6 +52,17 @@ func archetypesRegistry() []Archetype {
 			PresetSkills: SkillNone,
 			Selectable:   true,
 		},
+		{
+			Name:         "Prologue",
+			BaseSpeed:    2,
+			BombMaxRange: 1,
+			BombMinRange: 1,
+			BombPower:    2,
+			MaxBombCount: 1,
+			BaseHP:       1,
+			PresetSkills: SkillNone,
+			Selectable:   false,
+		},
 	}
 }
 

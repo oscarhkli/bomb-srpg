@@ -1,5 +1,5 @@
 import type Phaser from 'phaser';
-import type { Archetype, GameCfg } from '../../types/api';
+import type { Archetype, GameCfg, TeamSlot } from '../../types/api';
 import {
   NO_UNIT,
   SLOT_DISPLAY_ORDER_P1,
@@ -88,8 +88,8 @@ export default class UnitPage implements SettingsPage {
     this.slots = deserializeTeams(this.teams());
   }
 
-  private teams(): string[] {
-    return this.playerIndex === 1 ? this.gameCfg.p1Teams : this.gameCfg.p2Teams;
+  private teams(): TeamSlot[] {
+    return this.playerIndex === 1 ? this.gameCfg.p1Slots : this.gameCfg.p2Slots;
   }
 
   private teamColor(): number {
@@ -412,9 +412,9 @@ export default class UnitPage implements SettingsPage {
   // Only FormationPanel + NextButton depend on formation state, so only those are redrawn.
   private commitAndRerender(): void {
     if (this.playerIndex === 1) {
-      this.gameCfg.p1Teams = serializeTeams(this.slots);
+      this.gameCfg.p1Slots = serializeTeams(this.slots);
     } else {
-      this.gameCfg.p2Teams = serializeTeams(this.slots);
+      this.gameCfg.p2Slots = serializeTeams(this.slots);
     }
     this.renderFormationPanel();
     this.renderNextButton();

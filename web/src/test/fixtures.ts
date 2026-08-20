@@ -38,6 +38,7 @@ export function makeUnit(overrides: Partial<Unit> = {}): Unit {
     skills: [],
     hasMoved: false,
     hasUsedSkill: false,
+    role: 'Normal',
     ...overrides,
   };
 }
@@ -52,9 +53,10 @@ export function makeSoftBlock(overrides: Partial<SoftBlock> = {}): SoftBlock {
 
 export function makeCfg(overrides: Partial<GameCfg> = {}): GameCfg {
   return {
+    vsCpu: false,
     stagePreset: 'Plain',
-    p1Teams: [],
-    p2Teams: [],
+    p1Slots: [],
+    p2Slots: [],
     maxTurns: 30,
     allowResetTurn: true,
     ...overrides,

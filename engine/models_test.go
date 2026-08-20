@@ -73,6 +73,63 @@ func TestSkillTypeString(t *testing.T) {
 	}
 }
 
+func TestSkillUnitRoleString(t *testing.T) {
+	tests := []struct {
+		name  string
+		skill UnitRole
+		want  string
+	}{
+		{"UnitRole Normal", RoleNormal, "Normal"},
+		{"UnitRole King", RoleKing, "King"},
+		{"UnitRole Boss", RoleBoss, "Boss"},
+		{"Invalid Value", UnitRole(123), "Unknown"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.skill.String(); got != tt.want {
+				t.Errorf("UnitRole.String() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestUnitRole_UnmarshalJSON(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		want    UnitRole
+		wantErr bool
+	}{
+		{"Role Normal", `"Normal"`, RoleNormal, false},
+		{"Role King", `"King"`, RoleKing, false},
+		{"Role Boss", `"Boss"`, RoleBoss, false},
+		{"Role Unknown", `"ABC"`, RoleNormal, true},
+		{"Wrong JSON Type", `2`, RoleNormal, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var got UnitRole
+			err := json.Unmarshal([]byte(tt.input), &got)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("UnmarshalJSON(%s) error = nil, want error", tt.input)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("UnmarshalJSON(%s) unexpected error: %v", tt.input, err)
+			}
+			if got != tt.want {
+				t.Errorf("UnmarshalJSON(%s) = %v, want %v", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestGameStateJSONSerialization(t *testing.T) {
 	tests := []struct {
 		name string

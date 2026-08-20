@@ -49,35 +49,32 @@
 
 ## 6. Monolithic Architectural Separation & Presentation Boundaries
 
-```text
-+-------------------+      Uses Pointer (*)     +---------------------+
-|  MatchController  | ------------------------> |     engine.Match    |
-|   (UI Handler)    |                           | (Authoritative Core)|
-+-------------------+                           +---------------------+
-          |
-          | Calls Contract
-          v
-+-------------------+
-|   <<interface>>   |
-|     MatchView     |
-+-------------------+
-          |
-          +-----------------------+-----------------------+
-          | (Phase 1)             | (Phase 2)             | (Phase 4 Future)
-          v                       v                       v
-+-------------------+   +-------------------+   +-------------------+
-|   TerminalView    |   |      WebView      |   |   WebSocketView   |
-|   (ASCII Text)    |   |  (JSON streaming) |   | (Live Event Pump) |
-+-------------------+   +-------------------+   +-------------------+
+```mermaid
+flowchart TB
+    subgraph phase1["Phase 1 — CLI"]
+        MC["cli.MatchController<br/>(UI Handler)"]
+        MV["«interface»<br/>cli.MatchView"]
+        TV["cli.TerminalView<br/>(ASCII Text)"]
+        MC -- "Calls Contract" --> MV
+        MV -.implements.-> TV
+    end
+
+    subgraph phase2["Phase 2+ — Web Server"]
+        HH["server/http_handlers.go<br/>(REST handlers)"]
+    end
+
+    EM["engine.Match<br/>(Authoritative Core)"]
+
+    MC -- "Uses Pointer (*)" --> EM
+    HH -- "Uses Pointer (*), no interface" --> EM
 ```
 
 - **Data-Isolated Presentation Boundary**: Decouples rendering from the core transaction state machine. To enforce turn secrecy and prevent sandbox memory leaks across boundaries, UI layouts receive an isolated pointer to `engine.GameState` (`WorkingState`) instead of the parent `engine.Match` orchestrator.
-- **Abstract Rendering Contract (`MatchView`)**: Insulates input mechanics from layout layers via a stateless interface contract. Implementations satisfy compliance implicitly:
-  - **TerminalView (Phase 1)**: Synchronously maps the 2D grid matrix into single-byte ASCII tokens (`█`, `B`, `U`) for raw terminal streaming.
-  - **WebView (Phase 2)**: Directly serializes the active `GameState` struct into flat JSON arrays for HTTP response targets.
+- **Abstract Rendering Contract (`MatchView`)**: `cli.MatchView` is a CLI-only interface decoupling `MatchController` from its renderer, letting `TerminalView` (production) and `SpyMatchView` (test double) swap in without touching call sites. `TerminalView` synchronously maps the 2D grid matrix into single-byte ASCII tokens (`█`, `B`, `U`) for raw terminal streaming. The server never implements or depends on this interface — there is no `WebView` type; its rendering needs (one JSON payload per request) don't fit `MatchView`'s imperative render-call shape.
+- **Direct Serialization on the Web Boundary**: `server/http_handlers.go` serializes the active `WorkingState` struct straight to JSON on HTTP response targets, calling `*engine.Match` directly rather than going through a rendering contract.
 - **Flat Package Web Architecture**: Unlike the highly segregated `/engine` domain package, the `/server` package utilizes a cohesive flat file structure. This structure prevents circular dependencies during protocol handling and organizes network translation files by their specific communication protocol layer.
-- **Pointer-Driven Memory Persistence (`*engine.Match`)**: Controller pipelines execute actions exclusively via `*engine.Match` references. This guarantees user interactions mutate master allocation frames natively, eliminating the memory duplication overhead of dynamic matrix slices.
-- **Unified Service Entry Gate (`ApplyTurnCommand`)**: The engine exposes a single `ApplyTurnCommand` method. The MatchController (Phase 1) or HTTP handlers (Phase 2) construct `TurnCommand` structs with a `Type` discriminator (`TurnCmdMove`, `TurnCmdPlaceBomb`), allowing the engine to function as a stateless, decoupled command processor.
+- **Pointer-Driven Memory Persistence (`*engine.Match`)**: Both the CLI's `MatchController` and the server's HTTP handlers execute actions exclusively via `*engine.Match` references. This guarantees user interactions mutate master allocation frames natively, eliminating the memory duplication overhead of dynamic matrix slices.
+- **Unified Service Entry Gate (`ApplyTurnCommand`)**: The engine exposes a single `ApplyTurnCommand` method. The MatchController (Phase 1) or HTTP handlers (Phase 2+) construct `TurnCommand` structs with a `Type` discriminator (`TurnCmdMove`, `TurnCmdPlaceBomb`), allowing the engine to function as a stateless, decoupled command processor.
 
 ## 7. Network Sync, Transaction Pipeline & Idempotency Invariants
 
@@ -137,6 +134,11 @@ Surrender: `POST /surrender` (either team, any time).
 - **Input Model**: Click-only interaction for Phase 3 (keyboard shortcuts deferred to Phase 5+ polish pass).
 - **Retro Art Strategy**: Units, Bombs, and SoftBlocks in `MatchScene` render as pixel-art `Sprite`s (`this.load.aseprite(...)`). Tiles render as a pixel-art Stage background `Image`, one per `StagePreset`, keyed off `gameCfg.stagePreset`. Explosions remain a procedural `Graphics` tile-color flash. `MatchSettingsScene`'s `UnitPage` reuses the same unit `Sprite`s.
 
+## 10. VS CPU
+
+- **VS-CPU Turn Handoff**: The CPU's turn runs in a goroutine kicked off after the human's `ResolveTurn()` commits, buffering its events on `Match.CPU` until the frontend polls them. See [VS-CPU Turn Sequence](diagrams/vs-cpu-turn-sequence.md) for the full handshake.
+- **Latency Masking**: CPU compute is decoupled from the human's `/resolve` response entirely — the request returns as soon as the human's turn commits, and the goroutine runs while the frontend is already playing that turn's resolve animation. CPU think time is only ever perceptible if it outlasts an animation the player was watching anyway, rather than requiring dedicated "AI is thinking" UX.
+- **Boss Prologue over Full VS-COM**: Rather than build general-purpose CPU heuristics for a full team, the first CPU opponent is a single `Archetype.Boss` unit against a 5-unit human team — a narrower rules surface (`evaluateVictoryConditions()` gained a Boss-type goal alongside the King-type one) that ships a playable single-player mode sooner. The Boss/Prologue shape isn't throwaway scaffolding: it doubles as the natural seed for a future Tutorial or Story Mode encounter.
 
 ## File Structure (WIP)
 

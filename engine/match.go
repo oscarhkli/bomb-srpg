@@ -420,65 +420,50 @@ func (m *Match) handleDelayedBatchDamage(
 	// TODO: Item destruction in future phase
 }
 
-// evaluateVictoryConditions calculate the VictoryResult with the below truth table:
+// evaluateVictoryConditions defines each team's
+// - Goal (win condition met):
+//   - a living Boss for a Boss-type team, or a living King plus a living Ordinary unit for a King-type team
 //
-// # P1 King | P1 Non | P2 King | P2 Non | Expected Result
+// - Wiped (loss condition met):
+//   - all Bosses dead, or King and all Ordinary units dead) status
 //
-// ------------------------------------------------------
+// Then resolves the outcome:
+//   - Both teams meet Goal: match continues.
+//   - Just One team meets Goal, or holds a living King against a Wiped opponent: that team wins.
+//   - Neither team qualifies: draw.
 //
-//	T    |   T    |    T    |   T    | 0
-//
-// ------------------------------------------------------
-//
-//	T    |   T    |    T    |   F    | 1 (P2 misses non-king)
-//	T    |   T    |    F    |   T    | 1 (P2 King dead)
-//	T    |   T    |    F    |   F    | 1 (P2 wiped out)
-//	T    |   F    |    F    |   F    | 1 (P1 lone king)
-//
-// ------------------------------------------------------
-//
-//	F    |   T    |    T    |   T    | 2 (P1 King dead)
-//	F    |   F    |    T    |   T    | 2 (P1 wiped out)
-//	F    |   F    |    T    |   F    | 2 (P2 lone King)
-//	T    |   F    |    T    |   T    | 2 (P1 misses non-king)
-//
-// ------------------------------------------------------
-//
-//	F    |   T    |    F    |   T    | -1 (Both Kings dead)
-//	F    |   T    |    F    |   F    | -1 (Both Kings dead)
-//	F    |   F    |    F    |   T    | -1 (Both Kings dead)
-//	F    |   F    |    F    |   F    | -1 (Everyone dead)
-//	T    |   F    |    T    |   F    | -1 (Mutual lone Kings)*
+// Returns MatchInProgress, 1, 2, or MatchDrawn.
 func (m *Match) evaluateVictoryConditions() int {
-	p1King, p1NonKing := false, false
-	p2King, p2NonKing := false, false
+	p1HasBoss, p1BossAlive := false, false
+	p2HasBoss, p2BossAlive := false, false
+	p1KingAlive, p1OrdinaryAlive := false, false
+	p2KingAlive, p2OrdinaryAlive := false, false
 
 	for _, unit := range m.WorkingState.Units {
+		p1HasBoss = p1HasBoss || (unit.Team == 1 && unit.Role == RoleBoss)
+		p2HasBoss = p2HasBoss || (unit.Team == 2 && unit.Role == RoleBoss)
+
 		if unit.HP <= 0 {
 			continue
 		}
 		if unit.Team == 1 {
-			if unit.Type.Name == "King" {
-				p1King = true
-			} else {
-				p1NonKing = true
-			}
+			p1KingAlive = p1KingAlive || (unit.Role == RoleKing)
+			p1BossAlive = p1BossAlive || (unit.Role == RoleBoss)
+			p1OrdinaryAlive = p1OrdinaryAlive || (unit.Role != RoleKing && unit.Role != RoleBoss)
 		} else {
-			if unit.Type.Name == "King" {
-				p2King = true
-			} else {
-				p2NonKing = true
-			}
+			p2KingAlive = p2KingAlive || (unit.Role == RoleKing)
+			p2BossAlive = p2BossAlive || (unit.Role == RoleBoss)
+			p2OrdinaryAlive = p2OrdinaryAlive || (unit.Role != RoleKing && unit.Role != RoleBoss)
 		}
 	}
 
 	// Standard goals
-	p1Goal := p1King && p1NonKing
-	p2Goal := p2King && p2NonKing
+	p1Goal := (p1HasBoss && p1BossAlive) || (p1KingAlive && p1OrdinaryAlive)
+	p2Goal := (p2HasBoss && p2BossAlive) || (p2KingAlive && p2OrdinaryAlive)
 
 	// Opponent fully defeated conditions
-	p1Wiped := !p1King && !p1NonKing
-	p2Wiped := !p2King && !p2NonKing
+	p1Wiped := (p1HasBoss && !p1BossAlive) || (!p1HasBoss && !p1KingAlive && !p1OrdinaryAlive)
+	p2Wiped := (p2HasBoss && !p2BossAlive) || (!p2HasBoss && !p2KingAlive && !p2OrdinaryAlive)
 
 	// 1. Both teams are still strong -> The fight continues
 	if p1Goal && p2Goal {
@@ -486,16 +471,16 @@ func (m *Match) evaluateVictoryConditions() int {
 	}
 
 	// 2. P1 wins if they meet their goal, OR if they have a King and P2 is wiped
-	if p1Goal || (p1King && p2Wiped) {
+	if p1Goal || (p1KingAlive && p2Wiped) {
 		// Double check mutual wipe out edge case
-		if p2Goal || (p2King && p1Wiped) {
+		if p2Goal || (p2KingAlive && p1Wiped) {
 			return MatchDrawn
 		}
 		return 1
 	}
 
 	// 3. P2 wins if they meet their goal, OR if they have a King and P1 is wiped
-	if p2Goal || (p2King && p1Wiped) {
+	if p2Goal || (p2KingAlive && p1Wiped) {
 		return 2
 	}
 

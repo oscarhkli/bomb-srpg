@@ -301,8 +301,8 @@ func TestHTTPRouting(t *testing.T) {
 
 	gameCfgBody, _ := json.Marshal(engine.GameCfg{
 		StagePreset: "Plain",
-		P1Teams:     []string{"King"},
-		P2Teams:     []string{"King"},
+		P1Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}},
+		P2Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}},
 		MaxTurns:    10,
 	})
 

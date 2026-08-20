@@ -38,6 +38,12 @@ func TestGetArchetype(t *testing.T) {
 			expectedName:   "Bandit",
 		},
 		{
+			name:           "Existing archetype Prologue",
+			inputName:      "Prologue",
+			expectedExists: true,
+			expectedName:   "Prologue",
+		},
+		{
 			name:           "Non-existing archetype",
 			inputName:      "NonExistent",
 			expectedExists: false,
@@ -224,8 +230,8 @@ func TestStagePrests_Sanity(t *testing.T) {
 		t.Run(s.Name, func(t *testing.T) {
 			gs, err := initGameState(GameCfg{
 				StagePreset: s.Name,
-				P1Teams:     []string{"King", "Fighter"}, // we don't care this value in this test, as long as it can create a GameState
-				P2Teams:     []string{"King", "Fighter"}, // same as above
+				P1Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}}, // we don't care this value in this test, as long as it can create a GameState
+				P2Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}}, // same as above
 			})
 
 			if err != nil {

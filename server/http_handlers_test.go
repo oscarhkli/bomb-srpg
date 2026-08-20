@@ -305,8 +305,8 @@ func TestHandleCreateNewMatch(t *testing.T) {
 
 		gameCfg := engine.GameCfg{
 			StagePreset: "Plain",
-			P1Teams:     []string{"King", "Fighter"},
-			P2Teams:     []string{"King", "Witch"},
+			P1Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Fighter", Role: engine.RoleNormal}},
+			P2Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Witch", Role: engine.RoleNormal}},
 			MaxTurns:    10,
 		}
 		jsonBody, _ := json.Marshal(CreateMatchRequest{GameCfg: gameCfg})
@@ -357,8 +357,8 @@ func TestHandleCreateNewMatch(t *testing.T) {
 		h := NewHandler(s)
 		gameCfg := engine.GameCfg{
 			StagePreset: "Plain",
-			P1Teams:     []string{"King", "Fighter"},
-			P2Teams:     []string{"King", "Witch"},
+			P1Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Fighter", Role: engine.RoleNormal}},
+			P2Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Witch", Role: engine.RoleNormal}},
 			MaxTurns:    10,
 		}
 		jsonBody, _ := json.Marshal(gameCfg)
@@ -392,8 +392,8 @@ func TestHandleCreateNewMatch(t *testing.T) {
 
 		gameCfg := engine.GameCfg{
 			StagePreset: "Plain",
-			P1Teams:     []string{"King", "Fighter"},
-			P2Teams:     []string{"King", "Witch"},
+			P1Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Fighter", Role: engine.RoleNormal}},
+			P2Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Witch", Role: engine.RoleNormal}},
 			MaxTurns:    10,
 		}
 		jsonBody, _ := json.Marshal(CreateMatchRequest{GameCfg: gameCfg})
@@ -480,8 +480,8 @@ func TestHandleCreateNewMatch(t *testing.T) {
 
 		gameCfg := engine.GameCfg{
 			StagePreset: "Plain",
-			P1Teams:     []string{"King", "Fighter"},
-			P2Teams:     []string{"King", "Witch"},
+			P1Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Fighter", Role: engine.RoleNormal}},
+			P2Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Witch", Role: engine.RoleNormal}},
 			MaxTurns:    10,
 		}
 		jsonBody, _ := json.Marshal(CreateMatchRequest{GameCfg: gameCfg})
@@ -508,8 +508,8 @@ func TestHandleCreateNewMatch(t *testing.T) {
 		}
 		gameCfg := engine.GameCfg{
 			StagePreset: "Plain",
-			P1Teams:     []string{"King", "Fighter"},
-			P2Teams:     []string{"King", "Witch"},
+			P1Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Fighter", Role: engine.RoleNormal}},
+			P2Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Witch", Role: engine.RoleNormal}},
 			MaxTurns:    10,
 		}
 		jsonBody, _ := json.Marshal(CreateMatchRequest{GameCfg: gameCfg})
@@ -853,8 +853,8 @@ func TestHandleGetMatchState(t *testing.T) {
 
 		gameCfg := engine.GameCfg{
 			StagePreset: "Divided",
-			P1Teams:     []string{"King", "Fighter"},
-			P2Teams:     []string{"King", "Witch"},
+			P1Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Fighter", Role: engine.RoleNormal}},
+			P2Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Witch", Role: engine.RoleNormal}},
 			MaxTurns:    10,
 		}
 		_, err = s.CreateMatch(roomID, gameCfg)
@@ -959,8 +959,8 @@ func TestHandleGetMatchState(t *testing.T) {
 
 		gameCfg := engine.GameCfg{
 			StagePreset: "Plain",
-			P1Teams:     []string{"King", "Fighter"},
-			P2Teams:     []string{"King", "Witch"},
+			P1Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Fighter", Role: engine.RoleNormal}},
+			P2Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Witch", Role: engine.RoleNormal}},
 			MaxTurns:    10,
 		}
 		_, err = s.CreateMatch(roomID, gameCfg)
@@ -985,8 +985,8 @@ func TestHandleGetMatchState(t *testing.T) {
 
 		gameCfg := engine.GameCfg{
 			StagePreset: "Divided",
-			P1Teams:     []string{"King", "Fighter"},
-			P2Teams:     []string{"King", "Witch"},
+			P1Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Fighter", Role: engine.RoleNormal}},
+			P2Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Witch", Role: engine.RoleNormal}},
 			MaxTurns:    10,
 		}
 		_, err = s.CreateMatch(roomID, gameCfg)
@@ -1016,8 +1016,8 @@ func createTestRoomWithMatch(t *testing.T) (string, [2]string, *ServerStateManag
 
 	gameCfg := engine.GameCfg{
 		StagePreset: "Plain",
-		P1Teams:     []string{"King", "Fighter"},
-		P2Teams:     []string{"King", "Witch"},
+		P1Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Fighter", Role: engine.RoleNormal}},
+		P2Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Witch", Role: engine.RoleNormal}},
 		MaxTurns:    10,
 	}
 	playerTokens, err := s.CreateMatch(roomID, gameCfg)
@@ -2071,8 +2071,8 @@ func TestHandleGetMatchConfig(t *testing.T) {
 
 		gameCfg := engine.GameCfg{
 			StagePreset: "Divided",
-			P1Teams:     []string{"King", "Fighter"},
-			P2Teams:     []string{"King", "Witch"},
+			P1Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Fighter", Role: engine.RoleNormal}},
+			P2Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Witch", Role: engine.RoleNormal}},
 			MaxTurns:    10,
 		}
 		_, err = s.CreateMatch(roomID, gameCfg)
@@ -2160,8 +2160,8 @@ func TestHandleGetMatchConfig(t *testing.T) {
 
 		gameCfg := engine.GameCfg{
 			StagePreset: "Plain",
-			P1Teams:     []string{"King", "Fighter"},
-			P2Teams:     []string{"King", "Witch"},
+			P1Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Fighter", Role: engine.RoleNormal}},
+			P2Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Witch", Role: engine.RoleNormal}},
 			MaxTurns:    10,
 		}
 		_, err = s.CreateMatch(roomID, gameCfg)
@@ -2186,8 +2186,8 @@ func TestHandleGetMatchConfig(t *testing.T) {
 
 		gameCfg := engine.GameCfg{
 			StagePreset: "Divided",
-			P1Teams:     []string{"King", "Fighter"},
-			P2Teams:     []string{"King", "Witch"},
+			P1Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Fighter", Role: engine.RoleNormal}},
+			P2Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Witch", Role: engine.RoleNormal}},
 			MaxTurns:    10,
 		}
 		_, err = s.CreateMatch(roomID, gameCfg)
@@ -2200,7 +2200,7 @@ func TestHandleGetMatchConfig(t *testing.T) {
 		testMux("GET /api/match-rooms/{roomID}/match/config", h.HandleGetMatchConfig).ServeHTTP(rr, req)
 
 		assertObjectContract(t, rr.Body.Bytes(),
-			[]string{"stagePreset", "p1Teams", "p2Teams", "maxTurns", "allowResetTurn"}, nil)
+			[]string{"vsCpu", "stagePreset", "p1Slots", "p2Slots", "maxTurns", "allowResetTurn"}, nil)
 	})
 }
 
@@ -2215,8 +2215,8 @@ func TestHandleGetAllowedTiles(t *testing.T) {
 
 		gameCfg := engine.GameCfg{
 			StagePreset: "Divided",
-			P1Teams:     []string{"King", "Fighter"},
-			P2Teams:     []string{"King", "Witch"},
+			P1Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Fighter", Role: engine.RoleNormal}},
+			P2Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Witch", Role: engine.RoleNormal}},
 			MaxTurns:    10,
 		}
 		_, err = s.CreateMatch(roomID, gameCfg)
@@ -2272,8 +2272,8 @@ func TestHandleGetAllowedTiles(t *testing.T) {
 
 		gameCfg := engine.GameCfg{
 			StagePreset: "Divided",
-			P1Teams:     []string{"King", "Fighter"},
-			P2Teams:     []string{"King", "Witch"},
+			P1Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Fighter", Role: engine.RoleNormal}},
+			P2Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Witch", Role: engine.RoleNormal}},
 			MaxTurns:    10,
 		}
 		_, err = s.CreateMatch(roomID, gameCfg)
@@ -2307,8 +2307,8 @@ func TestHandleGetAllowedTiles(t *testing.T) {
 
 		gameCfg := engine.GameCfg{
 			StagePreset: "Divided",
-			P1Teams:     []string{"King", "Fighter"},
-			P2Teams:     []string{"King", "Witch"},
+			P1Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Fighter", Role: engine.RoleNormal}},
+			P2Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Witch", Role: engine.RoleNormal}},
 			MaxTurns:    10,
 		}
 		_, err = s.CreateMatch(roomID, gameCfg)
@@ -2385,8 +2385,8 @@ func TestHandleGetAllowedTiles(t *testing.T) {
 
 		gameCfg := engine.GameCfg{
 			StagePreset: "Plain",
-			P1Teams:     []string{"King", "Fighter"},
-			P2Teams:     []string{"King", "Witch"},
+			P1Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Fighter", Role: engine.RoleNormal}},
+			P2Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Witch", Role: engine.RoleNormal}},
 			MaxTurns:    10,
 		}
 		_, err = s.CreateMatch(roomID, gameCfg)
@@ -2411,8 +2411,8 @@ func TestHandleGetAllowedTiles(t *testing.T) {
 
 		gameCfg := engine.GameCfg{
 			StagePreset: "Divided",
-			P1Teams:     []string{"King", "Fighter"},
-			P2Teams:     []string{"King", "Witch"},
+			P1Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Fighter", Role: engine.RoleNormal}},
+			P2Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Witch", Role: engine.RoleNormal}},
 			MaxTurns:    10,
 		}
 		_, err = s.CreateMatch(roomID, gameCfg)
