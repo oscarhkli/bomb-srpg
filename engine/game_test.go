@@ -370,14 +370,44 @@ func TestInitGameState_Suite(t *testing.T) {
 			expectedTotalUnits: 7,
 		},
 		{
-			name: "Failure: Player 1 With Boss type Archetype, empty team",
+			name: "Failure: Player 1 with only a NO_UNIT slot has no real Boss, falls back to King-mode size check",
 			cfg: GameCfg{
 				StagePreset: "Plain",
 				P1Slots:     []TeamSlot{{Archetype: NoUnit, Role: RoleBoss}},
 				P2Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
 			},
 			expectError:   true,
-			errorContains: "Player 1 must have between 1 and 5 units",
+			errorContains: "Player 1 must have between 2 and 5 units",
+		},
+		{
+			name: "Success: Player 1 has a NO_UNIT slot tagged RoleBoss alongside a real King",
+			cfg: GameCfg{
+				StagePreset: "Plain",
+				P1Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: NoUnit, Role: RoleBoss}, {Archetype: "Fighter", Role: RoleNormal}},
+				P2Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
+			},
+			expectError:        false,
+			expectedTotalUnits: 4,
+		},
+		{
+			name: "Failure: Player 1's first slot is NO_UNIT tagged RoleKing, real King is elsewhere",
+			cfg: GameCfg{
+				StagePreset: "Plain",
+				P1Slots:     []TeamSlot{{Archetype: NoUnit, Role: RoleKing}, {Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
+				P2Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
+			},
+			expectError:   true,
+			errorContains: "Player 1 must have exactly one King as the first unit",
+		},
+		{
+			name: "Failure: Player 1's King-archetype first slot has no explicit Role",
+			cfg: GameCfg{
+				StagePreset: "Plain",
+				P1Slots:     []TeamSlot{{Archetype: "King"}, {Archetype: "Fighter", Role: RoleNormal}},
+				P2Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
+			},
+			expectError:   true,
+			errorContains: "Player 1 must have exactly one King as the first unit",
 		},
 	}
 

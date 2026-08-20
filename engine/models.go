@@ -288,10 +288,10 @@ type Bomb struct {
 	Countdown int        `json:"countdown"` // Turns remaining until detonation; <0 for non-countdown bombs
 }
 
-// TeamSlot hold a the archetype and the role of a slot
+// TeamSlot pairs an archetype name with the role it fills in a team.
 type TeamSlot struct {
 	Archetype string   `json:"archetype"`
-	Role      UnitRole `json:"role"` // "King" | "Boss" | "Normal"
+	Role      UnitRole `json:"role"`
 }
 
 // GameCfg holds all configuration for a match.

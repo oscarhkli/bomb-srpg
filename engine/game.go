@@ -143,7 +143,7 @@ func validateTeamComposition(slots []TeamSlot, playerLabel string) error {
 
 func hasRole(team []TeamSlot, role UnitRole) bool {
 	for _, t := range team {
-		if t.Role == role {
+		if t.Archetype != NoUnit && t.Role == role {
 			return true
 		}
 	}
@@ -151,12 +151,12 @@ func hasRole(team []TeamSlot, role UnitRole) bool {
 }
 
 func hasExactlyOneAndFirstIsKing(team []TeamSlot) bool {
-	if len(team) == 0 || team[0].Role != RoleKing {
+	if len(team) == 0 || team[0].Archetype == NoUnit || team[0].Role != RoleKing {
 		return false
 	}
 
 	for i := 1; i < len(team); i++ {
-		if team[i].Role == RoleKing {
+		if team[i].Archetype != NoUnit && team[i].Role == RoleKing {
 			return false
 		}
 	}
