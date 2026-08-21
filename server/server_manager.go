@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bomb-srpg/cpu"
 	"bomb-srpg/engine"
 	"context"
 	cryptorand "crypto/rand"
@@ -20,6 +21,8 @@ const (
 	roomIDBytes           = 5
 	RoomInactivityTimeout = 60 * time.Minute
 	CleanupInterval       = 60 * time.Minute
+
+	maxCPUReplanAttempts = 5
 )
 
 var (
@@ -448,7 +451,51 @@ func (s *ServerStateManager) ResolveTurn(roomID string, token string) ([]engine.
 
 	events := room.Match.ResolveTurn()
 	room.LastActivity = time.Now()
+
+	if room.GameCfg.VSCpu && room.Match.TrueState.ActiveTeam == 2 {
+		room.Match.CPU.Phase = engine.TurnPhasePlanning
+		go s.runCPUTurn(room, room.Match)
+	}
+
 	return events, nil
+}
+
+// runCPUTurn plays the CPU's turn to completion, holding the room lock throughout.
+// It abandons if the match was replaced or deleted while the goroutine was queued.
+func (s *ServerStateManager) runCPUTurn(room *MatchRoom, match *engine.Match) {
+	room.mu.Lock()
+	defer room.mu.Unlock()
+
+	if room.Match != match {
+		room.Logger.Info("CPU turn abandoned: match replaced or deleted", "phase", "planning")
+		return
+	}
+
+	defer func() {
+		match.CPU.Phase = engine.TurnPhaseReady
+		room.LastActivity = time.Now()
+	}()
+
+	for attempt := range maxCPUReplanAttempts {
+		err := applyPlan(match, cpu.Decide(match.WorkingState))
+		if err == nil {
+			break
+		}
+		room.Logger.Warn("CPU plan rejected, replanning", "attempt", attempt, "error", err)
+	}
+
+	match.CPU.PendingEvents = match.ResolveTurn()
+}
+
+// applyPlan applies each TurnCommand in order, stopping at the first rejection.
+// Returns the rejecting command's error, or nil if the whole plan applied.
+func applyPlan(match *engine.Match, plan []engine.TurnCommand) error {
+	for _, cmd := range plan {
+		if _, err := match.ApplyTurnCommand(cmd); err != nil {
+			return fmt.Errorf("command %+v rejected: %w", cmd, err)
+		}
+	}
+	return nil
 }
 
 // ResetTurn sends Surrender signal to engine to end the current Match in a given MatchRoom.
