@@ -160,6 +160,9 @@ bomb-srpg
 │   └── srpg-web/               <-- Phase 2+ HTTP entry point
 │       └── main.go
 │
+├── cpu/                        <-- Pure CPU planner
+│   └── decisions.go            <-- Proposes a plan from a sandbox snapshot for CPU's turn
+│
 ├── server/                     <-- Phase 2: HTTP Web server package
 │   ├── http_handlers.go        <-- REST HTTP interface boundary
 │   ├── middleware.go           <-- HTTP middleware: security headers, panic recovery
