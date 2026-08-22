@@ -211,6 +211,17 @@ func TestServerStateManager_LastActivityUpdated(t *testing.T) {
 			},
 		},
 		{
+			name: "runCPUTurn updates LastActivity",
+			setup: func(t *testing.T) (string, *ServerStateManager, [2]string) {
+				roomID, tokens, s := createTestRoomWithCfg(t, vsCpuGameCfg())
+				return roomID, s, tokens
+			},
+			action: func(t *testing.T, s *ServerStateManager, roomID string, tokens [2]string) {
+				room := mustRoom(t, s, roomID)
+				s.runCPUTurn(room, room.Match)
+			},
+		},
+		{
 			name: "Surrender updates LastActivity",
 			setup: func(t *testing.T) (string, *ServerStateManager, [2]string) {
 				roomID, tokens, s := createTestRoom(t)
@@ -294,12 +305,17 @@ func assertGameCfgSynced(t *testing.T, room *MatchRoom) {
 	}
 }
 
-func createTestRoom(t *testing.T) (string, [2]string, *ServerStateManager) {
+func createTestRoomWithCfg(t *testing.T, gameCfg engine.GameCfg) (string, [2]string, *ServerStateManager) {
 	t.Helper()
 	s := NewServerStateManager()
 	roomID, _ := s.CreateMatchRoom()
-	tokens, _ := s.CreateMatch(roomID, validGameCfg())
+	tokens, _ := s.CreateMatch(roomID, gameCfg)
 	return roomID, tokens, s
+}
+
+func createTestRoom(t *testing.T) (string, [2]string, *ServerStateManager) {
+	t.Helper()
+	return createTestRoomWithCfg(t, validGameCfg())
 }
 
 func TestMapError(t *testing.T) {
@@ -1352,4 +1368,335 @@ type testLogWriter struct {
 func (w *testLogWriter) Write(p []byte) (int, error) {
 	w.t.Log(string(bytes.TrimSpace(p)))
 	return len(p), nil
+}
+
+func vsCpuGameCfg() engine.GameCfg {
+	gameCfg := validGameCfg()
+	gameCfg.VSCpu = true
+	return gameCfg
+}
+
+func mustRoom(t *testing.T, s *ServerStateManager, roomID string) *MatchRoom {
+	t.Helper()
+	roomVal, ok := s.Rooms.Load(roomID)
+	if !ok {
+		t.Fatalf("Room %s not found", roomID)
+	}
+	return roomVal.(*MatchRoom)
+}
+
+func hasGameEvent(gameEvents []engine.GameEvent, evtType engine.GameEvtType, unitID engine.UnitID) bool {
+	return slices.ContainsFunc(gameEvents, func(evt engine.GameEvent) bool {
+		return evt.Type == evtType && evt.UnitID == unitID
+	})
+}
+
+func TestApplyPlan(t *testing.T) {
+	moverUID := engine.NewUnitID(1, 0)
+	bomberUID := engine.NewUnitID(1, 1)
+
+	tests := []struct {
+		name     string
+		plan     func(t *testing.T, m *engine.Match) []engine.TurnCommand
+		wantErr  error
+		validate func(t *testing.T, m *engine.Match)
+	}{
+		{
+			name: "Empty Plan",
+			plan: func(t *testing.T, m *engine.Match) []engine.TurnCommand { return nil },
+			validate: func(t *testing.T, m *engine.Match) {
+				if got := len(m.PlaybackLog); got != 0 {
+					t.Errorf("Expected no events logged, got %d", got)
+				}
+			},
+		},
+		{
+			name: "Full Plan Applied",
+			plan: func(t *testing.T, m *engine.Match) []engine.TurnCommand {
+				return []engine.TurnCommand{
+					engine.NewMoveCommand(moverUID, engine.Coordinate{X: 4, Y: 7}),
+					engine.NewPlaceBombCommand(bomberUID, engine.Coordinate{X: 3, Y: 7}),
+				}
+			},
+			validate: func(t *testing.T, m *engine.Match) {
+				if !hasGameEvent(m.PlaybackLog, engine.GameEvtUnitMoved, moverUID) {
+					t.Errorf("Expected unit %#x to have moved, got %#v", moverUID, m.PlaybackLog)
+				}
+				if !hasGameEvent(m.PlaybackLog, engine.GameEvtBombPlaced, bomberUID) {
+					t.Errorf("Expected unit %#x to have placed a bomb, got %#v", bomberUID, m.PlaybackLog)
+				}
+			},
+		},
+		{
+			name: "Stops At First Rejection",
+			plan: func(t *testing.T, m *engine.Match) []engine.TurnCommand {
+				return []engine.TurnCommand{
+					engine.NewMoveCommand(moverUID, engine.Coordinate{X: 99, Y: 99}),
+					engine.NewPlaceBombCommand(bomberUID, engine.Coordinate{X: 3, Y: 7}),
+				}
+			},
+			wantErr: engine.ErrOutOfMoveRange,
+			validate: func(t *testing.T, m *engine.Match) {
+				if hasGameEvent(m.PlaybackLog, engine.GameEvtBombPlaced, bomberUID) {
+					t.Errorf("Expected command after the rejected one to be skipped, got %#v", m.PlaybackLog)
+				}
+			},
+		},
+		{
+			name: "Unsupported Command",
+			plan: func(t *testing.T, m *engine.Match) []engine.TurnCommand {
+				return []engine.TurnCommand{{UnitID: moverUID, Target: engine.Coordinate{X: 1, Y: 1}}}
+			},
+			wantErr: engine.ErrUnsupportedCommand,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			roomID, _, s := createTestRoom(t)
+			match := mustRoom(t, s, roomID).Match
+
+			err := applyPlan(match, tt.plan(t, match))
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("applyPlan() error = %v, want %v", err, tt.wantErr)
+			}
+			if tt.validate != nil {
+				tt.validate(t, match)
+			}
+		})
+	}
+}
+
+// recordingDecider is an injectable cpu.Decide stand-in that counts invocations and
+// samples CPU.Phase from inside the CPU goroutine, where the room write lock is held.
+type recordingDecider struct {
+	match         *engine.Match
+	plan          func(gs *engine.GameState, call int) []engine.TurnCommand
+	calls         int
+	observedPhase engine.CPUTurnPhase
+	called        chan struct{}
+}
+
+func (d *recordingDecider) decide(gs *engine.GameState) []engine.TurnCommand {
+	call := d.calls
+	if call == 0 {
+		d.observedPhase = d.match.CPU.Phase
+	}
+	d.calls++
+
+	select {
+	case d.called <- struct{}{}:
+	default:
+	}
+
+	if d.plan == nil {
+		return nil
+	}
+	return d.plan(gs, call)
+}
+
+func TestServerStateManager_ResolveTurn_CPUTurn(t *testing.T) {
+	humanUID := engine.NewUnitID(1, 0)
+	cpuUID := engine.NewUnitID(2, 0)
+
+	legalCPUMove := []engine.TurnCommand{engine.NewMoveCommand(cpuUID, engine.Coordinate{X: 4, Y: 1})}
+	rejectedPlan := []engine.TurnCommand{engine.NewMoveCommand(humanUID, engine.Coordinate{X: 1, Y: 1})}
+
+	tests := []struct {
+		name           string
+		vsCpu          bool
+		setup          func(t *testing.T, room *MatchRoom) int
+		plan           func(gs *engine.GameState, call int) []engine.TurnCommand
+		wantCPUTurn    bool
+		wantCalls      int
+		wantActiveTeam int
+		validate       func(t *testing.T, room *MatchRoom, d *recordingDecider)
+	}{
+		{
+			name:  "Plan Applied",
+			vsCpu: true,
+			plan: func(gs *engine.GameState, call int) []engine.TurnCommand {
+				return legalCPUMove
+			},
+			wantCPUTurn:    true,
+			wantCalls:      1,
+			wantActiveTeam: 1,
+			validate: func(t *testing.T, room *MatchRoom, d *recordingDecider) {
+				if got, want := d.observedPhase, engine.TurnPhasePlanning; got != want {
+					t.Errorf("Expected phase %v while planning, got %v", want, got)
+				}
+				if !hasGameEvent(room.Match.CPU.PendingEvents, engine.GameEvtUnitMoved, cpuUID) {
+					t.Errorf("Expected unit %#x to have moved, got %#v", cpuUID, room.Match.CPU.PendingEvents)
+				}
+			},
+		},
+		{
+			name:  "Empty Plan",
+			vsCpu: true,
+			plan: func(gs *engine.GameState, call int) []engine.TurnCommand {
+				return nil
+			},
+			wantCPUTurn:    true,
+			wantCalls:      1,
+			wantActiveTeam: 1,
+			validate: func(t *testing.T, room *MatchRoom, d *recordingDecider) {
+				if got := len(room.Match.CPU.PendingEvents); got != 0 {
+					t.Errorf("Expected no pending events, got %d", got)
+				}
+			},
+		},
+		{
+			name:  "Replan On Rejection",
+			vsCpu: true,
+			plan: func(gs *engine.GameState, call int) []engine.TurnCommand {
+				if call == 0 {
+					return rejectedPlan
+				}
+				return legalCPUMove
+			},
+			wantCPUTurn:    true,
+			wantCalls:      2,
+			wantActiveTeam: 1,
+			validate: func(t *testing.T, room *MatchRoom, d *recordingDecider) {
+				if !hasGameEvent(room.Match.CPU.PendingEvents, engine.GameEvtUnitMoved, cpuUID) {
+					t.Errorf("Expected replanned move to apply, got %#v", room.Match.CPU.PendingEvents)
+				}
+			},
+		},
+		{
+			name:  "Replan Cap Exhausted",
+			vsCpu: true,
+			plan: func(gs *engine.GameState, call int) []engine.TurnCommand {
+				return rejectedPlan
+			},
+			wantCPUTurn:    true,
+			wantCalls:      maxCPUReplanAttempts,
+			wantActiveTeam: 1,
+			validate: func(t *testing.T, room *MatchRoom, d *recordingDecider) {
+				if got := len(room.Match.CPU.PendingEvents); got != 0 {
+					t.Errorf("Expected no command to apply, got %#v", room.Match.CPU.PendingEvents)
+				}
+			},
+		},
+		{
+			name:           "Not VS CPU",
+			vsCpu:          false,
+			wantCPUTurn:    false,
+			wantCalls:      0,
+			wantActiveTeam: 2,
+		},
+		{
+			name:  "Human Turn Next",
+			vsCpu: true,
+			setup: func(t *testing.T, room *MatchRoom) int {
+				room.Match.WorkingState.Turn = 2
+				room.Match.WorkingState.ActiveTeam = 2
+				return 1
+			},
+			wantCPUTurn:    false,
+			wantCalls:      0,
+			wantActiveTeam: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gameCfg := validGameCfg()
+			gameCfg.VSCpu = tt.vsCpu
+			roomID, tokens, s := createTestRoomWithCfg(t, gameCfg)
+			room := mustRoom(t, s, roomID)
+
+			tokenIdx := 0
+			if tt.setup != nil {
+				tokenIdx = tt.setup(t, room)
+			}
+
+			decider := &recordingDecider{match: room.Match, plan: tt.plan, called: make(chan struct{}, 1)}
+			s.decide = decider.decide
+
+			if _, err := s.ResolveTurn(roomID, tokens[tokenIdx]); err != nil {
+				t.Fatalf("ResolveTurn() error = %v", err)
+			}
+
+			if tt.wantCPUTurn {
+				select {
+				case <-decider.called:
+				case <-time.After(5 * time.Second):
+					t.Fatal("Timed out waiting for the CPU goroutine to invoke decide")
+				}
+			}
+
+			// Blocks until runCPUTurn releases the write lock, ordering every assertion below after it.
+			room.mu.RLock()
+			defer room.mu.RUnlock()
+
+			if got, want := decider.calls, tt.wantCalls; got != want {
+				t.Errorf("Expected %d decide calls, got %d", want, got)
+			}
+
+			wantPhase := engine.TurnPhaseIdle
+			if tt.wantCPUTurn {
+				wantPhase = engine.TurnPhaseReady
+			}
+			if got := room.Match.CPU.Phase; got != wantPhase {
+				t.Errorf("Expected CPU phase %v, got %v", wantPhase, got)
+			}
+			if got, want := room.Match.TrueState.ActiveTeam, tt.wantActiveTeam; got != want {
+				t.Errorf("Expected active team %d, got %d", want, got)
+			}
+			if tt.validate != nil {
+				tt.validate(t, room, decider)
+			}
+		})
+	}
+}
+
+func TestServerStateManager_runCPUTurn_StaleMatch(t *testing.T) {
+	tests := []struct {
+		name string
+		swap func(t *testing.T, room *MatchRoom)
+	}{
+		{
+			name: "Match Replaced",
+			swap: func(t *testing.T, room *MatchRoom) {
+				replacement, err := engine.InitGame(vsCpuGameCfg())
+				if err != nil {
+					t.Fatalf("InitGame() error = %v", err)
+				}
+				room.Match = replacement
+			},
+		},
+		{
+			name: "Match Deleted",
+			swap: func(t *testing.T, room *MatchRoom) { room.Match = nil },
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			roomID, _, s := createTestRoomWithCfg(t, vsCpuGameCfg())
+			room := mustRoom(t, s, roomID)
+
+			captured := room.Match
+			captured.CPU.Phase = engine.TurnPhasePlanning
+			decider := &recordingDecider{match: captured, called: make(chan struct{}, 1)}
+			s.decide = decider.decide
+
+			tt.swap(t, room)
+			s.runCPUTurn(room, captured)
+
+			if got := decider.calls; got != 0 {
+				t.Errorf("Expected the abandoned turn to skip planning, got %d decide calls", got)
+			}
+			if got, want := captured.CPU.Phase, engine.TurnPhasePlanning; got != want {
+				t.Errorf("Expected phase %v on the abandoned match, got %v", want, got)
+			}
+			if got, want := captured.TrueState.Turn, 1; got != want {
+				t.Errorf("Expected turn %d on the abandoned match, got %d", want, got)
+			}
+			if room.Match != nil && room.Match.CPU.Phase != engine.TurnPhaseIdle {
+				t.Errorf("Expected the replacement match untouched, got phase %v", room.Match.CPU.Phase)
+			}
+		})
+	}
 }

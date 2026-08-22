@@ -91,6 +91,7 @@ type MatchRoom struct {
 type ServerStateManager struct {
 	Rooms          sync.Map
 	generateRoomID func(int) (string, error)
+	decide         func(*engine.GameState) []engine.TurnCommand
 	Logger         *slog.Logger
 }
 
@@ -109,6 +110,7 @@ func WithLogger(logger *slog.Logger) Option {
 func NewServerStateManager(opts ...Option) *ServerStateManager {
 	manager := &ServerStateManager{
 		generateRoomID: randomHex,
+		decide:         cpu.Decide,
 		Logger:         slog.Default(),
 	}
 	for _, opt := range opts {
@@ -477,7 +479,7 @@ func (s *ServerStateManager) runCPUTurn(room *MatchRoom, match *engine.Match) {
 	}()
 
 	for attempt := range maxCPUReplanAttempts {
-		err := applyPlan(match, cpu.Decide(match.WorkingState))
+		err := applyPlan(match, s.decide(match.WorkingState))
 		if err == nil {
 			break
 		}
