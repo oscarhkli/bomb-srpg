@@ -151,9 +151,9 @@ func TestMatchController_GameplayActions(t *testing.T) {
 			inputCommands: "move 16 1 0\n",
 			setupMatch: func() *engine.Match {
 				m := newTestMatch(2, 2)
-				uID := engine.NewUnitID(1, 0)
-				m.WorkingState.Units[uID] = &engine.Unit{
-					ID:           uID,
+				unitID := engine.NewUnitID(1, 0)
+				m.WorkingState.Units[unitID] = &engine.Unit{
+					ID:           unitID,
 					Team:         1,
 					Position:     engine.Coordinate{X: 0, Y: 0},
 					HP:           1,
@@ -161,7 +161,7 @@ func TestMatchController_GameplayActions(t *testing.T) {
 					BombMaxRange: 100,
 				}
 				m.WorkingState.Grid[0][0].OccupantType = engine.OccupantUnit
-				m.WorkingState.Grid[0][0].OccupantID = int64(uID)
+				m.WorkingState.Grid[0][0].OccupantID = int64(unitID)
 
 				return m
 			},
@@ -176,9 +176,9 @@ func TestMatchController_GameplayActions(t *testing.T) {
 			inputCommands: "move 16 120 0\n",
 			setupMatch: func() *engine.Match {
 				m := newTestMatch(2, 2)
-				uID := engine.NewUnitID(1, 0)
-				m.WorkingState.Units[uID] = &engine.Unit{
-					ID:           uID,
+				unitID := engine.NewUnitID(1, 0)
+				m.WorkingState.Units[unitID] = &engine.Unit{
+					ID:           unitID,
 					Team:         1,
 					Position:     engine.Coordinate{X: 0, Y: 0},
 					Speed:        100,
@@ -186,7 +186,7 @@ func TestMatchController_GameplayActions(t *testing.T) {
 					BombMaxRange: 100,
 				}
 				m.WorkingState.Grid[0][0].OccupantType = engine.OccupantUnit
-				m.WorkingState.Grid[0][0].OccupantID = int64(uID)
+				m.WorkingState.Grid[0][0].OccupantID = int64(unitID)
 
 				return m
 			},
@@ -228,9 +228,9 @@ func TestMatchController_GameplayActions(t *testing.T) {
 			inputCommands: "bomb 16 1 0\n",
 			setupMatch: func() *engine.Match {
 				m := newTestMatch(2, 2)
-				uID := engine.NewUnitID(1, 0)
-				m.WorkingState.Units[uID] = &engine.Unit{
-					ID:           uID,
+				unitID := engine.NewUnitID(1, 0)
+				m.WorkingState.Units[unitID] = &engine.Unit{
+					ID:           unitID,
 					Team:         1,
 					Position:     engine.Coordinate{X: 0, Y: 0},
 					HP:           1,
@@ -238,7 +238,7 @@ func TestMatchController_GameplayActions(t *testing.T) {
 					BombMaxRange: 100,
 				}
 				m.WorkingState.Grid[0][0].OccupantType = engine.OccupantUnit
-				m.WorkingState.Grid[0][0].OccupantID = int64(uID)
+				m.WorkingState.Grid[0][0].OccupantID = int64(unitID)
 
 				return m
 			},
@@ -253,16 +253,16 @@ func TestMatchController_GameplayActions(t *testing.T) {
 			inputCommands: "bomb 16 1 0\n",
 			setupMatch: func() *engine.Match {
 				m := newTestMatch(2, 2)
-				uID := engine.NewUnitID(1, 0)
-				m.WorkingState.Units[uID] = &engine.Unit{
-					ID:           uID,
+				unitID := engine.NewUnitID(1, 0)
+				m.WorkingState.Units[unitID] = &engine.Unit{
+					ID:           unitID,
 					Team:         1,
 					Position:     engine.Coordinate{X: 0, Y: 0},
 					HP:           1,
 					BombMaxRange: 100,
 				}
 				m.WorkingState.Grid[0][0].OccupantType = engine.OccupantUnit
-				m.WorkingState.Grid[0][0].OccupantID = int64(uID)
+				m.WorkingState.Grid[0][0].OccupantID = int64(unitID)
 
 				return m
 			},

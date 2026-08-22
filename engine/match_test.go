@@ -691,16 +691,16 @@ func newTestMatch(width, height int) *Match {
 }
 
 func TestMatch_ApplyTurnCommand(t *testing.T) {
-	uID := NewUnitID(1, 0)
+	unitID := NewUnitID(1, 0)
 
 	t.Run("apply MoveCommand", func(t *testing.T) {
 		m := newTestMatch(2, 2)
 		m.WorkingState.Turn = 1
 		m.WorkingState.ActiveTeam = 1
-		m.WorkingState.Units[uID] = &Unit{ID: uID, Team: 1, HP: 1, Speed: 100, Position: Coordinate{0, 0}}
-		m.WorkingState.Grid[0][0] = Tile{Type: TerrainPlain, OccupantType: OccupantUnit, OccupantID: int64(uID)}
+		m.WorkingState.Units[unitID] = &Unit{ID: unitID, Team: 1, HP: 1, Speed: 100, Position: Coordinate{0, 0}}
+		m.WorkingState.Grid[0][0] = Tile{Type: TerrainPlain, OccupantType: OccupantUnit, OccupantID: int64(unitID)}
 
-		cmd := NewMoveCommand(uID, Coordinate{1, 0})
+		cmd := NewMoveCommand(unitID, Coordinate{1, 0})
 
 		gameEvents, err := m.ApplyTurnCommand(cmd)
 
@@ -717,10 +717,10 @@ func TestMatch_ApplyTurnCommand(t *testing.T) {
 		m := newTestMatch(2, 2)
 		m.WorkingState.Turn = 1
 		m.WorkingState.ActiveTeam = 1
-		m.WorkingState.Units[uID] = &Unit{ID: uID, Team: 1, HP: 1, BombMaxRange: 100, MaxBombCount: 100, Position: Coordinate{0, 0}}
-		m.WorkingState.Grid[0][0] = Tile{Type: TerrainPlain, OccupantType: OccupantUnit, OccupantID: int64(uID)}
+		m.WorkingState.Units[unitID] = &Unit{ID: unitID, Team: 1, HP: 1, BombMaxRange: 100, MaxBombCount: 100, Position: Coordinate{0, 0}}
+		m.WorkingState.Grid[0][0] = Tile{Type: TerrainPlain, OccupantType: OccupantUnit, OccupantID: int64(unitID)}
 
-		cmd := NewPlaceBombCommand(uID, Coordinate{1, 0})
+		cmd := NewPlaceBombCommand(unitID, Coordinate{1, 0})
 
 		gameEvents, err := m.ApplyTurnCommand(cmd)
 
@@ -737,10 +737,10 @@ func TestMatch_ApplyTurnCommand(t *testing.T) {
 		m := newTestMatch(2, 2)
 		m.WorkingState.Turn = 1
 		m.WorkingState.ActiveTeam = 1
-		m.WorkingState.Units[uID] = &Unit{ID: uID, Team: 1, HP: 1, BombMaxRange: 100, MaxBombCount: 100, Position: Coordinate{0, 0}}
-		m.WorkingState.Grid[0][0] = Tile{Type: TerrainPlain, OccupantType: OccupantUnit, OccupantID: int64(uID)}
+		m.WorkingState.Units[unitID] = &Unit{ID: unitID, Team: 1, HP: 1, BombMaxRange: 100, MaxBombCount: 100, Position: Coordinate{0, 0}}
+		m.WorkingState.Grid[0][0] = Tile{Type: TerrainPlain, OccupantType: OccupantUnit, OccupantID: int64(unitID)}
 
-		cmd := TurnCommand{Type: "invalid", UnitID: uID, Target: Coordinate{1, 0}}
+		cmd := TurnCommand{Type: "invalid", UnitID: unitID, Target: Coordinate{1, 0}}
 
 		gameEvents, err := m.ApplyTurnCommand(cmd)
 
@@ -925,19 +925,19 @@ func TestMatch_StartTurn_SuddenDeath(t *testing.T) {
 	t.Run("stage has many 1 available tile", func(t *testing.T) {
 		m := newTestMatch(1, 9)
 		m.TrueState.Turn = 101
-		bID := NewBombID(100, 1, u1)
+		bombID := NewBombID(100, 1, u1)
 		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 1, Position: Coordinate{0, 0}, Type: king, Role: RoleKing}
 		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 1, Position: Coordinate{0, 1}, Type: king, Role: RoleKing}
 		m.WorkingState.Units[u3] = &Unit{ID: u3, Team: 1, HP: 1, Position: Coordinate{0, 7}, Type: fighter}
 		m.WorkingState.Units[u4] = &Unit{ID: u4, Team: 2, HP: 1, Position: Coordinate{0, 8}, Type: fighter}
-		m.WorkingState.Bombs[bID] = &Bomb{ID: bID, OwnerID: u2, Position: Coordinate{0, 3}}
+		m.WorkingState.Bombs[bombID] = &Bomb{ID: bombID, OwnerID: u2, Position: Coordinate{0, 3}}
 		m.WorkingState.Grid[0][0].OccupantType = OccupantUnit
 		m.WorkingState.Grid[0][0].OccupantID = int64(u1)
 		m.WorkingState.Grid[1][0].OccupantType = OccupantUnit
 		m.WorkingState.Grid[1][0].OccupantID = int64(u2)
 		m.WorkingState.Grid[2][0].Type = TerrainBlock
 		m.WorkingState.Grid[3][0].OccupantType = OccupantBomb
-		m.WorkingState.Grid[3][0].OccupantID = int64(bID)
+		m.WorkingState.Grid[3][0].OccupantID = int64(bombID)
 		m.WorkingState.Grid[4][0].OccupantType = OccupantSoftBlock
 		m.WorkingState.Grid[5][0].OccupantType = OccupantItem
 		m.WorkingState.Grid[7][0].OccupantType = OccupantUnit
@@ -1141,13 +1141,13 @@ func TestMatch_ResolveTurn_ExplosionAndBlast(t *testing.T) {
 func TestMatch_ResolveTurn_CascadingChainReactions(t *testing.T) {
 	t.Run("Ticking bomb triggers secondary explosive via proximity chain reaction", func(t *testing.T) {
 		m := newTestMatch(16, 16)
-		uID := NewUnitID(1, 0)
+		unitID := NewUnitID(1, 0)
 
-		b1 := NewBombID(1, 1, uID)
+		b1 := NewBombID(1, 1, unitID)
 		m.WorkingState.Bombs[b1] = &Bomb{ID: b1, Countdown: 1, Range: 2, Position: Coordinate{1, 1}}
 		m.WorkingState.Grid[1][1] = Tile{OccupantType: OccupantBomb, OccupantID: int64(b1)}
 
-		b2 := NewBombID(1, 2, uID)
+		b2 := NewBombID(1, 2, unitID)
 		m.WorkingState.Bombs[b2] = &Bomb{ID: b2, Countdown: 3, Range: 2, Position: Coordinate{1, 2}}
 		m.WorkingState.Grid[2][1] = Tile{OccupantType: OccupantBomb, OccupantID: int64(b2)}
 
@@ -1179,17 +1179,17 @@ func TestMatch_ResolveTurn_CascadingChainReactions(t *testing.T) {
 
 	t.Run("Soft blocks act as solid line of sight obstacles shielding behind tiles during turn", func(t *testing.T) {
 		m := newTestMatch(16, 16)
-		uID := NewUnitID(1, 0)
+		unitID := NewUnitID(1, 0)
 
-		bID := NewBombID(1, 1, uID)
-		m.WorkingState.Bombs[bID] = &Bomb{ID: bID, Countdown: 1, Range: 5, Position: Coordinate{0, 0}}
-		m.WorkingState.Grid[0][0] = Tile{OccupantType: OccupantBomb, OccupantID: int64(bID)}
+		bombID := NewBombID(1, 1, unitID)
+		m.WorkingState.Bombs[bombID] = &Bomb{ID: bombID, Countdown: 1, Range: 5, Position: Coordinate{0, 0}}
+		m.WorkingState.Grid[0][0] = Tile{OccupantType: OccupantBomb, OccupantID: int64(bombID)}
 
-		sbID := 55
-		m.WorkingState.SoftBlocks[sbID] = &SoftBlock{ID: sbID, Position: Coordinate{1, 0}}
-		m.WorkingState.Grid[0][1] = Tile{OccupantType: OccupantSoftBlock, OccupantID: int64(sbID)}
+		softBlockID := 55
+		m.WorkingState.SoftBlocks[softBlockID] = &SoftBlock{ID: softBlockID, Position: Coordinate{1, 0}}
+		m.WorkingState.Grid[0][1] = Tile{OccupantType: OccupantSoftBlock, OccupantID: int64(softBlockID)}
 
-		b2 := NewBombID(1, 2, uID)
+		b2 := NewBombID(1, 2, unitID)
 		m.WorkingState.Bombs[b2] = &Bomb{ID: b2, Countdown: 3, Range: 2, Position: Coordinate{2, 0}}
 		m.WorkingState.Grid[0][2] = Tile{OccupantType: OccupantBomb, OccupantID: int64(b2)}
 
@@ -1197,7 +1197,7 @@ func TestMatch_ResolveTurn_CascadingChainReactions(t *testing.T) {
 
 		// Verification: SoftBlock must be flagged for destruction, but its active shielding body
 		// must prevent the blast ray from crossing over to touch Bomb 2 in this frame pass.
-		if _, ok := m.WorkingState.SoftBlocks[sbID]; ok {
+		if _, ok := m.WorkingState.SoftBlocks[softBlockID]; ok {
 			t.Error("Soft block failed to be destroyed by direct ray hit")
 		}
 		if _, ok := m.WorkingState.Bombs[b2]; !ok {
@@ -1253,9 +1253,9 @@ func TestMatch_ResolveTurn_TimelineSystemTransitions(t *testing.T) {
 			t.Errorf("Expected Turn will increment to 2, got %d", m.WorkingState.Turn)
 		}
 
-		for uID, unit := range m.WorkingState.Units {
+		for unitID, unit := range m.WorkingState.Units {
 			if unit.HasMoved || unit.HasUsedSkill {
-				t.Errorf("Expected Unit %#X HasMoved and HasUsed are reset, got HasMoved %v, HasUsedSkill %v", uID, unit.HasMoved, unit.HasUsedSkill)
+				t.Errorf("Expected Unit %#X HasMoved and HasUsed are reset, got HasMoved %v, HasUsedSkill %v", unitID, unit.HasMoved, unit.HasUsedSkill)
 			}
 		}
 

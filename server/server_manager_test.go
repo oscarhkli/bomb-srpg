@@ -106,7 +106,7 @@ func TestServerStateManager_CreateMatchRoom(t *testing.T) {
 			},
 		},
 		{
-			name: "Error thrown during geneateRoomID",
+			name: "Error thrown during generateRoomID",
 			setup: func() *ServerStateManager {
 				s := NewServerStateManager()
 				s.generateRoomID = func(int) (string, error) {
@@ -171,8 +171,8 @@ func TestServerStateManager_LastActivityUpdated(t *testing.T) {
 				return roomID, s, tokens
 			},
 			action: func(t *testing.T, s *ServerStateManager, roomID string, tokens [2]string) {
-				uID := engine.NewUnitID(1, 0)
-				s.SubmitTurnCommand(roomID, engine.NewMoveCommand(uID, engine.Coordinate{X: 4, Y: 7}), tokens[0])
+				unitID := engine.NewUnitID(1, 0)
+				s.SubmitTurnCommand(roomID, engine.NewMoveCommand(unitID, engine.Coordinate{X: 4, Y: 7}), tokens[0])
 			},
 		},
 		{
@@ -687,25 +687,25 @@ func TestServerStateManager_SubmitTurnCommand(t *testing.T) {
 			name: "Success",
 			setup: func(t *testing.T) (string, *ServerStateManager, engine.TurnCommand, string) {
 				roomID, tokens, s := createTestRoom(t)
-				uID := engine.NewUnitID(1, 0)
+				unitID := engine.NewUnitID(1, 0)
 				newPos := engine.Coordinate{X: 4, Y: 7}
-				cmd := engine.NewMoveCommand(uID, newPos)
+				cmd := engine.NewMoveCommand(unitID, newPos)
 				return roomID, s, cmd, tokens[0]
 			},
 			wantErr: nil,
 			validate: func(t *testing.T, gameEvents []engine.GameEvent, s *ServerStateManager, roomID string, cmd engine.TurnCommand) {
 				room := mustRoom(t, s, roomID)
-				uID := engine.NewUnitID(1, 0)
+				unitID := engine.NewUnitID(1, 0)
 				newPos := engine.Coordinate{X: 4, Y: 7}
-				if gotPos := room.Match.WorkingState.Units[uID].Position; gotPos != newPos {
-					t.Errorf("Expected Unit %#X new position %#v, got %#v", uID, newPos, gotPos)
+				if gotPos := room.Match.WorkingState.Units[unitID].Position; gotPos != newPos {
+					t.Errorf("Expected Unit %#X new position %#v, got %#v", unitID, newPos, gotPos)
 				}
 				if len(gameEvents) != 1 {
 					t.Errorf("expected 1 GameEvent returned, got %d", len(gameEvents))
 				}
 				resEvt := gameEvents[0]
 				validFrom := engine.Coordinate{X: 4, Y: 8}
-				if resEvt.Type != engine.GameEvtUnitMoved || resEvt.UnitID != uID || *resEvt.From != validFrom || *resEvt.To != newPos {
+				if resEvt.Type != engine.GameEvtUnitMoved || resEvt.UnitID != unitID || *resEvt.From != validFrom || *resEvt.To != newPos {
 					t.Errorf("malformed UnitMoveEvent returned: %+v", resEvt)
 				}
 			},
@@ -714,17 +714,17 @@ func TestServerStateManager_SubmitTurnCommand(t *testing.T) {
 			name: "Invalid TurnCommand (out of range)",
 			setup: func(t *testing.T) (string, *ServerStateManager, engine.TurnCommand, string) {
 				roomID, tokens, s := createTestRoom(t)
-				uID := engine.NewUnitID(1, 0)
+				unitID := engine.NewUnitID(1, 0)
 				newPos := engine.Coordinate{X: 4, Y: 7777}
-				cmd := engine.NewMoveCommand(uID, newPos)
+				cmd := engine.NewMoveCommand(unitID, newPos)
 				return roomID, s, cmd, tokens[0]
 			},
 			wantErr: ErrInvalidTurnCmd,
 			validate: func(t *testing.T, gameEvents []engine.GameEvent, s *ServerStateManager, roomID string, cmd engine.TurnCommand) {
 				room := mustRoom(t, s, roomID)
-				uID := engine.NewUnitID(1, 0)
-				if gotPos := room.Match.WorkingState.Units[uID].Position; gotPos.X == 4 && gotPos.Y == 7777 {
-					t.Errorf("Expected Unit %#X didn't move", uID)
+				unitID := engine.NewUnitID(1, 0)
+				if gotPos := room.Match.WorkingState.Units[unitID].Position; gotPos.X == 4 && gotPos.Y == 7777 {
+					t.Errorf("Expected Unit %#X didn't move", unitID)
 				}
 				if len(gameEvents) > 0 {
 					t.Errorf("Expected gameEvents to be empty, got %p", gameEvents)
@@ -735,9 +735,9 @@ func TestServerStateManager_SubmitTurnCommand(t *testing.T) {
 			name: "Room Not Found",
 			setup: func(t *testing.T) (string, *ServerStateManager, engine.TurnCommand, string) {
 				s := NewServerStateManager()
-				uID := engine.NewUnitID(1, 0)
+				unitID := engine.NewUnitID(1, 0)
 				newPos := engine.Coordinate{X: 4, Y: 7777}
-				cmd := engine.NewMoveCommand(uID, newPos)
+				cmd := engine.NewMoveCommand(unitID, newPos)
 				return "NONEXISTENT", s, cmd, "dummy-token"
 			},
 			wantErr: ErrRoomNotFound,
@@ -747,9 +747,9 @@ func TestServerStateManager_SubmitTurnCommand(t *testing.T) {
 			setup: func(t *testing.T) (string, *ServerStateManager, engine.TurnCommand, string) {
 				s := NewServerStateManager()
 				roomID, _ := s.CreateMatchRoom()
-				uID := engine.NewUnitID(1, 0)
+				unitID := engine.NewUnitID(1, 0)
 				newPos := engine.Coordinate{X: 4, Y: 7777}
-				cmd := engine.NewMoveCommand(uID, newPos)
+				cmd := engine.NewMoveCommand(unitID, newPos)
 				return roomID, s, cmd, "dummy-token"
 			},
 			wantErr: ErrMatchNotFound,
@@ -1323,8 +1323,8 @@ func hasGameEvent(gameEvents []engine.GameEvent, evtType engine.GameEvtType, uni
 }
 
 func TestApplyPlan(t *testing.T) {
-	moverUID := engine.NewUnitID(1, 0)
-	bomberUID := engine.NewUnitID(1, 1)
+	moverUnitID := engine.NewUnitID(1, 0)
+	bomberUnitID := engine.NewUnitID(1, 1)
 
 	tests := []struct {
 		name     string
@@ -1345,16 +1345,16 @@ func TestApplyPlan(t *testing.T) {
 			name: "Full Plan Applied",
 			plan: func(t *testing.T, m *engine.Match) []engine.TurnCommand {
 				return []engine.TurnCommand{
-					engine.NewMoveCommand(moverUID, engine.Coordinate{X: 4, Y: 7}),
-					engine.NewPlaceBombCommand(bomberUID, engine.Coordinate{X: 3, Y: 7}),
+					engine.NewMoveCommand(moverUnitID, engine.Coordinate{X: 4, Y: 7}),
+					engine.NewPlaceBombCommand(bomberUnitID, engine.Coordinate{X: 3, Y: 7}),
 				}
 			},
 			validate: func(t *testing.T, m *engine.Match) {
-				if !hasGameEvent(m.PlaybackLog, engine.GameEvtUnitMoved, moverUID) {
-					t.Errorf("Expected unit %#x to have moved, got %#v", moverUID, m.PlaybackLog)
+				if !hasGameEvent(m.PlaybackLog, engine.GameEvtUnitMoved, moverUnitID) {
+					t.Errorf("Expected unit %#x to have moved, got %#v", moverUnitID, m.PlaybackLog)
 				}
-				if !hasGameEvent(m.PlaybackLog, engine.GameEvtBombPlaced, bomberUID) {
-					t.Errorf("Expected unit %#x to have placed a bomb, got %#v", bomberUID, m.PlaybackLog)
+				if !hasGameEvent(m.PlaybackLog, engine.GameEvtBombPlaced, bomberUnitID) {
+					t.Errorf("Expected unit %#x to have placed a bomb, got %#v", bomberUnitID, m.PlaybackLog)
 				}
 			},
 		},
@@ -1362,13 +1362,13 @@ func TestApplyPlan(t *testing.T) {
 			name: "Stops At First Rejection",
 			plan: func(t *testing.T, m *engine.Match) []engine.TurnCommand {
 				return []engine.TurnCommand{
-					engine.NewMoveCommand(moverUID, engine.Coordinate{X: 99, Y: 99}),
-					engine.NewPlaceBombCommand(bomberUID, engine.Coordinate{X: 3, Y: 7}),
+					engine.NewMoveCommand(moverUnitID, engine.Coordinate{X: 99, Y: 99}),
+					engine.NewPlaceBombCommand(bomberUnitID, engine.Coordinate{X: 3, Y: 7}),
 				}
 			},
 			wantErr: engine.ErrOutOfMoveRange,
 			validate: func(t *testing.T, m *engine.Match) {
-				if hasGameEvent(m.PlaybackLog, engine.GameEvtBombPlaced, bomberUID) {
+				if hasGameEvent(m.PlaybackLog, engine.GameEvtBombPlaced, bomberUnitID) {
 					t.Errorf("Expected command after the rejected one to be skipped, got %#v", m.PlaybackLog)
 				}
 			},
@@ -1376,7 +1376,7 @@ func TestApplyPlan(t *testing.T) {
 		{
 			name: "Unsupported Command",
 			plan: func(t *testing.T, m *engine.Match) []engine.TurnCommand {
-				return []engine.TurnCommand{{UnitID: moverUID, Target: engine.Coordinate{X: 1, Y: 1}}}
+				return []engine.TurnCommand{{UnitID: moverUnitID, Target: engine.Coordinate{X: 1, Y: 1}}}
 			},
 			wantErr: engine.ErrUnsupportedCommand,
 		},
@@ -1427,11 +1427,11 @@ func (d *recordingDecider) decide(gs *engine.GameState) []engine.TurnCommand {
 }
 
 func TestServerStateManager_ResolveTurn_CPUTurn(t *testing.T) {
-	humanUID := engine.NewUnitID(1, 0)
-	cpuUID := engine.NewUnitID(2, 0)
+	humanUnitID := engine.NewUnitID(1, 0)
+	cpuUnitID := engine.NewUnitID(2, 0)
 
-	legalCPUMove := []engine.TurnCommand{engine.NewMoveCommand(cpuUID, engine.Coordinate{X: 4, Y: 1})}
-	rejectedPlan := []engine.TurnCommand{engine.NewMoveCommand(humanUID, engine.Coordinate{X: 1, Y: 1})}
+	legalCPUMove := []engine.TurnCommand{engine.NewMoveCommand(cpuUnitID, engine.Coordinate{X: 4, Y: 1})}
+	rejectedPlan := []engine.TurnCommand{engine.NewMoveCommand(humanUnitID, engine.Coordinate{X: 1, Y: 1})}
 
 	tests := []struct {
 		name           string
@@ -1456,8 +1456,8 @@ func TestServerStateManager_ResolveTurn_CPUTurn(t *testing.T) {
 				if got, want := d.observedPhase, engine.TurnPhasePlanning; got != want {
 					t.Errorf("Expected phase %v while planning, got %v", want, got)
 				}
-				if !hasGameEvent(room.Match.CPU.PendingEvents, engine.GameEvtUnitMoved, cpuUID) {
-					t.Errorf("Expected unit %#x to have moved, got %#v", cpuUID, room.Match.CPU.PendingEvents)
+				if !hasGameEvent(room.Match.CPU.PendingEvents, engine.GameEvtUnitMoved, cpuUnitID) {
+					t.Errorf("Expected unit %#x to have moved, got %#v", cpuUnitID, room.Match.CPU.PendingEvents)
 				}
 			},
 		},
@@ -1489,7 +1489,7 @@ func TestServerStateManager_ResolveTurn_CPUTurn(t *testing.T) {
 			wantCalls:      2,
 			wantActiveTeam: 1,
 			validate: func(t *testing.T, room *MatchRoom, d *recordingDecider) {
-				if !hasGameEvent(room.Match.CPU.PendingEvents, engine.GameEvtUnitMoved, cpuUID) {
+				if !hasGameEvent(room.Match.CPU.PendingEvents, engine.GameEvtUnitMoved, cpuUnitID) {
 					t.Errorf("Expected replanned move to apply, got %#v", room.Match.CPU.PendingEvents)
 				}
 			},
