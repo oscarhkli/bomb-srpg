@@ -2240,6 +2240,40 @@ func TestHandleGetAllowedTiles(t *testing.T) {
 		}
 	})
 
+	t.Run("Success: a boxed-in unit encodes an empty array, not null", func(t *testing.T) {
+		s := NewServerStateManager()
+		h := NewHandler(s)
+		roomID, err := s.CreateMatchRoom()
+		if err != nil {
+			t.Fatalf("Failed to create room: %v", err)
+		}
+		if _, err := s.CreateMatch(roomID, validGameCfg()); err != nil {
+			t.Fatalf("Failed to create match: %v", err)
+		}
+
+		// Unit 0x10 spawns at {4,8} with an ally on {3,8}; soft blocks on {5,8} and {4,7}
+		// plus the stage edge below leave it no legal landing tile.
+		gs := mustRoom(t, s, roomID).Match.WorkingState
+		gs.UpdateStageOccupant(engine.Coordinate{X: 5, Y: 8}, engine.OccupantSoftBlock, 1)
+		gs.UpdateStageOccupant(engine.Coordinate{X: 4, Y: 7}, engine.OccupantSoftBlock, 2)
+
+		req, err := http.NewRequest("GET", "/api/match-rooms/"+roomID+"/match/allowed-tiles?unitId=16&turnCmdType=move", nil)
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+
+		rr := httptest.NewRecorder()
+		testMux("GET /api/match-rooms/{roomID}/match/allowed-tiles", h.HandleGetAllowedTiles).ServeHTTP(rr, req)
+
+		if status := rr.Code; status != http.StatusOK {
+			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusOK)
+		}
+
+		if got := strings.TrimSpace(rr.Body.String()); got != "[]" {
+			t.Errorf("Expected an empty JSON array, got %q", got)
+		}
+	})
+
 	t.Run("Failure: missing query string", func(t *testing.T) {
 		s := NewServerStateManager()
 		h := NewHandler(s)

@@ -216,6 +216,13 @@ func TestGameStateJSONSerialization(t *testing.T) {
 			},
 			want: []string{"turn", "activeTeam", "grid", "units", "bombs", "softBlocks", "turnCommands"},
 		},
+		{
+			name: "Empty collections encode as arrays, not null",
+			gs: &GameState{
+				Grid: [][]Tile{{{Type: TerrainPlain, OccupantType: OccupantNone, OccupantID: 0}}},
+			},
+			want: []string{`"units":[]`, `"bombs":[]`, `"softBlocks":[]`, `"turnCommands":[]`},
+		},
 	}
 
 	for _, tt := range tests {

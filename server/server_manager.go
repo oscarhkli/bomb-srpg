@@ -557,7 +557,9 @@ func (s *ServerStateManager) GetAllowedTiles(roomID string, unitID engine.UnitID
 		return nil, err
 	}
 
-	return slices.Collect(maps.Keys(allowedTiles)), nil
+	// slices.Collect yields nil for an empty map; the client types this as a non-nullable array.
+	tiles := make([]engine.Coordinate, 0, len(allowedTiles))
+	return slices.AppendSeq(tiles, maps.Keys(allowedTiles)), nil
 }
 
 // StartCleanupLoop runs background cleanup until ctx is cancelled.
