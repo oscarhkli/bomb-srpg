@@ -41,11 +41,7 @@ func TestServerStateManager_CreateMatchRoom(t *testing.T) {
 				if len(id) != 10 {
 					t.Errorf("Expected ID length 10, got %d: %s", len(id), id)
 				}
-				roomVal, ok := s.Rooms.Load(id)
-				if !ok {
-					t.Fatal("Room not added to manager.Rooms")
-				}
-				room := roomVal.(*MatchRoom)
+				room := mustRoom(t, s, id)
 				if room.Match != nil {
 					t.Errorf("Expected Match=nil, got %v", room.Match)
 				}
@@ -251,11 +247,7 @@ func TestServerStateManager_LastActivityUpdated(t *testing.T) {
 				return
 			}
 
-			roomVal, ok := s.Rooms.Load(roomID)
-			if !ok {
-				t.Fatal("Room not found")
-			}
-			room := roomVal.(*MatchRoom)
+			room := mustRoom(t, s, roomID)
 			room.mu.RLock()
 			defer room.mu.RUnlock()
 			if !room.LastActivity.After(before) {
@@ -274,11 +266,7 @@ func TestServerStateManager_ReadOnlyMethodsDoNotUpdateLastActivity(t *testing.T)
 	s.GetMatchConfig(roomID)
 	s.GetAllowedTiles(roomID, engine.NewUnitID(1, 0), engine.TurnCmdPlaceBomb)
 
-	roomVal, ok := s.Rooms.Load(roomID)
-	if !ok {
-		t.Fatal("Room not found")
-	}
-	room := roomVal.(*MatchRoom)
+	room := mustRoom(t, s, roomID)
 	room.mu.RLock()
 	defer room.mu.RUnlock()
 	if !room.LastActivity.Equal(before) && !room.LastActivity.Before(before) {
@@ -388,11 +376,7 @@ func TestServerStateManager_CreateMatch(t *testing.T) {
 			gameCfg: validGameCfg(),
 			wantErr: nil,
 			validate: func(t *testing.T, s *ServerStateManager, roomID string) {
-				roomVal, ok := s.Rooms.Load(roomID)
-				if !ok {
-					t.Fatal("Room not found")
-				}
-				room := roomVal.(*MatchRoom)
+				room := mustRoom(t, s, roomID)
 				if room.Match == nil {
 					t.Fatal("Expected Match to be created, got nil")
 				}
@@ -453,8 +437,7 @@ func TestServerStateManager_CreateMatch(t *testing.T) {
 				if len(playerTokens) != 2 || playerTokens[0] == "" || playerTokens[1] == "" || playerTokens[0] == playerTokens[1] {
 					t.Errorf("Expected 2 unique non-empty PlayerToken, got %v", playerTokens)
 				}
-				roomVal, _ := s.Rooms.Load(roomID)
-				room := roomVal.(*MatchRoom)
+				room := mustRoom(t, s, roomID)
 				assertGameCfgSynced(t, room)
 				if playerTokens != room.PlayerTokens {
 					t.Errorf("Expected response and MatchRoom share the same PlayerTokens, response %v vs MatchRoom %v", playerTokens, room.PlayerTokens)
@@ -477,8 +460,7 @@ func TestServerStateManager_Rematch(t *testing.T) {
 				s := NewServerStateManager()
 				roomID, _ := s.CreateMatchRoom()
 				tokens, _ := s.CreateMatch(roomID, validGameCfg())
-				roomVal, _ := s.Rooms.Load(roomID)
-				room := roomVal.(*MatchRoom)
+				room := mustRoom(t, s, roomID)
 				room.Match = nil // kill the match
 				gameCfg := validGameCfg()
 				room.GameCfg = &gameCfg
@@ -492,8 +474,7 @@ func TestServerStateManager_Rematch(t *testing.T) {
 				s := NewServerStateManager()
 				roomID, _ := s.CreateMatchRoom()
 				tokens, _ := s.CreateMatch(roomID, validGameCfg())
-				roomVal, _ := s.Rooms.Load(roomID)
-				room := roomVal.(*MatchRoom)
+				room := mustRoom(t, s, roomID)
 				gameCfg := validGameCfg()
 				room.GameCfg = &gameCfg
 				return roomID, s, tokens
@@ -506,8 +487,7 @@ func TestServerStateManager_Rematch(t *testing.T) {
 				s := NewServerStateManager()
 				roomID, _ := s.CreateMatchRoom()
 				s.CreateMatch(roomID, validGameCfg())
-				roomVal, _ := s.Rooms.Load(roomID)
-				room := roomVal.(*MatchRoom)
+				room := mustRoom(t, s, roomID)
 				gameCfg := validGameCfg()
 				room.GameCfg = &gameCfg
 				return roomID, s, [2]string{"INVALID_TOKEN", ""}
@@ -541,11 +521,7 @@ func TestServerStateManager_Rematch(t *testing.T) {
 				t.Fatalf("Rematch() error = %v, want %v", err, tt.wantErr)
 			}
 			if err == nil {
-				roomVal, ok := s.Rooms.Load(roomID)
-				if !ok {
-					t.Fatal("Room not found")
-				}
-				room := roomVal.(*MatchRoom)
+				room := mustRoom(t, s, roomID)
 				if room.Match == nil {
 					t.Fatal("Expected Match to be created, got nil")
 				}
@@ -577,8 +553,7 @@ func TestServerStateManager_DeleteMatch(t *testing.T) {
 				s := NewServerStateManager()
 				roomID, _ := s.CreateMatchRoom()
 				tokens, _ := s.CreateMatch(roomID, validGameCfg())
-				roomVal, _ := s.Rooms.Load(roomID)
-				room := roomVal.(*MatchRoom)
+				room := mustRoom(t, s, roomID)
 				room.Match = nil // kill the match
 				return roomID, s, tokens
 			},
@@ -590,8 +565,7 @@ func TestServerStateManager_DeleteMatch(t *testing.T) {
 				s := NewServerStateManager()
 				roomID, _ := s.CreateMatchRoom()
 				tokens, _ := s.CreateMatch(roomID, validGameCfg())
-				roomVal, _ := s.Rooms.Load(roomID)
-				room := roomVal.(*MatchRoom)
+				room := mustRoom(t, s, roomID)
 				room.Match.WinnerTeamID = 1 // conclude the match
 				return roomID, s, tokens
 			},
@@ -613,8 +587,7 @@ func TestServerStateManager_DeleteMatch(t *testing.T) {
 				s := NewServerStateManager()
 				roomID, _ := s.CreateMatchRoom()
 				s.CreateMatch(roomID, validGameCfg())
-				roomVal, _ := s.Rooms.Load(roomID)
-				room := roomVal.(*MatchRoom)
+				room := mustRoom(t, s, roomID)
 				gameCfg := validGameCfg()
 				room.GameCfg = &gameCfg
 				return roomID, s, [2]string{"INVALID_TOKEN", ""}
@@ -639,11 +612,7 @@ func TestServerStateManager_DeleteMatch(t *testing.T) {
 				t.Fatalf("Rematch() error = %v, want %v", err, tt.wantErr)
 			}
 			if err == nil {
-				roomVal, ok := s.Rooms.Load(roomID)
-				if !ok {
-					t.Fatal("Room not found")
-				}
-				room := roomVal.(*MatchRoom)
+				room := mustRoom(t, s, roomID)
 				if room.Match != nil {
 					t.Fatalf("Expected Match to be deleted, got %p", room.Match)
 				}
@@ -669,11 +638,7 @@ func TestServerStateManager_GetMatchState(t *testing.T) {
 			},
 			wantErr: nil,
 			validate: func(t *testing.T, gs *engine.GameState, s *ServerStateManager, roomID string) {
-				roomVal, ok := s.Rooms.Load(roomID)
-				if !ok {
-					t.Fatal("Room not found")
-				}
-				room := roomVal.(*MatchRoom)
+				room := mustRoom(t, s, roomID)
 				if gs != room.Match.WorkingState {
 					t.Errorf("Expected matchState pointer %p, got %p", room.Match.WorkingState, gs)
 				}
@@ -729,11 +694,7 @@ func TestServerStateManager_SubmitTurnCommand(t *testing.T) {
 			},
 			wantErr: nil,
 			validate: func(t *testing.T, gameEvents []engine.GameEvent, s *ServerStateManager, roomID string, cmd engine.TurnCommand) {
-				roomVal, ok := s.Rooms.Load(roomID)
-				if !ok {
-					t.Fatal("Room not found")
-				}
-				room := roomVal.(*MatchRoom)
+				room := mustRoom(t, s, roomID)
 				uID := engine.NewUnitID(1, 0)
 				newPos := engine.Coordinate{X: 4, Y: 7}
 				if gotPos := room.Match.WorkingState.Units[uID].Position; gotPos != newPos {
@@ -760,11 +721,7 @@ func TestServerStateManager_SubmitTurnCommand(t *testing.T) {
 			},
 			wantErr: ErrInvalidTurnCmd,
 			validate: func(t *testing.T, gameEvents []engine.GameEvent, s *ServerStateManager, roomID string, cmd engine.TurnCommand) {
-				roomVal, ok := s.Rooms.Load(roomID)
-				if !ok {
-					t.Fatal("Room not found")
-				}
-				room := roomVal.(*MatchRoom)
+				room := mustRoom(t, s, roomID)
 				uID := engine.NewUnitID(1, 0)
 				if gotPos := room.Match.WorkingState.Units[uID].Position; gotPos.X == 4 && gotPos.Y == 7777 {
 					t.Errorf("Expected Unit %#X didn't move", uID)
@@ -828,19 +785,14 @@ func TestServerStateManager_StartTurn(t *testing.T) {
 			name: "Success",
 			setup: func(t *testing.T) (string, *ServerStateManager, string) {
 				roomID, tokens, s := createTestRoom(t)
-				roomVal, _ := s.Rooms.Load(roomID)
-				room := roomVal.(*MatchRoom)
+				room := mustRoom(t, s, roomID)
 				room.Match.TrueState.Turn = 1000
 				room.Match.WorkingState.Turn = 1000
 				return roomID, s, tokens[0]
 			},
 			wantErr: nil,
 			validate: func(t *testing.T, inSuddenDeath bool, gameEvents []engine.GameEvent, s *ServerStateManager, roomID string) {
-				roomVal, ok := s.Rooms.Load(roomID)
-				if !ok {
-					t.Fatal("Room not found")
-				}
-				room := roomVal.(*MatchRoom)
+				room := mustRoom(t, s, roomID)
 
 				if got, want := len(room.Match.WorkingState.Bombs), 2; got != want {
 					t.Errorf("Expected SuddenDeath triggered and drop %d bombs, got %d", want, got)
@@ -862,8 +814,7 @@ func TestServerStateManager_StartTurn(t *testing.T) {
 			name: "Match already ended",
 			setup: func(t *testing.T) (string, *ServerStateManager, string) {
 				roomID, tokens, s := createTestRoom(t)
-				roomVal, _ := s.Rooms.Load(roomID)
-				room := roomVal.(*MatchRoom)
+				room := mustRoom(t, s, roomID)
 				room.Match.WinnerTeamID = 1
 				return roomID, s, tokens[0]
 			},
@@ -920,18 +871,13 @@ func TestServerStateManager_ResetTurn(t *testing.T) {
 			name: "Success",
 			setup: func(t *testing.T) (string, *ServerStateManager, string) {
 				roomID, tokens, s := createTestRoom(t)
-				roomVal, _ := s.Rooms.Load(roomID)
-				room := roomVal.(*MatchRoom)
+				room := mustRoom(t, s, roomID)
 				room.Match.WorkingState.Units[16].HasMoved = true
 				return roomID, s, tokens[0]
 			},
 			wantErr: nil,
 			validate: func(t *testing.T, s *ServerStateManager, roomID string) {
-				roomVal, ok := s.Rooms.Load(roomID)
-				if !ok {
-					t.Fatal("Room not found")
-				}
-				room := roomVal.(*MatchRoom)
+				room := mustRoom(t, s, roomID)
 
 				if got, want := room.Match.WorkingState.Units[16].HasMoved, false; got != want {
 					t.Errorf("Expected Unit %#X HasMoved reset to %v, got %v", 16, want, got)
@@ -983,18 +929,13 @@ func TestServerStateManager_ResolveTurn(t *testing.T) {
 			setup: func(t *testing.T) (string, *ServerStateManager, string) {
 				roomID, tokens, s := createTestRoom(t)
 				s.SubmitTurnCommand(roomID, engine.NewPlaceBombCommand(16, engine.Coordinate{X: 4, Y: 7}), tokens[0])
-				roomVal, _ := s.Rooms.Load(roomID)
-				room := roomVal.(*MatchRoom)
+				room := mustRoom(t, s, roomID)
 				room.Match.WorkingState.Bombs[engine.NewBombID(1, 1, 16)].Countdown = 1
 				return roomID, s, tokens[0]
 			},
 			wantErr: nil,
 			validate: func(t *testing.T, gameEvents []engine.GameEvent, s *ServerStateManager, roomID string) {
-				roomVal, ok := s.Rooms.Load(roomID)
-				if !ok {
-					t.Fatal("Room not found")
-				}
-				room := roomVal.(*MatchRoom)
+				room := mustRoom(t, s, roomID)
 
 				if got, want := gameEvents, 6; len(got) != want {
 					t.Errorf("Expected %d gameEvents returned, got %#v", want, got)
@@ -1082,11 +1023,7 @@ func TestServerStateManager_Surrender(t *testing.T) {
 			req:     SurrenderRequest{TeamID: 3},
 			wantErr: ErrInvalidConfig,
 			validate: func(t *testing.T, gameEvents []engine.GameEvent, s *ServerStateManager, roomID string) {
-				roomVal, ok := s.Rooms.Load(roomID)
-				if !ok {
-					t.Fatal("Room not found")
-				}
-				room := roomVal.(*MatchRoom)
+				room := mustRoom(t, s, roomID)
 
 				if len(gameEvents) != 0 {
 					t.Errorf("Expected gameEvents to be empty, got %#v", gameEvents)
@@ -1158,11 +1095,7 @@ func TestServerStateManager_GetMatchConfig(t *testing.T) {
 			},
 			wantErr: nil,
 			validate: func(t *testing.T, gameCfg *engine.GameCfg, s *ServerStateManager, roomID string) {
-				roomVal, ok := s.Rooms.Load(roomID)
-				if !ok {
-					t.Fatal("Room not found")
-				}
-				room := roomVal.(*MatchRoom)
+				room := mustRoom(t, s, roomID)
 				if gameCfg != &room.Match.GameCfg {
 					t.Errorf("Expected matchState pointer %p, got %p", &room.Match.GameCfg, gameCfg)
 				}
@@ -1293,8 +1226,7 @@ func TestServerStateManager_cleanupInactiveRooms(t *testing.T) {
 	// Room 2: inactive (old LastActivity)
 	roomID2, _ := s.CreateMatchRoom()
 	s.CreateMatch(roomID2, validGameCfg())
-	roomVal, _ := s.Rooms.Load(roomID2)
-	room := roomVal.(*MatchRoom)
+	room := mustRoom(t, s, roomID2)
 	room.mu.Lock()
 	room.LastActivity = time.Now().Add(-120 * time.Minute)
 	room.mu.Unlock()
@@ -1302,8 +1234,7 @@ func TestServerStateManager_cleanupInactiveRooms(t *testing.T) {
 	// Room 3: ended match
 	roomID3, _ := s.CreateMatchRoom()
 	s.CreateMatch(roomID3, validGameCfg())
-	roomVal, _ = s.Rooms.Load(roomID3)
-	room = roomVal.(*MatchRoom)
+	room = mustRoom(t, s, roomID3)
 	room.mu.Lock()
 	room.Match.WinnerTeamID = 1
 	room.mu.Unlock()
