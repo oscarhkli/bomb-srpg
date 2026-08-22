@@ -229,12 +229,12 @@ func TestTerminalView_RenderGameEvents(t *testing.T) {
 		var fakeScreen bytes.Buffer
 		view := NewTerminalView(&fakeScreen)
 
-		events := []engine.GameEvent{
+		gameEvents := []engine.GameEvent{
 			engine.NewUnitMovedEvent(16, engine.Coordinate{X: 1, Y: 2}, engine.Coordinate{X: 2, Y: 2}),
 			engine.NewMatchEndedEvent(1),
 		}
 
-		err := view.RenderGameEvents(events)
+		err := view.RenderGameEvents(gameEvents)
 
 		if err != nil {
 			t.Fatalf("Expected no error, got: %v", err)

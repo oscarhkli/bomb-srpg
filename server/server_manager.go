@@ -451,7 +451,7 @@ func (s *ServerStateManager) ResolveTurn(roomID string, token string) ([]engine.
 		return nil, err
 	}
 
-	events := room.Match.ResolveTurn()
+	gameEvents := room.Match.ResolveTurn()
 	room.LastActivity = time.Now()
 
 	if room.GameCfg.VSCpu && room.Match.TrueState.ActiveTeam == 2 {
@@ -459,7 +459,7 @@ func (s *ServerStateManager) ResolveTurn(roomID string, token string) ([]engine.
 		go s.runCPUTurn(room, room.Match)
 	}
 
-	return events, nil
+	return gameEvents, nil
 }
 
 // runCPUTurn plays the CPU's turn to completion, holding the room lock throughout.
@@ -526,11 +526,11 @@ func (s *ServerStateManager) Surrender(roomID string, teamID int, token string) 
 		return nil, err
 	}
 
-	events := room.Match.Surrender(teamID)
+	gameEvents := room.Match.Surrender(teamID)
 	room.LastActivity = time.Now()
 	room.mu.Unlock()
 
-	return events, nil
+	return gameEvents, nil
 }
 
 // GetMatchConfig gets the GameConfig of the current Match in a given MatchRoom.

@@ -41,7 +41,7 @@ func (s *SpyMatchView) RenderTurnHeader(turn, activeTeamID int) error {
 	return nil
 }
 
-func (s *SpyMatchView) RenderGameEvents(events []engine.GameEvent) error {
+func (s *SpyMatchView) RenderGameEvents(gameEvents []engine.GameEvent) error {
 	s.RenderGameEventsCalled = true
 	return nil
 }

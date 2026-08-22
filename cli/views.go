@@ -9,5 +9,5 @@ type MatchView interface {
 	RenderMessage(message string) error
 	RenderFeedback(success bool, message string) error
 	RenderTurnHeader(turn, activeTeamID int) error
-	RenderGameEvents(events []engine.GameEvent) error
+	RenderGameEvents(gameEvents []engine.GameEvent) error
 }

@@ -108,18 +108,18 @@ func TestMatch_Surrender(t *testing.T) {
 			m := newTestMatch(1, 2)
 			m.PlaybackLog = append(m.PlaybackLog, NewUnitDiedEvent(16))
 
-			events := m.Surrender(tt.teamID)
+			gameEvents := m.Surrender(tt.teamID)
 
-			if len(events) != 1 {
-				t.Errorf("Expected 1 event for surrender, got %v", len(events))
+			if len(gameEvents) != 1 {
+				t.Errorf("Expected 1 event for surrender, got %v", len(gameEvents))
 			}
 
 			var foundEndedEvent bool
-			for _, event := range events {
-				if event.Type == GameEvtMatchEnded {
+			for _, evt := range gameEvents {
+				if evt.Type == GameEvtMatchEnded {
 					foundEndedEvent = true
-					if event.WinnerTeamID != tt.winnerTeamID {
-						t.Errorf("Malformed MatchEndedEvent! Got winner %d", event.WinnerTeamID)
+					if evt.WinnerTeamID != tt.winnerTeamID {
+						t.Errorf("Malformed MatchEndedEvent! Got winner %d", evt.WinnerTeamID)
 					}
 				}
 			}
@@ -143,7 +143,7 @@ func TestMatch_CommandMoveUnit(t *testing.T) {
 		setupState    func() *Match // Context setup helper
 		wantErr       bool
 		errContains   string
-		verifyResults func(t *testing.T, m *Match, evts []GameEvent) // Post-execution state check
+		verifyResults func(t *testing.T, m *Match, gameEvents []GameEvent) // Post-execution state check
 	}
 
 	validUnitID := NewUnitID(1, 0)
@@ -305,7 +305,7 @@ func TestMatch_CommandMoveUnit(t *testing.T) {
 				return m
 			},
 			wantErr: false,
-			verifyResults: func(t *testing.T, m *Match, evts []GameEvent) {
+			verifyResults: func(t *testing.T, m *Match, gameEvents []GameEvent) {
 				oldCell := m.WorkingState.Grid[origin.Y][origin.X]
 				if oldCell.OccupantType != OccupantNone {
 					t.Errorf("expected old tile to be cleared, got type %v", oldCell.OccupantType)
@@ -328,10 +328,10 @@ func TestMatch_CommandMoveUnit(t *testing.T) {
 				if event.Type != GameEvtUnitMoved || event.UnitID != validUnitID || event.From == nil || event.To == nil || *event.From != origin || *event.To != validTarget {
 					t.Errorf("malformed UnitMovedEvent logged: %+v", event)
 				}
-				if len(evts) != 1 {
-					t.Errorf("expected 1 GameEvent returned, got %d", len(evts))
+				if len(gameEvents) != 1 {
+					t.Errorf("expected 1 GameEvent returned, got %d", len(gameEvents))
 				}
-				resEvt := evts[0]
+				resEvt := gameEvents[0]
 				if resEvt.Type != GameEvtUnitMoved || resEvt.UnitID != validUnitID || resEvt.From == nil || resEvt.To == nil || *resEvt.From != origin || *resEvt.To != validTarget {
 					t.Errorf("malformed UnitMovedEvent returned: %+v", resEvt)
 				}
@@ -375,7 +375,7 @@ func TestMatch_CommandPlaceBomb(t *testing.T) {
 		setupState    func() *Match // Context setup helper
 		wantErr       bool
 		errContains   string
-		verifyResults func(t *testing.T, m *Match, evts []GameEvent) // Post-execution state check
+		verifyResults func(t *testing.T, m *Match, gameEvents []GameEvent) // Post-execution state check
 	}
 
 	// Constants for easy setup
@@ -589,7 +589,7 @@ func TestMatch_CommandPlaceBomb(t *testing.T) {
 				return m
 			},
 			wantErr: false,
-			verifyResults: func(t *testing.T, m *Match, evts []GameEvent) {
+			verifyResults: func(t *testing.T, m *Match, gameEvents []GameEvent) {
 				if m.WorkingState.TurnBombCounter != 1 {
 					t.Errorf("expected TurnBombCounter to be 1, got %d", m.WorkingState.TurnBombCounter)
 				}
@@ -625,10 +625,10 @@ func TestMatch_CommandPlaceBomb(t *testing.T) {
 				if event.Type != GameEvtBombPlaced || event.UnitID != validUnitID || event.BombID != expectedBombID || event.Position == nil || *event.Position != validTarget || event.Range != 3 || event.Countdown != 5 {
 					t.Errorf("malformed BombPlacedEvent logged: %+v", event)
 				}
-				if len(evts) != 1 {
-					t.Errorf("expected 1 GameEvent returned, got %d", len(evts))
+				if len(gameEvents) != 1 {
+					t.Errorf("expected 1 GameEvent returned, got %d", len(gameEvents))
 				}
-				resEvt := evts[0]
+				resEvt := gameEvents[0]
 				if resEvt.Type != GameEvtBombPlaced || resEvt.UnitID != validUnitID || resEvt.BombID != expectedBombID || resEvt.Position == nil || *resEvt.Position != validTarget || resEvt.Range != 3 || resEvt.Countdown != 5 {
 					t.Errorf("malformed BombPlacedEvent returned: %+v", resEvt)
 				}
@@ -1023,12 +1023,12 @@ func TestMatch_ResolveTurn_ExplosionAndBlast(t *testing.T) {
 		m.WorkingState.Grid[5][5] = Tile{OccupantType: OccupantBomb, OccupantID: int64(b1)}
 		m.WorkingState.Grid[15][15] = Tile{OccupantType: OccupantBomb, OccupantID: int64(b2)}
 
-		evts := m.ResolveTurn()
+		gameEvents := m.ResolveTurn()
 
-		if len(evts) != 1 {
-			t.Errorf("expected 1 GameEvent returned, got %d", len(evts))
+		if len(gameEvents) != 1 {
+			t.Errorf("expected 1 GameEvent returned, got %d", len(gameEvents))
 		}
-		resEvt := evts[0]
+		resEvt := gameEvents[0]
 		if resEvt.Type != GameEvtBombCountdownUpdated || resEvt.BombID != b1 || resEvt.Countdown != 2 {
 			t.Errorf("malformed EvtBombCountdownUpdated returned: %+v", resEvt)
 		}
@@ -1071,7 +1071,7 @@ func TestMatch_ResolveTurn_ExplosionAndBlast(t *testing.T) {
 		m.WorkingState.SoftBlocks[sb1] = &SoftBlock{ID: sb1, Position: Coordinate{0, 3}}
 		m.WorkingState.Grid[3][0] = Tile{OccupantType: OccupantSoftBlock, OccupantID: int64(sb1)}
 
-		events := m.ResolveTurn()
+		gameEvents := m.ResolveTurn()
 
 		if got, want := m.WorkingState.Units[u1].BombUsed, 0; got != want {
 			t.Errorf("expect Unit %#X bombUsed = %v, got %v", u1, got, want)
@@ -1096,15 +1096,15 @@ func TestMatch_ResolveTurn_ExplosionAndBlast(t *testing.T) {
 		damageEventsCount := 0
 		unitDiedEventsCount := 0
 		softBlockDestroyedEventsCount := 0
-		for _, e := range events {
-			if e.Type == GameEvtUnitDamaged {
+		for _, evt := range gameEvents {
+			if evt.Type == GameEvtUnitDamaged {
 				damageEventsCount++
 				continue
 			}
-			if e.Type == GameEvtUnitDied {
+			if evt.Type == GameEvtUnitDied {
 				unitDiedEventsCount++
 			}
-			if e.Type == GameEvtSoftBlockDestroyed {
+			if evt.Type == GameEvtSoftBlockDestroyed {
 				softBlockDestroyedEventsCount++
 			}
 		}
@@ -1151,7 +1151,7 @@ func TestMatch_ResolveTurn_CascadingChainReactions(t *testing.T) {
 		m.WorkingState.Bombs[b2] = &Bomb{ID: b2, Countdown: 3, Range: 2, Position: Coordinate{1, 2}}
 		m.WorkingState.Grid[2][1] = Tile{OccupantType: OccupantBomb, OccupantID: int64(b2)}
 
-		events := m.ResolveTurn()
+		gameEvents := m.ResolveTurn()
 
 		if _, exists := m.WorkingState.Bombs[b1]; exists {
 			t.Error("Bomb 1 failed to clear")
@@ -1167,8 +1167,8 @@ func TestMatch_ResolveTurn_CascadingChainReactions(t *testing.T) {
 		}
 
 		explosionPackets := 0
-		for _, e := range events {
-			if e.Type == GameEvtBombExploded {
+		for _, evt := range gameEvents {
+			if evt.Type == GameEvtBombExploded {
 				explosionPackets++
 			}
 		}
@@ -1193,7 +1193,7 @@ func TestMatch_ResolveTurn_CascadingChainReactions(t *testing.T) {
 		m.WorkingState.Bombs[b2] = &Bomb{ID: b2, Countdown: 3, Range: 2, Position: Coordinate{2, 0}}
 		m.WorkingState.Grid[0][2] = Tile{OccupantType: OccupantBomb, OccupantID: int64(b2)}
 
-		events := m.ResolveTurn()
+		gameEvents := m.ResolveTurn()
 
 		// Verification: SoftBlock must be flagged for destruction, but its active shielding body
 		// must prevent the blast ray from crossing over to touch Bomb 2 in this frame pass.
@@ -1208,8 +1208,8 @@ func TestMatch_ResolveTurn_CascadingChainReactions(t *testing.T) {
 		}
 
 		softBlockDestroyedPackets := 0
-		for _, e := range events {
-			if e.Type == GameEvtSoftBlockDestroyed {
+		for _, evt := range gameEvents {
+			if evt.Type == GameEvtSoftBlockDestroyed {
 				softBlockDestroyedPackets++
 			}
 		}
@@ -1243,10 +1243,10 @@ func TestMatch_ResolveTurn_TimelineSystemTransitions(t *testing.T) {
 		m.WorkingState.Units[u3] = &Unit{ID: u3, Team: 1, HP: 1, Type: fighter, HasMoved: true, HasUsedSkill: true}
 		m.WorkingState.Units[u4] = &Unit{ID: u4, Team: 2, HP: 1, Type: fighter}
 
-		events := m.ResolveTurn()
+		gameEvents := m.ResolveTurn()
 
-		if len(events) != 0 {
-			t.Errorf("Expected clean slice array from empty resolution pass, got %d items", len(events))
+		if len(gameEvents) != 0 {
+			t.Errorf("Expected clean slice array from empty resolution pass, got %d items", len(gameEvents))
 		}
 
 		if m.WorkingState.Turn != 2 {
@@ -1635,18 +1635,18 @@ func TestMatch_Resolve_VictoryCondition_Suite(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			m := newTestMatchWithTeams(t, tt.p1, tt.p2)
 
-			events := m.ResolveTurn()
+			gameEvents := m.ResolveTurn()
 
 			if m.WinnerTeamID != tt.expectedWinningTeam {
 				t.Errorf("Victory Guard Failed! Expected WinnerTeamID = %d, got %d", tt.expectedWinningTeam, m.WinnerTeamID)
 			}
 
 			var foundEndedEvent bool
-			for _, event := range events {
-				if event.Type == GameEvtMatchEnded {
+			for _, evt := range gameEvents {
+				if evt.Type == GameEvtMatchEnded {
 					foundEndedEvent = true
-					if event.WinnerTeamID != tt.expectedWinningTeam {
-						t.Errorf("Malformed MatchEndedEvent.WinnerTeam, got winner %d", event.WinnerTeamID)
+					if evt.WinnerTeamID != tt.expectedWinningTeam {
+						t.Errorf("Malformed MatchEndedEvent.WinnerTeam, got winner %d", evt.WinnerTeamID)
 					}
 				}
 			}
