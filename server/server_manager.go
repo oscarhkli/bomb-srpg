@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bomb-srpg/cpu"
 	"bomb-srpg/engine"
 	"context"
 	cryptorand "crypto/rand"
@@ -20,6 +21,8 @@ const (
 	roomIDBytes           = 5
 	RoomInactivityTimeout = 60 * time.Minute
 	CleanupInterval       = 60 * time.Minute
+
+	maxCPUReplanAttempts = 5
 )
 
 var (
@@ -88,6 +91,7 @@ type MatchRoom struct {
 type ServerStateManager struct {
 	Rooms          sync.Map
 	generateRoomID func(int) (string, error)
+	decide         func(*engine.GameState) []engine.TurnCommand
 	Logger         *slog.Logger
 }
 
@@ -106,6 +110,7 @@ func WithLogger(logger *slog.Logger) Option {
 func NewServerStateManager(opts ...Option) *ServerStateManager {
 	manager := &ServerStateManager{
 		generateRoomID: randomHex,
+		decide:         cpu.Decide,
 		Logger:         slog.Default(),
 	}
 	for _, opt := range opts {
@@ -446,9 +451,53 @@ func (s *ServerStateManager) ResolveTurn(roomID string, token string) ([]engine.
 		return nil, err
 	}
 
-	events := room.Match.ResolveTurn()
+	gameEvents := room.Match.ResolveTurn()
 	room.LastActivity = time.Now()
-	return events, nil
+
+	if room.GameCfg.VSCpu && room.Match.TrueState.ActiveTeam == 2 {
+		room.Match.CPU.Phase = engine.TurnPhasePlanning
+		go s.runCPUTurn(room, room.Match)
+	}
+
+	return gameEvents, nil
+}
+
+// runCPUTurn plays the CPU's turn to completion, holding the room lock throughout.
+// It abandons if the match was replaced or deleted while the goroutine was queued.
+func (s *ServerStateManager) runCPUTurn(room *MatchRoom, match *engine.Match) {
+	room.mu.Lock()
+	defer room.mu.Unlock()
+
+	if room.Match != match {
+		room.Logger.Info("CPU turn abandoned: match replaced or deleted", "phase", "planning")
+		return
+	}
+
+	defer func() {
+		match.CPU.Phase = engine.TurnPhaseReady
+		room.LastActivity = time.Now()
+	}()
+
+	for attempt := range maxCPUReplanAttempts {
+		err := applyPlan(match, s.decide(match.WorkingState))
+		if err == nil {
+			break
+		}
+		room.Logger.Warn("CPU plan rejected, replanning", "attempt", attempt, "error", err)
+	}
+
+	match.CPU.PendingEvents = match.ResolveTurn()
+}
+
+// applyPlan applies each TurnCommand in order, stopping at the first rejection.
+// Returns the rejecting command's error, or nil if the whole plan applied.
+func applyPlan(match *engine.Match, plan []engine.TurnCommand) error {
+	for _, cmd := range plan {
+		if _, err := match.ApplyTurnCommand(cmd); err != nil {
+			return fmt.Errorf("command %+v rejected: %w", cmd, err)
+		}
+	}
+	return nil
 }
 
 // ResetTurn sends Surrender signal to engine to end the current Match in a given MatchRoom.
@@ -477,11 +526,11 @@ func (s *ServerStateManager) Surrender(roomID string, teamID int, token string) 
 		return nil, err
 	}
 
-	events := room.Match.Surrender(teamID)
+	gameEvents := room.Match.Surrender(teamID)
 	room.LastActivity = time.Now()
 	room.mu.Unlock()
 
-	return events, nil
+	return gameEvents, nil
 }
 
 // GetMatchConfig gets the GameConfig of the current Match in a given MatchRoom.
@@ -508,7 +557,9 @@ func (s *ServerStateManager) GetAllowedTiles(roomID string, unitID engine.UnitID
 		return nil, err
 	}
 
-	return slices.Collect(maps.Keys(allowedTiles)), nil
+	// slices.Collect yields nil for an empty map; the client types this as a non-nullable array.
+	tiles := make([]engine.Coordinate, 0, len(allowedTiles))
+	return slices.AppendSeq(tiles, maps.Keys(allowedTiles)), nil
 }
 
 // StartCleanupLoop runs background cleanup until ctx is cancelled.

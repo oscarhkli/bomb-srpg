@@ -28,7 +28,6 @@ func InitGame(gameCfg GameCfg) (*Match, error) {
 		TrueState:    gameState,
 		WorkingState: gameState.DeepCopy(),
 		GameCfg:      gameCfg,
-		PlaybackLog:  []GameEvent{},
 	}, nil
 }
 

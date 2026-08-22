@@ -335,11 +335,7 @@ func TestHandleCreateNewMatch(t *testing.T) {
 		}
 
 		// Verify match was actually created in the server state manager
-		roomVal, ok := s.Rooms.Load(roomID)
-		if !ok {
-			t.Error("Room not found in server state manager")
-		}
-		room := roomVal.(*MatchRoom)
+		room := mustRoom(t, s, roomID)
 		if room.Match == nil {
 			t.Error("Match was not created in the server state manager")
 		}
@@ -386,8 +382,7 @@ func TestHandleCreateNewMatch(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to create room: %v", err)
 		}
-		roomVal, _ := s.Rooms.Load(roomID)
-		room := roomVal.(*MatchRoom)
+		room := mustRoom(t, s, roomID)
 		room.Match = &engine.Match{}
 
 		gameCfg := engine.GameCfg{
@@ -552,11 +547,7 @@ func TestHandleRematch(t *testing.T) {
 		}
 
 		// Verify match was actually recreated in the server state manager
-		roomVal, ok := s.Rooms.Load(roomID)
-		if !ok {
-			t.Error("Room not found in server state manager")
-		}
-		room := roomVal.(*MatchRoom)
+		room := mustRoom(t, s, roomID)
 		if room.Match == nil {
 			t.Error("Match was not created in the server state manager")
 		}
@@ -595,8 +586,7 @@ func TestHandleRematch(t *testing.T) {
 
 	t.Run("Failure: match not found", func(t *testing.T) {
 		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
-		roomVal, _ := s.Rooms.Load(roomID)
-		room := roomVal.(*MatchRoom)
+		room := mustRoom(t, s, roomID)
 		room.GameCfg = nil
 
 		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/rematch", nil)
@@ -685,8 +675,7 @@ func TestHandleRematch(t *testing.T) {
 func TestHandleDeleteMatch(t *testing.T) {
 	t.Run("Success: deletes an existing concluded Match", func(t *testing.T) {
 		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
-		roomVal, _ := s.Rooms.Load(roomID)
-		room := roomVal.(*MatchRoom)
+		room := mustRoom(t, s, roomID)
 		room.Match.WinnerTeamID = 1 // conclude the match
 
 		req, err := http.NewRequest("DELETE", "/api/match-rooms/"+roomID+"/match", nil)
@@ -708,8 +697,7 @@ func TestHandleDeleteMatch(t *testing.T) {
 
 	t.Run("Success: no-op when Match already cleared", func(t *testing.T) {
 		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
-		roomVal, _ := s.Rooms.Load(roomID)
-		room := roomVal.(*MatchRoom)
+		room := mustRoom(t, s, roomID)
 		room.Match = nil
 
 		req, err := http.NewRequest("DELETE", "/api/match-rooms/"+roomID+"/match", nil)
@@ -1032,9 +1020,9 @@ func TestHandleSubmitTurnCommand(t *testing.T) {
 	t.Run("Success: submit a valid TurnCommand in an existing room", func(t *testing.T) {
 		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
 
-		uID := engine.NewUnitID(1, 0)
+		unitID := engine.NewUnitID(1, 0)
 		newPos := engine.Coordinate{X: 4, Y: 7}
-		jsonBody, _ := json.Marshal(engine.NewMoveCommand(uID, newPos))
+		jsonBody, _ := json.Marshal(engine.NewMoveCommand(unitID, newPos))
 
 		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/turn-commands", strings.NewReader(string(jsonBody)))
 		if err != nil {
@@ -1064,25 +1052,24 @@ func TestHandleSubmitTurnCommand(t *testing.T) {
 		}
 		resEvt := response[0]
 		validFrom := engine.Coordinate{X: 4, Y: 8}
-		if resEvt.Type != engine.GameEvtUnitMoved || resEvt.UnitID != uID || *resEvt.From != validFrom || *resEvt.To != newPos {
+		if resEvt.Type != engine.GameEvtUnitMoved || resEvt.UnitID != unitID || *resEvt.From != validFrom || *resEvt.To != newPos {
 			t.Errorf("malformed UnitMoveEvent returned: %+v", resEvt)
 		}
 
-		roomVal, _ := s.Rooms.Load(roomID)
-		room := roomVal.(*MatchRoom)
-		u := room.Match.WorkingState.Units[uID]
+		room := mustRoom(t, s, roomID)
+		u := room.Match.WorkingState.Units[unitID]
 
 		if u.Position != newPos {
-			t.Errorf("Expected Unit %#X new position %#v, got %#v", uID, newPos, u.Position)
+			t.Errorf("Expected Unit %#X new position %#v, got %#v", unitID, newPos, u.Position)
 		}
 	})
 
 	t.Run("Failure: invalid TurnCommand", func(t *testing.T) {
 		roomID, playerTokens, _, h := createTestRoomWithMatch(t)
 
-		uID := engine.NewUnitID(1, 0)
+		unitID := engine.NewUnitID(1, 0)
 		newPos := engine.Coordinate{X: 4, Y: 777}
-		jsonBody, _ := json.Marshal(engine.NewMoveCommand(uID, newPos))
+		jsonBody, _ := json.Marshal(engine.NewMoveCommand(unitID, newPos))
 
 		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/turn-commands", strings.NewReader(string(jsonBody)))
 		if err != nil {
@@ -1128,9 +1115,9 @@ func TestHandleSubmitTurnCommand(t *testing.T) {
 		s := NewServerStateManager()
 		h := NewHandler(s)
 
-		uID := engine.NewUnitID(1, 0)
+		unitID := engine.NewUnitID(1, 0)
 		newPos := engine.Coordinate{X: 4, Y: 7}
-		jsonBody, _ := json.Marshal(engine.NewMoveCommand(uID, newPos))
+		jsonBody, _ := json.Marshal(engine.NewMoveCommand(unitID, newPos))
 
 		req, err := http.NewRequest("POST", "/api/match-rooms/NONEXISTENT/match/turn-commands", strings.NewReader(string(jsonBody)))
 		if err != nil {
@@ -1152,13 +1139,12 @@ func TestHandleSubmitTurnCommand(t *testing.T) {
 
 	t.Run("Failure: match not found", func(t *testing.T) {
 		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
-		roomVal, _ := s.Rooms.Load(roomID)
-		room := roomVal.(*MatchRoom)
+		room := mustRoom(t, s, roomID)
 		room.Match = nil
 
-		uID := engine.NewUnitID(1, 0)
+		unitID := engine.NewUnitID(1, 0)
 		newPos := engine.Coordinate{X: 4, Y: 7}
-		jsonBody, _ := json.Marshal(engine.NewMoveCommand(uID, newPos))
+		jsonBody, _ := json.Marshal(engine.NewMoveCommand(unitID, newPos))
 
 		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/turn-commands", strings.NewReader(string(jsonBody)))
 		if err != nil {
@@ -1180,9 +1166,9 @@ func TestHandleSubmitTurnCommand(t *testing.T) {
 
 	t.Run("Failure: failed to Encode", func(t *testing.T) {
 		roomID, playerTokens, _, h := createTestRoomWithMatch(t)
-		uID := engine.NewUnitID(1, 0)
+		unitID := engine.NewUnitID(1, 0)
 		newPos := engine.Coordinate{X: 4, Y: 7}
-		jsonBody, _ := json.Marshal(engine.NewMoveCommand(uID, newPos))
+		jsonBody, _ := json.Marshal(engine.NewMoveCommand(unitID, newPos))
 
 		testEncodeFailure(t, testMux("POST /api/match-rooms/{roomID}/match/turn-commands", h.HandleSubmitTurnCommand),
 			func() *http.Request {
@@ -1195,9 +1181,9 @@ func TestHandleSubmitTurnCommand(t *testing.T) {
 
 	t.Run("Test Contract", func(t *testing.T) {
 		roomID, playerTokens, _, h := createTestRoomWithMatch(t)
-		uID := engine.NewUnitID(1, 0)
+		unitID := engine.NewUnitID(1, 0)
 		newPos := engine.Coordinate{X: 4, Y: 7}
-		jsonBody, _ := json.Marshal(engine.NewMoveCommand(uID, newPos))
+		jsonBody, _ := json.Marshal(engine.NewMoveCommand(unitID, newPos))
 		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/turn-commands", strings.NewReader(string(jsonBody)))
 		if err != nil {
 			t.Fatalf("Failed to create request: %v", err)
@@ -1229,9 +1215,9 @@ func TestHandleSubmitTurnCommand(t *testing.T) {
 	t.Run("Failure: missing Authorization header", func(t *testing.T) {
 		roomID, _, _, h := createTestRoomWithMatch(t)
 
-		uID := engine.NewUnitID(1, 0)
+		unitID := engine.NewUnitID(1, 0)
 		newPos := engine.Coordinate{X: 4, Y: 7}
-		jsonBody, _ := json.Marshal(engine.NewMoveCommand(uID, newPos))
+		jsonBody, _ := json.Marshal(engine.NewMoveCommand(unitID, newPos))
 
 		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/turn-commands", strings.NewReader(string(jsonBody)))
 		if err != nil {
@@ -1253,9 +1239,9 @@ func TestHandleSubmitTurnCommand(t *testing.T) {
 	t.Run("Failure: invalid token", func(t *testing.T) {
 		roomID, _, _, h := createTestRoomWithMatch(t)
 
-		uID := engine.NewUnitID(1, 0)
+		unitID := engine.NewUnitID(1, 0)
 		newPos := engine.Coordinate{X: 4, Y: 7}
-		jsonBody, _ := json.Marshal(engine.NewMoveCommand(uID, newPos))
+		jsonBody, _ := json.Marshal(engine.NewMoveCommand(unitID, newPos))
 
 		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/turn-commands", strings.NewReader(string(jsonBody)))
 		if err != nil {
@@ -1278,9 +1264,9 @@ func TestHandleSubmitTurnCommand(t *testing.T) {
 	t.Run("Failure: wrong team token", func(t *testing.T) {
 		roomID, playerTokens, _, h := createTestRoomWithMatch(t)
 
-		uID := engine.NewUnitID(1, 0)
+		unitID := engine.NewUnitID(1, 0)
 		newPos := engine.Coordinate{X: 4, Y: 7}
-		jsonBody, _ := json.Marshal(engine.NewMoveCommand(uID, newPos))
+		jsonBody, _ := json.Marshal(engine.NewMoveCommand(unitID, newPos))
 
 		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/turn-commands", strings.NewReader(string(jsonBody)))
 		if err != nil {
@@ -1304,8 +1290,7 @@ func TestHandleSubmitTurnCommand(t *testing.T) {
 func TestHandleStartTurn(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
-		roomVal, _ := s.Rooms.Load(roomID)
-		room := roomVal.(*MatchRoom)
+		room := mustRoom(t, s, roomID)
 		room.Match.TrueState.Turn = 1000
 		room.Match.WorkingState.Turn = 1000
 
@@ -1372,8 +1357,7 @@ func TestHandleStartTurn(t *testing.T) {
 
 	t.Run("Failure: match not found", func(t *testing.T) {
 		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
-		roomVal, _ := s.Rooms.Load(roomID)
-		room := roomVal.(*MatchRoom)
+		room := mustRoom(t, s, roomID)
 		room.Match = nil
 
 		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/start-turn", nil)
@@ -1407,8 +1391,7 @@ func TestHandleStartTurn(t *testing.T) {
 
 	t.Run("Test Contract", func(t *testing.T) {
 		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
-		roomVal, _ := s.Rooms.Load(roomID)
-		room := roomVal.(*MatchRoom)
+		room := mustRoom(t, s, roomID)
 		room.Match.TrueState.Turn = 99999
 		room.Match.WorkingState.Turn = 99999
 
@@ -1507,10 +1490,9 @@ func TestHandleStartTurn(t *testing.T) {
 func TestHandleResetTurn(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
-		uID := engine.NewUnitID(1, 0)
-		roomVal, _ := s.Rooms.Load(roomID)
-		room := roomVal.(*MatchRoom)
-		room.Match.WorkingState.Units[uID].HasMoved = true
+		unitID := engine.NewUnitID(1, 0)
+		room := mustRoom(t, s, roomID)
+		room.Match.WorkingState.Units[unitID].HasMoved = true
 
 		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/reset", nil)
 		if err != nil {
@@ -1534,8 +1516,8 @@ func TestHandleResetTurn(t *testing.T) {
 			t.Errorf("Expect empty body, got %q", rr.Body.String())
 		}
 
-		if got, want := room.Match.WorkingState.Units[uID].HasMoved, false; got != want {
-			t.Errorf("Expected Unit %#X HasMoved reset to %v, got %v", uID, want, got)
+		if got, want := room.Match.WorkingState.Units[unitID].HasMoved, false; got != want {
+			t.Errorf("Expected Unit %#X HasMoved reset to %v, got %v", unitID, want, got)
 		}
 	})
 
@@ -1562,8 +1544,7 @@ func TestHandleResetTurn(t *testing.T) {
 
 	t.Run("Failure: match not found", func(t *testing.T) {
 		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
-		roomVal, _ := s.Rooms.Load(roomID)
-		room := roomVal.(*MatchRoom)
+		room := mustRoom(t, s, roomID)
 		room.Match = nil
 
 		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/reset", nil)
@@ -1646,11 +1627,10 @@ func TestHandleResetTurn(t *testing.T) {
 func TestHandleResolveTurn(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
-		uID := engine.NewUnitID(1, 0)
-		s.SubmitTurnCommand(roomID, engine.NewPlaceBombCommand(uID, engine.Coordinate{X: 4, Y: 7}), playerTokens[0])
-		roomVal, _ := s.Rooms.Load(roomID)
-		room := roomVal.(*MatchRoom)
-		room.Match.WorkingState.Bombs[engine.NewBombID(1, 1, uID)].Countdown = 1
+		unitID := engine.NewUnitID(1, 0)
+		s.SubmitTurnCommand(roomID, engine.NewPlaceBombCommand(unitID, engine.Coordinate{X: 4, Y: 7}), playerTokens[0])
+		room := mustRoom(t, s, roomID)
+		room.Match.WorkingState.Bombs[engine.NewBombID(1, 1, unitID)].Countdown = 1
 
 		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/resolve", nil)
 		if err != nil {
@@ -1679,7 +1659,7 @@ func TestHandleResolveTurn(t *testing.T) {
 		if got, want := response, 6; len(got) != want {
 			t.Errorf("Expected %d gameEvents returned, got %#v", want, got)
 		}
-		if got, want := room.Match.WorkingState.Units[uID].HP, 0; got != want {
+		if got, want := room.Match.WorkingState.Units[unitID].HP, 0; got != want {
 			t.Errorf("Expected Unit %#X HP %v, got %v", 16, want, got)
 		}
 		if got, want := room.Match.WinnerTeamID, 2; got != want {
@@ -1710,8 +1690,7 @@ func TestHandleResolveTurn(t *testing.T) {
 
 	t.Run("Failure: match not found", func(t *testing.T) {
 		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
-		roomVal, _ := s.Rooms.Load(roomID)
-		room := roomVal.(*MatchRoom)
+		room := mustRoom(t, s, roomID)
 		room.Match = nil
 
 		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/resolve", nil)
@@ -1745,8 +1724,8 @@ func TestHandleResolveTurn(t *testing.T) {
 
 	t.Run("Test Contract", func(t *testing.T) {
 		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
-		uID := engine.NewUnitID(1, 0)
-		s.SubmitTurnCommand(roomID, engine.NewPlaceBombCommand(uID, engine.Coordinate{X: 4, Y: 7}), playerTokens[0])
+		unitID := engine.NewUnitID(1, 0)
+		s.SubmitTurnCommand(roomID, engine.NewPlaceBombCommand(unitID, engine.Coordinate{X: 4, Y: 7}), playerTokens[0])
 
 		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/resolve", nil)
 		if err != nil {
@@ -1939,8 +1918,7 @@ func TestHandleSurrender(t *testing.T) {
 
 	t.Run("Failure: match not found", func(t *testing.T) {
 		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
-		roomVal, _ := s.Rooms.Load(roomID)
-		room := roomVal.(*MatchRoom)
+		room := mustRoom(t, s, roomID)
 		room.Match = nil
 
 		jsonBody, _ := json.Marshal(SurrenderRequest{TeamID: 1})
@@ -1976,8 +1954,8 @@ func TestHandleSurrender(t *testing.T) {
 
 	t.Run("Test Contract", func(t *testing.T) {
 		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
-		uID := engine.NewUnitID(1, 0)
-		s.SubmitTurnCommand(roomID, engine.NewPlaceBombCommand(uID, engine.Coordinate{X: 4, Y: 7}), playerTokens[0])
+		unitID := engine.NewUnitID(1, 0)
+		s.SubmitTurnCommand(roomID, engine.NewPlaceBombCommand(unitID, engine.Coordinate{X: 4, Y: 7}), playerTokens[0])
 
 		jsonBody, _ := json.Marshal(SurrenderRequest{TeamID: 1})
 		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/surrender", strings.NewReader(string(jsonBody)))
@@ -2259,6 +2237,40 @@ func TestHandleGetAllowedTiles(t *testing.T) {
 		slices.SortFunc(response, cmpFunc)
 		if !slices.Equal(want, response) {
 			t.Errorf("Expected coordinates %#v, got %#v", want, response)
+		}
+	})
+
+	t.Run("Success: a boxed-in unit encodes an empty array, not null", func(t *testing.T) {
+		s := NewServerStateManager()
+		h := NewHandler(s)
+		roomID, err := s.CreateMatchRoom()
+		if err != nil {
+			t.Fatalf("Failed to create room: %v", err)
+		}
+		if _, err := s.CreateMatch(roomID, validGameCfg()); err != nil {
+			t.Fatalf("Failed to create match: %v", err)
+		}
+
+		// Unit 0x10 spawns at {4,8} with an ally on {3,8}; soft blocks on {5,8} and {4,7}
+		// plus the stage edge below leave it no legal landing tile.
+		gs := mustRoom(t, s, roomID).Match.WorkingState
+		gs.UpdateStageOccupant(engine.Coordinate{X: 5, Y: 8}, engine.OccupantSoftBlock, 1)
+		gs.UpdateStageOccupant(engine.Coordinate{X: 4, Y: 7}, engine.OccupantSoftBlock, 2)
+
+		req, err := http.NewRequest("GET", "/api/match-rooms/"+roomID+"/match/allowed-tiles?unitId=16&turnCmdType=move", nil)
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+
+		rr := httptest.NewRecorder()
+		testMux("GET /api/match-rooms/{roomID}/match/allowed-tiles", h.HandleGetAllowedTiles).ServeHTTP(rr, req)
+
+		if status := rr.Code; status != http.StatusOK {
+			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusOK)
+		}
+
+		if got := strings.TrimSpace(rr.Body.String()); got != "[]" {
+			t.Errorf("Expected an empty JSON array, got %q", got)
 		}
 	})
 

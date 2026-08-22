@@ -97,11 +97,11 @@ func TestCombinatorialExhaustive(t *testing.T) {
 		for team := 1; team <= maxTeams; team++ {
 			for playerIdx := 0; playerIdx < maxPlayersPerTeam; playerIdx++ {
 				for bombNum := 1; bombNum <= maxBombsPerPlayer; bombNum++ {
-					uID := NewUnitID(team, playerIdx)
-					bID := NewBombID(turn, bombNum, uID)
+					unitID := NewUnitID(team, playerIdx)
+					bombID := NewBombID(turn, bombNum, unitID)
 
-					gotTurn, gotCount, gotUID := bID.Decode()
-					gotTeam, gotIdx := gotUID.Decode()
+					gotTurn, gotCount, gotUnitID := bombID.Decode()
+					gotTeam, gotIdx := gotUnitID.Decode()
 
 					if gotTurn != turn || gotCount != bombNum || gotTeam != team || gotIdx != playerIdx {
 						t.Fatalf("Bitwise leak detected! Turn %d, Team %d, Player %d, Bomb %d. Got: Turn %d, Team %d, Player %d, Bomb %d",
