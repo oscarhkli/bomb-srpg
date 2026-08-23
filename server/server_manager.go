@@ -395,71 +395,14 @@ func (s *ServerStateManager) StartTurn(roomID, token string) (bool, []engine.Gam
 		return false, nil, fmt.Errorf("%w: match already ended", ErrMatchEnded)
 	}
 
-	room.LastActivity = time.Now()
-	return room.Match.WorkingState.InSuddenDeath, gameEvents, nil
-}
-
-// ResetTurn sends ResetTurn signal to engine to drop the current WorkingState and reset to TrueState in a given MatchRoom.
-// Returns an error if any pre-check is violated
-func (s *ServerStateManager) ResetTurn(roomID, token string) error {
-	roomVal, ok := s.Rooms.Load(roomID)
-	if !ok {
-		s.Logger.Warn("match room not found", "roomID", roomID)
-		return fmt.Errorf("%w: roomID=%s", ErrRoomNotFound, roomID)
-	}
-	room := roomVal.(*MatchRoom)
-
-	room.mu.Lock()
-	defer room.mu.Unlock()
-
-	if room.Match == nil {
-		room.Logger.Warn("match not found")
-		return fmt.Errorf("%w: roomID=%s", ErrMatchNotFound, roomID)
-	}
-
-	teamID := room.Match.WorkingState.ActiveTeam
-	if err := room.validatePlayerToken(teamID, token); err != nil {
-		return err
-	}
-
-	room.Match.ResetTurn()
-
-	room.LastActivity = time.Now()
-	return nil
-}
-
-// ResetTurn sends ResolveTurn signal to engine to calculate the impacts of the Player's action in a given MatchRoom.
-// Returns the gameEvents or an error if any pre-check is violated
-func (s *ServerStateManager) ResolveTurn(roomID, token string) ([]engine.GameEvent, error) {
-	roomVal, ok := s.Rooms.Load(roomID)
-	if !ok {
-		s.Logger.Warn("match room not found", "roomID", roomID)
-		return nil, fmt.Errorf("%w: roomID=%s", ErrRoomNotFound, roomID)
-	}
-	room := roomVal.(*MatchRoom)
-
-	room.mu.Lock()
-	defer room.mu.Unlock()
-
-	if room.Match == nil {
-		room.Logger.Warn("match not found")
-		return nil, fmt.Errorf("%w: roomID=%s", ErrMatchNotFound, roomID)
-	}
-
-	teamID := room.Match.WorkingState.ActiveTeam
-	if err := room.validatePlayerToken(teamID, token); err != nil {
-		return nil, err
-	}
-
-	gameEvents := room.Match.ResolveTurn()
-	room.LastActivity = time.Now()
-
-	if room.GameCfg.VSCpu && room.Match.TrueState.ActiveTeam == 2 {
+	// Launch CPU planning against the post-hazard board.
+	if room.GameCfg.VSCpu && teamID == 2 && room.Match.CPU.Phase == engine.TurnPhaseIdle {
 		room.Match.CPU.Phase = engine.TurnPhasePlanning
 		go s.runCPUTurn(room, room.Match)
 	}
 
-	return gameEvents, nil
+	room.LastActivity = time.Now()
+	return room.Match.WorkingState.InSuddenDeath, gameEvents, nil
 }
 
 // runCPUTurn plays the CPU's turn to completion, holding the room lock throughout.
@@ -532,6 +475,64 @@ func (s *ServerStateManager) ConsumeCPUStatus(roomID, token string) (engine.CPUT
 	}
 
 	return turnPhase, pendingEvents, nil
+}
+
+// ResetTurn sends ResetTurn signal to engine to drop the current WorkingState and reset to TrueState in a given MatchRoom.
+// Returns an error if any pre-check is violated
+func (s *ServerStateManager) ResetTurn(roomID, token string) error {
+	roomVal, ok := s.Rooms.Load(roomID)
+	if !ok {
+		s.Logger.Warn("match room not found", "roomID", roomID)
+		return fmt.Errorf("%w: roomID=%s", ErrRoomNotFound, roomID)
+	}
+	room := roomVal.(*MatchRoom)
+
+	room.mu.Lock()
+	defer room.mu.Unlock()
+
+	if room.Match == nil {
+		room.Logger.Warn("match not found")
+		return fmt.Errorf("%w: roomID=%s", ErrMatchNotFound, roomID)
+	}
+
+	teamID := room.Match.WorkingState.ActiveTeam
+	if err := room.validatePlayerToken(teamID, token); err != nil {
+		return err
+	}
+
+	room.Match.ResetTurn()
+
+	room.LastActivity = time.Now()
+	return nil
+}
+
+// ResetTurn sends ResolveTurn signal to engine to calculate the impacts of the Player's action in a given MatchRoom.
+// Returns the gameEvents or an error if any pre-check is violated
+func (s *ServerStateManager) ResolveTurn(roomID, token string) ([]engine.GameEvent, error) {
+	roomVal, ok := s.Rooms.Load(roomID)
+	if !ok {
+		s.Logger.Warn("match room not found", "roomID", roomID)
+		return nil, fmt.Errorf("%w: roomID=%s", ErrRoomNotFound, roomID)
+	}
+	room := roomVal.(*MatchRoom)
+
+	room.mu.Lock()
+	defer room.mu.Unlock()
+
+	if room.Match == nil {
+		room.Logger.Warn("match not found")
+		return nil, fmt.Errorf("%w: roomID=%s", ErrMatchNotFound, roomID)
+	}
+
+	teamID := room.Match.WorkingState.ActiveTeam
+	if err := room.validatePlayerToken(teamID, token); err != nil {
+		return nil, err
+	}
+
+	gameEvents := room.Match.ResolveTurn()
+	room.LastActivity = time.Now()
+
+	return gameEvents, nil
 }
 
 // ResetTurn sends Surrender signal to engine to end the current Match in a given MatchRoom.

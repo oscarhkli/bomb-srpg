@@ -128,6 +128,15 @@ export async function startTurn(): Promise<StartTurnResponse> {
   return handleResponse<StartTurnResponse>(res);
 }
 
+export async function consumeCpuStatus(): Promise<CpuStatusResponse> {
+  const roomId = requireRoomId();
+  const res = await fetch(buildUrl(`/api/match-rooms/${roomId}/match/cpu-status/consume`), {
+    method: 'POST',
+    headers: authHeaders(),
+  });
+  return handleResponse<CpuStatusResponse>(res);
+}
+
 export async function submitTurnCommand(cmd: TurnCommand): Promise<GameEvent[]> {
   const roomId = requireRoomId();
   const res = await fetch(buildUrl(`/api/match-rooms/${roomId}/match/turn-commands`), {
@@ -157,15 +166,6 @@ export async function resolveTurn(): Promise<GameEvent[]> {
     headers: authHeaders(),
   });
   return handleResponse<GameEvent[]>(res);
-}
-
-export async function consumeCpuStatus(): Promise<CpuStatusResponse> {
-  const roomId = requireRoomId();
-  const res = await fetch(buildUrl(`/api/match-rooms/${roomId}/match/cpu-status/consume`), {
-    method: 'POST',
-    headers: authHeaders(),
-  });
-  return handleResponse<CpuStatusResponse>(res);
 }
 
 export async function surrender(req: SurrenderRequest): Promise<GameEvent[]> {
