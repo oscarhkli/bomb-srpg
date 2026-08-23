@@ -429,7 +429,7 @@ func (s *ServerStateManager) runCPUTurn(room *MatchRoom, match *engine.Match) {
 		room.Logger.Warn("CPU plan rejected, replanning", "attempt", attempt, "error", err)
 	}
 
-	match.CPU.PendingEvents = match.ResolveTurn()
+	match.CPU.PendingGameEvents = match.ResolveTurn()
 }
 
 // applyPlan applies each TurnCommand in order, stopping at the first rejection.
@@ -465,16 +465,16 @@ func (s *ServerStateManager) ConsumeCPUStatus(roomID, token string) (engine.CPUT
 		return 0, nil, err
 	}
 
-	turnPhase, pendingEvents := room.Match.CPU.Phase, room.Match.CPU.PendingEvents
+	turnPhase, pendingGameEvents := room.Match.CPU.Phase, room.Match.CPU.PendingGameEvents
 	if room.Match.CPU.Phase == engine.TurnPhaseReady {
-		room.Match.CPU.PendingEvents = []engine.GameEvent{}
+		room.Match.CPU.PendingGameEvents = []engine.GameEvent{}
 		room.Match.CPU.Phase = engine.TurnPhaseIdle
 	}
-	if pendingEvents == nil {
-		pendingEvents = []engine.GameEvent{}
+	if pendingGameEvents == nil {
+		pendingGameEvents = []engine.GameEvent{}
 	}
 
-	return turnPhase, pendingEvents, nil
+	return turnPhase, pendingGameEvents, nil
 }
 
 // ResetTurn sends ResetTurn signal to engine to drop the current WorkingState and reset to TrueState in a given MatchRoom.

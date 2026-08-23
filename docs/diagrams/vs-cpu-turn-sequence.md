@@ -46,14 +46,14 @@ sequenceDiagram
         end
         GO->>EN: match.ResolveTurn()  — cpu
         EN-->>GO: GameEvents (cpu)<br/>TrueState committed, ActiveTeam → 1
-        GO->>GO: PendingEvents = GameEvents (cpu), Phase = TurnPhaseReady
+        GO->>GO: PendingGameEvents = GameEvents (cpu), Phase = TurnPhaseReady
         GO->>GO: unlock room mutex
     end
 
     FE->>SV: POST /cpu-status/consume
     Note over SV,GO: blocks on the room mutex while runCPUTurn<br/>holds it — a de facto long-poll
     SV-->>FE: phase: ready, events: GameEvents (cpu)
-    Note over SV: read-and-clear —<br/>PendingEvents flushed, Phase → TurnPhaseIdle
+    Note over SV: read-and-clear —<br/>PendingGameEvents flushed, Phase → TurnPhaseIdle
     FE->>FE: play GameEvents (cpu)
 ```
 
@@ -64,7 +64,7 @@ sequenceDiagram
 3. The client holds both player tokens and selects by `ActiveTeam`, so it authenticates the CPU's `/start-turn` with team 2's token under the existing rule — no relaxation, and `StartTurnResponse` is identical on both paths.
 4. Frontend flow: animate `GameEvents (human)` → `/start-turn` → animate hazards and banner → `/cpu-status/consume` → animate `GameEvents (cpu)`. The poll blocks on the room mutex for the CPU turn's duration rather than returning `phase: planning`, so a "CPU is thinking" state renders from request dispatch, not from a `planning` response.
 5. `cpu.Decide()` is called once per turn and returns a full plan, not one command at a time — `runCPUTurn` applies it mechanically. `cpu` never pre-validates the plan against engine rules; `ApplyTurnCommand` is the sole authority. A failed apply mid-plan re-invokes `Decide()` against the now-current `WorkingState` for the remaining scope (bounded retries), rather than aborting outright or blindly continuing. See [Technical Design Spec §10](../design.md#10-vs-cpu) for the full rationale.
-6. `/cpu-status/consume` is `POST`, not `GET`: it read-and-clears `PendingEvents` on every call, breaking GET's idempotency guarantee. Upgrade path: an append-only event journal, decoupled from this mailbox and never cleared, would let a non-destructive `GET /cpu-status` return alongside it — swap method/route, drop the clear, no other change needed.
+6. `/cpu-status/consume` is `POST`, not `GET`: it read-and-clears `PendingGameEvents` on every call, breaking GET's idempotency guarantee. Upgrade path: an append-only event journal, decoupled from this mailbox and never cleared, would let a non-destructive `GET /cpu-status` return alongside it — swap method/route, drop the clear, no other change needed.
 
 ## CPU Plan Execution & Replan
 

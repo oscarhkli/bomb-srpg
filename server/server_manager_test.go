@@ -1007,8 +1007,8 @@ func TestServerStateManager_StartTurn_CPUTurn(t *testing.T) {
 				if got, want := d.observedPhase, engine.TurnPhasePlanning; got != want {
 					t.Errorf("Expected phase %v while planning, got %v", want, got)
 				}
-				if !hasGameEvent(room.Match.CPU.PendingEvents, engine.GameEvtUnitMoved, cpuUnitID) {
-					t.Errorf("Expected unit %#x to have moved, got %#v", cpuUnitID, room.Match.CPU.PendingEvents)
+				if !hasGameEvent(room.Match.CPU.PendingGameEvents, engine.GameEvtUnitMoved, cpuUnitID) {
+					t.Errorf("Expected unit %#x to have moved, got %#v", cpuUnitID, room.Match.CPU.PendingGameEvents)
 				}
 			},
 		},
@@ -1023,7 +1023,7 @@ func TestServerStateManager_StartTurn_CPUTurn(t *testing.T) {
 			wantCalls:      1,
 			wantActiveTeam: 1,
 			validate: func(t *testing.T, room *MatchRoom, d *recordingDecider) {
-				if got := len(room.Match.CPU.PendingEvents); got != 0 {
+				if got := len(room.Match.CPU.PendingGameEvents); got != 0 {
 					t.Errorf("Expected no pending events, got %d", got)
 				}
 			},
@@ -1042,8 +1042,8 @@ func TestServerStateManager_StartTurn_CPUTurn(t *testing.T) {
 			wantCalls:      2,
 			wantActiveTeam: 1,
 			validate: func(t *testing.T, room *MatchRoom, d *recordingDecider) {
-				if !hasGameEvent(room.Match.CPU.PendingEvents, engine.GameEvtUnitMoved, cpuUnitID) {
-					t.Errorf("Expected replanned move to apply, got %#v", room.Match.CPU.PendingEvents)
+				if !hasGameEvent(room.Match.CPU.PendingGameEvents, engine.GameEvtUnitMoved, cpuUnitID) {
+					t.Errorf("Expected replanned move to apply, got %#v", room.Match.CPU.PendingGameEvents)
 				}
 			},
 		},
@@ -1058,8 +1058,8 @@ func TestServerStateManager_StartTurn_CPUTurn(t *testing.T) {
 			wantCalls:      maxCPUReplanAttempts,
 			wantActiveTeam: 1,
 			validate: func(t *testing.T, room *MatchRoom, d *recordingDecider) {
-				if got := len(room.Match.CPU.PendingEvents); got != 0 {
-					t.Errorf("Expected no command to apply, got %#v", room.Match.CPU.PendingEvents)
+				if got := len(room.Match.CPU.PendingGameEvents); got != 0 {
+					t.Errorf("Expected no command to apply, got %#v", room.Match.CPU.PendingGameEvents)
 				}
 			},
 		},
@@ -1216,7 +1216,7 @@ func TestServerStateManager_ConsumeCPUStatus(t *testing.T) {
 				roomID, tokens, s := createTestRoom(t)
 				room := mustRoom(t, s, roomID)
 				room.Match.CPU.Phase = engine.TurnPhaseReady
-				room.Match.CPU.PendingEvents = []engine.GameEvent{
+				room.Match.CPU.PendingGameEvents = []engine.GameEvent{
 					engine.NewUnitMovedEvent(unitID, engine.Coordinate{X: 1, Y: 2}, engine.Coordinate{X: 2, Y: 2}),
 				}
 				return roomID, s, tokens[0]
@@ -1235,7 +1235,7 @@ func TestServerStateManager_ConsumeCPUStatus(t *testing.T) {
 				if got, want := room.Match.CPU.Phase, engine.TurnPhaseIdle; got != want {
 					t.Errorf("Expected CPU.Phase.TurnPhase reset to %v, got %v", want, got)
 				}
-				if got, want := room.Match.CPU.PendingEvents, 0; len(got) != want {
+				if got, want := room.Match.CPU.PendingGameEvents, 0; len(got) != want {
 					t.Errorf("Expected CPU.Phase.gameEvents cleared, got %#v", got)
 				}
 			},
@@ -1246,7 +1246,7 @@ func TestServerStateManager_ConsumeCPUStatus(t *testing.T) {
 				roomID, tokens, s := createTestRoom(t)
 				room := mustRoom(t, s, roomID)
 				room.Match.CPU.Phase = engine.TurnPhasePlanning
-				room.Match.CPU.PendingEvents = []engine.GameEvent{
+				room.Match.CPU.PendingGameEvents = []engine.GameEvent{
 					engine.NewUnitMovedEvent(unitID, engine.Coordinate{X: 1, Y: 2}, engine.Coordinate{X: 2, Y: 2}),
 				}
 				return roomID, s, tokens[0]
@@ -1265,7 +1265,7 @@ func TestServerStateManager_ConsumeCPUStatus(t *testing.T) {
 				if got, want := room.Match.CPU.Phase, engine.TurnPhasePlanning; got != want {
 					t.Errorf("Expected CPU.Phase.TurnPhase stays at %v, got %v", want, got)
 				}
-				if got, want := room.Match.CPU.PendingEvents, 1; len(got) != want {
+				if got, want := room.Match.CPU.PendingGameEvents, 1; len(got) != want {
 					t.Errorf("Expected CPU.Phase.gameEvents remain unchanged as %#v, got %#v", want, got)
 				}
 			},

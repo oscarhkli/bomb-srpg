@@ -163,7 +163,7 @@ export interface CreateMatchResponse {
 }
 
 export interface CpuStatusResponse {
-  turnPhase: string;
+  turnPhase: CPUTurnPhase;
   pendingGameEvents: GameEvent[];
 }
 

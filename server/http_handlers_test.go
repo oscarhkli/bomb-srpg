@@ -1494,7 +1494,7 @@ func TestHandleConsumeCPUStatus(t *testing.T) {
 		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
 		room := mustRoom(t, s, roomID)
 		room.Match.CPU.Phase = engine.TurnPhaseReady
-		room.Match.CPU.PendingEvents = []engine.GameEvent{
+		room.Match.CPU.PendingGameEvents = []engine.GameEvent{
 			engine.NewUnitMovedEvent(unitID, engine.Coordinate{X: 1, Y: 2}, engine.Coordinate{X: 2, Y: 2}),
 		}
 
@@ -1518,8 +1518,8 @@ func TestHandleConsumeCPUStatus(t *testing.T) {
 		}
 
 		var response struct {
-			TurnPhase     string             `json:"turnPhase"`
-			PendingEvents []engine.GameEvent `json:"pendingGameEvents"`
+			TurnPhase         string             `json:"turnPhase"`
+			PendingGameEvents []engine.GameEvent `json:"pendingGameEvents"`
 		}
 		if err := json.NewDecoder(rr.Body).Decode(&response); err != nil {
 			t.Fatalf("Failed to decode response JSON payload: %v", err)
@@ -1528,15 +1528,15 @@ func TestHandleConsumeCPUStatus(t *testing.T) {
 		if got, want := response.TurnPhase, engine.TurnPhaseReady.String(); got != want {
 			t.Errorf("Expected turnPhase %v, got %v", want, got)
 		}
-		if got, want := len(response.PendingEvents), 1; got != want {
-			t.Errorf("Expected %d pendingGameEvents returned, got %#v", want, response.PendingEvents)
+		if got, want := len(response.PendingGameEvents), 1; got != want {
+			t.Errorf("Expected %d pendingGameEvents returned, got %#v", want, response.PendingGameEvents)
 		}
 
 		if got, want := room.Match.CPU.Phase, engine.TurnPhaseIdle; got != want {
 			t.Errorf("Expected CPU.Phase reset to %v, got %v", want, got)
 		}
-		if got, want := len(room.Match.CPU.PendingEvents), 0; got != want {
-			t.Errorf("Expected CPU.PendingEvents cleared, got %#v", room.Match.CPU.PendingEvents)
+		if got, want := len(room.Match.CPU.PendingGameEvents), 0; got != want {
+			t.Errorf("Expected CPU.PendingGameEvents cleared, got %#v", room.Match.CPU.PendingGameEvents)
 		}
 	})
 
@@ -1562,8 +1562,8 @@ func TestHandleConsumeCPUStatus(t *testing.T) {
 		body := rr.Body.Bytes()
 
 		var response struct {
-			TurnPhase     string             `json:"turnPhase"`
-			PendingEvents []engine.GameEvent `json:"pendingGameEvents"`
+			TurnPhase         string             `json:"turnPhase"`
+			PendingGameEvents []engine.GameEvent `json:"pendingGameEvents"`
 		}
 		if err := json.Unmarshal(body, &response); err != nil {
 			t.Fatalf("Failed to decode response JSON payload: %v", err)
@@ -1572,8 +1572,8 @@ func TestHandleConsumeCPUStatus(t *testing.T) {
 		if got, want := response.TurnPhase, engine.TurnPhasePlanning.String(); got != want {
 			t.Errorf("Expected turnPhase %v, got %v", want, got)
 		}
-		if got, want := len(response.PendingEvents), 0; got != want {
-			t.Errorf("Expected no pendingGameEvents, got %#v", response.PendingEvents)
+		if got, want := len(response.PendingGameEvents), 0; got != want {
+			t.Errorf("Expected no pendingGameEvents, got %#v", response.PendingGameEvents)
 		}
 		if got, want := room.Match.CPU.Phase, engine.TurnPhasePlanning; got != want {
 			t.Errorf("Expected CPU.Phase to stay at %v, got %v", want, got)
@@ -1667,7 +1667,7 @@ func TestHandleConsumeCPUStatus(t *testing.T) {
 		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
 		room := mustRoom(t, s, roomID)
 		room.Match.CPU.Phase = engine.TurnPhaseReady
-		room.Match.CPU.PendingEvents = []engine.GameEvent{
+		room.Match.CPU.PendingGameEvents = []engine.GameEvent{
 			engine.NewUnitMovedEvent(unitID, engine.Coordinate{X: 1, Y: 2}, engine.Coordinate{X: 2, Y: 2}),
 		}
 

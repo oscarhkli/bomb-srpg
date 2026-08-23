@@ -70,10 +70,10 @@ type StartTurnResponse struct {
 	GameEvents    []engine.GameEvent `json:"gameEvents"`
 }
 
-// CPUStatusResponse wraps CPUTurnPhase and PendingEvents gathered from CPU's decision making.
+// CPUStatusResponse wraps CPUTurnPhase and PendingGameEvents gathered from CPU's decision making.
 type CPUStatusResponse struct {
-	TurnPhase     engine.CPUTurnPhase `json:"turnPhase"`
-	PendingEvents []engine.GameEvent  `json:"pendingGameEvents"`
+	TurnPhase         engine.CPUTurnPhase `json:"turnPhase"`
+	PendingGameEvents []engine.GameEvent  `json:"pendingGameEvents"`
 }
 
 // HandleGetCatalog returns all available unit archetypes and stages for the client to display in the lobby.
@@ -330,7 +330,7 @@ func (h *Handler) HandleConsumeCPUStatus(w http.ResponseWriter, r *http.Request)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 
-	res := CPUStatusResponse{TurnPhase: turnPhase, PendingEvents: pendingGameEvents}
+	res := CPUStatusResponse{TurnPhase: turnPhase, PendingGameEvents: pendingGameEvents}
 	if err := json.NewEncoder(w).Encode(res); err != nil {
 		h.Logger.Error("encode cpuStatusResponse failed", "error", err)
 		http.Error(w, "Failed to encode cpuStatusResponse", http.StatusInternalServerError)

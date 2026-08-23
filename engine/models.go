@@ -388,8 +388,8 @@ func (o CPUTurnPhase) MarshalJSON() ([]byte, error) {
 
 // CPUState manages the TurnPhase state and pending GameEvent for VS CPU.
 type CPUState struct {
-	Phase         CPUTurnPhase
-	PendingEvents []GameEvent
+	Phase             CPUTurnPhase
+	PendingGameEvents []GameEvent
 }
 
 // Match orchestrates a full game session: state, config, and event log.
