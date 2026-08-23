@@ -59,6 +59,12 @@ type CreateMatchRequest struct {
 	GameCfg engine.GameCfg `json:"gameCfg"`
 }
 
+// CPUStatusResponse wraps CPUTurnPhase and PendingEvents gathered from CPU's decision making.
+type CPUStatusResponse struct {
+	TurnPhase     engine.CPUTurnPhase `json:"turnPhase"`
+	PendingEvents []engine.GameEvent  `json:"pendingGameEvents"`
+}
+
 // SurrenderRequest wraps TeamID for backward compatibility with existing clients.
 type SurrenderRequest struct {
 	TeamID int `json:"teamId"`
@@ -295,8 +301,8 @@ func (h *Handler) HandleStartTurn(w http.ResponseWriter, r *http.Request) {
 
 	res := StartTurnResponse{InSuddenDeath: inSuddenDeath, GameEvents: gameEvents}
 	if err := json.NewEncoder(w).Encode(res); err != nil {
-		h.Logger.Error("encode gameEvents failed", "error", err)
-		http.Error(w, "Failed to encode gameEvents", http.StatusInternalServerError)
+		h.Logger.Error("encode startTurnResponse failed", "error", err)
+		http.Error(w, "Failed to encode startTurnResponse", http.StatusInternalServerError)
 		return
 	}
 }
@@ -348,6 +354,37 @@ func (h *Handler) HandleResolveTurn(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 
 	if err := json.NewEncoder(w).Encode(gameEvents); err != nil {
+		h.Logger.Error("encode gameEvents failed", "error", err)
+		http.Error(w, "Failed to encode gameEvents", http.StatusInternalServerError)
+		return
+	}
+}
+
+// HandleConsumeCPUStatus consumes current CPU Turn States in given MatchRoom and reset the state if CPU TurnPhase is in Ready - planning is done.
+// It encodes the cpuTurnPhase, gameEvents as JSON and writes them to the response.
+func (h *Handler) HandleConsumeCPUStatus(w http.ResponseWriter, r *http.Request) {
+	roomID := r.PathValue("roomID")
+
+	token, err := h.extractBearerToken(r)
+	if err != nil {
+		code, msg := mapError(err)
+		http.Error(w, msg, code)
+		return
+	}
+
+	turnPhase, pendingGameEvents, err := h.Manager.ConsumeCPUStatus(roomID, token)
+	if err != nil {
+		code, msg := mapError(err)
+		h.Logger.Warn("res turn failed", "roomID", roomID, "error", err)
+		http.Error(w, msg, code)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	res := CPUStatusResponse{TurnPhase: turnPhase, PendingEvents: pendingGameEvents}
+	if err := json.NewEncoder(w).Encode(res); err != nil {
 		h.Logger.Error("encode gameState failed", "error", err)
 		http.Error(w, "Failed to encode gameEvents", http.StatusInternalServerError)
 		return

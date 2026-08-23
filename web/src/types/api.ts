@@ -28,6 +28,8 @@ export type GameEvtType =
 
 export type UnitRole = 'Normal' | 'King' | 'Boss';
 
+export type CPUTurnPhase = 'TurnPhaseIdle' | 'TurnPhasePlanning' | 'TurnPhaseReady';
+
 export interface Coordinate {
   x: number;
   y: number;
@@ -158,6 +160,11 @@ export interface CreateMatchRequest {
 export interface CreateMatchResponse {
   success: boolean;
   playerTokens: [string, string];
+}
+
+export interface CpuStatusResponse {
+  turnPhase: string;
+  pendingGameEvents: GameEvent[];
 }
 
 export interface SurrenderRequest {

@@ -1631,3 +1631,108 @@ func TestServerStateManager_runCPUTurn_StaleMatch(t *testing.T) {
 		})
 	}
 }
+
+func TestServerStateManager_ConsumeCPUStatus(t *testing.T) {
+	unitID := engine.NewUnitID(2, 0)
+	tests := []struct {
+		name     string
+		setup    func(t *testing.T) (string, *ServerStateManager, string)
+		wantErr  error
+		validate func(t *testing.T, turnPhase engine.CPUTurnPhase, gameEvents []engine.GameEvent, s *ServerStateManager, roomID string)
+	}{
+		{
+			name: "Success - TurnPhaseReady and clear status",
+			setup: func(t *testing.T) (string, *ServerStateManager, string) {
+				roomID, tokens, s := createTestRoom(t)
+				room := mustRoom(t, s, roomID)
+				room.Match.CPU.Phase = engine.TurnPhaseReady
+				room.Match.CPU.PendingEvents = []engine.GameEvent{
+					engine.NewUnitMovedEvent(unitID, engine.Coordinate{X: 1, Y: 2}, engine.Coordinate{X: 2, Y: 2}),
+				}
+				return roomID, s, tokens[0]
+			},
+			wantErr: nil,
+			validate: func(t *testing.T, turnPhase engine.CPUTurnPhase, gameEvents []engine.GameEvent, s *ServerStateManager, roomID string) {
+				room := mustRoom(t, s, roomID)
+
+				if got, want := turnPhase, engine.TurnPhaseReady; got != want {
+					t.Errorf("Expected %v turnPhase return, got %v", want, got)
+				}
+				if got, want := gameEvents, 1; len(got) != want {
+					t.Errorf("Expected %d gameEvents returned, got %#v", want, got)
+				}
+
+				if got, want := room.Match.CPU.Phase, engine.TurnPhaseIdle; got != want {
+					t.Errorf("Expected CPU.Phase.TurnPhase reset to %v, got %v", want, got)
+				}
+				if got, want := room.Match.CPU.PendingEvents, 0; len(got) != want {
+					t.Errorf("Expected CPU.Phase.gameEvents cleared, got %#v", got)
+				}
+			},
+		},
+		{
+			name: "Success - non-TurnPhaseReady and do nothing",
+			setup: func(t *testing.T) (string, *ServerStateManager, string) {
+				roomID, tokens, s := createTestRoom(t)
+				room := mustRoom(t, s, roomID)
+				room.Match.CPU.Phase = engine.TurnPhasePlanning
+				room.Match.CPU.PendingEvents = []engine.GameEvent{
+					engine.NewUnitMovedEvent(unitID, engine.Coordinate{X: 1, Y: 2}, engine.Coordinate{X: 2, Y: 2}),
+				}
+				return roomID, s, tokens[0]
+			},
+			wantErr: nil,
+			validate: func(t *testing.T, turnPhase engine.CPUTurnPhase, gameEvents []engine.GameEvent, s *ServerStateManager, roomID string) {
+				room := mustRoom(t, s, roomID)
+
+				if got, want := turnPhase, engine.TurnPhasePlanning; got != want {
+					t.Errorf("Expected %v turnPhase return, got %v", want, got)
+				}
+				if got, want := gameEvents, 1; len(got) != want {
+					t.Errorf("Expected %d gameEvents returned, got %#v", want, got)
+				}
+
+				if got, want := room.Match.CPU.Phase, engine.TurnPhasePlanning; got != want {
+					t.Errorf("Expected CPU.Phase.TurnPhase stays at %v, got %v", want, got)
+				}
+				if got, want := room.Match.CPU.PendingEvents, 1; len(got) != want {
+					t.Errorf("Expected CPU.Phase.gameEvents remain unchanged as %#v, got %#v", want, got)
+				}
+			},
+		},
+		{
+			name: "Room Not Found",
+			setup: func(t *testing.T) (string, *ServerStateManager, string) {
+				s := NewServerStateManager()
+				return "NONEXISTENT", s, "dummy-token"
+			},
+			wantErr: ErrRoomNotFound,
+		},
+		{
+			name: "Match Not Found",
+			setup: func(t *testing.T) (string, *ServerStateManager, string) {
+				s := NewServerStateManager()
+				roomID, _ := s.CreateMatchRoom()
+				return roomID, s, "dummy-token"
+			},
+			wantErr: ErrMatchNotFound,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			roomID, s, token := tt.setup(t)
+			turnPhase, gameEvents, err := s.ConsumeCPUStatus(roomID, token)
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("ResolveTurn() error = %v, want %v", err, tt.wantErr)
+			}
+			if tt.validate != nil {
+				tt.validate(t, turnPhase, gameEvents, s, roomID)
+			} else {
+				if len(gameEvents) != 0 {
+					t.Errorf("Expected gameEvents to be empty, got %#v", gameEvents)
+				}
+			}
+		})
+	}
+}

@@ -226,6 +226,30 @@ func TestHTTPRouting(t *testing.T) {
 			wantStatus: http.StatusMethodNotAllowed,
 		},
 		{
+			name:       "POST /api/match-rooms/{roomID}/match/cpu-status/consume (404 - no room)",
+			method:     "POST",
+			path:       "/api/match-rooms/DUMMY/match/cpu-status/consume",
+			wantStatus: http.StatusNotFound,
+		},
+		{
+			name:       "GET /api/match-rooms/{roomID}/match/cpu-status/consume (405)",
+			method:     "GET",
+			path:       "/api/match-rooms/DUMMY/match/cpu-status/consume",
+			wantStatus: http.StatusMethodNotAllowed,
+		},
+		{
+			name:       "PUT /api/match-rooms/{roomID}/match/cpu-status/consume (405)",
+			method:     "PUT",
+			path:       "/api/match-rooms/DUMMY/match/cpu-status/consume",
+			wantStatus: http.StatusMethodNotAllowed,
+		},
+		{
+			name:       "DELETE /api/match-rooms/{roomID}/match/cpu-status/consume (405)",
+			method:     "DELETE",
+			path:       "/api/match-rooms/DUMMY/match/cpu-status/consume",
+			wantStatus: http.StatusMethodNotAllowed,
+		},
+		{
 			name:       "POST /api/match-rooms/{roomID}/match/surrender (404 - no room)",
 			method:     "POST",
 			path:       "/api/match-rooms/DUMMY/match/surrender",
@@ -331,6 +355,7 @@ func TestHTTPRouting(t *testing.T) {
 			// Add dummy token for mutating endpoints that require auth
 			if strings.Contains(tt.name, "turn-commands") || strings.Contains(tt.name, "start-turn") ||
 				strings.Contains(tt.name, "reset") || strings.Contains(tt.name, "resolve") ||
+				strings.Contains(tt.name, "cpu-status") ||
 				strings.Contains(tt.name, "surrender") || strings.Contains(tt.name, "rematch") ||
 				(tt.method == http.MethodDelete && strings.HasSuffix(tt.path, "/match")) {
 				req.Header.Set("Authorization", "Bearer dummy-token")

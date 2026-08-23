@@ -367,6 +367,25 @@ const (
 	TurnPhaseReady                        // CPU has made the decision
 )
 
+// String converts an CPUTurnPhase integer value into a human-readable text string.
+func (c CPUTurnPhase) String() string {
+	switch c {
+	case TurnPhaseIdle:
+		return "TurnPhaseIdle"
+	case TurnPhasePlanning:
+		return "TurnPhasePlanning"
+	case TurnPhaseReady:
+		return "TurnPhaseReady"
+	default:
+		return "TurnPhaseUnknown"
+	}
+}
+
+// MarshalJSON serializes CPUTurnPhase struct to JSON that client needs
+func (o CPUTurnPhase) MarshalJSON() ([]byte, error) {
+	return json.Marshal(o.String())
+}
+
 // CPUState manages the TurnPhase state and pending GameEvent for VS CPU.
 type CPUState struct {
 	Phase         CPUTurnPhase

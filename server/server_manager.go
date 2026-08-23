@@ -257,7 +257,7 @@ func (s *ServerStateManager) createMatchLocked(room *MatchRoom, gameCfg engine.G
 }
 
 // Rematch wipes the existing Match in a given MatchRoom and recreate one using GameCfg.
-func (s *ServerStateManager) Rematch(roomID string, token string) ([2]string, error) {
+func (s *ServerStateManager) Rematch(roomID, token string) ([2]string, error) {
 	roomVal, ok := s.Rooms.Load(roomID)
 	if !ok {
 		s.Logger.Warn("match room not found", "roomID", roomID)
@@ -292,7 +292,7 @@ func (s *ServerStateManager) Rematch(roomID string, token string) ([2]string, er
 
 // DeleteMatch removes the existing concluded Match in a given MatchRoom.
 // Returns an error if any pre-check is violated.
-func (s *ServerStateManager) DeleteMatch(roomID string, token string) error {
+func (s *ServerStateManager) DeleteMatch(roomID, token string) error {
 	roomVal, ok := s.Rooms.Load(roomID)
 	if !ok {
 		s.Logger.Warn("match room not found", "roomID", roomID)
@@ -368,7 +368,7 @@ func (s *ServerStateManager) SubmitTurnCommand(roomID string, cmd engine.TurnCom
 
 // StartTurn sends StartTurn signal engine to start a new turn in a given MatchRoom.
 // Returns the GameEvents or an error if any pre-check is violated
-func (s *ServerStateManager) StartTurn(roomID string, token string) (bool, []engine.GameEvent, error) {
+func (s *ServerStateManager) StartTurn(roomID, token string) (bool, []engine.GameEvent, error) {
 	roomVal, ok := s.Rooms.Load(roomID)
 	if !ok {
 		s.Logger.Warn("match room not found", "roomID", roomID)
@@ -401,7 +401,7 @@ func (s *ServerStateManager) StartTurn(roomID string, token string) (bool, []eng
 
 // ResetTurn sends ResetTurn signal to engine to drop the current WorkingState and reset to TrueState in a given MatchRoom.
 // Returns an error if any pre-check is violated
-func (s *ServerStateManager) ResetTurn(roomID string, token string) error {
+func (s *ServerStateManager) ResetTurn(roomID, token string) error {
 	roomVal, ok := s.Rooms.Load(roomID)
 	if !ok {
 		s.Logger.Warn("match room not found", "roomID", roomID)
@@ -430,7 +430,7 @@ func (s *ServerStateManager) ResetTurn(roomID string, token string) error {
 
 // ResetTurn sends ResolveTurn signal to engine to calculate the impacts of the Player's action in a given MatchRoom.
 // Returns the gameEvents or an error if any pre-check is violated
-func (s *ServerStateManager) ResolveTurn(roomID string, token string) ([]engine.GameEvent, error) {
+func (s *ServerStateManager) ResolveTurn(roomID, token string) ([]engine.GameEvent, error) {
 	roomVal, ok := s.Rooms.Load(roomID)
 	if !ok {
 		s.Logger.Warn("match room not found", "roomID", roomID)
@@ -498,6 +498,37 @@ func applyPlan(match *engine.Match, plan []engine.TurnCommand) error {
 		}
 	}
 	return nil
+}
+
+// ConsumeCPUStatus consumes current CPU Turn States in given MatchRoom and reset the state if CPU TurnPhase is in Ready - planning is done.
+// Returns the cpuTurnPhase and gameEvents or an error if any pre-check is violated
+func (s *ServerStateManager) ConsumeCPUStatus(roomID, token string) (engine.CPUTurnPhase, []engine.GameEvent, error) {
+	roomVal, ok := s.Rooms.Load(roomID)
+	if !ok {
+		s.Logger.Warn("match room not found", "roomID", roomID)
+		return 0, nil, fmt.Errorf("%w: roomID=%s", ErrRoomNotFound, roomID)
+	}
+	room := roomVal.(*MatchRoom)
+
+	room.mu.Lock()
+	defer room.mu.Unlock()
+
+	if room.Match == nil {
+		room.Logger.Warn("match not found")
+		return 0, nil, fmt.Errorf("%w: roomID=%s", ErrMatchNotFound, roomID)
+	}
+
+	if err := room.validateAnyMatchPlayerToken(token); err != nil {
+		return 0, nil, err
+	}
+
+	turnPhase, pendingEvents := room.Match.CPU.Phase, room.Match.CPU.PendingEvents
+	if room.Match.CPU.Phase == engine.TurnPhaseReady {
+		room.Match.CPU.PendingEvents = []engine.GameEvent{}
+		room.Match.CPU.Phase = engine.TurnPhaseIdle
+	}
+
+	return turnPhase, pendingEvents, nil
 }
 
 // ResetTurn sends Surrender signal to engine to end the current Match in a given MatchRoom.

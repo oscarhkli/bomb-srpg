@@ -1810,6 +1810,245 @@ func TestHandleResolveTurn(t *testing.T) {
 	})
 }
 
+func TestHandleConsumeCPUStatus(t *testing.T) {
+	unitID := engine.NewUnitID(1, 0)
+
+	t.Run("Success: TurnPhaseReady returns and clears pending events", func(t *testing.T) {
+		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
+		room := mustRoom(t, s, roomID)
+		room.Match.CPU.Phase = engine.TurnPhaseReady
+		room.Match.CPU.PendingEvents = []engine.GameEvent{
+			engine.NewUnitMovedEvent(unitID, engine.Coordinate{X: 1, Y: 2}, engine.Coordinate{X: 2, Y: 2}),
+		}
+
+		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/cpu-status/consume", nil)
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+playerTokens[0])
+
+		rr := httptest.NewRecorder()
+		testMux("POST /api/match-rooms/{roomID}/match/cpu-status/consume", h.HandleConsumeCPUStatus).ServeHTTP(rr, req)
+
+		if status := rr.Code; status != http.StatusOK {
+			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusOK)
+		}
+
+		expectedHeader := "application/json"
+		if contentType := rr.Header().Get("Content-Type"); contentType != expectedHeader {
+			t.Errorf("Handler returned wrong content type: got %v want %v", contentType, expectedHeader)
+		}
+
+		var response struct {
+			TurnPhase     string             `json:"turnPhase"`
+			PendingEvents []engine.GameEvent `json:"pendingGameEvents"`
+		}
+		if err := json.NewDecoder(rr.Body).Decode(&response); err != nil {
+			t.Fatalf("Failed to decode response JSON payload: %v", err)
+		}
+
+		if got, want := response.TurnPhase, engine.TurnPhaseReady.String(); got != want {
+			t.Errorf("Expected turnPhase %v, got %v", want, got)
+		}
+		if got, want := len(response.PendingEvents), 1; got != want {
+			t.Errorf("Expected %d pendingGameEvents returned, got %#v", want, response.PendingEvents)
+		}
+
+		if got, want := room.Match.CPU.Phase, engine.TurnPhaseIdle; got != want {
+			t.Errorf("Expected CPU.Phase reset to %v, got %v", want, got)
+		}
+		if got, want := len(room.Match.CPU.PendingEvents), 0; got != want {
+			t.Errorf("Expected CPU.PendingEvents cleared, got %#v", room.Match.CPU.PendingEvents)
+		}
+	})
+
+	t.Run("Success: TurnPhasePlanning leaves state untouched", func(t *testing.T) {
+		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
+		room := mustRoom(t, s, roomID)
+		room.Match.CPU.Phase = engine.TurnPhasePlanning
+
+		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/cpu-status/consume", nil)
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+playerTokens[0])
+
+		rr := httptest.NewRecorder()
+		testMux("POST /api/match-rooms/{roomID}/match/cpu-status/consume", h.HandleConsumeCPUStatus).ServeHTTP(rr, req)
+
+		if status := rr.Code; status != http.StatusOK {
+			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusOK)
+		}
+
+		var response struct {
+			TurnPhase     string             `json:"turnPhase"`
+			PendingEvents []engine.GameEvent `json:"pendingGameEvents"`
+		}
+		if err := json.NewDecoder(rr.Body).Decode(&response); err != nil {
+			t.Fatalf("Failed to decode response JSON payload: %v", err)
+		}
+
+		if got, want := response.TurnPhase, engine.TurnPhasePlanning.String(); got != want {
+			t.Errorf("Expected turnPhase %v, got %v", want, got)
+		}
+		if got, want := len(response.PendingEvents), 0; got != want {
+			t.Errorf("Expected no pendingGameEvents, got %#v", response.PendingEvents)
+		}
+		if got, want := room.Match.CPU.Phase, engine.TurnPhasePlanning; got != want {
+			t.Errorf("Expected CPU.Phase to stay at %v, got %v", want, got)
+		}
+	})
+
+	t.Run("Success: either player's token is accepted", func(t *testing.T) {
+		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
+		room := mustRoom(t, s, roomID)
+		room.Match.CPU.Phase = engine.TurnPhaseReady
+
+		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/cpu-status/consume", nil)
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+playerTokens[1])
+
+		rr := httptest.NewRecorder()
+		testMux("POST /api/match-rooms/{roomID}/match/cpu-status/consume", h.HandleConsumeCPUStatus).ServeHTTP(rr, req)
+
+		if status := rr.Code; status != http.StatusOK {
+			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusOK)
+		}
+	})
+
+	t.Run("Failure: room not found", func(t *testing.T) {
+		s := NewServerStateManager()
+		h := NewHandler(s)
+
+		req, err := http.NewRequest("POST", "/api/match-rooms/NONEXISTENT/match/cpu-status/consume", nil)
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+		req.Header.Set("Authorization", "Bearer dummy-token")
+
+		rr := httptest.NewRecorder()
+		testMux("POST /api/match-rooms/{roomID}/match/cpu-status/consume", h.HandleConsumeCPUStatus).ServeHTTP(rr, req)
+
+		if status := rr.Code; status != http.StatusNotFound {
+			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusNotFound)
+		}
+		if !strings.Contains(rr.Body.String(), "room not found") {
+			t.Errorf("Expected error message 'room not found', got: %s", rr.Body.String())
+		}
+	})
+
+	t.Run("Failure: match not found", func(t *testing.T) {
+		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
+		room := mustRoom(t, s, roomID)
+		room.Match = nil
+
+		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/cpu-status/consume", nil)
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+		req.Header.Set("Authorization", "Bearer "+playerTokens[0])
+
+		rr := httptest.NewRecorder()
+		testMux("POST /api/match-rooms/{roomID}/match/cpu-status/consume", h.HandleConsumeCPUStatus).ServeHTTP(rr, req)
+
+		if status := rr.Code; status != http.StatusNotFound {
+			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusNotFound)
+		}
+		if !strings.Contains(rr.Body.String(), "match not found") {
+			t.Errorf("Expected error message 'match not found', got: %s", rr.Body.String())
+		}
+	})
+
+	t.Run("Failure: failed to Encode", func(t *testing.T) {
+		roomID, playerTokens, _, h := createTestRoomWithMatch(t)
+
+		testEncodeFailure(t, testMux("POST /api/match-rooms/{roomID}/match/cpu-status/consume", h.HandleConsumeCPUStatus),
+			func() *http.Request {
+				req, _ := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/cpu-status/consume", nil)
+				req.Header.Set("Content-Type", "application/json")
+				req.Header.Set("Authorization", "Bearer "+playerTokens[0])
+				return req
+			}, http.StatusOK)
+	})
+
+	t.Run("Test Contract", func(t *testing.T) {
+		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
+		room := mustRoom(t, s, roomID)
+		room.Match.CPU.Phase = engine.TurnPhaseReady
+		room.Match.CPU.PendingEvents = []engine.GameEvent{
+			engine.NewUnitMovedEvent(unitID, engine.Coordinate{X: 1, Y: 2}, engine.Coordinate{X: 2, Y: 2}),
+		}
+
+		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/cpu-status/consume", nil)
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+		req.Header.Set("Authorization", "Bearer "+playerTokens[0])
+
+		rr := httptest.NewRecorder()
+		testMux("POST /api/match-rooms/{roomID}/match/cpu-status/consume", h.HandleConsumeCPUStatus).ServeHTTP(rr, req)
+
+		assertObjectContract(t, rr.Body.Bytes(), []string{"turnPhase", "pendingGameEvents"},
+			func(t *testing.T, raw map[string]any) {
+				t.Helper()
+				events, ok := raw["pendingGameEvents"].([]any)
+				if !ok || len(events) == 0 {
+					t.Fatalf("Expected non-empty pendingGameEvents, got %#v", raw["pendingGameEvents"])
+				}
+				evt := events[0].(map[string]any)
+				for _, field := range []string{"type", "unitId", "from", "to"} {
+					if _, exists := evt[field]; !exists {
+						t.Errorf("Contract Broken: pendingGameEvents[0] missing key '%s'", field)
+					}
+				}
+			})
+	})
+
+	t.Run("Failure: missing Authorization header", func(t *testing.T) {
+		roomID, _, _, h := createTestRoomWithMatch(t)
+
+		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/cpu-status/consume", nil)
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+
+		rr := httptest.NewRecorder()
+		testMux("POST /api/match-rooms/{roomID}/match/cpu-status/consume", h.HandleConsumeCPUStatus).ServeHTTP(rr, req)
+
+		if status := rr.Code; status != http.StatusUnauthorized {
+			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusUnauthorized)
+		}
+		if !strings.Contains(rr.Body.String(), "invalid player token") {
+			t.Errorf("Expected error message 'invalid player token', got: %s", rr.Body.String())
+		}
+	})
+
+	t.Run("Failure: invalid token", func(t *testing.T) {
+		roomID, _, _, h := createTestRoomWithMatch(t)
+
+		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/cpu-status/consume", nil)
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+		req.Header.Set("Authorization", "Bearer invalid-token")
+
+		rr := httptest.NewRecorder()
+		testMux("POST /api/match-rooms/{roomID}/match/cpu-status/consume", h.HandleConsumeCPUStatus).ServeHTTP(rr, req)
+
+		if status := rr.Code; status != http.StatusUnauthorized {
+			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusUnauthorized)
+		}
+		if !strings.Contains(rr.Body.String(), "invalid player token") {
+			t.Errorf("Expected error message 'invalid player token', got: %s", rr.Body.String())
+		}
+	})
+}
+
 func TestHandleSurrender(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		roomID, playerTokens, s, h := createTestRoomWithMatch(t)

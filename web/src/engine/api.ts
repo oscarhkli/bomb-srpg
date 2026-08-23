@@ -11,6 +11,7 @@ import type {
   GameCfg,
   StartTurnResponse,
   Catalog,
+  CpuStatusResponse,
 } from '../types/api';
 
 let roomId: string | undefined;
@@ -156,6 +157,15 @@ export async function resolveTurn(): Promise<GameEvent[]> {
     headers: authHeaders(),
   });
   return handleResponse<GameEvent[]>(res);
+}
+
+export async function consumeCpuStatus(): Promise<CpuStatusResponse> {
+  const roomId = requireRoomId();
+  const res = await fetch(buildUrl(`/api/match-rooms/${roomId}/match/cpu-status/consume`), {
+    method: 'POST',
+    headers: authHeaders(),
+  });
+  return handleResponse<CpuStatusResponse>(res);
 }
 
 export async function surrender(req: SurrenderRequest): Promise<GameEvent[]> {
