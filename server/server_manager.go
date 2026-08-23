@@ -527,6 +527,9 @@ func (s *ServerStateManager) ConsumeCPUStatus(roomID, token string) (engine.CPUT
 		room.Match.CPU.PendingEvents = []engine.GameEvent{}
 		room.Match.CPU.Phase = engine.TurnPhaseIdle
 	}
+	if pendingEvents == nil {
+		pendingEvents = []engine.GameEvent{}
+	}
 
 	return turnPhase, pendingEvents, nil
 }

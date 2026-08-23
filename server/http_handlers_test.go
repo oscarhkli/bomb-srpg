@@ -1882,11 +1882,13 @@ func TestHandleConsumeCPUStatus(t *testing.T) {
 			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusOK)
 		}
 
+		body := rr.Body.Bytes()
+
 		var response struct {
 			TurnPhase     string             `json:"turnPhase"`
 			PendingEvents []engine.GameEvent `json:"pendingGameEvents"`
 		}
-		if err := json.NewDecoder(rr.Body).Decode(&response); err != nil {
+		if err := json.Unmarshal(body, &response); err != nil {
 			t.Fatalf("Failed to decode response JSON payload: %v", err)
 		}
 
@@ -1898,6 +1900,14 @@ func TestHandleConsumeCPUStatus(t *testing.T) {
 		}
 		if got, want := room.Match.CPU.Phase, engine.TurnPhasePlanning; got != want {
 			t.Errorf("Expected CPU.Phase to stay at %v, got %v", want, got)
+		}
+
+		var raw map[string]any
+		if err := json.Unmarshal(body, &raw); err != nil {
+			t.Fatalf("Failed to parse raw JSON: %v", err)
+		}
+		if _, ok := raw["pendingGameEvents"].([]any); !ok {
+			t.Errorf("Expected pendingGameEvents to serialize as [], got %#v (client types this field as non-nullable)", raw["pendingGameEvents"])
 		}
 	})
 
