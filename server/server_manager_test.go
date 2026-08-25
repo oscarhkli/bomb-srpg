@@ -4,12 +4,14 @@ import (
 	"bomb-srpg/engine"
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"reflect"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -639,8 +641,44 @@ func TestServerStateManager_GetMatchState(t *testing.T) {
 			wantErr: nil,
 			validate: func(t *testing.T, gs *engine.GameState, s *ServerStateManager, roomID string) {
 				room := mustRoom(t, s, roomID)
-				if gs != room.Match.WorkingState {
-					t.Errorf("Expected matchState pointer %p, got %p", room.Match.WorkingState, gs)
+				live := room.Match.WorkingState
+				if gs == live {
+					t.Error("Expected a copy of the WorkingState, got the live pointer")
+				}
+				if got, want := gs.Turn, live.Turn; got != want {
+					t.Errorf("Expected Turn %d, got %d", want, got)
+				}
+				if got, want := gs.ActiveTeam, live.ActiveTeam; got != want {
+					t.Errorf("Expected ActiveTeam %d, got %d", want, got)
+				}
+				if got, want := len(gs.Units), len(live.Units); got != want {
+					t.Errorf("Expected %d units, got %d", want, got)
+				}
+			},
+		},
+		{
+			name: "Mid-Turn Progress Survives The Copy",
+			setup: func(t *testing.T) (string, *ServerStateManager) {
+				s := NewServerStateManager()
+				roomID, _ := s.CreateMatchRoom()
+				s.CreateMatch(roomID, validGameCfg())
+				room := mustRoom(t, s, roomID)
+				room.Match.WorkingState.InSuddenDeath = true
+				for _, u := range room.Match.WorkingState.Units {
+					u.HasMoved = true
+					u.HasUsedSkill = true
+				}
+				return roomID, s
+			},
+			wantErr: nil,
+			validate: func(t *testing.T, gs *engine.GameState, s *ServerStateManager, roomID string) {
+				if !gs.InSuddenDeath {
+					t.Error("Expected InSuddenDeath to survive the copy, got false")
+				}
+				for unitID, u := range gs.Units {
+					if !u.HasMoved || !u.HasUsedSkill {
+						t.Errorf("Expected unit %#x action economy to survive the copy, got HasMoved %v, HasUsedSkill %v", unitID, u.HasMoved, u.HasUsedSkill)
+					}
 				}
 			},
 		},
@@ -1081,6 +1119,30 @@ func TestServerStateManager_StartTurn_CPUTurn(t *testing.T) {
 			},
 		},
 		{
+			name:  "Unconsumed Ready Phase Relaunches",
+			vsCpu: true,
+			setup: func(t *testing.T, room *MatchRoom) int {
+				tokenIdx := cpuTurnPending(t, room)
+				room.Match.CPU.Phase = engine.TurnPhaseReady
+				room.Match.CPU.PendingGameEvents = []engine.GameEvent{engine.NewMatchEndedEvent(1)}
+				return tokenIdx
+			},
+			plan: func(gs *engine.GameState, call int) []engine.TurnCommand {
+				return legalCPUMove
+			},
+			wantCPUTurn:    true,
+			wantCalls:      1,
+			wantActiveTeam: 1,
+			validate: func(t *testing.T, room *MatchRoom, d *recordingDecider) {
+				if hasGameEvent(room.Match.CPU.PendingGameEvents, engine.GameEvtMatchEnded, 0) {
+					t.Errorf("Expected the stale event dropped, got %#v", room.Match.CPU.PendingGameEvents)
+				}
+				if !hasGameEvent(room.Match.CPU.PendingGameEvents, engine.GameEvtUnitMoved, cpuUnitID) {
+					t.Errorf("Expected unit %#x to have moved, got %#v", cpuUnitID, room.Match.CPU.PendingGameEvents)
+				}
+			},
+		},
+		{
 			name:           "Not VS CPU",
 			vsCpu:          false,
 			setup:          cpuTurnPending,
@@ -1152,10 +1214,11 @@ func TestServerStateManager_StartTurn_CPUTurn(t *testing.T) {
 	}
 }
 
-func TestServerStateManager_runCPUTurn_StaleMatch(t *testing.T) {
+func TestServerStateManager_runCPUTurn_Abandons(t *testing.T) {
 	tests := []struct {
-		name string
-		swap func(t *testing.T, room *MatchRoom)
+		name      string
+		swap      func(t *testing.T, room *MatchRoom)
+		wantPhase engine.CPUTurnPhase
 	}{
 		{
 			name: "Match Replaced",
@@ -1166,10 +1229,17 @@ func TestServerStateManager_runCPUTurn_StaleMatch(t *testing.T) {
 				}
 				room.Match = replacement
 			},
+			wantPhase: engine.TurnPhasePlanning,
 		},
 		{
-			name: "Match Deleted",
-			swap: func(t *testing.T, room *MatchRoom) { room.Match = nil },
+			name:      "Match Deleted",
+			swap:      func(t *testing.T, room *MatchRoom) { room.Match = nil },
+			wantPhase: engine.TurnPhasePlanning,
+		},
+		{
+			name:      "Match Already Ended",
+			swap:      func(t *testing.T, room *MatchRoom) { room.Match.WinnerTeamID = 1 },
+			wantPhase: engine.TurnPhaseReady,
 		},
 	}
 
@@ -1189,16 +1259,105 @@ func TestServerStateManager_runCPUTurn_StaleMatch(t *testing.T) {
 			if got := decider.calls; got != 0 {
 				t.Errorf("Expected the abandoned turn to skip planning, got %d decide calls", got)
 			}
-			if got, want := captured.CPU.Phase, engine.TurnPhasePlanning; got != want {
+			if got, want := captured.CPU.Phase, tt.wantPhase; got != want {
 				t.Errorf("Expected phase %v on the abandoned match, got %v", want, got)
 			}
 			if got, want := captured.TrueState.Turn, 1; got != want {
 				t.Errorf("Expected turn %d on the abandoned match, got %d", want, got)
 			}
-			if room.Match != nil && room.Match.CPU.Phase != engine.TurnPhaseIdle {
+			if room.Match != nil && room.Match != captured && room.Match.CPU.Phase != engine.TurnPhaseIdle {
 				t.Errorf("Expected the replacement match untouched, got phase %v", room.Match.CPU.Phase)
 			}
 		})
+	}
+}
+
+// Readers must not touch the match while the CPU goroutine mutates it. Meaningful under -race.
+func TestServerStateManager_ReadsDuringCPUTurn(t *testing.T) {
+	cpuUnitID := engine.NewUnitID(2, 0)
+
+	roomID, _, s := createTestRoomWithCfg(t, vsCpuGameCfg())
+	room := mustRoom(t, s, roomID)
+	room.Match.WorkingState.ActiveTeam = 2
+	room.Match.CPU.Phase = engine.TurnPhasePlanning
+	match := room.Match
+
+	planning, release := make(chan struct{}), make(chan struct{})
+	s.decide = func(*engine.GameState) []engine.TurnCommand {
+		close(planning)
+		<-release
+		return nil
+	}
+
+	cpuDone := make(chan struct{})
+	go func() {
+		defer close(cpuDone)
+		s.runCPUTurn(room, match)
+	}()
+
+	<-planning
+
+	stop := make(chan struct{})
+	var readers sync.WaitGroup
+	for range 4 {
+		readers.Go(func() {
+			for {
+				select {
+				case <-stop:
+					return
+				default:
+				}
+				gs, err := s.GetMatchState(roomID)
+				if err != nil {
+					t.Errorf("GetMatchState() error = %v", err)
+					return
+				}
+				// Consume it the way HandleGetMatchState does, or nothing racy is ever touched.
+				if _, err := json.Marshal(gs); err != nil {
+					t.Errorf("Marshal(gameState) error = %v", err)
+					return
+				}
+				s.GetAllowedTiles(roomID, cpuUnitID, engine.TurnCmdMove)
+				s.GetMatchConfig(roomID)
+			}
+		})
+	}
+
+	close(release)
+	<-cpuDone
+	close(stop)
+	readers.Wait()
+
+	if got, want := match.CPU.Phase, engine.TurnPhaseReady; got != want {
+		t.Errorf("Expected phase %v after the CPU turn, got %v", want, got)
+	}
+}
+
+func TestServerStateManager_runCPUTurn_Panic(t *testing.T) {
+	roomID, tokens, s := createTestRoomWithCfg(t, vsCpuGameCfg())
+	room := mustRoom(t, s, roomID)
+	room.Match.WorkingState.ActiveTeam = 2
+	room.Match.CPU.Phase = engine.TurnPhasePlanning
+	match := room.Match
+
+	s.decide = func(*engine.GameState) []engine.TurnCommand { panic("decide exploded") }
+
+	s.runCPUTurn(room, match)
+
+	if got, want := match.CPU.Phase, engine.TurnPhaseReady; got != want {
+		t.Errorf("Expected phase %v after the panic, got %v", want, got)
+	}
+	if got, want := match.TrueState.Turn, 2; got != want {
+		t.Errorf("Expected the forfeited turn to still advance to %d, got %d", want, got)
+	}
+
+	// Proves the room mutex was released rather than left held by the unwinding goroutine.
+	turnPhase, _, err := s.ConsumeCPUStatus(roomID, tokens[0])
+	if err != nil {
+		t.Fatalf("ConsumeCPUStatus() error = %v", err)
+	}
+	if got, want := turnPhase, engine.TurnPhaseReady; got != want {
+		t.Errorf("Expected %v turnPhase return, got %v", want, got)
 	}
 }
 
@@ -1543,8 +1702,11 @@ func TestServerStateManager_GetMatchConfig(t *testing.T) {
 			wantErr: nil,
 			validate: func(t *testing.T, gameCfg *engine.GameCfg, s *ServerStateManager, roomID string) {
 				room := mustRoom(t, s, roomID)
-				if gameCfg != &room.Match.GameCfg {
-					t.Errorf("Expected matchState pointer %p, got %p", &room.Match.GameCfg, gameCfg)
+				if gameCfg == &room.Match.GameCfg {
+					t.Error("Expected a copy of the GameCfg, got the live pointer")
+				}
+				if got, want := *gameCfg, room.Match.GameCfg; !reflect.DeepEqual(got, want) {
+					t.Errorf("Expected GameCfg %+v, got %+v", want, got)
 				}
 			},
 		},

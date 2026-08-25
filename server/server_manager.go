@@ -146,6 +146,17 @@ func (s *ServerStateManager) CreateMatchRoom() (string, error) {
 	return "", fmt.Errorf("room unavailable: failed to generate a MatchRoom ID after %d times of retry", maxRetry)
 }
 
+// loadRoom looks up a MatchRoom without locking it.
+// Callers must hold room.mu before touching room.Match, which a CPU goroutine may be mutating.
+func (s *ServerStateManager) loadRoom(roomID string) (*MatchRoom, error) {
+	roomVal, ok := s.Rooms.Load(roomID)
+	if !ok {
+		s.Logger.Warn("match room not found", "roomID", roomID)
+		return nil, fmt.Errorf("%w: roomID=%s", ErrRoomNotFound, roomID)
+	}
+	return roomVal.(*MatchRoom), nil
+}
+
 func randomHex(byteLength int) (string, error) {
 	b := make([]byte, byteLength)
 	if _, err := cryptorand.Read(b); err != nil {
@@ -169,12 +180,10 @@ func generatePlayerTokens() ([2]string, error) {
 // CreateMatch initialize the game in a given MatchRoom.
 // Returns an error if any setup rule is violated.
 func (s *ServerStateManager) CreateMatch(roomID string, gameCfg engine.GameCfg) ([2]string, error) {
-	roomVal, ok := s.Rooms.Load(roomID)
-	if !ok {
-		s.Logger.Warn("match room not found", "roomID", roomID)
-		return [2]string{}, fmt.Errorf("%w: roomID=%s", ErrRoomNotFound, roomID)
+	room, err := s.loadRoom(roomID)
+	if err != nil {
+		return [2]string{}, err
 	}
-	room := roomVal.(*MatchRoom)
 
 	room.mu.Lock()
 	defer room.mu.Unlock()
@@ -221,25 +230,6 @@ func matchToken(a, b string) bool {
 	return subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1
 }
 
-func (s *ServerStateManager) roomReadyForMatch(roomID string) (*MatchRoom, error) {
-	roomVal, ok := s.Rooms.Load(roomID)
-	if !ok {
-		s.Logger.Warn("match room not found", "roomID", roomID)
-		return nil, fmt.Errorf("%w: roomID=%s", ErrRoomNotFound, roomID)
-	}
-	room := roomVal.(*MatchRoom)
-
-	room.mu.RLock()
-	defer room.mu.RUnlock()
-
-	if room.Match == nil {
-		room.Logger.Warn("match not found")
-		return nil, fmt.Errorf("%w: roomID=%s", ErrMatchNotFound, roomID)
-	}
-
-	return room, nil
-}
-
 func (s *ServerStateManager) createMatchLocked(room *MatchRoom, gameCfg engine.GameCfg) (*engine.Match, error) {
 	roomID := room.ID
 	if room.Match != nil {
@@ -258,12 +248,10 @@ func (s *ServerStateManager) createMatchLocked(room *MatchRoom, gameCfg engine.G
 
 // Rematch wipes the existing Match in a given MatchRoom and recreate one using GameCfg.
 func (s *ServerStateManager) Rematch(roomID, token string) ([2]string, error) {
-	roomVal, ok := s.Rooms.Load(roomID)
-	if !ok {
-		s.Logger.Warn("match room not found", "roomID", roomID)
-		return [2]string{}, fmt.Errorf("%w: roomID=%s", ErrRoomNotFound, roomID)
+	room, err := s.loadRoom(roomID)
+	if err != nil {
+		return [2]string{}, err
 	}
-	room := roomVal.(*MatchRoom)
 
 	room.mu.Lock()
 	defer room.mu.Unlock()
@@ -293,12 +281,10 @@ func (s *ServerStateManager) Rematch(roomID, token string) ([2]string, error) {
 // DeleteMatch removes the existing concluded Match in a given MatchRoom.
 // Returns an error if any pre-check is violated.
 func (s *ServerStateManager) DeleteMatch(roomID, token string) error {
-	roomVal, ok := s.Rooms.Load(roomID)
-	if !ok {
-		s.Logger.Warn("match room not found", "roomID", roomID)
-		return fmt.Errorf("%w: roomID=%s", ErrRoomNotFound, roomID)
+	room, err := s.loadRoom(roomID)
+	if err != nil {
+		return err
 	}
-	room := roomVal.(*MatchRoom)
 
 	room.mu.Lock()
 	defer room.mu.Unlock()
@@ -323,25 +309,32 @@ func (s *ServerStateManager) DeleteMatch(roomID, token string) error {
 }
 
 // GetMatchState gets the WorkingState of the Match in a given MatchRoom.
-// Returns the WorkingState or an error if any pre-check is violated.
+// Returns a copy of the WorkingState or an error if any pre-check is violated.
 func (s *ServerStateManager) GetMatchState(roomID string) (*engine.GameState, error) {
-	room, err := s.roomReadyForMatch(roomID)
+	room, err := s.loadRoom(roomID)
 	if err != nil {
 		return nil, err
 	}
 
-	return room.Match.WorkingState, nil
+	room.mu.RLock()
+	defer room.mu.RUnlock()
+
+	if room.Match == nil {
+		room.Logger.Warn("match not found")
+		return nil, fmt.Errorf("%w: roomID=%s", ErrMatchNotFound, roomID)
+	}
+
+	// A copy, so the caller can marshal it after the lock is released.
+	return room.Match.WorkingState.DeepCopy(), nil
 }
 
 // SubmitTurnCommand delivers TurnCommand to engine to move a Unit or place a bomb in a given MatchRoom.
 // Returns the GameEvents or an error if any pre-check is violated
 func (s *ServerStateManager) SubmitTurnCommand(roomID string, cmd engine.TurnCommand, token string) ([]engine.GameEvent, error) {
-	roomVal, ok := s.Rooms.Load(roomID)
-	if !ok {
-		s.Logger.Warn("match room not found", "roomID", roomID)
-		return nil, fmt.Errorf("%w: roomID=%s", ErrRoomNotFound, roomID)
+	room, err := s.loadRoom(roomID)
+	if err != nil {
+		return nil, err
 	}
-	room := roomVal.(*MatchRoom)
 
 	room.mu.Lock()
 	defer room.mu.Unlock()
@@ -369,12 +362,10 @@ func (s *ServerStateManager) SubmitTurnCommand(roomID string, cmd engine.TurnCom
 // StartTurn sends StartTurn signal engine to start a new turn in a given MatchRoom.
 // Returns the GameEvents or an error if any pre-check is violated
 func (s *ServerStateManager) StartTurn(roomID, token string) (bool, []engine.GameEvent, error) {
-	roomVal, ok := s.Rooms.Load(roomID)
-	if !ok {
-		s.Logger.Warn("match room not found", "roomID", roomID)
-		return false, nil, fmt.Errorf("%w: roomID=%s", ErrRoomNotFound, roomID)
+	room, err := s.loadRoom(roomID)
+	if err != nil {
+		return false, nil, err
 	}
-	room := roomVal.(*MatchRoom)
 
 	room.mu.Lock()
 	defer room.mu.Unlock()
@@ -396,8 +387,10 @@ func (s *ServerStateManager) StartTurn(roomID, token string) (bool, []engine.Gam
 	}
 
 	// Launch CPU planning against the post-hazard board.
-	if room.GameCfg.VSCpu && teamID == 2 && room.Match.CPU.Phase == engine.TurnPhaseIdle {
+	// A Ready phase here means the last turn's events were never consumed; they are stale now.
+	if room.Match.GameCfg.VSCpu && teamID == 2 && room.Match.CPU.Phase != engine.TurnPhasePlanning {
 		room.Match.CPU.Phase = engine.TurnPhasePlanning
+		room.Match.CPU.PendingGameEvents = nil
 		go s.runCPUTurn(room, room.Match)
 	}
 
@@ -406,27 +399,45 @@ func (s *ServerStateManager) StartTurn(roomID, token string) (bool, []engine.Gam
 }
 
 // runCPUTurn plays the CPU's turn to completion, holding the room lock throughout.
-// It abandons if the match was replaced or deleted while the goroutine was queued.
+// It abandons if the match was replaced, deleted, or already won while the goroutine was queued.
 func (s *ServerStateManager) runCPUTurn(room *MatchRoom, match *engine.Match) {
 	room.mu.Lock()
 	defer room.mu.Unlock()
 
 	if room.Match != match {
-		room.Logger.Info("CPU turn abandoned: match replaced or deleted", "phase", "planning")
+		room.Logger.Info("CPU turn abandoned: match replaced or deleted")
 		return
 	}
-
 	defer func() {
 		match.CPU.Phase = engine.TurnPhaseReady
 		room.LastActivity = time.Now()
 	}()
 
+	if match.WinnerTeamID != 0 {
+		room.Logger.Info("CPU turn abandoned: match already ended")
+		return
+	}
+
+	// A panic here would kill the process: the HTTP RecoverPanic middleware does not span goroutines.
+	// The turn is forfeited from a clean sandbox so the match can still advance; a panic from that
+	// forfeit stays fatal, since re-resolving the same board would panic identically.
+	defer func() {
+		if rec := recover(); rec != nil {
+			room.Logger.Error("CPU turn panicked, forfeiting", "panic", rec)
+			match.ResetTurn()
+			match.CPU.PendingGameEvents = match.ResolveTurn()
+		}
+	}()
+
+	var err error
 	for attempt := range maxCPUReplanAttempts {
-		err := applyPlan(match, s.decide(match.WorkingState))
-		if err == nil {
+		if err = applyPlan(match, s.decide(match.WorkingState)); err == nil {
 			break
 		}
 		room.Logger.Warn("CPU plan rejected, replanning", "attempt", attempt, "error", err)
+	}
+	if err != nil {
+		room.Logger.Error("CPU replan attempts exhausted, committing partial turn", "attempts", maxCPUReplanAttempts, "error", err)
 	}
 
 	match.CPU.PendingGameEvents = match.ResolveTurn()
@@ -446,12 +457,10 @@ func applyPlan(match *engine.Match, plan []engine.TurnCommand) error {
 // ConsumeCPUStatus consumes current CPU Turn States in given MatchRoom and reset the state if CPU TurnPhase is in Ready - planning is done.
 // Returns the cpuTurnPhase and gameEvents or an error if any pre-check is violated
 func (s *ServerStateManager) ConsumeCPUStatus(roomID, token string) (engine.CPUTurnPhase, []engine.GameEvent, error) {
-	roomVal, ok := s.Rooms.Load(roomID)
-	if !ok {
-		s.Logger.Warn("match room not found", "roomID", roomID)
-		return 0, nil, fmt.Errorf("%w: roomID=%s", ErrRoomNotFound, roomID)
+	room, err := s.loadRoom(roomID)
+	if err != nil {
+		return 0, nil, err
 	}
-	room := roomVal.(*MatchRoom)
 
 	room.mu.Lock()
 	defer room.mu.Unlock()
@@ -467,7 +476,7 @@ func (s *ServerStateManager) ConsumeCPUStatus(roomID, token string) (engine.CPUT
 
 	turnPhase, pendingGameEvents := room.Match.CPU.Phase, room.Match.CPU.PendingGameEvents
 	if room.Match.CPU.Phase == engine.TurnPhaseReady {
-		room.Match.CPU.PendingGameEvents = []engine.GameEvent{}
+		room.Match.CPU.PendingGameEvents = nil
 		room.Match.CPU.Phase = engine.TurnPhaseIdle
 	}
 	if pendingGameEvents == nil {
@@ -480,12 +489,10 @@ func (s *ServerStateManager) ConsumeCPUStatus(roomID, token string) (engine.CPUT
 // ResetTurn sends ResetTurn signal to engine to drop the current WorkingState and reset to TrueState in a given MatchRoom.
 // Returns an error if any pre-check is violated
 func (s *ServerStateManager) ResetTurn(roomID, token string) error {
-	roomVal, ok := s.Rooms.Load(roomID)
-	if !ok {
-		s.Logger.Warn("match room not found", "roomID", roomID)
-		return fmt.Errorf("%w: roomID=%s", ErrRoomNotFound, roomID)
+	room, err := s.loadRoom(roomID)
+	if err != nil {
+		return err
 	}
-	room := roomVal.(*MatchRoom)
 
 	room.mu.Lock()
 	defer room.mu.Unlock()
@@ -509,12 +516,10 @@ func (s *ServerStateManager) ResetTurn(roomID, token string) error {
 // ResetTurn sends ResolveTurn signal to engine to calculate the impacts of the Player's action in a given MatchRoom.
 // Returns the gameEvents or an error if any pre-check is violated
 func (s *ServerStateManager) ResolveTurn(roomID, token string) ([]engine.GameEvent, error) {
-	roomVal, ok := s.Rooms.Load(roomID)
-	if !ok {
-		s.Logger.Warn("match room not found", "roomID", roomID)
-		return nil, fmt.Errorf("%w: roomID=%s", ErrRoomNotFound, roomID)
+	room, err := s.loadRoom(roomID)
+	if err != nil {
+		return nil, err
 	}
-	room := roomVal.(*MatchRoom)
 
 	room.mu.Lock()
 	defer room.mu.Unlock()
@@ -542,48 +547,62 @@ func (s *ServerStateManager) Surrender(roomID string, teamID int, token string) 
 		return nil, fmt.Errorf("%w: team must be 1 or 2", ErrInvalidConfig)
 	}
 
-	roomVal, ok := s.Rooms.Load(roomID)
-	if !ok {
-		s.Logger.Warn("match room not found", "roomID", roomID)
-		return nil, fmt.Errorf("%w: roomID=%s", ErrRoomNotFound, roomID)
+	room, err := s.loadRoom(roomID)
+	if err != nil {
+		return nil, err
 	}
-	room := roomVal.(*MatchRoom)
 
 	room.mu.Lock()
+	defer room.mu.Unlock()
+
 	if room.Match == nil {
-		room.mu.Unlock()
 		room.Logger.Warn("match not found")
 		return nil, fmt.Errorf("%w: roomID=%s", ErrMatchNotFound, roomID)
 	}
 
 	if err := room.validatePlayerToken(teamID, token); err != nil {
-		room.mu.Unlock()
 		return nil, err
 	}
 
 	gameEvents := room.Match.Surrender(teamID)
 	room.LastActivity = time.Now()
-	room.mu.Unlock()
 
 	return gameEvents, nil
 }
 
 // GetMatchConfig gets the GameConfig of the current Match in a given MatchRoom.
 func (s *ServerStateManager) GetMatchConfig(roomID string) (*engine.GameCfg, error) {
-	room, err := s.roomReadyForMatch(roomID)
+	room, err := s.loadRoom(roomID)
 	if err != nil {
 		return nil, err
 	}
 
-	return &room.Match.GameCfg, nil
+	room.mu.RLock()
+	defer room.mu.RUnlock()
+
+	if room.Match == nil {
+		room.Logger.Warn("match not found")
+		return nil, fmt.Errorf("%w: roomID=%s", ErrMatchNotFound, roomID)
+	}
+
+	gameCfg := room.Match.GameCfg
+	return &gameCfg, nil
 }
 
 // GetAllowedTiles gets the hints for Player to identify which tiles are available according to the TurnCmdAction
 // Returns the coordinates of the allowed tiles or an error if any pre-check is violated
 func (s *ServerStateManager) GetAllowedTiles(roomID string, unitID engine.UnitID, turnCmdType engine.TurnCmdType) ([]engine.Coordinate, error) {
-	room, err := s.roomReadyForMatch(roomID)
+	room, err := s.loadRoom(roomID)
 	if err != nil {
 		return nil, err
+	}
+
+	room.mu.RLock()
+	defer room.mu.RUnlock()
+
+	if room.Match == nil {
+		room.Logger.Warn("match not found")
+		return nil, fmt.Errorf("%w: roomID=%s", ErrMatchNotFound, roomID)
 	}
 
 	allowedTiles, err := room.Match.WorkingState.FindAllowedTilesForCommand(unitID, turnCmdType)
