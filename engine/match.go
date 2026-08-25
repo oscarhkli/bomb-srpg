@@ -247,6 +247,7 @@ func (m *Match) ResolveTurn() []GameEvent {
 		u.HasMoved = false
 		u.HasUsedSkill = false
 	}
+	m.WorkingState.TurnBombCounter = 0
 
 	if m.WinnerTeamID == 0 {
 		winner := m.evaluateVictoryConditions()
