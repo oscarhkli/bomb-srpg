@@ -18,17 +18,17 @@ func TestTerminalView_RenderBoard(t *testing.T) {
 		gs.ActiveTeam = 1
 		u1 := engine.NewUnitID(1, 0)
 		u2 := engine.NewUnitID(2, 0)
-		bID := engine.NewBombID(100, 1, u1)
+		bombID := engine.NewBombID(100, 1, u1)
 		gs.Units[u1] = &engine.Unit{ID: u1, Team: 1, HP: 1, Position: engine.Coordinate{X: 0, Y: 0}}
 		gs.Units[u2] = &engine.Unit{ID: u2, Team: 2, HP: 1, Position: engine.Coordinate{X: 1, Y: 0}}
-		gs.Bombs[bID] = &engine.Bomb{ID: bID, OwnerID: u1, Countdown: 5, Position: engine.Coordinate{X: 2, Y: 1}}
+		gs.Bombs[bombID] = &engine.Bomb{ID: bombID, OwnerID: u1, Countdown: 5, Position: engine.Coordinate{X: 2, Y: 1}}
 		gs.Grid[0][0].OccupantType = engine.OccupantUnit
 		gs.Grid[0][0].OccupantID = int64(u1)
 		gs.Grid[0][1].OccupantType = engine.OccupantUnit
 		gs.Grid[0][1].OccupantID = int64(u2)
 		gs.Grid[1][1].Type = engine.TerrainBlock
 		gs.Grid[1][2].OccupantType = engine.OccupantBomb
-		gs.Grid[1][2].OccupantID = int64(bID)
+		gs.Grid[1][2].OccupantID = int64(bombID)
 		gs.Grid[2][0].OccupantType = engine.OccupantSoftBlock
 		gs.Grid[2][2].OccupantType = engine.OccupantItem
 
@@ -229,12 +229,12 @@ func TestTerminalView_RenderGameEvents(t *testing.T) {
 		var fakeScreen bytes.Buffer
 		view := NewTerminalView(&fakeScreen)
 
-		events := []engine.GameEvent{
+		gameEvents := []engine.GameEvent{
 			engine.NewUnitMovedEvent(16, engine.Coordinate{X: 1, Y: 2}, engine.Coordinate{X: 2, Y: 2}),
 			engine.NewMatchEndedEvent(1),
 		}
 
-		err := view.RenderGameEvents(events)
+		err := view.RenderGameEvents(gameEvents)
 
 		if err != nil {
 			t.Fatalf("Expected no error, got: %v", err)

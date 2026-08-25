@@ -8,6 +8,7 @@ import {
   createMatch,
   getMatchState,
   startTurn,
+  consumeCpuStatus,
   submitTurnCommand,
   resetTurn,
   resolveTurn,
@@ -27,6 +28,7 @@ import type {
   StartTurnResponse,
   StagePreset,
   Catalog,
+  CpuStatusResponse,
 } from '../types/api';
 
 const mockFetch = vi.fn();
@@ -238,6 +240,31 @@ describe('api.ts', () => {
       mockErr(401, 'invalid player token');
 
       const error = await startTurn().catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(ApiError);
+      expect((error as ApiError).status).toBe(401);
+    });
+  });
+
+  describe('consumeCpuStatus', () => {
+    const fixture: CpuStatusResponse = {
+      turnPhase: 'TurnPhaseReady',
+      pendingGameEvents: [{ type: 'bombExploded', bombId: 1 }],
+    };
+
+    it('should POST with auth and return events', async () => {
+      mockOk(200, fixture);
+
+      const result = await consumeCpuStatus();
+
+      expect(result).toEqual(fixture);
+      const [, options] = mockFetch.mock.calls[0] as [string, RequestInit];
+      expect(options.headers).toHaveProperty('Authorization');
+    });
+
+    it('should throw ApiError on failure', async () => {
+      mockErr(401, 'invalid player token');
+
+      const error = await consumeCpuStatus().catch((e: unknown) => e);
       expect(error).toBeInstanceOf(ApiError);
       expect((error as ApiError).status).toBe(401);
     });

@@ -12,6 +12,7 @@ func RegisterRoutes(mux *http.ServeMux, h *Handler) {
 	mux.HandleFunc("GET /api/match-rooms/{roomID}/match/state", h.HandleGetMatchState)
 	mux.HandleFunc("POST /api/match-rooms/{roomID}/match/turn-commands", h.HandleSubmitTurnCommand)
 	mux.HandleFunc("POST /api/match-rooms/{roomID}/match/start-turn", h.HandleStartTurn)
+	mux.HandleFunc("POST /api/match-rooms/{roomID}/match/cpu-status/consume", h.HandleConsumeCPUStatus)
 	mux.HandleFunc("POST /api/match-rooms/{roomID}/match/reset", h.HandleResetTurn)
 	mux.HandleFunc("POST /api/match-rooms/{roomID}/match/resolve", h.HandleResolveTurn)
 	mux.HandleFunc("POST /api/match-rooms/{roomID}/match/surrender", h.HandleSurrender)

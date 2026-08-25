@@ -130,6 +130,27 @@ func TestUnitRole_UnmarshalJSON(t *testing.T) {
 	}
 }
 
+func TestCPUTurnPhaseString(t *testing.T) {
+	tests := []struct {
+		name      string
+		turnPhase CPUTurnPhase
+		want      string
+	}{
+		{"TurnPhase Idle", TurnPhaseIdle, "TurnPhaseIdle"},
+		{"TurnPhase Planning", TurnPhasePlanning, "TurnPhasePlanning"},
+		{"TurnPhase Ready", TurnPhaseReady, "TurnPhaseReady"},
+		{"Invalid Value", CPUTurnPhase(99), "TurnPhaseUnknown"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.turnPhase.String(); got != tt.want {
+				t.Errorf("CPUTurnPhase.String() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestGameStateJSONSerialization(t *testing.T) {
 	tests := []struct {
 		name string
@@ -215,6 +236,13 @@ func TestGameStateJSONSerialization(t *testing.T) {
 				Grid:       [][]Tile{{{Type: TerrainPlain, OccupantType: OccupantNone, OccupantID: 0}}},
 			},
 			want: []string{"turn", "activeTeam", "grid", "units", "bombs", "softBlocks", "turnCommands"},
+		},
+		{
+			name: "Empty collections encode as arrays, not null",
+			gs: &GameState{
+				Grid: [][]Tile{{{Type: TerrainPlain, OccupantType: OccupantNone, OccupantID: 0}}},
+			},
+			want: []string{`"units":[]`, `"bombs":[]`, `"softBlocks":[]`, `"turnCommands":[]`},
 		},
 	}
 

@@ -28,7 +28,6 @@ func InitGame(gameCfg GameCfg) (*Match, error) {
 		TrueState:    gameState,
 		WorkingState: gameState.DeepCopy(),
 		GameCfg:      gameCfg,
-		PlaybackLog:  []GameEvent{},
 	}, nil
 }
 
@@ -209,16 +208,24 @@ func applyGlobalOverride(orig, newVal int) int {
 	return orig
 }
 
-// DeepCopy creates a deep copy of the GameState.
-// This is used to create an independent working state for planning stage, allowing player to reset to the original state if needed without affecting the true state.
+// DeepCopy creates a faithful deep copy of the GameState, sharing no memory with the original.
+// It is used both to fork an independent WorkingState for the planning stage and to snapshot state
+// for callers that read it after releasing the lock that guarded the original.
 func (gs *GameState) DeepCopy() *GameState {
 	if gs == nil {
 		return nil
 	}
 
 	clone := &GameState{
-		Turn:       gs.Turn,
-		ActiveTeam: gs.ActiveTeam,
+		Turn:            gs.Turn,
+		InSuddenDeath:   gs.InSuddenDeath,
+		ActiveTeam:      gs.ActiveTeam,
+		TurnBombCounter: gs.TurnBombCounter,
+	}
+
+	if gs.TurnCommands != nil {
+		clone.TurnCommands = make([]TurnCommand, len(gs.TurnCommands))
+		copy(clone.TurnCommands, gs.TurnCommands)
 	}
 
 	if gs.Grid == nil {
@@ -253,6 +260,8 @@ func (gs *GameState) DeepCopy() *GameState {
 				HP:           unit.HP,
 				Skills:       unit.Skills,
 				Role:         unit.Role,
+				HasMoved:     unit.HasMoved,
+				HasUsedSkill: unit.HasUsedSkill,
 			}
 		}
 	}

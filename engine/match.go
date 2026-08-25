@@ -9,7 +9,7 @@ import (
 // and rollback to the beginning of the turn with deep copy of TrueState
 func (m *Match) ResetTurn() {
 	m.WorkingState = m.TrueState.DeepCopy()
-	m.PlaybackLog = []GameEvent{}
+	m.PlaybackLog = nil
 }
 
 // SubmitAction registers a validated mid-turn planning step permanently.
@@ -33,7 +33,7 @@ func (m *Match) Surrender(teamID int) []GameEvent {
 
 	// discard all the logs in rollback mode
 	// as opponent doesn't need to know what steps were taken lead to surrender
-	m.PlaybackLog = []GameEvent{}
+	m.PlaybackLog = nil
 
 	// broadcast it
 	return []GameEvent{
@@ -49,7 +49,7 @@ func (m *Match) ApplyTurnCommand(cmd TurnCommand) ([]GameEvent, error) {
 	case TurnCmdPlaceBomb:
 		return m.CommandPlaceBomb(cmd.UnitID, cmd.Target)
 	default:
-		return []GameEvent{}, fmt.Errorf("%w: %s", ErrUnsupportedCommand, cmd.Type)
+		return nil, fmt.Errorf("%w: %s", ErrUnsupportedCommand, cmd.Type)
 	}
 }
 
@@ -59,22 +59,22 @@ func (m *Match) ApplyTurnCommand(cmd TurnCommand) ([]GameEvent, error) {
 func (m *Match) CommandMoveUnit(unitID UnitID, target Coordinate) ([]GameEvent, error) {
 	unit, err := m.validateActiveUnit(unitID)
 	if err != nil {
-		return []GameEvent{}, err
+		return nil, err
 	}
 
 	if unit.HasMoved {
-		return []GameEvent{}, fmt.Errorf("%w: unit %#x already moved this turn", ErrAlreadyMoved, unitID)
+		return nil, fmt.Errorf("%w: unit %#x already moved this turn", ErrAlreadyMoved, unitID)
 	}
 
 	tiles := m.WorkingState.FindReachableTiles(unit.Position, unit.NewMovementRule())
 
 	if _, ok := tiles[target]; !ok {
-		return []GameEvent{}, ErrOutOfMoveRange
+		return nil, ErrOutOfMoveRange
 	}
 
 	// err will always be nil at the moment, not testable until the Skills implementation in Phase 4
 	if err = m.WorkingState.IsLandingLegal(target, OccupantUnit); err != nil {
-		return []GameEvent{}, fmt.Errorf("%w: %w", ErrInvalidLanding, err)
+		return nil, fmt.Errorf("%w: %w", ErrInvalidLanding, err)
 	}
 
 	oldPos := unit.Position
@@ -117,25 +117,25 @@ func (m *Match) CommandPlaceBomb(unitID UnitID, target Coordinate) ([]GameEvent,
 	// identify the unit and check the availability
 	unit, err := m.validateActiveUnit(unitID)
 	if err != nil {
-		return []GameEvent{}, err
+		return nil, err
 	}
 
 	if unit.HasUsedSkill {
-		return []GameEvent{}, fmt.Errorf("%w: unit %#x already used skill this turn", ErrAlreadyUsedSkill, unitID)
+		return nil, fmt.Errorf("%w: unit %#x already used skill this turn", ErrAlreadyUsedSkill, unitID)
 	}
 
 	if unit.BombUsed >= unit.MaxBombCount {
-		return []GameEvent{}, fmt.Errorf("%w: unit %#x out of bombs", ErrOutOfBombs, unitID)
+		return nil, fmt.Errorf("%w: unit %#x out of bombs", ErrOutOfBombs, unitID)
 	}
 
 	tiles := m.WorkingState.FindReachableTiles(unit.Position, unit.NewBombPlacementRule())
 
 	if _, ok := tiles[target]; !ok {
-		return []GameEvent{}, ErrOutOfBombRange
+		return nil, ErrOutOfBombRange
 	}
 
 	if err = m.WorkingState.IsLandingLegal(target, OccupantBomb); err != nil {
-		return []GameEvent{}, fmt.Errorf("%w: %w", ErrInvalidLanding, err)
+		return nil, fmt.Errorf("%w: %w", ErrInvalidLanding, err)
 	}
 
 	gameEvents := m.placeBomb(unitID, target, unit.BombPower)
@@ -205,14 +205,14 @@ func (m *Match) StartTurn() []GameEvent {
 	// Flush animation log arrays from the sandbox replay history buffer to the caller
 	gameEvents := make([]GameEvent, len(m.PlaybackLog))
 	copy(gameEvents, m.PlaybackLog)
-	m.PlaybackLog = []GameEvent{}
+	m.PlaybackLog = nil
 
 	return gameEvents
 }
 
 // injectSuddenDeathHazards picks 2 random unoccupied tiles and drop bombs there.
 func (m *Match) injectSuddenDeathHazards() {
-	emptyTilePos := []Coordinate{}
+	var emptyTilePos []Coordinate
 	for y, row := range m.WorkingState.Grid {
 		for x, tile := range row {
 			if tile.OccupantType == OccupantNone && tile.Type != TerrainBlock {
@@ -247,6 +247,7 @@ func (m *Match) ResolveTurn() []GameEvent {
 		u.HasMoved = false
 		u.HasUsedSkill = false
 	}
+	m.WorkingState.TurnBombCounter = 0
 
 	if m.WinnerTeamID == 0 {
 		winner := m.evaluateVictoryConditions()
@@ -266,7 +267,7 @@ func (m *Match) ResolveTurn() []GameEvent {
 	// Flush animation log arrays from the sandbox replay history buffer to the caller
 	gameEvents := make([]GameEvent, len(m.PlaybackLog))
 	copy(gameEvents, m.PlaybackLog)
-	m.PlaybackLog = []GameEvent{}
+	m.PlaybackLog = nil
 
 	return gameEvents
 }
@@ -336,7 +337,7 @@ func (m *Match) processChainDetonations(
 			StopOnNonUnitOccupant: true,
 		})
 
-		affectedPos := []Coordinate{}
+		var affectedPos []Coordinate
 
 		for pos := range affectedTiles {
 			affectedPos = append(affectedPos, pos)

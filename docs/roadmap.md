@@ -119,7 +119,8 @@ Refer to [Frontend README](frontend/README.md)
 
 ### TODO
 
-- [x] New Archetype type Boss (Prologue)
+- [x] New Archetype (Prologue)
+- [x] Unit Role
 - [x] New Match Settings and Victory Condition Evaluation for Boss
 - [ ] Frontend
   - [ ] Prologue stage (Human with 5 units vs 1 Boss)

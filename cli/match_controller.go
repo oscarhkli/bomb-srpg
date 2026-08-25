@@ -26,8 +26,8 @@ func (c *MatchController) StartInputLoop() {
 
 	for {
 		// Always render the latest situation
-		events := c.Match.StartTurn()
-		_ = c.View.RenderGameEvents(events)
+		gameEvents := c.Match.StartTurn()
+		_ = c.View.RenderGameEvents(gameEvents)
 
 		if err := c.View.RenderBoard(c.Match.WorkingState); err != nil {
 			log.Fatalf("Critical Interface Failure: %v", err)
@@ -80,14 +80,14 @@ func (c *MatchController) handleSystemCommand(cmd string) {
 		_ = c.View.RenderFeedback(true, "Turn reset successfully!")
 
 	case "/commit":
-		events := c.Match.ResolveTurn()
+		gameEvents := c.Match.ResolveTurn()
 		_ = c.View.RenderFeedback(true, "Turn committed and resolved!")
-		_ = c.View.RenderGameEvents(events)
+		_ = c.View.RenderGameEvents(gameEvents)
 
 	case "/surrender":
-		events := c.Match.Surrender(c.Match.WorkingState.ActiveTeam)
+		gameEvents := c.Match.Surrender(c.Match.WorkingState.ActiveTeam)
 		_ = c.View.RenderFeedback(true, fmt.Sprintf("PLAYER %d surrendered!", c.Match.WorkingState.ActiveTeam))
-		_ = c.View.RenderGameEvents(events)
+		_ = c.View.RenderGameEvents(gameEvents)
 
 	default:
 		_ = c.View.RenderFeedback(false, fmt.Sprintf("Unknown meta command: %s. Use /config, /reset, /commit, or /surrender\n", cmd))

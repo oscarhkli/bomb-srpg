@@ -322,6 +322,7 @@ type GameState struct {
 
 // MarshalJSON serializes GameState struct to JSON that client needs
 func (gs GameState) MarshalJSON() ([]byte, error) {
+	// Every slice is built non-nil so it marshals as [] — the client types these as non-nullable arrays.
 	units := make([]*Unit, 0, len(gs.Units))
 	for _, u := range gs.Units {
 		units = append(units, u)
@@ -334,6 +335,8 @@ func (gs GameState) MarshalJSON() ([]byte, error) {
 	for _, sb := range gs.SoftBlocks {
 		softBlocks = append(softBlocks, sb)
 	}
+	turnCommands := make([]TurnCommand, 0, len(gs.TurnCommands))
+	turnCommands = append(turnCommands, gs.TurnCommands...)
 	return json.Marshal(struct {
 		Turn          int           `json:"turn"`
 		InSuddenDeath bool          `json:"inSuddenDeath"`
@@ -351,7 +354,7 @@ func (gs GameState) MarshalJSON() ([]byte, error) {
 		units,
 		bombs,
 		softBlocks,
-		gs.TurnCommands,
+		turnCommands,
 	})
 }
 
@@ -364,10 +367,29 @@ const (
 	TurnPhaseReady                        // CPU has made the decision
 )
 
+// String converts an CPUTurnPhase integer value into a human-readable text string.
+func (c CPUTurnPhase) String() string {
+	switch c {
+	case TurnPhaseIdle:
+		return "TurnPhaseIdle"
+	case TurnPhasePlanning:
+		return "TurnPhasePlanning"
+	case TurnPhaseReady:
+		return "TurnPhaseReady"
+	default:
+		return "TurnPhaseUnknown"
+	}
+}
+
+// MarshalJSON serializes CPUTurnPhase struct to JSON that client needs
+func (o CPUTurnPhase) MarshalJSON() ([]byte, error) {
+	return json.Marshal(o.String())
+}
+
 // CPUState manages the TurnPhase state and pending GameEvent for VS CPU.
 type CPUState struct {
-	Phase         CPUTurnPhase
-	PendingEvents []GameEvent
+	Phase             CPUTurnPhase
+	PendingGameEvents []GameEvent
 }
 
 // Match orchestrates a full game session: state, config, and event log.

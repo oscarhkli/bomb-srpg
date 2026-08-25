@@ -70,6 +70,12 @@ type StartTurnResponse struct {
 	GameEvents    []engine.GameEvent `json:"gameEvents"`
 }
 
+// CPUStatusResponse wraps CPUTurnPhase and PendingGameEvents gathered from CPU's decision making.
+type CPUStatusResponse struct {
+	TurnPhase         engine.CPUTurnPhase `json:"turnPhase"`
+	PendingGameEvents []engine.GameEvent  `json:"pendingGameEvents"`
+}
+
 // HandleGetCatalog returns all available unit archetypes and stages for the client to display in the lobby.
 // It encodes the archetype and stagePreset definitions as JSON and writes them to the response.
 func (h *Handler) HandleGetCatalog(w http.ResponseWriter, r *http.Request) {
@@ -295,8 +301,39 @@ func (h *Handler) HandleStartTurn(w http.ResponseWriter, r *http.Request) {
 
 	res := StartTurnResponse{InSuddenDeath: inSuddenDeath, GameEvents: gameEvents}
 	if err := json.NewEncoder(w).Encode(res); err != nil {
-		h.Logger.Error("encode gameEvents failed", "error", err)
-		http.Error(w, "Failed to encode gameEvents", http.StatusInternalServerError)
+		h.Logger.Error("encode startTurnResponse failed", "error", err)
+		http.Error(w, "Failed to encode startTurnResponse", http.StatusInternalServerError)
+		return
+	}
+}
+
+// HandleConsumeCPUStatus consumes current CPU Turn States in given MatchRoom and reset the state if CPU TurnPhase is in Ready - planning is done.
+// It encodes the cpuTurnPhase, gameEvents as JSON and writes them to the response.
+func (h *Handler) HandleConsumeCPUStatus(w http.ResponseWriter, r *http.Request) {
+	roomID := r.PathValue("roomID")
+
+	token, err := h.extractBearerToken(r)
+	if err != nil {
+		code, msg := mapError(err)
+		http.Error(w, msg, code)
+		return
+	}
+
+	turnPhase, pendingGameEvents, err := h.Manager.ConsumeCPUStatus(roomID, token)
+	if err != nil {
+		code, msg := mapError(err)
+		h.Logger.Warn("consume cpu status failed", "roomID", roomID, "error", err)
+		http.Error(w, msg, code)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	res := CPUStatusResponse{TurnPhase: turnPhase, PendingGameEvents: pendingGameEvents}
+	if err := json.NewEncoder(w).Encode(res); err != nil {
+		h.Logger.Error("encode cpuStatusResponse failed", "error", err)
+		http.Error(w, "Failed to encode cpuStatusResponse", http.StatusInternalServerError)
 		return
 	}
 }
@@ -348,7 +385,7 @@ func (h *Handler) HandleResolveTurn(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 
 	if err := json.NewEncoder(w).Encode(gameEvents); err != nil {
-		h.Logger.Error("encode gameState failed", "error", err)
+		h.Logger.Error("encode gameEvents failed", "error", err)
 		http.Error(w, "Failed to encode gameEvents", http.StatusInternalServerError)
 		return
 	}
