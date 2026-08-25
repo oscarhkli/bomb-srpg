@@ -9,27 +9,27 @@ func Decide(gs *engine.GameState) []engine.TurnCommand {
 	cmds := []engine.TurnCommand{}
 
 	livingUnits := []*engine.Unit{}
-	livingEnemyUnits := []*engine.Unit{}
+	// livingEnemyUnits := []*engine.Unit{}
 
 	for _, u := range gs.Units {
-		if u.HP == 0 {
+		if u.HP <= 0 {
 			continue
 		}
 		if team, _ := u.ID.Decode(); team == 2 {
 			livingUnits = append(livingUnits, u)
-		} else {
-			livingEnemyUnits = append(livingEnemyUnits, u)
+			// } else {
+			// 	livingEnemyUnits = append(livingEnemyUnits, u)
 		}
+	}
 
-		for _, u := range livingUnits {
-			rts := gs.FindReachableTiles(u.Position, u.NewMovementRule())
-			if len(rts) == 0 {
-				continue
-			}
-			for k, _ := range rts {
-				cmds = append(cmds, engine.NewMoveCommand(u.ID, k))
-				break
-			}
+	for _, u := range livingUnits {
+		rts := gs.FindReachableTiles(u.Position, u.NewMovementRule())
+		if len(rts) == 0 {
+			continue
+		}
+		for k := range rts {
+			cmds = append(cmds, engine.NewMoveCommand(u.ID, k))
+			break
 		}
 	}
 
