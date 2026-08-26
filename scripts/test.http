@@ -21,9 +21,28 @@ Content-Type: application/json
 
 {
   "gameCfg": {
+    "vsCpu": true,
     "stagePreset": "Plain",
-    "p1Teams": ["King", "Fighter", "Fighter", "Witch", "Bandit"],
-    "p2Teams": ["King", "Witch", "Fighter", "Bandit", "Bandit"],
+    "p1Slots": [{
+        "archetype": "King",
+        "role": "King"
+      }, {
+        "archetype": "Fighter",
+        "role": "Normal"
+      }, {
+        "archetype": "Fighter",
+        "role": "Normal"
+      }, {
+        "archetype": "Witch",
+        "role": "Normal"
+      }, {
+        "archetype": "Bandit",
+        "role": "Normal"
+    }],
+    "p2Slots": [{
+        "archetype": "Prologue",
+        "role": "Boss"
+    }],
     "maxTurns": 30,
     "allowResetTurn": true
   }
@@ -88,6 +107,10 @@ Authorization: Bearer {{token1}}
   "teamId": 1
 }
 
+### Consume CPU Status
+POST {{baseUrl}}/api/match-rooms/{{roomId}}/match/cpu-status/consume
+Content-Type: application/json
+Authorization: Bearer {{token1}}
 
 ### Get Match Config
 GET {{baseUrl}}/api/match-rooms/{{roomId}}/match/config
