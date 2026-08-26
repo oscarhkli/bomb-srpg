@@ -995,6 +995,62 @@ func TestMatch_StartTurn_SuddenDeath(t *testing.T) {
 	})
 }
 
+func TestMatch_ResolveTurn_SplitsPlanningFromResolution(t *testing.T) {
+	king, ok := GetArchetype("King")
+	if !ok {
+		t.Fatalf("Archetype King does not exist")
+	}
+
+	m := newTestMatch(9, 9)
+	m.WorkingState.ActiveTeam = 1
+	unitID := NewUnitID(1, 0)
+	m.WorkingState.Units[unitID] = &Unit{
+		ID: unitID, Team: 1, HP: 1, Type: king, Role: RoleKing,
+		Position:     Coordinate{0, 0},
+		Speed:        king.BaseSpeed,
+		BombMaxRange: king.BombMaxRange,
+		BombMinRange: king.BombMinRange,
+		BombPower:    king.BombPower,
+		MaxBombCount: king.MaxBombCount,
+	}
+	m.WorkingState.Grid[0][0] = Tile{Type: TerrainPlain, OccupantType: OccupantUnit, OccupantID: int64(unitID)}
+
+	if _, err := m.CommandPlaceBomb(unitID, Coordinate{1, 0}); err != nil {
+		t.Fatalf("CommandPlaceBomb() error = %v", err)
+	}
+	if _, err := m.CommandMoveUnit(unitID, Coordinate{0, 1}); err != nil {
+		t.Fatalf("CommandMoveUnit() error = %v", err)
+	}
+	for _, bomb := range m.WorkingState.Bombs {
+		bomb.Countdown = 1
+	}
+
+	planGameEvents, resolveTurnGameEvents := m.ResolveTurn()
+
+	wantPlan := []GameEvtType{GameEvtBombPlaced, GameEvtUnitMoved}
+	if len(planGameEvents) != len(wantPlan) {
+		t.Fatalf("Expected %d planGameEvents, got %#v", len(wantPlan), planGameEvents)
+	}
+	for i, want := range wantPlan {
+		if got := planGameEvents[i].Type; got != want {
+			t.Errorf("Expected planGameEvents[%d] type %v, got %v", i, want, got)
+		}
+	}
+
+	for _, evt := range resolveTurnGameEvents {
+		if evt.Type == GameEvtBombPlaced || evt.Type == GameEvtUnitMoved {
+			t.Errorf("Expected no planning event in resolveTurnGameEvents, got %#v", evt)
+		}
+	}
+	if len(resolveTurnGameEvents) == 0 {
+		t.Error("Expected the detonation to produce resolveTurnGameEvents, got none")
+	}
+
+	if got := len(m.PlaybackLog); got != 0 {
+		t.Errorf("Expected PlaybackLog flushed, got %d entries", got)
+	}
+}
+
 func TestMatch_ResolveTurn_ExplosionAndBlast(t *testing.T) {
 	king, ok := GetArchetype("King")
 	if !ok {
@@ -1023,7 +1079,7 @@ func TestMatch_ResolveTurn_ExplosionAndBlast(t *testing.T) {
 		m.WorkingState.Grid[5][5] = Tile{OccupantType: OccupantBomb, OccupantID: int64(b1)}
 		m.WorkingState.Grid[15][15] = Tile{OccupantType: OccupantBomb, OccupantID: int64(b2)}
 
-		gameEvents := m.ResolveTurn()
+		_, gameEvents := m.ResolveTurn()
 
 		if len(gameEvents) != 1 {
 			t.Errorf("expected 1 GameEvent returned, got %d", len(gameEvents))
@@ -1071,7 +1127,7 @@ func TestMatch_ResolveTurn_ExplosionAndBlast(t *testing.T) {
 		m.WorkingState.SoftBlocks[sb1] = &SoftBlock{ID: sb1, Position: Coordinate{0, 3}}
 		m.WorkingState.Grid[3][0] = Tile{OccupantType: OccupantSoftBlock, OccupantID: int64(sb1)}
 
-		gameEvents := m.ResolveTurn()
+		_, gameEvents := m.ResolveTurn()
 
 		if got, want := m.WorkingState.Units[u1].BombUsed, 0; got != want {
 			t.Errorf("expect Unit %#X bombUsed = %v, got %v", u1, got, want)
@@ -1151,7 +1207,7 @@ func TestMatch_ResolveTurn_CascadingChainReactions(t *testing.T) {
 		m.WorkingState.Bombs[b2] = &Bomb{ID: b2, Countdown: 3, Range: 2, Position: Coordinate{1, 2}}
 		m.WorkingState.Grid[2][1] = Tile{OccupantType: OccupantBomb, OccupantID: int64(b2)}
 
-		gameEvents := m.ResolveTurn()
+		_, gameEvents := m.ResolveTurn()
 
 		if _, exists := m.WorkingState.Bombs[b1]; exists {
 			t.Error("Bomb 1 failed to clear")
@@ -1193,7 +1249,7 @@ func TestMatch_ResolveTurn_CascadingChainReactions(t *testing.T) {
 		m.WorkingState.Bombs[b2] = &Bomb{ID: b2, Countdown: 3, Range: 2, Position: Coordinate{2, 0}}
 		m.WorkingState.Grid[0][2] = Tile{OccupantType: OccupantBomb, OccupantID: int64(b2)}
 
-		gameEvents := m.ResolveTurn()
+		_, gameEvents := m.ResolveTurn()
 
 		// Verification: SoftBlock must be flagged for destruction, but its active shielding body
 		// must prevent the blast ray from crossing over to touch Bomb 2 in this frame pass.
@@ -1243,7 +1299,7 @@ func TestMatch_ResolveTurn_TimelineSystemTransitions(t *testing.T) {
 		m.WorkingState.Units[u3] = &Unit{ID: u3, Team: 1, HP: 1, Type: fighter, HasMoved: true, HasUsedSkill: true}
 		m.WorkingState.Units[u4] = &Unit{ID: u4, Team: 2, HP: 1, Type: fighter}
 
-		gameEvents := m.ResolveTurn()
+		_, gameEvents := m.ResolveTurn()
 
 		if len(gameEvents) != 0 {
 			t.Errorf("Expected clean slice array from empty resolution pass, got %d items", len(gameEvents))
@@ -1278,7 +1334,7 @@ func TestMatch_ResolveTurn_TimelineSystemTransitions(t *testing.T) {
 		m.WorkingState.Grid[0][0] = Tile{Type: TerrainPlain, OccupantType: OccupantUnit, OccupantID: int64(u1)}
 		m.WorkingState.Grid[1][0] = Tile{Type: TerrainPlain, OccupantType: OccupantUnit, OccupantID: int64(u2)}
 
-		_ = m.ResolveTurn()
+		m.ResolveTurn()
 
 		if m.TrueState.Turn != 2 {
 			t.Errorf("TrueState clock failed to advance! Got turn %d, want 2", m.TrueState.Turn)
@@ -1635,7 +1691,7 @@ func TestMatch_Resolve_VictoryCondition_Suite(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			m := newTestMatchWithTeams(t, tt.p1, tt.p2)
 
-			gameEvents := m.ResolveTurn()
+			_, gameEvents := m.ResolveTurn()
 
 			if m.WinnerTeamID != tt.expectedWinningTeam {
 				t.Errorf("Victory Guard Failed! Expected WinnerTeamID = %d, got %d", tt.expectedWinningTeam, m.WinnerTeamID)

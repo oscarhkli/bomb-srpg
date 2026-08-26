@@ -390,7 +390,8 @@ func (s *ServerStateManager) StartTurn(roomID, token string) (bool, []engine.Gam
 	// A Ready phase here means the last turn's events were never consumed; they are stale now.
 	if room.Match.GameCfg.VSCpu && teamID == 2 && room.Match.CPU.Phase != engine.TurnPhasePlanning {
 		room.Match.CPU.Phase = engine.TurnPhasePlanning
-		room.Match.CPU.PendingGameEvents = nil
+		room.Match.CPU.PlanGameEvents = nil
+		room.Match.CPU.ResolveTurnGameEvents = nil
 		go s.runCPUTurn(room, room.Match)
 	}
 
@@ -425,7 +426,7 @@ func (s *ServerStateManager) runCPUTurn(room *MatchRoom, match *engine.Match) {
 		if rec := recover(); rec != nil {
 			room.Logger.Error("CPU turn panicked, forfeiting", "panic", rec)
 			match.ResetTurn()
-			match.CPU.PendingGameEvents = match.ResolveTurn()
+			match.CPU.PlanGameEvents, match.CPU.ResolveTurnGameEvents = match.ResolveTurn()
 		}
 	}()
 
@@ -440,7 +441,7 @@ func (s *ServerStateManager) runCPUTurn(room *MatchRoom, match *engine.Match) {
 		room.Logger.Error("CPU replan attempts exhausted, committing partial turn", "attempts", maxCPUReplanAttempts, "error", err)
 	}
 
-	match.CPU.PendingGameEvents = match.ResolveTurn()
+	match.CPU.PlanGameEvents, match.CPU.ResolveTurnGameEvents = match.ResolveTurn()
 }
 
 // applyPlan applies each TurnCommand in order, stopping at the first rejection.
@@ -455,11 +456,11 @@ func applyPlan(match *engine.Match, plan []engine.TurnCommand) error {
 }
 
 // ConsumeCPUStatus consumes current CPU Turn States in given MatchRoom and reset the state if CPU TurnPhase is in Ready - planning is done.
-// Returns the cpuTurnPhase and gameEvents or an error if any pre-check is violated
-func (s *ServerStateManager) ConsumeCPUStatus(roomID, token string) (engine.CPUTurnPhase, []engine.GameEvent, error) {
+// Returns the cpuTurnPhase, the CPU's planning and resolution gameEvents, or an error if any pre-check is violated
+func (s *ServerStateManager) ConsumeCPUStatus(roomID, token string) (engine.CPUTurnPhase, []engine.GameEvent, []engine.GameEvent, error) {
 	room, err := s.loadRoom(roomID)
 	if err != nil {
-		return 0, nil, err
+		return 0, nil, nil, err
 	}
 
 	room.mu.Lock()
@@ -467,23 +468,28 @@ func (s *ServerStateManager) ConsumeCPUStatus(roomID, token string) (engine.CPUT
 
 	if room.Match == nil {
 		room.Logger.Warn("match not found")
-		return 0, nil, fmt.Errorf("%w: roomID=%s", ErrMatchNotFound, roomID)
+		return 0, nil, nil, fmt.Errorf("%w: roomID=%s", ErrMatchNotFound, roomID)
 	}
 
 	if err := room.validateAnyMatchPlayerToken(token); err != nil {
-		return 0, nil, err
+		return 0, nil, nil, err
 	}
 
-	turnPhase, pendingGameEvents := room.Match.CPU.Phase, room.Match.CPU.PendingGameEvents
-	if room.Match.CPU.Phase == engine.TurnPhaseReady {
-		room.Match.CPU.PendingGameEvents = nil
+	turnPhase := room.Match.CPU.Phase
+	planGameEvents, resolveTurnGameEvents := room.Match.CPU.PlanGameEvents, room.Match.CPU.ResolveTurnGameEvents
+	if turnPhase == engine.TurnPhaseReady {
+		room.Match.CPU.PlanGameEvents = nil
+		room.Match.CPU.ResolveTurnGameEvents = nil
 		room.Match.CPU.Phase = engine.TurnPhaseIdle
 	}
-	if pendingGameEvents == nil {
-		pendingGameEvents = []engine.GameEvent{}
+	if planGameEvents == nil {
+		planGameEvents = []engine.GameEvent{}
+	}
+	if resolveTurnGameEvents == nil {
+		resolveTurnGameEvents = []engine.GameEvent{}
 	}
 
-	return turnPhase, pendingGameEvents, nil
+	return turnPhase, planGameEvents, resolveTurnGameEvents, nil
 }
 
 // ResetTurn sends ResetTurn signal to engine to drop the current WorkingState and reset to TrueState in a given MatchRoom.
@@ -513,12 +519,12 @@ func (s *ServerStateManager) ResetTurn(roomID, token string) error {
 	return nil
 }
 
-// ResetTurn sends ResolveTurn signal to engine to calculate the impacts of the Player's action in a given MatchRoom.
-// Returns the gameEvents or an error if any pre-check is violated
-func (s *ServerStateManager) ResolveTurn(roomID, token string) ([]engine.GameEvent, error) {
+// ResolveTurn sends ResolveTurn signal to engine to calculate the impacts of the Player's action in a given MatchRoom.
+// Returns the planning and resolution gameEvents or an error if any pre-check is violated
+func (s *ServerStateManager) ResolveTurn(roomID, token string) ([]engine.GameEvent, []engine.GameEvent, error) {
 	room, err := s.loadRoom(roomID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	room.mu.Lock()
@@ -526,18 +532,18 @@ func (s *ServerStateManager) ResolveTurn(roomID, token string) ([]engine.GameEve
 
 	if room.Match == nil {
 		room.Logger.Warn("match not found")
-		return nil, fmt.Errorf("%w: roomID=%s", ErrMatchNotFound, roomID)
+		return nil, nil, fmt.Errorf("%w: roomID=%s", ErrMatchNotFound, roomID)
 	}
 
 	teamID := room.Match.WorkingState.ActiveTeam
 	if err := room.validatePlayerToken(teamID, token); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	gameEvents := room.Match.ResolveTurn()
+	planGameEvents, resolveTurnGameEvents := room.Match.ResolveTurn()
 	room.LastActivity = time.Now()
 
-	return gameEvents, nil
+	return planGameEvents, resolveTurnGameEvents, nil
 }
 
 // ResetTurn sends Surrender signal to engine to end the current Match in a given MatchRoom.

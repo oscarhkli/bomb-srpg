@@ -248,7 +248,8 @@ describe('api.ts', () => {
   describe('consumeCpuStatus', () => {
     const fixture: CpuStatusResponse = {
       turnPhase: 'TurnPhaseReady',
-      pendingGameEvents: [{ type: 'bombExploded', bombId: 1 }],
+      planGameEvents: [{ type: 'unitMoved', unitId: 1, from: { x: 1, y: 0 }, to: { x: 1, y: 1 } }],
+      resolveTurnGameEvents: [{ type: 'bombExploded', bombId: 1 }],
     };
 
     it('should POST with auth and return events', async () => {

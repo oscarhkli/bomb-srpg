@@ -240,7 +240,13 @@ func (m *Match) injectSuddenDeathHazards() {
 // 5. Victory audit guard: Check who has living units left on the board
 // 6. Advance Turn Counter (Turn++)
 // 7. Overwrite TrueState with clean DeepCopy
-func (m *Match) ResolveTurn() []GameEvent {
+// Returns the events accumulated during planning and those produced by this resolution,
+// as two slices so callers can animate the two phases apart. MatchEndedEvent lands in the latter.
+func (m *Match) ResolveTurn() (planGameEvents, resolveTurnGameEvents []GameEvent) {
+	planGameEvents = make([]GameEvent, len(m.PlaybackLog))
+	copy(planGameEvents, m.PlaybackLog)
+	m.PlaybackLog = nil
+
 	m.resolveBombExplosionAndDamage()
 
 	for _, u := range m.WorkingState.Units {
@@ -265,11 +271,11 @@ func (m *Match) ResolveTurn() []GameEvent {
 	m.TrueState = m.WorkingState.DeepCopy()
 
 	// Flush animation log arrays from the sandbox replay history buffer to the caller
-	gameEvents := make([]GameEvent, len(m.PlaybackLog))
-	copy(gameEvents, m.PlaybackLog)
+	resolveTurnGameEvents = make([]GameEvent, len(m.PlaybackLog))
+	copy(resolveTurnGameEvents, m.PlaybackLog)
 	m.PlaybackLog = nil
 
-	return gameEvents
+	return planGameEvents, resolveTurnGameEvents
 }
 
 // resolveBombExplosionAndDamage resolves bomb explosion, chain reaction and the damages made, and fire related GameEvents.

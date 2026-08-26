@@ -1045,8 +1045,8 @@ func TestServerStateManager_StartTurn_CPUTurn(t *testing.T) {
 				if got, want := d.observedPhase, engine.TurnPhasePlanning; got != want {
 					t.Errorf("Expected phase %v while planning, got %v", want, got)
 				}
-				if !hasGameEvent(room.Match.CPU.PendingGameEvents, engine.GameEvtUnitMoved, cpuUnitID) {
-					t.Errorf("Expected unit %#x to have moved, got %#v", cpuUnitID, room.Match.CPU.PendingGameEvents)
+				if !hasGameEvent(room.Match.CPU.PlanGameEvents, engine.GameEvtUnitMoved, cpuUnitID) {
+					t.Errorf("Expected unit %#x to have moved, got %#v", cpuUnitID, room.Match.CPU.PlanGameEvents)
 				}
 			},
 		},
@@ -1061,7 +1061,7 @@ func TestServerStateManager_StartTurn_CPUTurn(t *testing.T) {
 			wantCalls:      1,
 			wantActiveTeam: 1,
 			validate: func(t *testing.T, room *MatchRoom, d *recordingDecider) {
-				if got := len(room.Match.CPU.PendingGameEvents); got != 0 {
+				if got := len(room.Match.CPU.PlanGameEvents); got != 0 {
 					t.Errorf("Expected no pending events, got %d", got)
 				}
 			},
@@ -1080,8 +1080,8 @@ func TestServerStateManager_StartTurn_CPUTurn(t *testing.T) {
 			wantCalls:      2,
 			wantActiveTeam: 1,
 			validate: func(t *testing.T, room *MatchRoom, d *recordingDecider) {
-				if !hasGameEvent(room.Match.CPU.PendingGameEvents, engine.GameEvtUnitMoved, cpuUnitID) {
-					t.Errorf("Expected replanned move to apply, got %#v", room.Match.CPU.PendingGameEvents)
+				if !hasGameEvent(room.Match.CPU.PlanGameEvents, engine.GameEvtUnitMoved, cpuUnitID) {
+					t.Errorf("Expected replanned move to apply, got %#v", room.Match.CPU.PlanGameEvents)
 				}
 			},
 		},
@@ -1096,8 +1096,8 @@ func TestServerStateManager_StartTurn_CPUTurn(t *testing.T) {
 			wantCalls:      maxCPUReplanAttempts,
 			wantActiveTeam: 1,
 			validate: func(t *testing.T, room *MatchRoom, d *recordingDecider) {
-				if got := len(room.Match.CPU.PendingGameEvents); got != 0 {
-					t.Errorf("Expected no command to apply, got %#v", room.Match.CPU.PendingGameEvents)
+				if got := len(room.Match.CPU.PlanGameEvents); got != 0 {
+					t.Errorf("Expected no command to apply, got %#v", room.Match.CPU.PlanGameEvents)
 				}
 			},
 		},
@@ -1124,7 +1124,8 @@ func TestServerStateManager_StartTurn_CPUTurn(t *testing.T) {
 			setup: func(t *testing.T, room *MatchRoom) int {
 				tokenIdx := cpuTurnPending(t, room)
 				room.Match.CPU.Phase = engine.TurnPhaseReady
-				room.Match.CPU.PendingGameEvents = []engine.GameEvent{engine.NewMatchEndedEvent(1)}
+				room.Match.CPU.ResolveTurnGameEvents = []engine.GameEvent{engine.NewMatchEndedEvent(1)}
+				room.Match.CPU.PlanGameEvents = []engine.GameEvent{engine.NewUnitMovedEvent(cpuUnitID, engine.Coordinate{X: 0, Y: 0}, engine.Coordinate{X: 1, Y: 0})}
 				return tokenIdx
 			},
 			plan: func(gs *engine.GameState, call int) []engine.TurnCommand {
@@ -1134,11 +1135,11 @@ func TestServerStateManager_StartTurn_CPUTurn(t *testing.T) {
 			wantCalls:      1,
 			wantActiveTeam: 1,
 			validate: func(t *testing.T, room *MatchRoom, d *recordingDecider) {
-				if hasGameEvent(room.Match.CPU.PendingGameEvents, engine.GameEvtMatchEnded, 0) {
-					t.Errorf("Expected the stale event dropped, got %#v", room.Match.CPU.PendingGameEvents)
+				if hasGameEvent(room.Match.CPU.ResolveTurnGameEvents, engine.GameEvtMatchEnded, 0) {
+					t.Errorf("Expected the stale event dropped, got %#v", room.Match.CPU.ResolveTurnGameEvents)
 				}
-				if !hasGameEvent(room.Match.CPU.PendingGameEvents, engine.GameEvtUnitMoved, cpuUnitID) {
-					t.Errorf("Expected unit %#x to have moved, got %#v", cpuUnitID, room.Match.CPU.PendingGameEvents)
+				if !hasGameEvent(room.Match.CPU.PlanGameEvents, engine.GameEvtUnitMoved, cpuUnitID) {
+					t.Errorf("Expected unit %#x to have moved, got %#v", cpuUnitID, room.Match.CPU.PlanGameEvents)
 				}
 			},
 		},
@@ -1352,7 +1353,7 @@ func TestServerStateManager_runCPUTurn_Panic(t *testing.T) {
 	}
 
 	// Proves the room mutex was released rather than left held by the unwinding goroutine.
-	turnPhase, _, err := s.ConsumeCPUStatus(roomID, tokens[0])
+	turnPhase, _, _, err := s.ConsumeCPUStatus(roomID, tokens[0])
 	if err != nil {
 		t.Fatalf("ConsumeCPUStatus() error = %v", err)
 	}
@@ -1367,7 +1368,7 @@ func TestServerStateManager_ConsumeCPUStatus(t *testing.T) {
 		name     string
 		setup    func(t *testing.T) (string, *ServerStateManager, string)
 		wantErr  error
-		validate func(t *testing.T, turnPhase engine.CPUTurnPhase, gameEvents []engine.GameEvent, s *ServerStateManager, roomID string)
+		validate func(t *testing.T, turnPhase engine.CPUTurnPhase, planGameEvents, resolveTurnGameEvents []engine.GameEvent, s *ServerStateManager, roomID string)
 	}{
 		{
 			name: "Success - TurnPhaseReady and clear status",
@@ -1375,27 +1376,36 @@ func TestServerStateManager_ConsumeCPUStatus(t *testing.T) {
 				roomID, tokens, s := createTestRoom(t)
 				room := mustRoom(t, s, roomID)
 				room.Match.CPU.Phase = engine.TurnPhaseReady
-				room.Match.CPU.PendingGameEvents = []engine.GameEvent{
+				room.Match.CPU.PlanGameEvents = []engine.GameEvent{
 					engine.NewUnitMovedEvent(unitID, engine.Coordinate{X: 1, Y: 2}, engine.Coordinate{X: 2, Y: 2}),
+				}
+				room.Match.CPU.ResolveTurnGameEvents = []engine.GameEvent{
+					engine.NewUnitDiedEvent(unitID),
 				}
 				return roomID, s, tokens[0]
 			},
 			wantErr: nil,
-			validate: func(t *testing.T, turnPhase engine.CPUTurnPhase, gameEvents []engine.GameEvent, s *ServerStateManager, roomID string) {
+			validate: func(t *testing.T, turnPhase engine.CPUTurnPhase, planGameEvents, resolveTurnGameEvents []engine.GameEvent, s *ServerStateManager, roomID string) {
 				room := mustRoom(t, s, roomID)
 
 				if got, want := turnPhase, engine.TurnPhaseReady; got != want {
 					t.Errorf("Expected %v turnPhase return, got %v", want, got)
 				}
-				if got, want := gameEvents, 1; len(got) != want {
-					t.Errorf("Expected %d gameEvents returned, got %#v", want, got)
+				if !hasGameEvent(planGameEvents, engine.GameEvtUnitMoved, unitID) {
+					t.Errorf("Expected the move in planGameEvents, got %#v", planGameEvents)
+				}
+				if !hasGameEvent(resolveTurnGameEvents, engine.GameEvtUnitDied, unitID) {
+					t.Errorf("Expected the death in resolveTurnGameEvents, got %#v", resolveTurnGameEvents)
 				}
 
 				if got, want := room.Match.CPU.Phase, engine.TurnPhaseIdle; got != want {
 					t.Errorf("Expected CPU.Phase.TurnPhase reset to %v, got %v", want, got)
 				}
-				if got, want := room.Match.CPU.PendingGameEvents, 0; len(got) != want {
-					t.Errorf("Expected CPU.Phase.gameEvents cleared, got %#v", got)
+				if got, want := len(room.Match.CPU.PlanGameEvents), 0; got != want {
+					t.Errorf("Expected CPU.PlanGameEvents cleared, got %#v", room.Match.CPU.PlanGameEvents)
+				}
+				if got, want := len(room.Match.CPU.ResolveTurnGameEvents), 0; got != want {
+					t.Errorf("Expected CPU.ResolveTurnGameEvents cleared, got %#v", room.Match.CPU.ResolveTurnGameEvents)
 				}
 			},
 		},
@@ -1405,27 +1415,27 @@ func TestServerStateManager_ConsumeCPUStatus(t *testing.T) {
 				roomID, tokens, s := createTestRoom(t)
 				room := mustRoom(t, s, roomID)
 				room.Match.CPU.Phase = engine.TurnPhasePlanning
-				room.Match.CPU.PendingGameEvents = []engine.GameEvent{
+				room.Match.CPU.ResolveTurnGameEvents = []engine.GameEvent{
 					engine.NewUnitMovedEvent(unitID, engine.Coordinate{X: 1, Y: 2}, engine.Coordinate{X: 2, Y: 2}),
 				}
 				return roomID, s, tokens[0]
 			},
 			wantErr: nil,
-			validate: func(t *testing.T, turnPhase engine.CPUTurnPhase, gameEvents []engine.GameEvent, s *ServerStateManager, roomID string) {
+			validate: func(t *testing.T, turnPhase engine.CPUTurnPhase, planGameEvents, resolveTurnGameEvents []engine.GameEvent, s *ServerStateManager, roomID string) {
 				room := mustRoom(t, s, roomID)
 
 				if got, want := turnPhase, engine.TurnPhasePlanning; got != want {
 					t.Errorf("Expected %v turnPhase return, got %v", want, got)
 				}
-				if got, want := gameEvents, 1; len(got) != want {
-					t.Errorf("Expected %d gameEvents returned, got %#v", want, got)
+				if got, want := len(resolveTurnGameEvents), 1; got != want {
+					t.Errorf("Expected %d resolveTurnGameEvents returned, got %#v", want, resolveTurnGameEvents)
 				}
 
 				if got, want := room.Match.CPU.Phase, engine.TurnPhasePlanning; got != want {
 					t.Errorf("Expected CPU.Phase.TurnPhase stays at %v, got %v", want, got)
 				}
-				if got, want := room.Match.CPU.PendingGameEvents, 1; len(got) != want {
-					t.Errorf("Expected CPU.Phase.gameEvents remain unchanged as %#v, got %#v", want, got)
+				if got, want := len(room.Match.CPU.ResolveTurnGameEvents), 1; got != want {
+					t.Errorf("Expected CPU.ResolveTurnGameEvents remain unchanged as %d, got %#v", want, room.Match.CPU.ResolveTurnGameEvents)
 				}
 			},
 		},
@@ -1451,15 +1461,15 @@ func TestServerStateManager_ConsumeCPUStatus(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			roomID, s, token := tt.setup(t)
-			turnPhase, gameEvents, err := s.ConsumeCPUStatus(roomID, token)
+			turnPhase, planGameEvents, resolveTurnGameEvents, err := s.ConsumeCPUStatus(roomID, token)
 			if !errors.Is(err, tt.wantErr) {
-				t.Fatalf("ResolveTurn() error = %v, want %v", err, tt.wantErr)
+				t.Fatalf("ConsumeCPUStatus() error = %v, want %v", err, tt.wantErr)
 			}
 			if tt.validate != nil {
-				tt.validate(t, turnPhase, gameEvents, s, roomID)
+				tt.validate(t, turnPhase, planGameEvents, resolveTurnGameEvents, s, roomID)
 			} else {
-				if len(gameEvents) != 0 {
-					t.Errorf("Expected gameEvents to be empty, got %#v", gameEvents)
+				if len(planGameEvents) != 0 || len(resolveTurnGameEvents) != 0 {
+					t.Errorf("Expected gameEvents to be empty, got %#v and %#v", planGameEvents, resolveTurnGameEvents)
 				}
 			}
 		})
@@ -1528,7 +1538,7 @@ func TestServerStateManager_ResolveTurn(t *testing.T) {
 		name     string
 		setup    func(t *testing.T) (string, *ServerStateManager, string)
 		wantErr  error
-		validate func(t *testing.T, gameEvents []engine.GameEvent, s *ServerStateManager, roomID string)
+		validate func(t *testing.T, planGameEvents, resolveTurnGameEvents []engine.GameEvent, s *ServerStateManager, roomID string)
 	}{
 		{
 			name: "Success",
@@ -1540,11 +1550,20 @@ func TestServerStateManager_ResolveTurn(t *testing.T) {
 				return roomID, s, tokens[0]
 			},
 			wantErr: nil,
-			validate: func(t *testing.T, gameEvents []engine.GameEvent, s *ServerStateManager, roomID string) {
+			validate: func(t *testing.T, planGameEvents, resolveTurnGameEvents []engine.GameEvent, s *ServerStateManager, roomID string) {
 				room := mustRoom(t, s, roomID)
 
-				if got, want := gameEvents, 6; len(got) != want {
-					t.Errorf("Expected %d gameEvents returned, got %#v", want, got)
+				if got, want := planGameEvents, 1; len(got) != want {
+					t.Errorf("Expected %d planGameEvents returned, got %#v", want, got)
+				}
+				if !hasGameEvent(planGameEvents, engine.GameEvtBombPlaced, 16) {
+					t.Errorf("Expected the placed bomb in planGameEvents, got %#v", planGameEvents)
+				}
+				if got, want := resolveTurnGameEvents, 5; len(got) != want {
+					t.Errorf("Expected %d resolveTurnGameEvents returned, got %#v", want, got)
+				}
+				if hasGameEvent(resolveTurnGameEvents, engine.GameEvtBombPlaced, 16) {
+					t.Errorf("Expected no planning event in resolveTurnGameEvents, got %#v", resolveTurnGameEvents)
 				}
 				if got, want := room.Match.WorkingState.Units[16].HP, 0; got != want {
 					t.Errorf("Expected Unit %#X HP %v, got %v", 16, want, got)
@@ -1576,15 +1595,15 @@ func TestServerStateManager_ResolveTurn(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			roomID, s, token := tt.setup(t)
-			gameEvents, err := s.ResolveTurn(roomID, token)
+			planGameEvents, resolveTurnGameEvents, err := s.ResolveTurn(roomID, token)
 			if !errors.Is(err, tt.wantErr) {
 				t.Fatalf("ResolveTurn() error = %v, want %v", err, tt.wantErr)
 			}
 			if tt.validate != nil {
-				tt.validate(t, gameEvents, s, roomID)
+				tt.validate(t, planGameEvents, resolveTurnGameEvents, s, roomID)
 			} else {
-				if len(gameEvents) != 0 {
-					t.Errorf("Expected gameEvents to be empty, got %#v", gameEvents)
+				if len(planGameEvents) != 0 || len(resolveTurnGameEvents) != 0 {
+					t.Errorf("Expected gameEvents to be empty, got %#v and %#v", planGameEvents, resolveTurnGameEvents)
 				}
 			}
 		})

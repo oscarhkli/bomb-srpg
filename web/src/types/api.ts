@@ -164,7 +164,8 @@ export interface CreateMatchResponse {
 
 export interface CpuStatusResponse {
   turnPhase: CPUTurnPhase;
-  pendingGameEvents: GameEvent[];
+  planGameEvents: GameEvent[];
+  resolveTurnGameEvents: GameEvent[];
 }
 
 export interface SurrenderRequest {

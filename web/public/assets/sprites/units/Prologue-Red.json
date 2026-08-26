@@ -1,0 +1,20 @@
+{ "frames": [
+   {
+    "filename": "Prologue #Red.aseprite",
+    "frame": { "x": 0, "y": 0, "w": 43, "h": 41 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 9, "y": 7, "w": 43, "h": 41 },
+    "sourceSize": { "w": 64, "h": 64 },
+    "duration": 100
+   }
+ ],
+ "meta": {
+  "app": "https://www.aseprite.org/",
+  "version": "1.x-dev",
+  "image": "Prologue-Red.png",
+  "format": "RGBA8888",
+  "size": { "w": 43, "h": 41 },
+  "scale": "1"
+ }
+}
