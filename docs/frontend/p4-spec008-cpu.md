@@ -20,6 +20,7 @@ This spec introduces Prologue of Story Mode in order to enable the first VS CPU 
 ## Non-Goal
 
 - Complete Story Mode
+- A VS CPU option in Battle Mode
 
 ## Scene Entry
 
@@ -45,7 +46,7 @@ Start Game
 - For simplicity, all 3 options should share the same property as `Start Game`, i.e., font size, font family, hover with a Bomb icon.
 - `Story Mode`: `fadeTransition` `MatchScene` for Prologue Match (details in next section).
 - `Battle Mode`: `fadeTransition` `MatchSettingsScene` as of `Start Game` prior Phase 4.7.
-- `Back`: navigates up a layer, i.e., displaying `Story Mode` only.
+- `Back`: navigates up a layer, i.e., the sub-menu disappears and `Start Game` is restored.
 
 ### Creating Prologue Match
 
@@ -88,33 +89,37 @@ Prologue Match has a predefined `GameCfg`. There isn't any option for Player to 
 }
 ```
 
-- If Player clicks `Story Mode`, follow how `MatchsScene` calls `startMatch()`:
+- If Player clicks `Story Mode`, follow how `MatchSettingsScene` calls `startMatch()`:
   - Call `createMatchRoom()` to get `roomId`.
   - Use `roomId` to `initRoom()`.
-  - Use `roomId` and `MatchSettingsScene.gameCfg` to call `createMatch()`.
+  - Use `roomId` and the Prologue `GameCfg` above to call `createMatch()`.
   - `fadeTransition` to `MatchScene` with `roomId` and `playerTokens`.
 - If `createMatchRoom()` or `createMatch()` fails, report the error and stay on `TitleScene` (no transition to `MatchScene`).
-- Extract `startMatch()` so that it's reusable for both situations instead of blindly duplicating it.
+- Extract `startMatch()` so that it's reusable for both situations instead of blindly duplicating it. The extraction must preserve three properties the current implementation already guarantees: a re-entrancy guard so a second click can't start a second match, the fade-out and match-creation running concurrently with the transition waiting on both, and a failure path that fades back in and reports the error in place.
 
 ## Match Scene for Prologue Match
 
 ### Sprite
 
-Boss is one of the Unit, but with a difference - since it's a NPC, Blue version is unavaible, but Red only (by design P2 is either Human or CPU). The other things follows the same as other units. See [p4-spec001-sprites](p4-spec001-sprites.md#sprites) for the ground rules.
+Boss is one of the Unit, but with a difference - since it's a NPC, Blue version is unavailable, but Red only (by design P2 is either Human or CPU). Team formation rules place a Boss on P2 only, so a Blue lookup can never occur. The other things follows the same as other units. See [p4-spec001-sprites](p4-spec001-sprites.md#sprites) for the ground rules.
 
 | Entity         | Texture Key       | Path (relative to `sprites/`)    | Type             |
 | -------------- | ----------------- | -------------------------------- | ---------------- |
 | Prologue (Red) | unit_prologue_red | units/Prologue-Red.png (+ .json) | atlas (aseprite) |
 
+These loads belong in `MatchScene.preload()`, added to the existing `SPRITE_MANIFEST`, and the archetype-to-texture lookup gains a `Prologue` entry for team 2.
+
 ### VS CPU
 
 `gameCfg.vsCpu = true` marks a VS CPU match. The turn opens identically to VS Human — `startTurn()` in `beginTurn()`, then `SuddenDeathCutscene` (if needed) and `TurnBanner` — but when `gameState.activeTeam === 2` the CPU's whole turn arrives as data instead of as click events.
+
+Interactions are locked from the CPU turn's `beginTurn()` and the Player regains control only after the next `TurnBanner` — their own turn's — has finished. `MatchScene` is hot-seat, so without this lock the Boss would be selectable while `activeTeam === 2`.
 
 #### Polling for the CPU's turn
 
 Once `startTurn()` resolves and `gameCfg.vsCpu && gameState.activeTeam === 2`, start calling `consumeCpuStatus()`. This runs **concurrently** with the `SuddenDeathCutscene → TurnBanner` rendering. The rendering owns the clock, the polling owns the data, and neither waits on the other.
 
-`consumeCpuStatus()` blocks server-side on the room lock while the CPU is planning, so it behaves as a short long-poll — the first call usually returns `TurnPhaseReady` directly. Poll accordingly:
+`consumeCpuStatus()` typically does not return until the CPU has finished planning, so it behaves as a short long-poll and the first call usually answers `TurnPhaseReady`. `TurnPhasePlanning` is still possible and must be retried. Poll accordingly:
 
 - Fire the first call immediately, not after a delay.
 - On `TurnPhasePlanning`, retry with backoff: `250ms → 500ms → 1s → 2s`, capped at 2s.
@@ -143,8 +148,10 @@ If `planGameEvents` is empty (the CPU passed), skip step 2 — a pause with noth
 
 Two distinct failures, distinguished by one `getMatchState()` call after the 30s budget expires:
 
-- **`turn` advanced and `activeTeam` is back to 1** — the CPU's turn committed on the server and only the animation was lost. Re-render the board from the fetched state and continue to the next turn. Use `fadeTransition` to hide the re-render procees from the Player. No error surfaced to the Player.
+- **`turn` advanced and `activeTeam` is back to 1** — the CPU's turn committed on the server and only the animation was lost. Re-render the board from the fetched state and continue to the next turn. Mask the re-render with a fade-out → fade-in, as `fadeTransition` does for a Page swap. No error surfaced to the Player.
 - **`turn` unchanged** — the server-side turn never completed. Surface an error and the match cannot proceed.
+
+The recovery `getMatchState()` has no separate timeout — if the CPU turn is still running it resolves once that finishes, and reports the advanced turn.
 
 Do not force-end the match on a poll timeout. The CPU's moves are committed to `TrueState` before `consumeCpuStatus()` can ever see them, so a lost batch is cosmetic, not a desync.
 
@@ -152,26 +159,41 @@ Do not force-end the match on a poll timeout. The CPU's moves are committed to `
 
 `startTurn()` sets the phase to `TurnPhasePlanning` under the room lock *before* it responds, so a poll issued after `startTurn()` resolves can only observe `TurnPhasePlanning` or `TurnPhaseReady`. Observing `TurnPhaseIdle` during a CPU turn means the mailbox was already drained by a second, competing consumer — the events are gone and will not reappear.
 
-Treat it as a bug signal: stop polling, run the `getMatchState()` recovery above, and log it. Never render an `TurnPhaseIdle` response's events; they are always empty. The practical guard is to ensure only one poll loop is ever in flight per turn.
+Treat it as a bug signal: stop polling, run the `getMatchState()` recovery above, and log it. Never render a `TurnPhaseIdle` response's events; they are always empty. The practical guard is to ensure only one poll loop is ever in flight per turn.
 
-> Note: `ServerStateManager.ResolveTurn` concatenates the two slices, so `/resolve` and the VS Human path are unchanged by this spec. `MatchScene`'s human branch still drops its own planning events through `resolveTurnPlayer`'s per-type filter, which is valid only while each `GameEvtType` belongs to exactly one phase. Splitting that path is tracked in [p4-spec009-match](p4-spec009-match.md) and is trigger-gated, not scheduled.
+> Note: `/resolve` concatenates the two slices from `ServerStateManager.ResolveTurn`, so `/resolve` and the VS Human path are unchanged by this spec. `MatchScene`'s human branch still drops its own planning events through `resolveTurnPlayer`'s per-type filter, which is valid only while each `GameEvtType` belongs to exactly one phase. Splitting that path is tracked in [p4-spec009-match](p4-spec009-match.md) and is trigger-gated, not scheduled.
 
-## Visual Spec for Victory Cutscene for Prologue Match
+## Victory Cutscene for Prologue Match
 
 When Prologue Match ends, it should return to `TitleScene` instead of `MatchSettingsScene`.
 
-1. Create a new `returnTitleButton` button, same dimensions and coloring as `returnMatchSettingsButton` with the text `Return to Title`.
-2. Swap `returnMatchSettingsButton` for `returnTitleButton`.
-3. Refer to [Details for button handler](p3-spec006-match.md#return-to-match-settings) to add the click handler for `returnTitleButton` with one exception: `returnTitleButton` `fadeTransition` to `TitleScene`.
+In a Prologue Match, `VictoryCutscene`'s lower button reads `Return to Title` and `fadeTransition`s to `TitleScene`; `Rematch` is unchanged and replays the Prologue in the same room. Styling, dimensions, and the `deleteMatch()`-and-fade handling follow [Return to Match Settings](p3-spec006-match.md#return-to-match-settings).
+
+`gameCfg.vsCpu` is the discriminator — it is true exactly when the match was entered from Story Mode. Revisit if Battle Mode ever gains a CPU option.
 
 ---
 
 ## Acceptance Criteria
 
-1. Given `MatchScene` has loaded a match, when the unit is clicked, then all buttons in `TurnCommandPanel` display their pixel-art sprite textures instead of the Phase 3 vector-graphics placeholders.
-2. Given a button in `TurnCommandPanel`, when the button is disabled due to some reasons, then the button with the label should turn in its greyscale color.
-3. Given a button in `TurnCommandPanel`, when the button is not disabled and selected, then the button with the label should change the sprite to mimic glow effect.
-4. Given a button in `TurnCommandPanel`, when the button is not disabled and clicked, then the button with the label should change the sprite to mimic click effect, and label should shift **2px** downwards.
-5. Given `MatchScene` has loaded a match, when `ConfirmDialog` pops up, then all buttons in `ConfirmDialog` display their pixel-art sprite textures instead of the Phase 3 vector-graphics placeholders.
-6. Given a button in `ConfirmDialog`, when the button is not disabled and selected, then the button with the label should change the sprite to mimic glow effect.
-7. Given a button in `ConfirmDialog`, when the button is not disabled and clicked, then the button with the label should change the sprite to mimic click effect, and label should shift **2px** downwards.
+### Story Mode entry
+
+1. Given `TitleScene`, when Player clicks `Start Game`, then `Start Game` disappears and `Story Mode` / `Battle Mode` / `Back` appear at the same position, sharing its font and hover Bomb icon.
+2. Given the sub-menu is open, when Player clicks `Back`, then `Start Game` is restored.
+3. Given the sub-menu is open, when Player clicks `Story Mode`, then a match is created with the Prologue `GameCfg` and `MatchScene` opens with the returned `roomId` and `playerTokens`.
+4. Given Player clicks `Story Mode`, when `createMatchRoom()` or `createMatch()` fails, then the error is reported and the Player stays on `TitleScene`.
+5. Given a Prologue Match has loaded, when the board renders, then the P2 Boss uses the `unit_prologue_red` texture.
+
+### VS CPU turn
+
+6. Given a Prologue Match and `activeTeam === 2`, when the turn opens, then `SuddenDeathCutscene` and `TurnBanner` play at their normal speed, the CPU's animation begins as soon as the banner finishes, and the Player cannot plan or select units until their own next `TurnBanner` has finished.
+7. Given a `TurnPhaseReady` response and a finished `TurnBanner`, when the CPU turn renders, then `planGameEvents` animate first, then a 600ms hold, then `resolveTurnGameEvents`.
+8. Given `planGameEvents` is empty, when the CPU turn renders, then the 600ms hold is skipped.
+9. Given `resolveTurnGameEvents` ends with `matchEnded`, then `VictoryCutscene` opens; otherwise `beginTurn()` runs and the Player's turn opens.
+10. Given polling exhausts its budget, when `getMatchState()` shows `turn` advanced and `activeTeam === 1`, then the board re-renders from that state and play continues with no error surfaced; when `turn` is unchanged, then an error is surfaced. The match is never force-ended.
+11. Given a Prologue Match has ended, when `VictoryCutscene` shows, then the lower button reads `Return to Title` and `fadeTransition`s to `TitleScene`, and `Rematch` still restarts the Prologue in the same room.
+
+### VS Human regression
+
+12. Given a Battle Mode match (`gameCfg.vsCpu === false`), when a turn opens, then the Player can plan immediately after `TurnBanner` — no CPU polling delay, and no plan/resolve animation split.
+13. Given a Battle Mode match, when `/resolve` returns, then its `gameEvents` render as one continuous sequence, unchanged from Phase 4.7.
+14. Given a Battle Mode match has ended, when `VictoryCutscene` shows, then the lower button reads `Return to Match Settings` and returns to `MatchSettingsScene`.

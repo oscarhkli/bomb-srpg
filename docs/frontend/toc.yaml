@@ -72,8 +72,8 @@ specs:
     category: Canvas
     completion-date: 2028-08-16
   - file: p4-spec008-cpu.md
-    status: Draft
-    category: VS-CPU
+    status: Ready
+    category: Story
     completion-date:
   - file: p4-spec009-match.md
     status: Draft
