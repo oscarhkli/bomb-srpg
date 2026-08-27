@@ -1380,7 +1380,7 @@ func TestServerStateManager_ConsumeCPUStatus(t *testing.T) {
 					engine.NewUnitMovedEvent(unitID, engine.Coordinate{X: 1, Y: 2}, engine.Coordinate{X: 2, Y: 2}),
 				}
 				room.Match.CPU.ResolveTurnGameEvents = []engine.GameEvent{
-					engine.NewUnitDiedEvent(unitID),
+					engine.NewUnitDiedEvent(unitID, engine.Coordinate{X: 2, Y: 2}),
 				}
 				return roomID, s, tokens[0]
 			},

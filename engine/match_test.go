@@ -106,7 +106,7 @@ func TestMatch_Surrender(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			m := newTestMatch(1, 2)
-			m.PlaybackLog = append(m.PlaybackLog, NewUnitDiedEvent(16))
+			m.PlaybackLog = append(m.PlaybackLog, NewUnitDiedEvent(16, Coordinate{X: 0, Y: 0}))
 
 			gameEvents := m.Surrender(tt.teamID)
 
@@ -1085,7 +1085,8 @@ func TestMatch_ResolveTurn_ExplosionAndBlast(t *testing.T) {
 			t.Errorf("expected 1 GameEvent returned, got %d", len(gameEvents))
 		}
 		resEvt := gameEvents[0]
-		if resEvt.Type != GameEvtBombCountdownUpdated || resEvt.BombID != b1 || resEvt.Countdown != 2 {
+		if resEvt.Type != GameEvtBombCountdownUpdated || resEvt.BombID != b1 || resEvt.Countdown != 2 ||
+			resEvt.Position == nil || *resEvt.Position != (Coordinate{5, 5}) {
 			t.Errorf("malformed EvtBombCountdownUpdated returned: %+v", resEvt)
 		}
 		if m.WorkingState.Bombs[b1].Countdown != 2 {
@@ -1155,10 +1156,16 @@ func TestMatch_ResolveTurn_ExplosionAndBlast(t *testing.T) {
 		for _, evt := range gameEvents {
 			if evt.Type == GameEvtUnitDamaged {
 				damageEventsCount++
+				if wantPos := m.WorkingState.Units[evt.UnitID].Position; evt.Position == nil || *evt.Position != wantPos {
+					t.Errorf("GameEvtUnitDamaged for %#X: expected Position %v, got %v", evt.UnitID, wantPos, evt.Position)
+				}
 				continue
 			}
 			if evt.Type == GameEvtUnitDied {
 				unitDiedEventsCount++
+				if wantPos := m.WorkingState.Units[evt.UnitID].Position; evt.Position == nil || *evt.Position != wantPos {
+					t.Errorf("GameEvtUnitDied for %#X: expected Position %v, got %v", evt.UnitID, wantPos, evt.Position)
+				}
 			}
 			if evt.Type == GameEvtSoftBlockDestroyed {
 				softBlockDestroyedEventsCount++
@@ -1222,10 +1229,15 @@ func TestMatch_ResolveTurn_CascadingChainReactions(t *testing.T) {
 			t.Errorf("Grid Clearance Bug: Exploded bomb positions %#v failed to revert to OccupantNone, got %v", Coordinate{1, 2}, m.WorkingState.Grid[1][2].OccupantType)
 		}
 
+		wantExplosionPos := map[BombID]Coordinate{b1: {1, 1}, b2: {1, 2}}
 		explosionPackets := 0
 		for _, evt := range gameEvents {
 			if evt.Type == GameEvtBombExploded {
 				explosionPackets++
+				wantPos, ok := wantExplosionPos[evt.BombID]
+				if !ok || evt.Position == nil || *evt.Position != wantPos {
+					t.Errorf("GameEvtBombExploded for %#X: expected Position %v, got %v", evt.BombID, wantPos, evt.Position)
+				}
 			}
 		}
 		if explosionPackets != 2 {

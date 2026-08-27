@@ -113,10 +113,11 @@ export interface TurnCommand {
 
 // Optional fields vary by event type:
 // unitMoved: from, to
-// unitDamaged: newHp
+// unitDamaged: position, newHp
+// unitDied: position
 // bombPlaced: bombId, position, range, countdown
-// bombCountdownUpdated: bombId, countdown
-// bombExploded: bombId, affectedPositions
+// bombCountdownUpdated: bombId, position, countdown
+// bombExploded: bombId, position, affectedPositions
 // softBlockDestroyed: softBlockId, position
 // matchEnded: winnerTeamId, isDraw
 export interface GameEvent {

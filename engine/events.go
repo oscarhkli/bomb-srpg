@@ -46,13 +46,13 @@ func NewUnitMovedEvent(unitID UnitID, from, to Coordinate) GameEvent {
 }
 
 // NewUnitDamagedEvent creates a unit damaged event.
-func NewUnitDamagedEvent(unitID UnitID, newHP int) GameEvent {
-	return GameEvent{Type: GameEvtUnitDamaged, UnitID: unitID, NewHP: newHP}
+func NewUnitDamagedEvent(unitID UnitID, pos Coordinate, newHP int) GameEvent {
+	return GameEvent{Type: GameEvtUnitDamaged, UnitID: unitID, Position: &pos, NewHP: newHP}
 }
 
 // NewUnitDiedEvent creates a unit died event.
-func NewUnitDiedEvent(unitID UnitID) GameEvent {
-	return GameEvent{Type: GameEvtUnitDied, UnitID: unitID}
+func NewUnitDiedEvent(unitID UnitID, pos Coordinate) GameEvent {
+	return GameEvent{Type: GameEvtUnitDied, UnitID: unitID, Position: &pos}
 }
 
 // NewBombPlacedEvent creates a bomb placed event.
@@ -61,13 +61,13 @@ func NewBombPlacedEvent(unitID UnitID, bombID BombID, pos Coordinate, rangeVal, 
 }
 
 // NewBombCountdownUpdatedEvent creats a bomb countdown updated event.
-func NewBombCountdownUpdatedEvent(bombID BombID, countdown int) GameEvent {
-	return GameEvent{Type: GameEvtBombCountdownUpdated, BombID: bombID, Countdown: countdown}
+func NewBombCountdownUpdatedEvent(bombID BombID, pos Coordinate, countdown int) GameEvent {
+	return GameEvent{Type: GameEvtBombCountdownUpdated, BombID: bombID, Position: &pos, Countdown: countdown}
 }
 
 // NewBombExplodedEvent creates a bomb exploded event.
-func NewBombExplodedEvent(bombID BombID, affected []Coordinate) GameEvent {
-	return GameEvent{Type: GameEvtBombExploded, BombID: bombID, AffectedPositions: affected}
+func NewBombExplodedEvent(bombID BombID, pos Coordinate, affected []Coordinate) GameEvent {
+	return GameEvent{Type: GameEvtBombExploded, BombID: bombID, Position: &pos, AffectedPositions: affected}
 }
 
 // NewSoftBlockDestroyedEvent creates a soft block destroyed event.

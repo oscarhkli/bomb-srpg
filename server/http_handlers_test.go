@@ -1498,7 +1498,7 @@ func TestHandleConsumeCPUStatus(t *testing.T) {
 			engine.NewUnitMovedEvent(unitID, engine.Coordinate{X: 1, Y: 2}, engine.Coordinate{X: 2, Y: 2}),
 		}
 		room.Match.CPU.ResolveTurnGameEvents = []engine.GameEvent{
-			engine.NewUnitDiedEvent(unitID),
+			engine.NewUnitDiedEvent(unitID, engine.Coordinate{X: 2, Y: 2}),
 		}
 
 		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/cpu-status/consume", nil)
@@ -1687,7 +1687,7 @@ func TestHandleConsumeCPUStatus(t *testing.T) {
 			engine.NewUnitMovedEvent(unitID, engine.Coordinate{X: 1, Y: 2}, engine.Coordinate{X: 2, Y: 2}),
 		}
 		room.Match.CPU.ResolveTurnGameEvents = []engine.GameEvent{
-			engine.NewUnitDiedEvent(unitID),
+			engine.NewUnitDiedEvent(unitID, engine.Coordinate{X: 2, Y: 2}),
 		}
 
 		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/cpu-status/consume", nil)

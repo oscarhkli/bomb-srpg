@@ -306,7 +306,7 @@ func (m *Match) tickCountdownsAndQueueFuses() ([]BombID, map[BombID]bool) {
 		}
 
 		bomb.Countdown--
-		m.PlaybackLog = append(m.PlaybackLog, NewBombCountdownUpdatedEvent(id, bomb.Countdown))
+		m.PlaybackLog = append(m.PlaybackLog, NewBombCountdownUpdatedEvent(id, bomb.Position, bomb.Countdown))
 		if bomb.Countdown == 0 {
 			queue = append(queue, id)
 			ignited[id] = true
@@ -377,7 +377,7 @@ func (m *Match) processChainDetonations(
 
 		m.WorkingState.ClearStageTile(currBomb.Position)
 		delete(m.WorkingState.Bombs, currBombID)
-		m.PlaybackLog = append(m.PlaybackLog, NewBombExplodedEvent(currBombID, affectedPos))
+		m.PlaybackLog = append(m.PlaybackLog, NewBombExplodedEvent(currBombID, currBomb.Position, affectedPos))
 	}
 }
 
@@ -405,11 +405,11 @@ func (m *Match) handleDelayedBatchDamage(
 		}
 
 		unit.HP -= 1
-		m.PlaybackLog = append(m.PlaybackLog, NewUnitDamagedEvent(unitID, unit.HP))
+		m.PlaybackLog = append(m.PlaybackLog, NewUnitDamagedEvent(unitID, unit.Position, unit.HP))
 
 		if unit.HP <= 0 {
 			m.WorkingState.ClearStageTile(unit.Position)
-			m.PlaybackLog = append(m.PlaybackLog, NewUnitDiedEvent(unitID))
+			m.PlaybackLog = append(m.PlaybackLog, NewUnitDiedEvent(unitID, unit.Position))
 		}
 	}
 
