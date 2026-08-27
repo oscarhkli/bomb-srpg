@@ -30,8 +30,10 @@ Specs will be written prior to development—partly handcrafted, and partly gene
 | [Phase 4.5: Resize Canvas to 640x360](p4-spec005-canvas.md) | Canvas | Done | 2026-08-15 |
 | [Phase 4.6: Swapping Sprites for Buttons in TurnCommandPanel and ConfirmDialog in MatchScene](p4-spec006-sprites.md) | Sprites | Done | 2026-08-16 |
 | [Phase 4.7: Auto Resize Canvas](p4-spec007-canvas.md) | Canvas | Done | 2028-08-16 |
-| [Phase 4.8: Swapping Sprites for Existing Vector Graphics in MatchSummaryPanel](p4-spec008-sprites.md) | Sprites | Draft | — |
-| [Phase 4.9: Refine UX in MatchScene on TurnCommand Buttons](p4-spec009-sprites.md) | Sprites | Draft | — |
+| [Phase 4.8: Add Story Mode to TitleScene and Initiate Prologue Match](p4-spec008-cpu.md) | VS-CPU | Draft | — |
+| [Phase 4.9: Refine 2-phase GameEvents Handling in ResolveTurn](p4-spec009-match.md) | Sprites | Draft | — |
+| [Phase 4.10: Swapping Sprites for Existing Vector Graphics in MatchSummaryPanel](p4-spec010-sprites.md) | Sprites | Draft | — |
+| [Phase 4.11: Refine UX in MatchScene on TurnCommand Buttons](p4-spec011-sprites.md) | Sprites | Draft | — |
 <!-- END SPEC TABLE -->
 
 ## Workflow

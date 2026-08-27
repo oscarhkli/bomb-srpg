@@ -71,11 +71,19 @@ specs:
     status: Done
     category: Canvas
     completion-date: 2028-08-16
-  - file: p4-spec008-sprites.md
+  - file: p4-spec008-cpu.md
+    status: Draft
+    category: VS-CPU
+    completion-date:
+  - file: p4-spec009-match.md
     status: Draft
     category: Sprites
     completion-date:
-  - file: p4-spec009-sprites.md
+  - file: p4-spec010-sprites.md
+    status: Draft
+    category: Sprites
+    completion-date:
+  - file: p4-spec011-sprites.md
     status: Draft
     category: Sprites
     completion-date:

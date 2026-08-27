@@ -1,14 +1,14 @@
 ---
-title: "Phase 4.9: Refine UX in MatchScene on TurnCommand Buttons"
+title: "Phase 4.11: Refine UX in MatchScene on TurnCommand Buttons"
 ---
 
-# Phase 4.9: Refine UX in MatchScene on TurnCommand Buttons
+# Phase 4.11: Refine UX in MatchScene on TurnCommand Buttons
 
 **Skip everything below - copy-and-paste only.**
 
 ## Context
 
-This spec replace the vector graphic of the buttons in `TurnCommandPanel` and `ConfirmDialog` in MatchScene by Pixel Art sprites. Also, it adjusts the layout according to the sprites.
+This spec replaces the vector graphic of the buttons in `TurnCommandPanel` and `ConfirmDialog` in MatchScene by Pixel Art sprites. Also, it adjusts the layout according to the sprites.
 
 > **Shared vocabulary:** This spec relies on shared terms and design conventions — `Page`, `region`, `Panel`, `fadeTransition`, `BackButton`, `TeamBadge`, the `render*`/`draw*` split, etc. — defined in [`VISUAL_VOCAB.md`](./VISUAL_VOCAB.md). Read it first.
 
