@@ -1494,8 +1494,11 @@ func TestHandleConsumeCPUStatus(t *testing.T) {
 		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
 		room := mustRoom(t, s, roomID)
 		room.Match.CPU.Phase = engine.TurnPhaseReady
-		room.Match.CPU.PendingGameEvents = []engine.GameEvent{
+		room.Match.CPU.PlanGameEvents = []engine.GameEvent{
 			engine.NewUnitMovedEvent(unitID, engine.Coordinate{X: 1, Y: 2}, engine.Coordinate{X: 2, Y: 2}),
+		}
+		room.Match.CPU.ResolveTurnGameEvents = []engine.GameEvent{
+			engine.NewUnitDiedEvent(unitID, engine.Coordinate{X: 2, Y: 2}),
 		}
 
 		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/cpu-status/consume", nil)
@@ -1518,8 +1521,9 @@ func TestHandleConsumeCPUStatus(t *testing.T) {
 		}
 
 		var response struct {
-			TurnPhase         string             `json:"turnPhase"`
-			PendingGameEvents []engine.GameEvent `json:"pendingGameEvents"`
+			TurnPhase             string             `json:"turnPhase"`
+			PlanGameEvents        []engine.GameEvent `json:"planGameEvents"`
+			ResolveTurnGameEvents []engine.GameEvent `json:"resolveTurnGameEvents"`
 		}
 		if err := json.NewDecoder(rr.Body).Decode(&response); err != nil {
 			t.Fatalf("Failed to decode response JSON payload: %v", err)
@@ -1528,15 +1532,21 @@ func TestHandleConsumeCPUStatus(t *testing.T) {
 		if got, want := response.TurnPhase, engine.TurnPhaseReady.String(); got != want {
 			t.Errorf("Expected turnPhase %v, got %v", want, got)
 		}
-		if got, want := len(response.PendingGameEvents), 1; got != want {
-			t.Errorf("Expected %d pendingGameEvents returned, got %#v", want, response.PendingGameEvents)
+		if got, want := len(response.PlanGameEvents), 1; got != want {
+			t.Errorf("Expected %d planGameEvents returned, got %#v", want, response.PlanGameEvents)
+		}
+		if got, want := len(response.ResolveTurnGameEvents), 1; got != want {
+			t.Errorf("Expected %d resolveTurnGameEvents returned, got %#v", want, response.ResolveTurnGameEvents)
 		}
 
 		if got, want := room.Match.CPU.Phase, engine.TurnPhaseIdle; got != want {
 			t.Errorf("Expected CPU.Phase reset to %v, got %v", want, got)
 		}
-		if got, want := len(room.Match.CPU.PendingGameEvents), 0; got != want {
-			t.Errorf("Expected CPU.PendingGameEvents cleared, got %#v", room.Match.CPU.PendingGameEvents)
+		if got, want := len(room.Match.CPU.PlanGameEvents), 0; got != want {
+			t.Errorf("Expected CPU.PlanGameEvents cleared, got %#v", room.Match.CPU.PlanGameEvents)
+		}
+		if got, want := len(room.Match.CPU.ResolveTurnGameEvents), 0; got != want {
+			t.Errorf("Expected CPU.ResolveTurnGameEvents cleared, got %#v", room.Match.CPU.ResolveTurnGameEvents)
 		}
 	})
 
@@ -1562,8 +1572,9 @@ func TestHandleConsumeCPUStatus(t *testing.T) {
 		body := rr.Body.Bytes()
 
 		var response struct {
-			TurnPhase         string             `json:"turnPhase"`
-			PendingGameEvents []engine.GameEvent `json:"pendingGameEvents"`
+			TurnPhase             string             `json:"turnPhase"`
+			PlanGameEvents        []engine.GameEvent `json:"planGameEvents"`
+			ResolveTurnGameEvents []engine.GameEvent `json:"resolveTurnGameEvents"`
 		}
 		if err := json.Unmarshal(body, &response); err != nil {
 			t.Fatalf("Failed to decode response JSON payload: %v", err)
@@ -1572,8 +1583,11 @@ func TestHandleConsumeCPUStatus(t *testing.T) {
 		if got, want := response.TurnPhase, engine.TurnPhasePlanning.String(); got != want {
 			t.Errorf("Expected turnPhase %v, got %v", want, got)
 		}
-		if got, want := len(response.PendingGameEvents), 0; got != want {
-			t.Errorf("Expected no pendingGameEvents, got %#v", response.PendingGameEvents)
+		if got, want := len(response.PlanGameEvents), 0; got != want {
+			t.Errorf("Expected no planGameEvents, got %#v", response.PlanGameEvents)
+		}
+		if got, want := len(response.ResolveTurnGameEvents), 0; got != want {
+			t.Errorf("Expected no resolveTurnGameEvents, got %#v", response.ResolveTurnGameEvents)
 		}
 		if got, want := room.Match.CPU.Phase, engine.TurnPhasePlanning; got != want {
 			t.Errorf("Expected CPU.Phase to stay at %v, got %v", want, got)
@@ -1583,8 +1597,10 @@ func TestHandleConsumeCPUStatus(t *testing.T) {
 		if err := json.Unmarshal(body, &raw); err != nil {
 			t.Fatalf("Failed to parse raw JSON: %v", err)
 		}
-		if _, ok := raw["pendingGameEvents"].([]any); !ok {
-			t.Errorf("Expected pendingGameEvents to serialize as [], got %#v (client types this field as non-nullable)", raw["pendingGameEvents"])
+		for _, field := range []string{"planGameEvents", "resolveTurnGameEvents"} {
+			if _, ok := raw[field].([]any); !ok {
+				t.Errorf("Expected %s to serialize as [], got %#v (client types this field as non-nullable)", field, raw[field])
+			}
 		}
 	})
 
@@ -1667,8 +1683,11 @@ func TestHandleConsumeCPUStatus(t *testing.T) {
 		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
 		room := mustRoom(t, s, roomID)
 		room.Match.CPU.Phase = engine.TurnPhaseReady
-		room.Match.CPU.PendingGameEvents = []engine.GameEvent{
+		room.Match.CPU.PlanGameEvents = []engine.GameEvent{
 			engine.NewUnitMovedEvent(unitID, engine.Coordinate{X: 1, Y: 2}, engine.Coordinate{X: 2, Y: 2}),
+		}
+		room.Match.CPU.ResolveTurnGameEvents = []engine.GameEvent{
+			engine.NewUnitDiedEvent(unitID, engine.Coordinate{X: 2, Y: 2}),
 		}
 
 		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/cpu-status/consume", nil)
@@ -1680,18 +1699,21 @@ func TestHandleConsumeCPUStatus(t *testing.T) {
 		rr := httptest.NewRecorder()
 		testMux("POST /api/match-rooms/{roomID}/match/cpu-status/consume", h.HandleConsumeCPUStatus).ServeHTTP(rr, req)
 
-		assertObjectContract(t, rr.Body.Bytes(), []string{"turnPhase", "pendingGameEvents"},
+		assertObjectContract(t, rr.Body.Bytes(), []string{"turnPhase", "planGameEvents", "resolveTurnGameEvents"},
 			func(t *testing.T, raw map[string]any) {
 				t.Helper()
-				events, ok := raw["pendingGameEvents"].([]any)
+				events, ok := raw["planGameEvents"].([]any)
 				if !ok || len(events) == 0 {
-					t.Fatalf("Expected non-empty pendingGameEvents, got %#v", raw["pendingGameEvents"])
+					t.Fatalf("Expected non-empty planGameEvents, got %#v", raw["planGameEvents"])
 				}
 				evt := events[0].(map[string]any)
 				for _, field := range []string{"type", "unitId", "from", "to"} {
 					if _, exists := evt[field]; !exists {
-						t.Errorf("Contract Broken: pendingGameEvents[0] missing key '%s'", field)
+						t.Errorf("Contract Broken: planGameEvents[0] missing key '%s'", field)
 					}
+				}
+				if _, ok := raw["resolveTurnGameEvents"].([]any); !ok {
+					t.Errorf("Expected resolveTurnGameEvents array, got %#v", raw["resolveTurnGameEvents"])
 				}
 			})
 	})

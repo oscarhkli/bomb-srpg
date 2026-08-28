@@ -70,12 +70,24 @@ specs:
   - file: p4-spec007-canvas.md
     status: Done
     category: Canvas
-    completion-date: 2028-08-16
-  - file: p4-spec008-sprites.md
+    completion-date: 2026-08-16
+  - file: p4-spec008-match.md
+    status: Done
+    category: Match
+    completion-date: 2026-08-28
+  - file: p4-spec009-cpu.md
+    status: Ready
+    category: Sprites
+    completion-date:
+  - file: p4-spec010-match.md
+    status: Draft
+    category: Match
+    completion-date:
+  - file: p4-spec011-sprites.md
     status: Draft
     category: Sprites
     completion-date:
-  - file: p4-spec009-sprites.md
+  - file: p4-spec012-sprites.md
     status: Draft
     category: Sprites
     completion-date:

@@ -124,7 +124,7 @@ Refer to [Frontend README](frontend/README.md)
 - [x] New Match Settings and Victory Condition Evaluation for Boss
 - [ ] Frontend
   - [ ] Prologue stage (Human with 5 units vs 1 Boss)
-- [ ] goroutine setup to decouple resolve-response from CPU computation
+- [x] goroutine setup to decouple resolve-response from CPU computation
 - [ ] Finite State Machine for 1 CPU decision making
 
 ## Phase 5a: UI Refinement (Polish Pass)
@@ -189,3 +189,4 @@ Refer to [Frontend README](frontend/README.md)
 
 - Story Mode (pre-req: Computer Player)
 - Replay (pre-req: Database)
+- Resume the game when encountering interuption, e.g., network drop, accidentally refresh the page, etc.

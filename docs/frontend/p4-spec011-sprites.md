@@ -1,14 +1,14 @@
 ---
-title: "Phase 4.9: Refine UX in MatchScene on TurnCommand Buttons"
+title: "Phase 4.11: Swapping Sprites for Existing Vector Graphics in MatchSummaryPanel"
 ---
 
-# Phase 4.9: Refine UX in MatchScene on TurnCommand Buttons
+# Phase 4.11: Swapping Sprites for Existing Vector Graphics in MatchSummaryPanel
 
 **Skip everything below - copy-and-paste only.**
 
 ## Context
 
-This spec replace the vector graphic of the buttons in `TurnCommandPanel` and `ConfirmDialog` in MatchScene by Pixel Art sprites. Also, it adjusts the layout according to the sprites.
+This spec replaces the vector graphic of the buttons in `TurnCommandPanel` and `ConfirmDialog` in MatchScene by Pixel Art sprites. Also, it adjusts the layout according to the sprites.
 
 > **Shared vocabulary:** This spec relies on shared terms and design conventions — `Page`, `region`, `Panel`, `fadeTransition`, `BackButton`, `TeamBadge`, the `render*`/`draw*` split, etc. — defined in [`VISUAL_VOCAB.md`](./VISUAL_VOCAB.md). Read it first.
 
@@ -95,13 +95,7 @@ Used when the button is not in disabled state and User clicks / pressed / moused
 
 ## Acceptance Criteria
 
-1. Given `MatchScene` has loaded a match, when the unit is clicked, then all buttons in `TurnCommandPanel` display their pixel-art sprite textures instead of the Phase 3 vector-graphics placeholders.
-2. Given a button in `TurnCommandPanel`, when the button is disabled due to some reasons, then the button with the label should turn in its greyscale color.
-3. Given a button in `TurnCommandPanel`, when the button is not disabled and selected, then the button with the label should change the sprite to mimic glow effect.
-4. Given a button in `TurnCommandPanel`, when the button is not disabled and clicked, then the button with the label should change the sprite to mimic click effect, and label should shift **2px** downwards.
-5. Given `MatchScene` has loaded a match, when `ConfirmDialog` pops up, then all buttons in `ConfirmDialog` display their pixel-art sprite textures instead of the Phase 3 vector-graphics placeholders.
-6. Given a button in `ConfirmDialog`, when the button is not disabled and selected, then the button with the label should change the sprite to mimic glow effect.
-7. Given a button in `ConfirmDialog`, when the button is not disabled and clicked, then the button with the label should change the sprite to mimic click effect, and label should shift **2px** downwards.
+???
 
 ## Log
 

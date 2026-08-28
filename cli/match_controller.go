@@ -80,7 +80,8 @@ func (c *MatchController) handleSystemCommand(cmd string) {
 		_ = c.View.RenderFeedback(true, "Turn reset successfully!")
 
 	case "/commit":
-		gameEvents := c.Match.ResolveTurn()
+		planGameEvents, resolveTurnGameEvents := c.Match.ResolveTurn()
+		gameEvents := append(planGameEvents, resolveTurnGameEvents...)
 		_ = c.View.RenderFeedback(true, "Turn committed and resolved!")
 		_ = c.View.RenderGameEvents(gameEvents)
 

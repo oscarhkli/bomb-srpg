@@ -70,10 +70,12 @@ type StartTurnResponse struct {
 	GameEvents    []engine.GameEvent `json:"gameEvents"`
 }
 
-// CPUStatusResponse wraps CPUTurnPhase and PendingGameEvents gathered from CPU's decision making.
+// CPUStatusResponse wraps CPUTurnPhase and the CPU turn's gameEvents, split by phase so the
+// client can animate the CPU's actions and their resolution apart.
 type CPUStatusResponse struct {
-	TurnPhase         engine.CPUTurnPhase `json:"turnPhase"`
-	PendingGameEvents []engine.GameEvent  `json:"pendingGameEvents"`
+	TurnPhase             engine.CPUTurnPhase `json:"turnPhase"`
+	PlanGameEvents        []engine.GameEvent  `json:"planGameEvents"`
+	ResolveTurnGameEvents []engine.GameEvent  `json:"resolveTurnGameEvents"`
 }
 
 // HandleGetCatalog returns all available unit archetypes and stages for the client to display in the lobby.
@@ -319,7 +321,7 @@ func (h *Handler) HandleConsumeCPUStatus(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	turnPhase, pendingGameEvents, err := h.Manager.ConsumeCPUStatus(roomID, token)
+	turnPhase, planGameEvents, resolveTurnGameEvents, err := h.Manager.ConsumeCPUStatus(roomID, token)
 	if err != nil {
 		code, msg := mapError(err)
 		h.Logger.Warn("consume cpu status failed", "roomID", roomID, "error", err)
@@ -330,7 +332,7 @@ func (h *Handler) HandleConsumeCPUStatus(w http.ResponseWriter, r *http.Request)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 
-	res := CPUStatusResponse{TurnPhase: turnPhase, PendingGameEvents: pendingGameEvents}
+	res := CPUStatusResponse{TurnPhase: turnPhase, PlanGameEvents: planGameEvents, ResolveTurnGameEvents: resolveTurnGameEvents}
 	if err := json.NewEncoder(w).Encode(res); err != nil {
 		h.Logger.Error("encode cpuStatusResponse failed", "error", err)
 		http.Error(w, "Failed to encode cpuStatusResponse", http.StatusInternalServerError)
@@ -373,7 +375,7 @@ func (h *Handler) HandleResolveTurn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	gameEvents, err := h.Manager.ResolveTurn(roomID, token)
+	planGameEvents, resolveTurnGameEvents, err := h.Manager.ResolveTurn(roomID, token)
 	if err != nil {
 		code, msg := mapError(err)
 		h.Logger.Warn("res turn failed", "roomID", roomID, "error", err)
@@ -381,10 +383,13 @@ func (h *Handler) HandleResolveTurn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// TODO: to be resolved before p4-spec009-match.md. This will be split into 2 slices instead of combined one
+	planGameEvents = append(planGameEvents, resolveTurnGameEvents...)
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 
-	if err := json.NewEncoder(w).Encode(gameEvents); err != nil {
+	if err := json.NewEncoder(w).Encode(planGameEvents); err != nil {
 		h.Logger.Error("encode gameEvents failed", "error", err)
 		http.Error(w, "Failed to encode gameEvents", http.StatusInternalServerError)
 		return

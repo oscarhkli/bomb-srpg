@@ -96,7 +96,7 @@ export default class TurnCommandPanel {
       centerX,
       firstCenterY,
       BUTTON_LABEL_BOMB,
-      !unit.hasUsedSkill,
+      !unit.hasUsedSkill && unit.bombUsed < unit.maxBombCount,
       buttonHeight,
       1,
       () => {
