@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mockScene } from '../test/setup';
-import { allContainers, allGraphics, clickPointerdown } from '../test/sceneHelpers';
+import { allContainers, allGraphics, clickPointerdown, lastContainers } from '../test/sceneHelpers';
 import {
   GAME_CONTROL_REGION_X,
   GAME_CONTROL_REGION_WIDTH,
@@ -134,6 +134,39 @@ describe('TurnCommandPanel', () => {
 
     const [, placeBombButtonContainer] = allContainers();
     expect(placeBombButtonContainer!.disableInteractive).toHaveBeenCalled();
+  });
+
+  it('renders placeBombButton disabled when unit has no bomb charge left, even with hasUsedSkill false', () => {
+    const { panel } = makePanel();
+
+    panel.openFor(makeUnit({ hasUsedSkill: false, maxBombCount: 2, bombUsed: 2 }));
+
+    const [, placeBombButtonContainer] = allContainers();
+    expect(placeBombButtonContainer!.disableInteractive).toHaveBeenCalled();
+  });
+
+  it('keeps placeBombButton disabled across a turn boundary while the placed bomb has not detonated, then re-enables once it has', () => {
+    const { panel } = makePanel();
+
+    // Next turn opens: hasUsedSkill resets, but bombUsed (server truth) still reflects
+    // the outstanding bomb — the button must stay disabled.
+    panel.openFor(makeUnit({ hasUsedSkill: false, maxBombCount: 1, bombUsed: 1 }));
+    const [, stillDisabled] = lastContainers(3);
+    expect(stillDisabled!.disableInteractive).toHaveBeenCalled();
+
+    // The bomb has since detonated: bombUsed resets — button re-enables.
+    panel.openFor(makeUnit({ hasUsedSkill: false, maxBombCount: 1, bombUsed: 0 }));
+    const [, reenabled] = lastContainers(3);
+    expect(reenabled!.disableInteractive).not.toHaveBeenCalled();
+  });
+
+  it('renders placeBombButton enabled when unit has an unused action and a bomb charge left', () => {
+    const { panel } = makePanel();
+
+    panel.openFor(makeUnit({ hasUsedSkill: false, maxBombCount: 2, bombUsed: 1 }));
+
+    const [, placeBombButtonContainer] = allContainers();
+    expect(placeBombButtonContainer!.disableInteractive).not.toHaveBeenCalled();
   });
 
   it('hides the panel when backButton is clicked with nothing to roll back', () => {
