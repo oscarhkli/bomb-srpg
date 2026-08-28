@@ -1,8 +1,8 @@
 ---
-title: "Phase 4.8: Add Story Mode to TitleScene and Initiate Prologue Match"
+title: "Phase 4.9: Add Story Mode to TitleScene and Initiate Prologue Match"
 ---
 
-# Phase 4.8: Add Story Mode to TitleScene and Initiate Prologue Match
+# Phase 4.9: Add Story Mode to TitleScene and Initiate Prologue Match
 
 ## Context
 
@@ -45,7 +45,7 @@ Start Game
 - When Player clicks `Start Game`, `Start Game` should disappear. The sub-menu, "Story Mode, Battle Mode, etc." should appear next at the same position.
 - For simplicity, all 3 options should share the same property as `Start Game`, i.e., font size, font family, hover with a Bomb icon.
 - `Story Mode`: `fadeTransition` `MatchScene` for Prologue Match (details in next section).
-- `Battle Mode`: `fadeTransition` `MatchSettingsScene` as of `Start Game` prior Phase 4.7.
+- `Battle Mode`: `fadeTransition` `MatchSettingsScene` as of `Start Game` prior Phase 4.8.
 - `Back`: navigates up a layer, i.e., the sub-menu disappears and `Start Game` is restored.
 
 ### Creating Prologue Match
@@ -115,6 +115,14 @@ These loads belong in `MatchScene.preload()`, added to the existing `SPRITE_MANI
 
 Interactions are locked from the CPU turn's `beginTurn()` and the Player regains control only after the next `TurnBanner` — their own turn's — has finished. `MatchScene` is hot-seat, so without this lock the Boss would be selectable while `activeTeam === 2`.
 
+#### Event position contract
+
+Every resolution event carries `position` — the tile the event happened on — in the shape `bombPlaced` already uses: `bombCountdownUpdated`, `unitDamaged`, `unitDied`, and `bombExploded`. For `bombExploded` that tile is the bomb's own, not one of `affectedPositions`.
+
+`position` answers *where*; the id answers *which*. A consumer identifies an event's subject by `bombId` / `unitId` / `softBlockId`, never by its tile. One occupant per tile makes a coordinate look like a usable key, but that only holds for a single instant: once a bomb can move, a tile vacated by one bomb and refilled by another maps to two different bombs inside one turn.
+
+Without this, a client can only place an effect by looking the subject up in its own copy of the board. That copy is refreshed from `/state` after each human command, but a CPU turn offers no such moment — the server has resolved the turn before `consumeCpuStatus()` answers, so `/state` returns the board after the explosions rather than before them.
+
 #### Polling for the CPU's turn
 
 Once `startTurn()` resolves and `gameCfg.vsCpu && gameState.activeTeam === 2`, start calling `consumeCpuStatus()`. This runs **concurrently** with the `SuddenDeathCutscene → TurnBanner` rendering. The rendering owns the clock, the polling owns the data, and neither waits on the other.
@@ -138,11 +146,13 @@ After the `TurnBanner` has finished **and** a `TurnPhaseReady` response is in ha
 
 1. Animate `planGameEvents` — the CPU's units move and place bombs, using the same animations a human's commands produce.
 2. Hold for **600ms**. This is the beat that stands in for the human pressing Resolve; without it the CPU's move and the explosion it triggers read as one indivisible event.
-3. Animate `resolveTurnGameEvents`.
+3. Animate `resolveTurnGameEvents`. Every effect is placed from its own event's `position`; no board state is consulted to decide where an explosion, fire, or death renders.
 4. If `resolveTurnGameEvents` ends with `matchEnded`, transition to `VictoryCutscene` instead of `beginTurn()`.
 5. Otherwise the CPU's turn is over and `activeTeam` is back to 1 — call `beginTurn()`, exactly as the VS Human path does after `/resolve`. The next `startTurn()` opens the Player's turn.
 
 If `planGameEvents` is empty (the CPU passed), skip step 2 — a pause with nothing before it reads as a stall.
+
+One renderer serves both paths. `resolveTurnGameEvents` and `/resolve`'s events animate through the same code reading positions from events alone, so VS CPU and VS Human never diverge in how a resolved turn is drawn — a change to one is a change to both. The regression criteria below constrain what the Player sees, not which code the two paths share.
 
 #### When polling fails
 
@@ -161,7 +171,7 @@ Do not force-end the match on a poll timeout. The CPU's moves are committed to `
 
 Treat it as a bug signal: stop polling, run the `getMatchState()` recovery above, and log it. Never render a `TurnPhaseIdle` response's events; they are always empty. The practical guard is to ensure only one poll loop is ever in flight per turn.
 
-> Note: `/resolve` concatenates the two slices from `ServerStateManager.ResolveTurn`, so `/resolve` and the VS Human path are unchanged by this spec. `MatchScene`'s human branch still drops its own planning events through `resolveTurnPlayer`'s per-type filter, which is valid only while each `GameEvtType` belongs to exactly one phase. Splitting that path is tracked in [p4-spec009-match](p4-spec009-match.md) and is trigger-gated, not scheduled.
+> Note: `/resolve` concatenates the two slices from `ServerStateManager.ResolveTurn`, so its response shape and the VS Human turn flow are unchanged by this spec — the shared renderer changes for both paths, but what the Player sees does not. `MatchScene`'s human branch still drops its own planning events through `resolveTurnPlayer`'s per-type filter, which is valid only while each `GameEvtType` belongs to exactly one phase. Splitting that path is tracked in [p4-spec010-match](p4-spec010-match.md) and is trigger-gated, not scheduled.
 
 ## Victory Cutscene for Prologue Match
 
@@ -187,13 +197,16 @@ In a Prologue Match, `VictoryCutscene`'s lower button reads `Return to Title` an
 
 6. Given a Prologue Match and `activeTeam === 2`, when the turn opens, then `SuddenDeathCutscene` and `TurnBanner` play at their normal speed, the CPU's animation begins as soon as the banner finishes, and the Player cannot plan or select units until their own next `TurnBanner` has finished.
 7. Given a `TurnPhaseReady` response and a finished `TurnBanner`, when the CPU turn renders, then `planGameEvents` animate first, then a 600ms hold, then `resolveTurnGameEvents`.
-8. Given `planGameEvents` is empty, when the CPU turn renders, then the 600ms hold is skipped.
-9. Given `resolveTurnGameEvents` ends with `matchEnded`, then `VictoryCutscene` opens; otherwise `beginTurn()` runs and the Player's turn opens.
-10. Given polling exhausts its budget, when `getMatchState()` shows `turn` advanced and `activeTeam === 1`, then the board re-renders from that state and play continues with no error surfaced; when `turn` is unchanged, then an error is surfaced. The match is never force-ended.
-11. Given a Prologue Match has ended, when `VictoryCutscene` shows, then the lower button reads `Return to Title` and `fadeTransition`s to `TitleScene`, and `Rematch` still restarts the Prologue in the same room.
+8. Given a CPU unit moved during `planGameEvents` and is hit during `resolveTurnGameEvents`, when the turn renders, then the fire and the unit's removal appear on the tile it moved **to**.
+9. Given a bomb the CPU placed this turn is detonated by another bomb's chain reaction, when the turn renders, then that explosion animates like any other — no part of `resolveTurnGameEvents` is dropped.
+10. Given `planGameEvents` is empty, when the CPU turn renders, then the 600ms hold is skipped.
+11. Given `resolveTurnGameEvents` ends with `matchEnded`, then `VictoryCutscene` opens; otherwise `beginTurn()` runs and the Player's turn opens.
+12. Given polling exhausts its budget, when `getMatchState()` shows `turn` advanced and `activeTeam === 1`, then the board re-renders from that state and play continues with no error surfaced; when `turn` is unchanged, then an error is surfaced. The match is never force-ended.
+13. Given a Prologue Match has ended, when `VictoryCutscene` shows, then the lower button reads `Return to Title` and `fadeTransition`s to `TitleScene`, and `Rematch` still restarts the Prologue in the same room.
 
 ### VS Human regression
 
-12. Given a Battle Mode match (`gameCfg.vsCpu === false`), when a turn opens, then the Player can plan immediately after `TurnBanner` — no CPU polling delay, and no plan/resolve animation split.
-13. Given a Battle Mode match, when `/resolve` returns, then its `gameEvents` render as one continuous sequence, unchanged from Phase 4.7.
-14. Given a Battle Mode match has ended, when `VictoryCutscene` shows, then the lower button reads `Return to Match Settings` and returns to `MatchSettingsScene`.
+14. Given a Battle Mode match (`gameCfg.vsCpu === false`), when a turn opens, then the Player can plan immediately after `TurnBanner` — no CPU polling delay, and no plan/resolve animation split.
+15. Given a Battle Mode match, when `/resolve` returns, then its `gameEvents` render as one continuous sequence, unchanged from Phase 4.8.
+16. Given a Battle Mode match, when a resolved turn renders, then explosions, fire, and deaths appear on the same tiles and at the same moments as before this spec.
+17. Given a Battle Mode match has ended, when `VictoryCutscene` shows, then the lower button reads `Return to Match Settings` and returns to `MatchSettingsScene`.

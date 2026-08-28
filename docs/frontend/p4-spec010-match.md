@@ -1,8 +1,8 @@
 ---
-title: "Phase 4.9: Refine 2-phase GameEvents Handling in ResolveTurn"
+title: "Phase 4.10: Refine 2-phase GameEvents Handling in ResolveTurn"
 ---
 
-# Phase 4.9: Refine 2-phase GameEvents Handling in ResolveTurn
+# Phase 4.10: Refine 2-phase GameEvents Handling in ResolveTurn
 
 ## Context
 
@@ -12,7 +12,7 @@ title: "Phase 4.9: Refine 2-phase GameEvents Handling in ResolveTurn"
 
 That classification holds only while each `GameEvtType` belongs to exactly one phase. It is true today. This spec is **not scheduled work**; see Trigger.
 
-[p4-spec008-cpu](p4-spec008-cpu.md) already consumes the two slices on the VS CPU path via `/cpu-status/consume`. This spec brings the VS Human path to the same shape.
+[p4-spec009-cpu](p4-spec009-cpu.md) already consumes the two slices on the VS CPU path via `/cpu-status/consume`. This spec brings the VS Human path to the same shape.
 
 > **Shared vocabulary:** This spec relies on shared terms and design conventions — `Page`, `region`, `Panel`, `fadeTransition`, `BackButton`, `TeamBadge`, the `render*`/`draw*` split, etc. — defined in [`VISUAL_VOCAB.md`](./VISUAL_VOCAB.md). Read it first.
 
