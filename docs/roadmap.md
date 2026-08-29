@@ -122,8 +122,8 @@ Refer to [Frontend README](frontend/README.md)
 - [x] New Archetype (Prologue)
 - [x] Unit Role
 - [x] New Match Settings and Victory Condition Evaluation for Boss
-- [ ] Frontend
-  - [ ] Prologue stage (Human with 5 units vs 1 Boss)
+- [x] Frontend
+  - [x] Prologue stage (Human with 5 units vs 1 Boss)
 - [x] goroutine setup to decouple resolve-response from CPU computation
 - [ ] Finite State Machine for 1 CPU decision making
 

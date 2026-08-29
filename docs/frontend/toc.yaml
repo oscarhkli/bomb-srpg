@@ -76,9 +76,9 @@ specs:
     category: Match
     completion-date: 2026-08-28
   - file: p4-spec009-cpu.md
-    status: Ready
+    status: Done
     category: Sprites
-    completion-date:
+    completion-date: 2026-08-29
   - file: p4-spec010-match.md
     status: Draft
     category: Match
