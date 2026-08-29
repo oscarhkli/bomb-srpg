@@ -77,7 +77,7 @@ specs:
     completion-date: 2026-08-28
   - file: p4-spec009-cpu.md
     status: Done
-    category: Sprites
+    category: Story
     completion-date: 2026-08-29
   - file: p4-spec010-match.md
     status: Draft
