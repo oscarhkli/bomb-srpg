@@ -325,6 +325,10 @@ describe('resolveUnitTextureKey', () => {
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('99'));
     warnSpy.mockRestore();
   });
+
+  it('resolves the Prologue Boss to unit_prologue_red for team 2', () => {
+    expect(resolveUnitTextureKey('Prologue', 2)).toBe('unit_prologue_red');
+  });
 });
 
 describe('renderOccupants — teardown', () => {

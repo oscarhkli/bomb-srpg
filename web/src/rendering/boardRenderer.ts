@@ -31,6 +31,7 @@ const UNIT_TEXTURE_KEYS: Record<string, Record<number, string>> = {
   King: { 1: 'unit_king_blue', 2: 'unit_king_red' },
   Bandit: { 1: 'unit_bandit_blue', 2: 'unit_bandit_red' },
   Witch: { 1: 'unit_witch_blue', 2: 'unit_witch_red' },
+  Prologue: { 2: 'unit_prologue_red' },
 };
 
 // StagePreset.Name -> texture key

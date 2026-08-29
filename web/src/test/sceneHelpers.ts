@@ -139,10 +139,31 @@ export function fireDelayedCall(delayMs: number): void {
   delayedCallAt(delayMs)();
 }
 
+// Drains every scheduled delayedCall in insertion order, including ones appended by callbacks
+// while draining (e.g. a chain reaction's nested removals, or a poll loop's next retry). The
+// index cursor keeps each callback firing exactly once.
+export function drainDelayedCalls(): void {
+  let i = 0;
+  while (i < mockScene.time.delayedCall.mock.calls.length) {
+    const cb = mockScene.time.delayedCall.mock.calls[i]![1] as () => void;
+    i++;
+    cb();
+  }
+}
+
 // Finds and invokes the scene's 'shutdown' listener registered via this.events.once(...),
 // simulating the scene being torn down mid-flight.
 export function fireShutdown(): void {
   const call = mockScene.events.once.mock.calls.find(c => c[0] === 'shutdown');
+  (call?.[1] as (() => void) | undefined)?.();
+}
+
+// Invokes only the most recently registered 'shutdown' listener, leaving earlier ones (e.g. the
+// scene's own generation-bump listener) untouched — isolates a single pending shutdown race
+// (delayShutdownSafe's own listener) from the rest of the scene's teardown behavior.
+export function fireLastShutdownListener(): void {
+  const calls = mockScene.events.once.mock.calls.filter(c => c[0] === 'shutdown');
+  const call = calls[calls.length - 1];
   (call?.[1] as (() => void) | undefined)?.();
 }
 

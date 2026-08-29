@@ -1,4 +1,7 @@
 import Phaser from 'phaser';
+import ErrorPanel from '../ui/ErrorPanel';
+import { startMatch } from './startMatch';
+import type { GameCfg } from '../types/api';
 import {
   FADE_MS,
   GAME_FONT_FAMILY,
@@ -8,12 +11,35 @@ import {
   TITLE_COPYRIGHT_BOTTOM_MARGIN,
   TITLE_COPYRIGHT_FONT_SIZE,
   TITLE_HOVER_BOMB_GAP,
+  TITLE_SUBMENU_LINE_GAP,
 } from '../constants';
 
-// Entry scene: game title, game mode selection, and copyright line.
+function prologueGameCfg(): GameCfg {
+  return {
+    vsCpu: true,
+    stagePreset: 'Plain',
+    p1Slots: [
+      { archetype: 'King', role: 'King' },
+      { archetype: 'Fighter', role: 'Normal' },
+      { archetype: 'Witch', role: 'Normal' },
+      { archetype: 'Fighter', role: 'Normal' },
+      { archetype: 'Bandit', role: 'Normal' },
+    ],
+    p2Slots: [{ archetype: 'Prologue', role: 'Boss' }],
+    maxTurns: 30,
+    allowResetTurn: true,
+  };
+}
+
 export default class TitleScene extends Phaser.Scene {
   // Guards against re-entrant option clicks once a transition has started.
   private isTransitioning = false;
+  private errorPanel!: ErrorPanel;
+  // Bumped on 'shutdown'; startMatch()'s async callback compares against this.
+  private generation = 0;
+  private rootOption!: Phaser.GameObjects.Text;
+  private submenuOptions: Phaser.GameObjects.Text[] = [];
+  private hoverBomb: Phaser.GameObjects.Text | undefined;
 
   constructor() {
     super('TitleScene');
@@ -27,6 +53,10 @@ export default class TitleScene extends Phaser.Scene {
 
   create(): void {
     this.isTransitioning = false;
+    this.errorPanel = new ErrorPanel(this);
+    this.events.once('shutdown', () => {
+      this.generation++;
+    });
     this.cameras.main.fadeIn(FADE_MS);
     this.renderTitle();
     this.renderGameModeSelectionPanel();
@@ -63,17 +93,44 @@ export default class TitleScene extends Phaser.Scene {
 
   private renderGameModeSelectionPanel(): void {
     const { width, height } = this.cameras.main;
-    const option = this.add.text(width / 2, height / 2, 'Start Game', {
+    const x = width / 2;
+    const y = height / 2;
+
+    this.rootOption = this.buildOption(x, y, 'Start Game', () => this.showSubmenu());
+    this.submenuOptions = [
+      this.buildOption(x, y - TITLE_SUBMENU_LINE_GAP, 'Story Mode', () =>
+        this.onStoryModeClicked()
+      ),
+      this.buildOption(x, y, 'Battle Mode', () => this.onBattleModeClicked()),
+      this.buildOption(x, y + TITLE_SUBMENU_LINE_GAP, 'Back', () => this.showRoot()),
+    ];
+    this.showRoot();
+  }
+
+  private buildOption(
+    x: number,
+    y: number,
+    label: string,
+    onClick: () => void
+  ): Phaser.GameObjects.Text {
+    const option = this.add.text(x, y, label, {
       fontFamily: GAME_FONT_FAMILY,
       fontSize: `${TITLE_GAME_MODE_FONT_SIZE}px`,
     });
     option.setOrigin(0.5);
     option.setInteractive({ useHandCursor: true });
+    this.attachHoverBomb(option);
+    option.on('pointerdown', () => {
+      this.destroyHoverBomb();
+      onClick();
+    });
+    return option;
+  }
 
-    let hoverBomb: Phaser.GameObjects.Text | undefined;
+  private attachHoverBomb(option: Phaser.GameObjects.Text): void {
     option.on('pointerover', () => {
-      hoverBomb?.destroy();
-      hoverBomb = this.add.text(
+      this.destroyHoverBomb();
+      this.hoverBomb = this.add.text(
         option.x - option.width / 2 - TITLE_HOVER_BOMB_GAP,
         option.y,
         '💣',
@@ -82,24 +139,72 @@ export default class TitleScene extends Phaser.Scene {
           fontSize: `${TITLE_GAME_MODE_FONT_SIZE}px`,
         }
       );
-      hoverBomb.setOrigin(1, 0.5);
+      this.hoverBomb.setOrigin(1, 0.5);
     });
-    option.on('pointerout', () => {
-      hoverBomb?.destroy();
-      hoverBomb = undefined;
+    option.on('pointerout', () => this.destroyHoverBomb());
+  }
+
+  private destroyHoverBomb(): void {
+    this.hoverBomb?.destroy();
+    this.hoverBomb = undefined;
+  }
+
+  private showRoot(): void {
+    if (this.isTransitioning) {
+      return;
+    }
+    this.destroyHoverBomb();
+    this.rootOption.setVisible(true);
+    this.rootOption.setInteractive({ useHandCursor: true });
+    this.submenuOptions.forEach(o => {
+      o.setVisible(false);
+      o.disableInteractive();
     });
-    option.on('pointerdown', () => {
-      if (this.isTransitioning) {
-        return;
-      }
-      this.isTransitioning = true;
-      option.disableInteractive();
-      this.cameras.main.fadeOut(FADE_MS, 0, 0, 0);
-      this.cameras.main.once('camerafadeoutcomplete', () => {
-        // {} (not omitted): Phaser retains the previous scene data when start() gets no
-        // data argument, which would resurrect the last match's settings.
-        this.scene.start('MatchSettingsScene', {});
-      });
+  }
+
+  private showSubmenu(): void {
+    if (this.isTransitioning) {
+      return;
+    }
+    this.destroyHoverBomb();
+    this.rootOption.setVisible(false);
+    this.rootOption.disableInteractive();
+    this.submenuOptions.forEach(o => {
+      o.setVisible(true);
+      o.setInteractive({ useHandCursor: true });
+    });
+  }
+
+  private disableSubmenuInteractive(): void {
+    this.submenuOptions.forEach(o => o.disableInteractive());
+  }
+
+  private onStoryModeClicked(): void {
+    this.disableSubmenuInteractive();
+    startMatch({
+      scene: this,
+      gameCfg: prologueGameCfg(),
+      isTransitioning: () => this.isTransitioning,
+      setTransitioning: value => {
+        this.isTransitioning = value;
+        if (!value) {
+          this.submenuOptions.forEach(o => o.setInteractive({ useHandCursor: true }));
+        }
+      },
+      generation: () => this.generation,
+      errorPanel: this.errorPanel,
+    });
+  }
+
+  private onBattleModeClicked(): void {
+    if (this.isTransitioning) {
+      return;
+    }
+    this.isTransitioning = true;
+    this.disableSubmenuInteractive();
+    this.cameras.main.fadeOut(FADE_MS, 0, 0, 0);
+    this.cameras.main.once('camerafadeoutcomplete', () => {
+      this.scene.start('MatchSettingsScene', {});
     });
   }
 

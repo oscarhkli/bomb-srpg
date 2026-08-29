@@ -11,7 +11,10 @@ import {
   flush,
   tweenConfigAt,
   fireShutdown,
+  fireLastShutdownListener,
   fireCameraFadeOutComplete,
+  delayedCallAt,
+  drainDelayedCalls,
 } from '../test/sceneHelpers';
 import { makeCfg, makeState, plainTile, tileOf, makeUnit, makeBomb } from '../test/fixtures';
 import {
@@ -27,18 +30,28 @@ import {
   startTurn,
   rematch,
   deleteMatch,
+  consumeCpuStatus,
 } from '../engine/api';
 import { playResolveTurnEvents } from '../rendering/resolveTurnPlayer';
 import TurnBanner from '../ui/TurnBanner';
 import SuddenDeathCutscene from '../ui/SuddenDeathCutscene';
 import VictoryCutscene from '../ui/VictoryCutscene';
 import MatchScene, { type MatchSceneData } from './MatchScene';
-import type { Coordinate, GameCfg, GameEvent, GameState, Tile } from '../types/api';
+import type {
+  Coordinate,
+  CpuStatusResponse,
+  GameCfg,
+  GameEvent,
+  GameState,
+  Tile,
+} from '../types/api';
 import {
   DEPTH_SUDDEN_DEATH_BOMB,
   DEPTH_OCCUPANT,
   SUDDEN_DEATH_BOMB_DROP_DURATION_MS,
   CONFIRM_TEXT_RESET,
+  CPU_POLL_BACKOFF_MS,
+  CPU_PLAN_RESOLVE_HOLD_MS,
 } from '../constants';
 
 vi.mock('../engine/api');
@@ -1164,6 +1177,322 @@ describe('MatchScene', () => {
     });
   });
 
+  describe('VS CPU turn', () => {
+    function readyStatus(overrides: Partial<CpuStatusResponse> = {}): CpuStatusResponse {
+      return {
+        turnPhase: 'TurnPhaseReady',
+        planGameEvents: [],
+        resolveTurnGameEvents: [],
+        ...overrides,
+      };
+    }
+
+    beforeEach(() => {
+      vi.mocked(getMatchConfig).mockResolvedValue(makeCfg({ vsCpu: true }));
+    });
+
+    it('does not animate the CPU turn until its own TurnBanner has finished, even when polling resolves instantly (AC 6, 7)', async () => {
+      queueMatchStates(makeState({ grid: [[plainTile()]], activeTeam: 2, turn: 1 }));
+      // Ends the match so the CPU turn terminates cleanly once it renders, instead of resyncing
+      // and recursing into another beginTurn() that would outlive this test.
+      vi.mocked(consumeCpuStatus).mockResolvedValue(
+        readyStatus({ resolveTurnGameEvents: [{ type: 'matchEnded', winnerTeamId: 2 }] })
+      );
+      let resolveCpuBanner: () => void = () => undefined;
+      turnBannerPlay.mockReturnValue(
+        new Promise<void>(resolve => {
+          resolveCpuBanner = resolve;
+        })
+      );
+
+      await bootScene();
+      await flush();
+
+      // Polling itself may have already resolved (concurrent with the banner), but the CPU's
+      // plan/resolve render must not have started yet.
+      expect(playResolveTurnEvents).not.toHaveBeenCalled();
+
+      resolveCpuBanner();
+      await flush();
+
+      expect(playResolveTurnEvents).toHaveBeenCalled();
+    });
+
+    it('polls consumeCpuStatus once startTurn resolves, animates plan -> hold -> resolve, then opens the next turn (AC 6, 7, 11)', async () => {
+      queueMatchStates(
+        makeState({ grid: [[plainTile()]], activeTeam: 2, turn: 1 }),
+        makeState({ grid: [[plainTile()]], activeTeam: 1, turn: 2 })
+      );
+      const moveEvent: GameEvent = {
+        type: 'unitMoved',
+        unitId: 0x21,
+        from: { x: 0, y: 0 },
+        to: { x: 0, y: 0 },
+      };
+      const damagedEvent: GameEvent = {
+        type: 'unitDamaged',
+        unitId: 0x21,
+        newHp: 1,
+        position: { x: 0, y: 0 },
+      };
+      vi.mocked(consumeCpuStatus).mockResolvedValue(
+        readyStatus({ planGameEvents: [moveEvent], resolveTurnGameEvents: [damagedEvent] })
+      );
+
+      await bootScene();
+      // The CPU-turn chain (gameCfg -> poll -> bannerDone -> runCpuTurn) is a couple of extra
+      // promise hops beyond bootScene()'s own settle.
+      await flush();
+
+      expect(consumeCpuStatus).toHaveBeenCalled();
+      // Hold happens between plan and resolve — fire it to let the CPU turn finish resolving.
+      delayedCallAt(CPU_PLAN_RESOLVE_HOLD_MS)();
+      await flush();
+
+      expect(playResolveTurnEvents).toHaveBeenCalledWith(
+        [damagedEvent],
+        expect.objectContaining({})
+      );
+      // Player's turn opened next: 2 startTurn calls total (CPU's, then the Player's).
+      expect(startTurn).toHaveBeenCalledTimes(2);
+      expect(turnBannerPlay).toHaveBeenCalledWith(1);
+    });
+
+    it('skips the 600ms hold when planGameEvents is empty (AC 10)', async () => {
+      queueMatchStates(
+        makeState({ grid: [[plainTile()]], activeTeam: 2, turn: 1 }),
+        makeState({ grid: [[plainTile()]], activeTeam: 1, turn: 2 })
+      );
+      vi.mocked(consumeCpuStatus).mockResolvedValue(readyStatus());
+
+      await bootScene();
+
+      expect(mockScene.time.delayedCall).not.toHaveBeenCalledWith(
+        CPU_PLAN_RESOLVE_HOLD_MS,
+        expect.any(Function)
+      );
+      expect(startTurn).toHaveBeenCalledTimes(2);
+    });
+
+    it('retries TurnPhasePlanning with backoff 250/500/1000/2000ms before succeeding', async () => {
+      queueMatchStates(
+        makeState({ grid: [[plainTile()]], activeTeam: 2, turn: 1 }),
+        makeState({ grid: [[plainTile()]], activeTeam: 1, turn: 2 })
+      );
+      vi.mocked(consumeCpuStatus)
+        .mockResolvedValueOnce({
+          turnPhase: 'TurnPhasePlanning',
+          planGameEvents: [],
+          resolveTurnGameEvents: [],
+        })
+        .mockResolvedValueOnce({
+          turnPhase: 'TurnPhasePlanning',
+          planGameEvents: [],
+          resolveTurnGameEvents: [],
+        })
+        .mockResolvedValue(readyStatus());
+
+      await bootScene();
+      await flush();
+      delayedCallAt(CPU_POLL_BACKOFF_MS[0])();
+      await flush();
+      delayedCallAt(CPU_POLL_BACKOFF_MS[1])();
+      await flush();
+
+      expect(consumeCpuStatus).toHaveBeenCalledTimes(3);
+      expect(startTurn).toHaveBeenCalledTimes(2);
+    });
+
+    it('locks unit-click interactions through the whole CPU turn and only releases after the Player TurnBanner finishes (AC 6)', async () => {
+      const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
+      queueMatchStates(
+        makeState({ grid: [[plainTile()]], activeTeam: 2, turn: 1, units: [unit] }),
+        makeState({ grid: [[plainTile()]], activeTeam: 1, turn: 2, units: [unit] })
+      );
+      vi.mocked(consumeCpuStatus).mockResolvedValue(readyStatus());
+      let resolveHumanBanner: () => void = () => undefined;
+      turnBannerPlay.mockImplementation(activeTeam => {
+        if (activeTeam === 1) {
+          return new Promise<void>(resolve => {
+            resolveHumanBanner = resolve;
+          });
+        }
+        return Promise.resolve();
+      });
+
+      await bootScene();
+      await flush();
+
+      const containersBefore = mockScene.add.container.mock.calls.length;
+      pointerDownOf(occupantSprite(0))();
+      expect(mockScene.add.container.mock.calls.length).toBe(containersBefore);
+
+      resolveHumanBanner();
+      await flush();
+
+      pointerDownOf(occupantSprite(0))();
+      expect(mockScene.add.container.mock.calls.length).toBeGreaterThan(containersBefore);
+    });
+
+    it('opens VictoryCutscene instead of beginTurn() when resolveTurnGameEvents ends with matchEnded (AC 11)', async () => {
+      queueMatchStates(makeState({ grid: [[plainTile()]], activeTeam: 2, turn: 1 }));
+      vi.mocked(consumeCpuStatus).mockResolvedValue(
+        readyStatus({ resolveTurnGameEvents: [{ type: 'matchEnded', winnerTeamId: 2 }] })
+      );
+
+      await bootScene();
+
+      expect(victoryCutscenePlay).toHaveBeenCalledWith(2, expect.any(String), expect.any(Object));
+      // Only the CPU's own startTurn — the match ended before a next turn could open.
+      expect(startTurn).toHaveBeenCalledTimes(1);
+    });
+
+    it('re-renders silently from getMatchState() when polling times out but the turn advanced (AC 12)', async () => {
+      queueMatchStates(
+        makeState({ grid: [[plainTile()]], activeTeam: 2, turn: 1 }),
+        makeState({ grid: [[plainTile()]], activeTeam: 1, turn: 2 })
+      );
+      vi.mocked(consumeCpuStatus).mockResolvedValue({
+        turnPhase: 'TurnPhasePlanning',
+        planGameEvents: [],
+        resolveTurnGameEvents: [],
+      });
+      // Budget is wall-clock (Date.now()-based): jump straight past it on the first check so
+      // the poll times out without needing to drain any backoff waits.
+      const dateNowSpy = vi.spyOn(Date, 'now').mockReturnValueOnce(0).mockReturnValue(31000);
+
+      await bootScene();
+      await flush();
+      fireCameraFadeOutComplete();
+      await flush();
+      dateNowSpy.mockRestore();
+
+      expect(mockScene.add.text).not.toHaveBeenCalledWith(
+        expect.any(Number),
+        expect.any(Number),
+        expect.stringContaining('did not complete'),
+        expect.anything()
+      );
+      expect(startTurn).toHaveBeenCalledTimes(2);
+    });
+
+    it('surfaces an error and never force-ends the match when polling times out and the turn is unchanged (AC 12)', async () => {
+      queueMatchStates(makeState({ grid: [[plainTile()]], activeTeam: 2, turn: 1 }));
+      vi.mocked(consumeCpuStatus).mockResolvedValue({
+        turnPhase: 'TurnPhasePlanning',
+        planGameEvents: [],
+        resolveTurnGameEvents: [],
+      });
+      const dateNowSpy = vi.spyOn(Date, 'now').mockReturnValueOnce(0).mockReturnValue(31000);
+
+      await bootScene();
+      await flush();
+      dateNowSpy.mockRestore();
+
+      expect(victoryCutscenePlay).not.toHaveBeenCalled();
+      expect(startTurn).toHaveBeenCalledTimes(1);
+    });
+
+    it('retries via the backoff schedule while still within budget (wall-clock never exceeds 30s)', async () => {
+      queueMatchStates(
+        makeState({ grid: [[plainTile()]], activeTeam: 2, turn: 1 }),
+        makeState({ grid: [[plainTile()]], activeTeam: 1, turn: 2 })
+      );
+      vi.mocked(consumeCpuStatus)
+        .mockResolvedValueOnce({
+          turnPhase: 'TurnPhasePlanning',
+          planGameEvents: [],
+          resolveTurnGameEvents: [],
+        })
+        .mockResolvedValue(readyStatus());
+
+      await bootScene();
+      await flush();
+      drainDelayedCalls();
+      await flush();
+
+      expect(consumeCpuStatus).toHaveBeenCalledTimes(2);
+      expect(startTurn).toHaveBeenCalledTimes(2);
+    });
+
+    it('treats TurnPhaseIdle as a bug signal: stops polling, renders none of its events, and runs the same recovery as AC 12 (AC 13)', async () => {
+      queueMatchStates(
+        makeState({ grid: [[plainTile()]], activeTeam: 2, turn: 1 }),
+        makeState({ grid: [[plainTile()]], activeTeam: 1, turn: 2 })
+      );
+      vi.mocked(consumeCpuStatus).mockResolvedValue({
+        turnPhase: 'TurnPhaseIdle',
+        planGameEvents: [
+          { type: 'unitMoved', unitId: 1, from: { x: 0, y: 0 }, to: { x: 0, y: 0 } },
+        ],
+        resolveTurnGameEvents: [],
+      });
+
+      await bootScene();
+      fireCameraFadeOutComplete();
+      await flush();
+
+      expect(consumeCpuStatus).toHaveBeenCalledTimes(1);
+      expect(playResolveTurnEvents).not.toHaveBeenCalled();
+      expect(startTurn).toHaveBeenCalledTimes(2);
+    });
+
+    it('resolves a backoff wait via its own shutdown listener, not just the scheduled timer', async () => {
+      queueMatchStates(
+        makeState({ grid: [[plainTile()]], activeTeam: 2, turn: 1 }),
+        makeState({ grid: [[plainTile()]], activeTeam: 1, turn: 2 })
+      );
+      vi.mocked(consumeCpuStatus)
+        .mockResolvedValueOnce({
+          turnPhase: 'TurnPhasePlanning',
+          planGameEvents: [],
+          resolveTurnGameEvents: [],
+        })
+        .mockResolvedValue(readyStatus());
+
+      await bootScene();
+      await flush();
+      expect(consumeCpuStatus).toHaveBeenCalledTimes(1);
+
+      // Fires only delayShutdownSafe's own listener, leaving the generation-bump listener from
+      // create() untouched — without that listener, the pending backoff wait would never
+      // resolve, since its delayedCall is never fired here.
+      fireLastShutdownListener();
+      await flush();
+
+      expect(consumeCpuStatus).toHaveBeenCalledTimes(2);
+      expect(startTurn).toHaveBeenCalledTimes(2);
+    });
+
+    it('aborts the CPU turn without rendering resolveTurnGameEvents when a planGameEvents entry is malformed', async () => {
+      queueMatchStates(makeState({ grid: [[plainTile()]], activeTeam: 2, turn: 1 }));
+      const malformedMove: GameEvent = {
+        type: 'unitMoved',
+        unitId: 1,
+        from: { x: 0, y: 0 },
+        // to is missing — applyUnitMoved() rejects it and returns false.
+      };
+      vi.mocked(consumeCpuStatus).mockResolvedValue(
+        readyStatus({
+          planGameEvents: [malformedMove],
+          resolveTurnGameEvents: [{ type: 'matchEnded', winnerTeamId: 2 }],
+        })
+      );
+
+      await bootScene();
+      await flush();
+
+      expect(mockScene.add.text).toHaveBeenCalledWith(
+        expect.any(Number),
+        expect.any(Number),
+        expect.stringContaining('Invalid unitMoved event'),
+        expect.anything()
+      );
+      expect(playResolveTurnEvents).not.toHaveBeenCalled();
+      expect(victoryCutscenePlay).not.toHaveBeenCalled();
+    });
+  });
+
   describe('victory cutscene and rematch', () => {
     // winnerTeamId omitted entirely simulates the server sending a matchEnded event with no
     // winnerTeamId field at all (missing, not just out-of-range).
@@ -1183,7 +1512,11 @@ describe('MatchScene', () => {
       async winnerTeamId => {
         await resolveWithMatchEnded(winnerTeamId);
 
-        expect(victoryCutscenePlay).toHaveBeenCalledWith(winnerTeamId, expect.any(Object));
+        expect(victoryCutscenePlay).toHaveBeenCalledWith(
+          winnerTeamId,
+          expect.any(String),
+          expect.any(Object)
+        );
         // Only one startTurn() call (the very first turn) — no second beginTurn() ran.
         expect(startTurn).toHaveBeenCalledTimes(1);
       }
@@ -1226,7 +1559,7 @@ describe('MatchScene', () => {
     it('rematch: fades out, then restarts the scene with the same roomId/playerTokens and isRematch=true', async () => {
       await resolveWithMatchEnded(1);
 
-      const onRematch = victoryCutscenePlay.mock.calls[0]![1].onRematch;
+      const onRematch = victoryCutscenePlay.mock.calls[0]![2].onRematch;
       onRematch();
 
       expect(mockScene.cameras.main.fadeOut).toHaveBeenCalledWith(200, 0, 0, 0);
@@ -1261,6 +1594,30 @@ describe('MatchScene', () => {
       expect(mockScene.cameras.main.fadeIn).toHaveBeenCalledWith(200);
     });
 
+    it('a Prologue Match (vsCpu) shows Return to Title and fadeTransitions to TitleScene, deleting the match concurrently (p4-spec009 AC 14)', async () => {
+      vi.mocked(getMatchConfig).mockResolvedValue(makeCfg({ vsCpu: true }));
+      let resolveDelete: () => void = () => undefined;
+      vi.mocked(deleteMatch).mockReturnValue(
+        new Promise<void>(resolve => {
+          resolveDelete = resolve;
+        })
+      );
+      await resolveWithMatchEnded(1);
+
+      expect(victoryCutscenePlay).toHaveBeenCalledWith(1, 'Return to Title', expect.any(Object));
+      const onReturnClicked = victoryCutscenePlay.mock.calls[0]![2].onReturnClicked;
+      onReturnClicked();
+
+      expect(mockScene.cameras.main.fadeOut).toHaveBeenCalledWith(200, 0, 0, 0);
+      expect(deleteMatch).toHaveBeenCalledOnce();
+
+      fireCameraFadeOutComplete();
+      resolveDelete();
+      await flush();
+
+      expect(mockScene.scene.start).toHaveBeenCalledWith('TitleScene');
+    });
+
     it('return to settings: fades out and calls deleteMatch() concurrently, then starts MatchSettingsScene once both settle', async () => {
       let resolveDelete: () => void = () => undefined;
       vi.mocked(deleteMatch).mockReturnValue(
@@ -1270,8 +1627,8 @@ describe('MatchScene', () => {
       );
       await resolveWithMatchEnded(1);
 
-      const onReturnToSettings = victoryCutscenePlay.mock.calls[0]![1].onReturnToSettings;
-      onReturnToSettings();
+      const onReturnClicked = victoryCutscenePlay.mock.calls[0]![2].onReturnClicked;
+      onReturnClicked();
 
       expect(mockScene.cameras.main.fadeOut).toHaveBeenCalledWith(200, 0, 0, 0);
       expect(deleteMatch).toHaveBeenCalledOnce();
@@ -1294,8 +1651,8 @@ describe('MatchScene', () => {
       vi.mocked(deleteMatch).mockRejectedValue(new Error('delete failed'));
       await resolveWithMatchEnded(1);
 
-      const onReturnToSettings = victoryCutscenePlay.mock.calls[0]![1].onReturnToSettings;
-      onReturnToSettings();
+      const onReturnClicked = victoryCutscenePlay.mock.calls[0]![2].onReturnClicked;
+      onReturnClicked();
       fireCameraFadeOutComplete();
       await flush();
 
@@ -1309,7 +1666,7 @@ describe('MatchScene', () => {
     it('ignores a second Rematch click while the first fade-out/restart is already in progress', async () => {
       await resolveWithMatchEnded(1);
 
-      const onRematch = victoryCutscenePlay.mock.calls[0]![1].onRematch;
+      const onRematch = victoryCutscenePlay.mock.calls[0]![2].onRematch;
       onRematch();
       onRematch();
 
@@ -1321,9 +1678,9 @@ describe('MatchScene', () => {
     it('ignores a second Return-to-Settings click while the first fade-out/delete is already in progress', async () => {
       await resolveWithMatchEnded(1);
 
-      const onReturnToSettings = victoryCutscenePlay.mock.calls[0]![1].onReturnToSettings;
-      onReturnToSettings();
-      onReturnToSettings();
+      const onReturnClicked = victoryCutscenePlay.mock.calls[0]![2].onReturnClicked;
+      onReturnClicked();
+      onReturnClicked();
 
       expect(mockScene.cameras.main.fadeOut).toHaveBeenCalledTimes(1);
       expect(deleteMatch).toHaveBeenCalledTimes(1);
@@ -1610,7 +1967,7 @@ describe('MatchScene', () => {
       await flush();
 
       expect(surrender).toHaveBeenCalledWith({ teamId: 2 });
-      expect(victoryCutscenePlay).toHaveBeenCalledWith(1, expect.any(Object));
+      expect(victoryCutscenePlay).toHaveBeenCalledWith(1, expect.any(String), expect.any(Object));
     });
 
     it('shows an error and does not render VictoryCutscene when the surrender response has no matchEnded event', async () => {
