@@ -15,6 +15,7 @@ export const UNIT_SPRITE_MANIFEST: SpriteManifestEntry[] = [
   { key: 'unit_bandit_red', png: 'units/Bandit-Red.png', json: 'units/Bandit-Red.json' },
   { key: 'unit_witch_blue', png: 'units/Witch-Blue.png', json: 'units/Witch-Blue.json' },
   { key: 'unit_witch_red', png: 'units/Witch-Red.png', json: 'units/Witch-Red.json' },
+  { key: 'unit_prologue_red', png: 'units/Prologue-Red.png', json: 'units/Prologue-Red.json' },
 ];
 
 export const BUTTON_SPRITE_MANIFEST: SpriteManifestEntry[] = [

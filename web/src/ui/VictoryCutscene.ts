@@ -28,7 +28,7 @@ import { drawPillButton, verticalButtonY } from './pillButton';
 
 export interface VictoryCutsceneCallbacks {
   onRematch: () => void;
-  onReturnToSettings: () => void;
+  onReturnClicked: () => void;
 }
 
 const BUTTON_STYLE = {
@@ -43,7 +43,7 @@ const BUTTON_STYLE = {
 export default class VictoryCutscene {
   constructor(private readonly scene: Phaser.Scene) {}
 
-  play(winnerTeamId: number, callbacks: VictoryCutsceneCallbacks): void {
+  play(winnerTeamId: number, returnLabel: string, callbacks: VictoryCutsceneCallbacks): void {
     const { width, height } = this.scene.cameras.main;
     const isDraw = winnerTeamId === -1;
     const bannerY = height / 2 - TURN_BANNER_HEIGHT / 2;
@@ -83,7 +83,7 @@ export default class VictoryCutscene {
 
     fadeInTargets(this.scene, [banner, ...texts], FADE_MS, () => {
       this.scene.time.delayedCall(VICTORY_BUTTON_DELAY_MS, () => {
-        this.renderButtons(width, bannerY, callbacks);
+        this.renderButtons(width, bannerY, returnLabel, callbacks);
       });
     });
   }
@@ -105,7 +105,12 @@ export default class VictoryCutscene {
     return text;
   }
 
-  private renderButtons(width: number, bannerY: number, callbacks: VictoryCutsceneCallbacks): void {
+  private renderButtons(
+    width: number,
+    bannerY: number,
+    returnLabel: string,
+    callbacks: VictoryCutsceneCallbacks
+  ): void {
     const x = width / 2 - LIFECYCLE_BUTTON_WIDTH / 2;
     const rematchY = bannerY + TURN_BANNER_HEIGHT + VICTORY_BUTTON_GAP;
     const returnY = verticalButtonY(rematchY, 1, LIFECYCLE_BUTTON_HEIGHT_SMALL, VICTORY_BUTTON_GAP);
@@ -129,10 +134,10 @@ export default class VictoryCutscene {
       returnY,
       LIFECYCLE_BUTTON_WIDTH,
       LIFECYCLE_BUTTON_HEIGHT_SMALL,
-      'Return to Match Settings',
+      returnLabel,
       BUTTON_STYLE,
       DEPTH_VICTORY_CUTSCENE,
-      callbacks.onReturnToSettings,
+      callbacks.onReturnClicked,
       0
     );
   }

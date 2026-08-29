@@ -16,7 +16,7 @@ export interface BombGraphics {
   countdownText: Phaser.GameObjects.Text;
 }
 
-export interface ResolveTurnPlayerDeps {
+export interface ResolveTurnPlayerOptions {
   scene: Phaser.Scene;
   gameStateSnapshot: GameState;
   unitSpritesById: Map<number, Phaser.GameObjects.Sprite>;
@@ -40,6 +40,10 @@ function renderBombCountdownText(text: Phaser.GameObjects.Text, countdown: numbe
   }
 }
 
+function inBounds(snapshot: GameState, p: Coordinate): boolean {
+  return snapshot.grid[p.y]?.[p.x] !== undefined;
+}
+
 function validate(events: GameEvent[], snapshot: GameState): string | null {
   for (const event of events) {
     switch (event.type) {
@@ -57,26 +61,24 @@ function validate(events: GameEvent[], snapshot: GameState): string | null {
         break;
       }
       case 'bombExploded': {
-        const { bombId, affectedPositions } = event;
-        if (bombId === undefined || affectedPositions === undefined) {
-          return 'bombExploded event is missing bombId/affectedPositions';
+        const { bombId, position, affectedPositions } = event;
+        if (bombId === undefined || !position || affectedPositions === undefined) {
+          return 'bombExploded event is missing bombId/position/affectedPositions';
         }
-        const bomb = snapshot.bombs.find(b => b.id === bombId);
-        if (!bomb) {
-          return `bombExploded event references unknown bombId ${bombId}`;
+        if (!inBounds(snapshot, position)) {
+          return `bombExploded event has an out-of-bounds position (${position.x}, ${position.y})`;
         }
         for (const p of affectedPositions) {
-          const row = snapshot.grid[p.y];
-          if (!row?.[p.x]) {
+          if (!inBounds(snapshot, p)) {
             return `bombExploded event has an out-of-bounds affected position (${p.x}, ${p.y})`;
           }
         }
         break;
       }
       case 'unitDamaged': {
-        const { unitId, newHp } = event;
-        if (unitId === undefined || newHp === undefined) {
-          return 'unitDamaged event is missing unitId/newHp';
+        const { unitId, newHp, position } = event;
+        if (unitId === undefined || newHp === undefined || !position) {
+          return 'unitDamaged event is missing unitId/newHp/position';
         }
         if (!Number.isInteger(newHp) || newHp < 0) {
           return `unitDamaged event has an invalid newHp ${newHp}`;
@@ -84,25 +86,34 @@ function validate(events: GameEvent[], snapshot: GameState): string | null {
         if (!snapshot.units.some(u => u.id === unitId)) {
           return `unitDamaged event references unknown unitId ${unitId}`;
         }
+        if (!inBounds(snapshot, position)) {
+          return `unitDamaged event has an out-of-bounds position (${position.x}, ${position.y})`;
+        }
         break;
       }
       case 'unitDied': {
-        const { unitId } = event;
-        if (unitId === undefined) {
-          return 'unitDied event is missing unitId';
+        const { unitId, position } = event;
+        if (unitId === undefined || !position) {
+          return 'unitDied event is missing unitId/position';
         }
         if (!snapshot.units.some(u => u.id === unitId)) {
           return `unitDied event references unknown unitId ${unitId}`;
         }
+        if (!inBounds(snapshot, position)) {
+          return `unitDied event has an out-of-bounds position (${position.x}, ${position.y})`;
+        }
         break;
       }
       case 'softBlockDestroyed': {
-        const { softBlockId } = event;
-        if (softBlockId === undefined) {
-          return 'softBlockDestroyed event is missing softBlockId';
+        const { softBlockId, position } = event;
+        if (softBlockId === undefined || !position) {
+          return 'softBlockDestroyed event is missing softBlockId/position';
         }
         if (!snapshot.softBlocks.some(s => s.id === softBlockId)) {
           return `softBlockDestroyed event references unknown softBlockId ${softBlockId}`;
+        }
+        if (!inBounds(snapshot, position)) {
+          return `softBlockDestroyed event has an out-of-bounds position (${position.x}, ${position.y})`;
         }
         break;
       }
@@ -169,7 +180,7 @@ function directionMaxDistances(
 
 export function playResolveTurnEvents(
   events: GameEvent[],
-  deps: ResolveTurnPlayerDeps
+  deps: ResolveTurnPlayerOptions
 ): PlayResult {
   const validationError = validate(events, deps.gameStateSnapshot);
   if (validationError !== null) {
@@ -196,10 +207,14 @@ export function playResolveTurnEvents(
     if (event.type !== 'bombExploded') {
       continue;
     }
-    const { bombId, affectedPositions } = event;
-    const position = deps.gameStateSnapshot.bombs.find(b => b.id === bombId)!.position;
-    const offset = causerOffsetFor(position, explodedList);
-    explodedList.push({ bombId: bombId!, position, affectedPositions: affectedPositions!, offset });
+    const { bombId, position, affectedPositions } = event;
+    const offset = causerOffsetFor(position!, explodedList);
+    explodedList.push({
+      bombId: bombId!,
+      position: position!,
+      affectedPositions: affectedPositions!,
+      offset,
+    });
   }
 
   for (const info of explodedList) {
@@ -208,6 +223,11 @@ export function playResolveTurnEvents(
 
     deps.scene.time.delayedCall(offset, () => {
       const bg = deps.bombGraphicsById.get(bombId);
+      if (!bg) {
+        // Tolerated: a bombId with no live graphics (e.g. a bug upstream) still renders the
+        // explosion at the event's own position — there's nothing to clean up for it locally.
+        console.warn(`bombExploded event references a bomb with no live graphics: ${bombId}`);
+      }
       bg?.container.destroy();
       deps.bombGraphicsById.delete(bombId);
 
@@ -227,11 +247,10 @@ export function playResolveTurnEvents(
 
   for (const event of events) {
     if (event.type === 'unitDamaged') {
-      const { unitId, newHp } = event;
-      const position = deps.gameStateSnapshot.units.find(u => u.id === unitId)!.position;
-      const offset = causerOffsetFor(position, explodedList);
+      const { unitId, newHp, position } = event;
+      const offset = causerOffsetFor(position!, explodedList);
       deps.scene.time.delayedCall(offset, () => {
-        const fire = drawFireShape(deps.scene, position);
+        const fire = drawFireShape(deps.scene, position!);
         fireByUnitId.set(unitId!, fire);
         if (newHp! > 0) {
           deps.scene.time.delayedCall(FIRE_DURATION_MS, () => {
@@ -244,9 +263,8 @@ export function playResolveTurnEvents(
         endTimes.push(offset + FIRE_DURATION_MS);
       }
     } else if (event.type === 'unitDied') {
-      const { unitId } = event;
-      const position = deps.gameStateSnapshot.units.find(u => u.id === unitId)!.position;
-      const offset = causerOffsetFor(position, explodedList);
+      const { unitId, position } = event;
+      const offset = causerOffsetFor(position!, explodedList);
       deps.scene.time.delayedCall(offset + FIRE_DURATION_MS, () => {
         deps.unitSpritesById.get(unitId!)?.destroy();
         deps.unitSpritesById.delete(unitId!);
@@ -255,11 +273,10 @@ export function playResolveTurnEvents(
       });
       endTimes.push(offset + FIRE_DURATION_MS);
     } else if (event.type === 'softBlockDestroyed') {
-      const { softBlockId } = event;
-      const position = deps.gameStateSnapshot.softBlocks.find(s => s.id === softBlockId)!.position;
-      const offset = causerOffsetFor(position, explodedList);
+      const { softBlockId, position } = event;
+      const offset = causerOffsetFor(position!, explodedList);
       deps.scene.time.delayedCall(offset, () => {
-        const fire = drawFireShape(deps.scene, position);
+        const fire = drawFireShape(deps.scene, position!);
         deps.scene.time.delayedCall(FIRE_DURATION_MS, () => {
           fire.destroy();
           deps.softBlockSpritesById.get(softBlockId!)?.destroy();

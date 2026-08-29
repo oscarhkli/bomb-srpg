@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mockScene, createMockGraphics, createMockText, createMockContainer } from '../test/setup';
-import { delayedCallAt, makeBombGraphics } from '../test/sceneHelpers';
+import { delayedCallAt, makeBombGraphics, drainDelayedCalls } from '../test/sceneHelpers';
 import { makeState, makeUnit, makeSoftBlock, plainGrid } from '../test/fixtures';
 import { occupantsMatch } from '../test/occupantsMatch';
 import type { GameEvent, GameState } from '../types/api';
@@ -114,7 +114,10 @@ describe('playResolveTurnEvents — validation', () => {
     expect(mockScene.time.delayedCall).not.toHaveBeenCalled();
   });
 
-  it('flags a bombId that does not exist in the snapshot and schedules nothing', () => {
+  // bombCountdownUpdated keeps its snapshot-existence check (unlike bombExploded's, dropped
+  // below) since its countdown display always targets an already-live bomb, never one placed
+  // earlier in the same CPU turn.
+  it('flags a bombCountdownUpdated referencing a bombId absent from the snapshot', () => {
     const onError = vi.fn();
 
     const result = playResolveTurnEvents(
@@ -128,6 +131,105 @@ describe('playResolveTurnEvents — validation', () => {
         onError,
       }
     );
+
+    expect(result.ok).toBe(false);
+    expect(onError).toHaveBeenCalledOnce();
+    expect(mockScene.time.delayedCall).not.toHaveBeenCalled();
+  });
+
+  it('accepts a bombExploded whose bombId is absent from the snapshot — a CPU-turn bomb placed this same turn (AC 9)', () => {
+    const onError = vi.fn();
+
+    const result = playResolveTurnEvents(
+      [{ type: 'bombExploded', bombId: 999, position: { x: 1, y: 1 }, affectedPositions: [] }],
+      {
+        scene: mockScene as never,
+        gameStateSnapshot: baseState({ grid: grid5x5() }),
+        unitSpritesById: new Map(),
+        bombGraphicsById: new Map(),
+        softBlockSpritesById: new Map(),
+        onError,
+      }
+    );
+
+    expect(result.ok).toBe(true);
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  it('flags a bombExploded event missing position and schedules nothing', () => {
+    const onError = vi.fn();
+
+    const result = playResolveTurnEvents(
+      [{ type: 'bombExploded', bombId: 1, affectedPositions: [] }],
+      {
+        scene: mockScene as never,
+        gameStateSnapshot: baseState({ grid: grid5x5() }),
+        unitSpritesById: new Map(),
+        bombGraphicsById: new Map(),
+        softBlockSpritesById: new Map(),
+        onError,
+      }
+    );
+
+    expect(result.ok).toBe(false);
+    expect(onError).toHaveBeenCalledOnce();
+    expect(mockScene.time.delayedCall).not.toHaveBeenCalled();
+  });
+
+  it('flags a unitDamaged event missing position and schedules nothing', () => {
+    const onError = vi.fn();
+    const state = baseState({
+      units: [makeUnit({ id: 0x21, type: 'Bandit', speed: 3, maxBombCount: 1, team: 2 })],
+    });
+
+    const result = playResolveTurnEvents([{ type: 'unitDamaged', unitId: 0x21, newHp: 1 }], {
+      scene: mockScene as never,
+      gameStateSnapshot: state,
+      unitSpritesById: new Map(),
+      bombGraphicsById: new Map(),
+      softBlockSpritesById: new Map(),
+      onError,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(onError).toHaveBeenCalledOnce();
+    expect(mockScene.time.delayedCall).not.toHaveBeenCalled();
+  });
+
+  it('flags a unitDied event missing position and schedules nothing', () => {
+    const onError = vi.fn();
+    const state = baseState({
+      units: [makeUnit({ id: 0x21, type: 'Bandit', speed: 3, maxBombCount: 1, team: 2 })],
+    });
+
+    const result = playResolveTurnEvents([{ type: 'unitDied', unitId: 0x21 }], {
+      scene: mockScene as never,
+      gameStateSnapshot: state,
+      unitSpritesById: new Map(),
+      bombGraphicsById: new Map(),
+      softBlockSpritesById: new Map(),
+      onError,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(onError).toHaveBeenCalledOnce();
+    expect(mockScene.time.delayedCall).not.toHaveBeenCalled();
+  });
+
+  it('flags a softBlockDestroyed event missing position and schedules nothing', () => {
+    const onError = vi.fn();
+    const state = baseState({
+      softBlocks: [makeSoftBlock({ id: 20 })],
+    });
+
+    const result = playResolveTurnEvents([{ type: 'softBlockDestroyed', softBlockId: 20 }], {
+      scene: mockScene as never,
+      gameStateSnapshot: state,
+      unitSpritesById: new Map(),
+      bombGraphicsById: new Map(),
+      softBlockSpritesById: new Map(),
+      onError,
+    });
 
     expect(result.ok).toBe(false);
     expect(onError).toHaveBeenCalledOnce();
@@ -182,7 +284,14 @@ describe('playResolveTurnEvents — validation', () => {
     });
 
     const result = playResolveTurnEvents(
-      [{ type: 'bombExploded', bombId: 1, affectedPositions: [{ x: 99, y: 99 }] }],
+      [
+        {
+          type: 'bombExploded',
+          bombId: 1,
+          position: { x: 2, y: 2 },
+          affectedPositions: [{ x: 99, y: 99 }],
+        },
+      ],
       {
         scene: mockScene as never,
         gameStateSnapshot: state,
@@ -209,7 +318,14 @@ describe('playResolveTurnEvents — validation', () => {
     const result = playResolveTurnEvents(
       // (3,3) is diagonal to the bomb at (2,2) — not on the same row or column, but in-bounds.
       // A future engine change could plausibly emit this; it must not be rejected client-side.
-      [{ type: 'bombExploded', bombId: 1, affectedPositions: [{ x: 3, y: 3 }] }],
+      [
+        {
+          type: 'bombExploded',
+          bombId: 1,
+          position: { x: 2, y: 2 },
+          affectedPositions: [{ x: 3, y: 3 }],
+        },
+      ],
       {
         scene: mockScene as never,
         gameStateSnapshot: state,
@@ -252,6 +368,7 @@ describe('playResolveTurnEvents — bombExploded (non-chain)', () => {
         {
           type: 'bombExploded',
           bombId: 1,
+          position: { x: 2, y: 2 },
           affectedPositions: [
             { x: 3, y: 2 },
             { x: 4, y: 2 },
@@ -293,6 +410,7 @@ describe('playResolveTurnEvents — bombExploded (non-chain)', () => {
         {
           type: 'bombExploded',
           bombId: 1,
+          position: { x: 2, y: 2 },
           // The engine's raycast seeds the reachable set with the bomb's own tile,
           // so (2,2) is always present alongside the outward ray tiles.
           affectedPositions: [
@@ -321,6 +439,37 @@ describe('playResolveTurnEvents — bombExploded (non-chain)', () => {
   });
 });
 
+describe('playResolveTurnEvents — bombExploded with no live graphics (AC 9)', () => {
+  it('still renders the beam and warns, instead of throwing, when bombGraphicsById has no entry', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const state = baseState({ grid: grid5x5() });
+
+    const result = playResolveTurnEvents(
+      [
+        {
+          type: 'bombExploded',
+          bombId: 999,
+          position: { x: 2, y: 2 },
+          affectedPositions: [{ x: 3, y: 2 }],
+        },
+      ],
+      {
+        scene: mockScene as never,
+        gameStateSnapshot: state,
+        unitSpritesById: new Map(),
+        bombGraphicsById: new Map(),
+        softBlockSpritesById: new Map(),
+        onError: vi.fn(),
+      }
+    );
+
+    expect(result.ok).toBe(true);
+    expect(() => delayedCallAt(0)()).not.toThrow();
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+});
+
 describe('playResolveTurnEvents — chain reactions', () => {
   it('delays a chain-reacted bomb by reachTime from the causing bomb whose blast reached it', () => {
     const bombGraphicsById = new Map<number, BombGraphics>([
@@ -340,12 +489,18 @@ describe('playResolveTurnEvents — chain reactions', () => {
         {
           type: 'bombExploded',
           bombId: 1,
+          position: { x: 0, y: 0 },
           affectedPositions: [
             { x: 1, y: 0 },
             { x: 2, y: 0 },
           ],
         },
-        { type: 'bombExploded', bombId: 2, affectedPositions: [{ x: 3, y: 0 }] },
+        {
+          type: 'bombExploded',
+          bombId: 2,
+          position: { x: 2, y: 0 },
+          affectedPositions: [{ x: 3, y: 0 }],
+        },
       ],
       {
         scene: mockScene as never,
@@ -386,15 +541,26 @@ describe('playResolveTurnEvents — chain reactions', () => {
         {
           type: 'bombExploded',
           bombId: 1,
+          position: { x: 0, y: 0 },
           affectedPositions: [
             { x: 1, y: 0 },
             { x: 3, y: 0 },
           ],
         },
         // Bomb 2 (later in array, but closer): reaches (3,0) via 1 tile => 60ms.
-        { type: 'bombExploded', bombId: 2, affectedPositions: [{ x: 3, y: 0 }] },
+        {
+          type: 'bombExploded',
+          bombId: 2,
+          position: { x: 2, y: 0 },
+          affectedPositions: [{ x: 3, y: 0 }],
+        },
         // Bomb 3 sits at (3,0) — a chain reaction caused by both 1 and 2.
-        { type: 'bombExploded', bombId: 3, affectedPositions: [{ x: 4, y: 0 }] },
+        {
+          type: 'bombExploded',
+          bombId: 3,
+          position: { x: 3, y: 0 },
+          affectedPositions: [{ x: 4, y: 0 }],
+        },
       ],
       {
         scene: mockScene as never,
@@ -414,16 +580,18 @@ describe('playResolveTurnEvents — chain reactions', () => {
 });
 
 describe('playResolveTurnEvents — occupant events', () => {
-  it('delays unitDamaged by reachTime from the causing bomb, using the snapshot position not the event position', () => {
+  it('delays unitDamaged by reachTime from the causing bomb, using the event position not the snapshot position', () => {
     const unitGraphics = createMockGraphics();
     const state = baseState({
       grid: grid5x5(),
       bombs: [{ id: 1, ownerId: 0x11, position: { x: 0, y: 0 }, range: 2, countdown: 0 }],
+      // Deliberately-wrong snapshot position — the unit's real position must come from
+      // the event only, since a CPU turn's snapshot predates its own planGameEvents.
       units: [
         makeUnit({
           id: 0x21,
           type: 'Bandit',
-          position: { x: 2, y: 0 },
+          position: { x: 9, y: 9 },
           speed: 3,
           maxBombCount: 1,
           team: 2,
@@ -436,13 +604,13 @@ describe('playResolveTurnEvents — occupant events', () => {
         {
           type: 'bombExploded',
           bombId: 1,
+          position: { x: 0, y: 0 },
           affectedPositions: [
             { x: 1, y: 0 },
             { x: 2, y: 0 },
           ],
         },
-        // Deliberately-wrong `position` on the wire — snapshot position (2,0) must win.
-        { type: 'unitDamaged', unitId: 0x21, newHp: 0, position: { x: 9, y: 9 } },
+        { type: 'unitDamaged', unitId: 0x21, newHp: 0, position: { x: 2, y: 0 } },
       ],
       {
         scene: mockScene as never,
@@ -478,8 +646,8 @@ describe('playResolveTurnEvents — occupant events', () => {
 
     playResolveTurnEvents(
       [
-        { type: 'unitDamaged', unitId: 0x21, newHp: 0 },
-        { type: 'unitDied', unitId: 0x21 },
+        { type: 'unitDamaged', unitId: 0x21, newHp: 0, position: { x: 1, y: 1 } },
+        { type: 'unitDied', unitId: 0x21, position: { x: 1, y: 1 } },
       ],
       {
         scene: mockScene as never,
@@ -500,18 +668,6 @@ describe('playResolveTurnEvents — occupant events', () => {
     expect(unitGraphics.destroy).toHaveBeenCalled();
   });
 });
-
-// Drains every scheduled delayedCall in insertion order, including ones appended by callbacks
-// while draining (unitDied/softBlockDestroyed schedule nested removals). The index cursor keeps
-// each callback firing exactly once.
-function fireAllDelayedCalls(): void {
-  let i = 0;
-  while (i < mockScene.time.delayedCall.mock.calls.length) {
-    const cb = mockScene.time.delayedCall.mock.calls[i]![1] as () => void;
-    i++;
-    cb();
-  }
-}
 
 // Plays the event stream to completion, then asserts the graphics maps hold exactly the
 // occupants the expected end-state says survived.
@@ -538,14 +694,15 @@ describe('playResolveTurnEvents — render fidelity oracle', () => {
         {
           type: 'bombExploded',
           bombId: 1,
+          position: { x: 0, y: 0 },
           affectedPositions: [
             { x: 1, y: 0 },
             { x: 2, y: 0 },
           ],
         },
-        { type: 'unitDamaged', unitId: 0x21, newHp: 0 },
-        { type: 'unitDied', unitId: 0x21 },
-        { type: 'softBlockDestroyed', softBlockId: 20 },
+        { type: 'unitDamaged', unitId: 0x21, newHp: 0, position: { x: 1, y: 0 } },
+        { type: 'unitDied', unitId: 0x21, position: { x: 1, y: 0 } },
+        { type: 'softBlockDestroyed', softBlockId: 20, position: { x: 2, y: 0 } },
       ],
       expected: makeState({
         grid,
@@ -562,8 +719,13 @@ describe('playResolveTurnEvents — render fidelity oracle', () => {
         bombs: [{ id: 1, ownerId: 0x11, position: { x: 0, y: 0 }, range: 3, countdown: 0 }],
       }),
       events: [
-        { type: 'bombExploded', bombId: 1, affectedPositions: [{ x: 1, y: 0 }] },
-        { type: 'unitDamaged', unitId: 0x21, newHp: 1 },
+        {
+          type: 'bombExploded',
+          bombId: 1,
+          position: { x: 0, y: 0 },
+          affectedPositions: [{ x: 1, y: 0 }],
+        },
+        { type: 'unitDamaged', unitId: 0x21, newHp: 1, position: { x: 1, y: 0 } },
       ],
       expected: makeState({
         grid,
@@ -592,7 +754,7 @@ describe('playResolveTurnEvents — render fidelity oracle', () => {
     });
     expect(result.ok).toBe(true);
 
-    fireAllDelayedCalls();
+    drainDelayedCalls();
 
     expect(occupantsMatch(expected, unitSpritesById, bombGraphicsById, softBlockSpritesById)).toBe(
       true
@@ -628,7 +790,14 @@ describe('playResolveTurnEvents — done promise', () => {
     });
 
     const result = playResolveTurnEvents(
-      [{ type: 'bombExploded', bombId: 1, affectedPositions: [{ x: 1, y: 0 }] }],
+      [
+        {
+          type: 'bombExploded',
+          bombId: 1,
+          position: { x: 0, y: 0 },
+          affectedPositions: [{ x: 1, y: 0 }],
+        },
+      ],
       {
         scene: mockScene as never,
         gameStateSnapshot: state,

@@ -163,6 +163,8 @@ Two distinct failures, distinguished by one `getMatchState()` call after the 30s
 
 The recovery `getMatchState()` has no separate timeout — if the CPU turn is still running it resolves once that finishes, and reports the advanced turn.
 
+A surfaced `turn` unchanged error is terminal. No retry affordance is offered: the recovery `getMatchState()` already waits out a still-running CPU turn, so reaching this branch means the turn finished without advancing — a repeated poll or fetch has nothing new to observe. The Player sees the error over the last-rendered board and cannot act; the match does not continue from here.
+
 Do not force-end the match on a poll timeout. The CPU's moves are committed to `TrueState` before `consumeCpuStatus()` can ever see them, so a lost batch is cosmetic, not a desync.
 
 #### `TurnPhaseIdle` is an error, not a fallback
@@ -183,6 +185,13 @@ In a Prologue Match, `VictoryCutscene`'s lower button reads `Return to Title` an
 
 ---
 
+## Naming
+
+`resolveTurnPlayer.ts`'s `ResolveTurnPlayerDeps` is renamed `ResolveTurnPlayerOptions` as part
+of this spec's implementation, for naming consistency with `startMatch()`'s extracted
+`StartMatchOptions` (`Options` is the idiomatic TS name for a single-object argument bundle).
+Only the exported type name changes; the `deps` parameter name and call sites are unaffected.
+
 ## Acceptance Criteria
 
 ### Story Mode entry
@@ -201,12 +210,13 @@ In a Prologue Match, `VictoryCutscene`'s lower button reads `Return to Title` an
 9. Given a bomb the CPU placed this turn is detonated by another bomb's chain reaction, when the turn renders, then that explosion animates like any other — no part of `resolveTurnGameEvents` is dropped.
 10. Given `planGameEvents` is empty, when the CPU turn renders, then the 600ms hold is skipped.
 11. Given `resolveTurnGameEvents` ends with `matchEnded`, then `VictoryCutscene` opens; otherwise `beginTurn()` runs and the Player's turn opens.
-12. Given polling exhausts its budget, when `getMatchState()` shows `turn` advanced and `activeTeam === 1`, then the board re-renders from that state and play continues with no error surfaced; when `turn` is unchanged, then an error is surfaced. The match is never force-ended.
-13. Given a Prologue Match has ended, when `VictoryCutscene` shows, then the lower button reads `Return to Title` and `fadeTransition`s to `TitleScene`, and `Rematch` still restarts the Prologue in the same room.
+12. Given polling exhausts its budget, when `getMatchState()` shows `turn` advanced and `activeTeam === 1`, then the board re-renders from that state and play continues with no error surfaced; when `turn` is unchanged, then an error is surfaced with no retry offered and the Player cannot act. The match is never force-ended.
+13. Given a poll returns `TurnPhaseIdle` during a CPU turn, when that response is received, then polling stops, none of its events render, and the same `getMatchState()` recovery as AC12 runs.
+14. Given a Prologue Match has ended, when `VictoryCutscene` shows, then the lower button reads `Return to Title` and `fadeTransition`s to `TitleScene`, and `Rematch` still restarts the Prologue in the same room.
 
 ### VS Human regression
 
-14. Given a Battle Mode match (`gameCfg.vsCpu === false`), when a turn opens, then the Player can plan immediately after `TurnBanner` — no CPU polling delay, and no plan/resolve animation split.
-15. Given a Battle Mode match, when `/resolve` returns, then its `gameEvents` render as one continuous sequence, unchanged from Phase 4.8.
-16. Given a Battle Mode match, when a resolved turn renders, then explosions, fire, and deaths appear on the same tiles and at the same moments as before this spec.
-17. Given a Battle Mode match has ended, when `VictoryCutscene` shows, then the lower button reads `Return to Match Settings` and returns to `MatchSettingsScene`.
+15. Given a Battle Mode match (`gameCfg.vsCpu === false`), when a turn opens, then the Player can plan immediately after `TurnBanner` — no CPU polling delay, and no plan/resolve animation split.
+16. Given a Battle Mode match, when `/resolve` returns, then its `gameEvents` render as one continuous sequence, unchanged from Phase 4.8.
+17. Given a Battle Mode match, when a resolved turn renders, then explosions, fire, and deaths appear on the same tiles and at the same moments as before this spec.
+18. Given a Battle Mode match has ended, when `VictoryCutscene` shows, then the lower button reads `Return to Match Settings` and returns to `MatchSettingsScene`.

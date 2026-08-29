@@ -112,6 +112,11 @@ export const TURN_BANNER_FONT_SIZE = 48;
 export const TURN_BANNER_TEXT_COLOR = 0xffffff;
 export const TURN_BANNER_HOLD_MS = 2000;
 
+// VS CPU turn polling (consumeCpuStatus)
+export const CPU_POLL_BACKOFF_MS = [250, 500, 1000, 2000] as const;
+export const CPU_POLL_BUDGET_MS = 30000;
+export const CPU_PLAN_RESOLVE_HOLD_MS = 600;
+
 // SuddenDeathCutscene
 export const SUDDEN_DEATH_CUTSCENE_DURATION_MS = 3000;
 export const SUDDEN_DEATH_PULSE_HALF_MS = 250;
@@ -249,6 +254,7 @@ export const MAX_TURNS_RECOMMENDED_GLYPH_GAP = 10;
 export const TITLE_TOP_MARGIN = 24;
 export const TITLE_FONT_SIZE = 44;
 export const TITLE_GAME_MODE_FONT_SIZE = 20;
+export const TITLE_SUBMENU_LINE_GAP = 36;
 export const TITLE_COPYRIGHT_BOTTOM_MARGIN = 6;
 export const TITLE_COPYRIGHT_FONT_SIZE = 12;
 // Hover indicator: the 💣 renders this many px left of the hovered game mode option.

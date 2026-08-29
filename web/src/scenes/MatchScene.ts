@@ -13,6 +13,7 @@ import {
   startTurn,
   rematch,
   deleteMatch,
+  consumeCpuStatus,
 } from '../engine/api';
 import TurnCommandPanel from '../ui/TurnCommandPanel';
 import ConfirmDialog from '../ui/ConfirmDialog';
@@ -42,9 +43,13 @@ import {
   CONFIRM_TEXT_RESET,
   CONFIRM_TEXT_SURRENDER,
   FADE_MS,
+  CPU_POLL_BACKOFF_MS,
+  CPU_POLL_BUDGET_MS,
+  CPU_PLAN_RESOLVE_HOLD_MS,
 } from '../constants';
 import type {
   Coordinate,
+  CpuStatusResponse,
   GameCfg,
   GameEvent,
   GameState,
@@ -52,6 +57,11 @@ import type {
   TurnCommand,
   Unit,
 } from '../types/api';
+
+// pollCpuStatus()'s outcome: a successful TurnPhaseReady, or a failure reason for the caller's recovery.
+type CpuPollResult =
+  | { ok: true; status: CpuStatusResponse }
+  | { ok: false; reason: 'timeout' | 'idle' };
 
 export interface MatchSceneData {
   roomId: string;
@@ -66,6 +76,8 @@ export default class MatchScene extends Phaser.Scene {
   private playerTokens!: [string, string];
   private gameState!: GameState;
   private gameCfg!: GameCfg;
+  // Resolved once per scene entry from create()'s getMatchConfig() call.
+  private gameCfgPromise!: Promise<GameCfg>;
   // Tracks whether this entry's own fetch has landed, since gameState/gameCfg are never reset.
   private gameStateLoaded = false;
   private gameCfgLoaded = false;
@@ -167,7 +179,8 @@ export default class MatchScene extends Phaser.Scene {
         this.showError('Failed to load match state');
       });
 
-    getMatchConfig()
+    this.gameCfgPromise = getMatchConfig();
+    this.gameCfgPromise
       .then(cfg => {
         if (gen !== this.generation) {
           return;
@@ -200,6 +213,12 @@ export default class MatchScene extends Phaser.Scene {
   private async beginTurn(): Promise<void> {
     const gen = this.generation;
     this.interactionsEnabled = false;
+    // Flipped by the detached gameCfgPromise continuation below; read only by the finally.
+    let isCpuTurn = false;
+    let resolveBannerDone: () => void = () => undefined;
+    const bannerDone = new Promise<void>(resolve => {
+      resolveBannerDone = resolve;
+    });
     try {
       const state = await getMatchState();
       if (gen !== this.generation) {
@@ -213,6 +232,22 @@ export default class MatchScene extends Phaser.Scene {
       if (gen !== this.generation) {
         return;
       }
+
+      // Polling starts as soon as gameCfg is known; the render itself waits on bannerDone.
+      void this.gameCfgPromise.then(cfg => {
+        if (gen !== this.generation || !(cfg.vsCpu && state.activeTeam === 2)) {
+          return;
+        }
+        isCpuTurn = true;
+        this.interactionsEnabled = false;
+        const pollPromise = this.pollCpuStatus(gen);
+        void bannerDone.then(() => {
+          if (gen === this.generation) {
+            void this.runCpuTurn(pollPromise, gen);
+          }
+        });
+      });
+
       if (resp.inSuddenDeath) {
         // Refetch so gameState.bombs includes the hazards startTurn() just injected server-side.
         this.gameState = await getMatchState();
@@ -228,16 +263,135 @@ export default class MatchScene extends Phaser.Scene {
         }
       }
       await this.turnBanner.play(state.activeTeam);
+      resolveBannerDone();
     } catch (err) {
       if (gen !== this.generation) {
         return;
       }
       this.showError(err instanceof Error ? err.message : String(err));
     } finally {
-      if (gen === this.generation) {
+      if (gen === this.generation && !isCpuTurn) {
         this.interactionsEnabled = true;
       }
     }
+  }
+
+  // Resolves after `ms`, or immediately on scene shutdown — a bare delayedCall is discarded on
+  // shutdown and would otherwise leave its awaiter suspended forever.
+  private delayShutdownSafe(ms: number): Promise<void> {
+    return new Promise<void>(resolve => {
+      this.time.delayedCall(ms, resolve);
+      this.events.once('shutdown', () => resolve());
+    });
+  }
+
+  // Polls consumeCpuStatus() with backoff until TurnPhaseReady, budget exhaustion, or TurnPhaseIdle.
+  private async pollCpuStatus(gen: number): Promise<CpuPollResult> {
+    const startedAt = Date.now();
+    let attempt = 0;
+    for (;;) {
+      const resp = await consumeCpuStatus();
+      if (gen !== this.generation) {
+        return { ok: false, reason: 'timeout' };
+      }
+      if (resp.turnPhase === 'TurnPhaseReady') {
+        return { ok: true, status: resp };
+      }
+      if (resp.turnPhase === 'TurnPhaseIdle') {
+        console.error('consumeCpuStatus() returned TurnPhaseIdle during a CPU turn');
+        return { ok: false, reason: 'idle' };
+      }
+      if (Date.now() - startedAt >= CPU_POLL_BUDGET_MS) {
+        return { ok: false, reason: 'timeout' };
+      }
+      const delay = CPU_POLL_BACKOFF_MS[Math.min(attempt, CPU_POLL_BACKOFF_MS.length - 1)]!;
+      await this.delayShutdownSafe(delay);
+      if (gen !== this.generation) {
+        return { ok: false, reason: 'timeout' };
+      }
+      attempt++;
+    }
+  }
+
+  // Animates planGameEvents, holds, then animates resolveTurnGameEvents through the same
+  // renderer /resolve uses. Falls back to recoverFromCpuPollFailure() on a poll failure.
+  private async runCpuTurn(pollPromise: Promise<CpuPollResult>, gen: number): Promise<void> {
+    const result = await pollPromise;
+    if (gen !== this.generation) {
+      return;
+    }
+    if (!result.ok) {
+      await this.recoverFromCpuPollFailure(gen);
+      return;
+    }
+
+    const { planGameEvents, resolveTurnGameEvents } = result.status;
+    for (const event of planGameEvents) {
+      if (!this.applyGameEvent(event)) {
+        return;
+      }
+    }
+    if (planGameEvents.length > 0) {
+      await this.delayShutdownSafe(CPU_PLAN_RESOLVE_HOLD_MS);
+      if (gen !== this.generation) {
+        return;
+      }
+    }
+
+    const { ok, done } = playResolveTurnEvents(resolveTurnGameEvents, {
+      scene: this,
+      gameStateSnapshot: this.gameState,
+      unitSpritesById: this.unitSpritesById,
+      bombGraphicsById: this.bombGraphicsById,
+      softBlockSpritesById: this.softBlockSpritesById,
+      onError: message => this.showError(message),
+    });
+    if (ok) {
+      await done;
+      if (gen !== this.generation) {
+        return;
+      }
+    }
+
+    const matchEndedEvent = resolveTurnGameEvents.find(event => event.type === 'matchEnded');
+    if (matchEndedEvent) {
+      this.handleMatchEnded(matchEndedEvent);
+      return;
+    }
+
+    await this.resyncFromServer(gen, true, freshState => {
+      this.turnPanel.update(freshState.turn, this.gameCfg.maxTurns, freshState.activeTeam);
+    });
+    if (gen !== this.generation) {
+      return;
+    }
+    await this.beginTurn();
+  }
+
+  // Distinguishes a lost animation (turn advanced server-side, re-render silently) from a CPU
+  // turn that never completed (surface an error; the match is never force-ended).
+  private async recoverFromCpuPollFailure(gen: number): Promise<void> {
+    const turnBeforeCpu = this.gameState.turn;
+    const freshState = await getMatchState();
+    if (gen !== this.generation) {
+      return;
+    }
+    if (freshState.turn !== turnBeforeCpu && freshState.activeTeam === 1) {
+      const fadeDone = new Promise<void>(resolve => {
+        this.cameras.main.fadeOut(FADE_MS, 0, 0, 0);
+        this.cameras.main.once('camerafadeoutcomplete', () => resolve());
+        this.events.once('shutdown', () => resolve());
+      });
+      await fadeDone;
+      if (gen !== this.generation) {
+        return;
+      }
+      this.renderBoard(freshState);
+      this.cameras.main.fadeIn(FADE_MS);
+      await this.beginTurn();
+      return;
+    }
+    this.showError('CPU turn did not complete');
   }
 
   // Renders a sudden-death bomb dropping in from off-screen onto its tile, via renderBomb().
@@ -630,9 +784,12 @@ export default class MatchScene extends Phaser.Scene {
     }
     // Permanently locked: the match is over, so interactions never need to re-enable.
     this.interactionsEnabled = false;
-    this.victoryCutscene.play(winnerTeamId, {
+    const isVsCpu = this.gameCfgLoaded && this.gameCfg.vsCpu;
+    const returnLabel = isVsCpu ? 'Return to Title' : 'Return to Match Settings';
+    this.victoryCutscene.play(winnerTeamId, returnLabel, {
       onRematch: () => this.handleRematchClicked(),
-      onReturnToSettings: () => this.handleReturnToSettingsClicked(),
+      onReturnClicked: () =>
+        isVsCpu ? this.handleReturnToTitleClicked() : this.handleReturnToSettingsClicked(),
     });
   }
 
@@ -651,11 +808,8 @@ export default class MatchScene extends Phaser.Scene {
     });
   }
 
-  private handleReturnToSettingsClicked(): void {
-    if (this.victoryActionTaken) {
-      return;
-    }
-    this.victoryActionTaken = true;
+  // Fades out and deletes the match concurrently; a delete failure is logged, never blocking.
+  private async fadeOutAndDeleteMatch(): Promise<void> {
     const fadeDone = new Promise<void>(resolve => {
       this.cameras.main.fadeOut(FADE_MS, 0, 0, 0);
       this.cameras.main.once('camerafadeoutcomplete', () => resolve());
@@ -663,11 +817,29 @@ export default class MatchScene extends Phaser.Scene {
     const deleteDone = deleteMatch().catch(err =>
       console.error('Failed to delete match:', err instanceof Error ? err.message : err)
     );
-    void Promise.all([fadeDone, deleteDone]).then(() => {
+    await Promise.all([fadeDone, deleteDone]);
+  }
+
+  private handleReturnToSettingsClicked(): void {
+    if (this.victoryActionTaken) {
+      return;
+    }
+    this.victoryActionTaken = true;
+    void this.fadeOutAndDeleteMatch().then(() => {
       // Forward gameCfg so MatchSettingsScene remembers the last match's settings.
       this.scene.start('MatchSettingsScene', {
         gameCfg: this.gameCfg,
       } satisfies MatchSettingsSceneData);
+    });
+  }
+
+  private handleReturnToTitleClicked(): void {
+    if (this.victoryActionTaken) {
+      return;
+    }
+    this.victoryActionTaken = true;
+    void this.fadeOutAndDeleteMatch().then(() => {
+      this.scene.start('TitleScene');
     });
   }
 

@@ -1,11 +1,11 @@
 import Phaser from 'phaser';
-import { getCatalog, createMatchRoom, initRoom, createMatch } from '../engine/api';
+import { getCatalog } from '../engine/api';
 import ErrorPanel from '../ui/ErrorPanel';
 import { drawBackButton } from '../ui/backButton';
 import UnitPage from '../ui/matchSettings/UnitPage';
 import StagePage from '../ui/matchSettings/StagePage';
 import type { PageBounds, SettingsPage, SettingsPageNav } from '../ui/matchSettings/SettingsPage';
-import type { MatchSceneData } from './MatchScene';
+import { startMatch } from './startMatch';
 import type { Catalog, GameCfg } from '../types/api';
 import { UNIT_SPRITE_MANIFEST, SPRITE_ASSET_BASE } from '../rendering/spriteManifest';
 import {
@@ -191,46 +191,15 @@ export default class MatchSettingsScene extends Phaser.Scene {
   }
 
   private startMatch(): void {
-    if (this.isTransitioning) {
-      return;
-    }
-    this.isTransitioning = true;
-    const gen = this.generation;
-    this.cameras.main.fadeOut(FADE_MS, 0, 0, 0);
-    const fadeDone = new Promise<void>(resolve => {
-      this.cameras.main.once('camerafadeoutcomplete', () => resolve());
-      // Scene may be torn down before the fade event fires; resolve anyway so this
-      // promise can't hang forever (the gen check below still guards the outcome).
-      this.events.once('shutdown', () => resolve());
-    });
-    const matchResult = createMatchRoom()
-      .then(({ id }) => {
-        initRoom(id);
-        return createMatch({ gameCfg: this.gameCfg }).then(({ playerTokens }) => ({
-          ok: true as const,
-          roomId: id,
-          playerTokens,
-        }));
-      })
-      .catch((err: unknown) => ({
-        ok: false as const,
-        message: err instanceof Error ? err.message : String(err),
-      }));
-
-    void Promise.all([fadeDone, matchResult]).then(([, result]) => {
-      if (gen !== this.generation) {
-        return;
-      }
-      if (!result.ok) {
-        this.cameras.main.fadeIn(FADE_MS);
-        this.errorPanel.show(`Failed to create match: ${result.message}`);
-        this.isTransitioning = false;
-        return;
-      }
-      this.scene.start('MatchScene', {
-        roomId: result.roomId,
-        playerTokens: result.playerTokens,
-      } satisfies MatchSceneData);
+    startMatch({
+      scene: this,
+      gameCfg: this.gameCfg,
+      isTransitioning: () => this.isTransitioning,
+      setTransitioning: value => {
+        this.isTransitioning = value;
+      },
+      generation: () => this.generation,
+      errorPanel: this.errorPanel,
     });
   }
 }

@@ -39,7 +39,7 @@ describe('VictoryCutscene', () => {
   it('fills the 640x360 camera viewport exactly', () => {
     const cutscene = new VictoryCutscene(mockScene as never);
 
-    cutscene.play(1, { onRematch: vi.fn(), onReturnToSettings: vi.fn() });
+    cutscene.play(1, 'Return to Match Settings', { onRematch: vi.fn(), onReturnClicked: vi.fn() });
 
     expect(firstGraphics().fillRect).toHaveBeenCalledWith(0, 0, 640, 360);
   });
@@ -50,7 +50,10 @@ describe('VictoryCutscene', () => {
   ])('fills the banner with TEAM_COLORS[%i] for a non-draw result', (winnerTeamId, color) => {
     const cutscene = new VictoryCutscene(mockScene as never);
 
-    cutscene.play(winnerTeamId, { onRematch: vi.fn(), onReturnToSettings: vi.fn() });
+    cutscene.play(winnerTeamId, 'Return to Match Settings', {
+      onRematch: vi.fn(),
+      onReturnClicked: vi.fn(),
+    });
 
     // graphicsAt(0) is the full-canvas scrim, graphicsAt(1) is the banner itself.
     expect(graphicsAt(1).fillStyle).toHaveBeenCalledWith(color);
@@ -59,7 +62,7 @@ describe('VictoryCutscene', () => {
   it('fills the banner with TEAM_COLOR_FALLBACK and shows "Draw Game" for winnerTeamId -1', () => {
     const cutscene = new VictoryCutscene(mockScene as never);
 
-    cutscene.play(-1, { onRematch: vi.fn(), onReturnToSettings: vi.fn() });
+    cutscene.play(-1, 'Return to Match Settings', { onRematch: vi.fn(), onReturnClicked: vi.fn() });
 
     expect(graphicsAt(1).fillStyle).toHaveBeenCalledWith(TEAM_COLOR_FALLBACK);
     expect(mockScene.add.text).toHaveBeenCalledWith(
@@ -73,7 +76,7 @@ describe('VictoryCutscene', () => {
   it('renders "Winner..." shifted 5% left of center and "Player {X}!" fully centered, for a non-draw result', () => {
     const cutscene = new VictoryCutscene(mockScene as never);
 
-    cutscene.play(2, { onRematch: vi.fn(), onReturnToSettings: vi.fn() });
+    cutscene.play(2, 'Return to Match Settings', { onRematch: vi.fn(), onReturnClicked: vi.fn() });
 
     // Camera width is 640 in the test mock, so 5% left of center (320) is 288.
     expect(mockScene.add.text).toHaveBeenCalledWith(
@@ -96,7 +99,7 @@ describe('VictoryCutscene', () => {
   it('covers the full canvas with a dim scrim pinned to the camera at DEPTH_VICTORY_CUTSCENE', () => {
     const cutscene = new VictoryCutscene(mockScene as never);
 
-    cutscene.play(1, { onRematch: vi.fn(), onReturnToSettings: vi.fn() });
+    cutscene.play(1, 'Return to Match Settings', { onRematch: vi.fn(), onReturnClicked: vi.fn() });
 
     const scrim = firstGraphics();
     expect(scrim.fillRect).toHaveBeenCalledWith(0, 0, 640, 360);
@@ -107,7 +110,7 @@ describe('VictoryCutscene', () => {
   it('does not render the Rematch/Return buttons before the fade-in and 2s delay complete', () => {
     const cutscene = new VictoryCutscene(mockScene as never);
 
-    cutscene.play(1, { onRematch: vi.fn(), onReturnToSettings: vi.fn() });
+    cutscene.play(1, 'Return to Match Settings', { onRematch: vi.fn(), onReturnClicked: vi.fn() });
 
     expect(mockScene.add.text).not.toHaveBeenCalledWith(
       expect.any(Number),
@@ -120,7 +123,7 @@ describe('VictoryCutscene', () => {
   it('renders Rematch and Return to Match Settings buttons 2s after the fade-in completes', () => {
     const cutscene = new VictoryCutscene(mockScene as never);
 
-    cutscene.play(1, { onRematch: vi.fn(), onReturnToSettings: vi.fn() });
+    cutscene.play(1, 'Return to Match Settings', { onRematch: vi.fn(), onReturnClicked: vi.fn() });
     completeFadeInAndButtonDelay();
 
     expect(mockScene.add.text).toHaveBeenCalledWith(
@@ -137,11 +140,25 @@ describe('VictoryCutscene', () => {
     );
   });
 
+  it('renders the caller-provided returnLabel instead of a hardcoded string', () => {
+    const cutscene = new VictoryCutscene(mockScene as never);
+
+    cutscene.play(1, 'Return to Title', { onRematch: vi.fn(), onReturnClicked: vi.fn() });
+    completeFadeInAndButtonDelay();
+
+    expect(mockScene.add.text).toHaveBeenCalledWith(
+      expect.any(Number),
+      expect.any(Number),
+      'Return to Title',
+      expect.objectContaining({})
+    );
+  });
+
   it('invokes onRematch when the Rematch button is clicked', () => {
     const onRematch = vi.fn();
     const cutscene = new VictoryCutscene(mockScene as never);
 
-    cutscene.play(1, { onRematch, onReturnToSettings: vi.fn() });
+    cutscene.play(1, 'Return to Match Settings', { onRematch, onReturnClicked: vi.fn() });
     completeFadeInAndButtonDelay();
 
     // graphicsAt(0)=scrim, (1)=banner (text lines are add.text, not add.graphics), so the
@@ -152,24 +169,24 @@ describe('VictoryCutscene', () => {
     expect(onRematch).toHaveBeenCalledOnce();
   });
 
-  it('invokes onReturnToSettings when the Return to Match Settings button is clicked', () => {
-    const onReturnToSettings = vi.fn();
+  it('invokes onReturnClicked when the Return to Match Settings button is clicked', () => {
+    const onReturnClicked = vi.fn();
     const cutscene = new VictoryCutscene(mockScene as never);
 
-    cutscene.play(1, { onRematch: vi.fn(), onReturnToSettings });
+    cutscene.play(1, 'Return to Match Settings', { onRematch: vi.fn(), onReturnClicked });
     completeFadeInAndButtonDelay();
 
     // graphicsAt(2) is the Rematch button's Graphics; the Return button's is the next one.
     const returnButtonGraphics = graphicsAt(3);
     pointerDownOf(returnButtonGraphics)();
 
-    expect(onReturnToSettings).toHaveBeenCalledOnce();
+    expect(onReturnClicked).toHaveBeenCalledOnce();
   });
 
   it('never fades the banner back out or destroys any object on its own', () => {
     const cutscene = new VictoryCutscene(mockScene as never);
 
-    cutscene.play(1, { onRematch: vi.fn(), onReturnToSettings: vi.fn() });
+    cutscene.play(1, 'Return to Match Settings', { onRematch: vi.fn(), onReturnClicked: vi.fn() });
     completeFadeInAndButtonDelay();
 
     expect(mockScene.tweens.add).toHaveBeenCalledTimes(1);
