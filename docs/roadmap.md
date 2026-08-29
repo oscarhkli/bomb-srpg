@@ -127,7 +127,7 @@ Refer to [Frontend README](frontend/README.md)
 - [x] goroutine setup to decouple resolve-response from CPU computation
 - [ ] Finite State Machine for 1 CPU decision making
 
-## Phase 5a: UI Refinement (Polish Pass)
+## Phase 5a: UI Refinement
 
 - **Goal:** Elevate the rough local client to a presentable, responsive, accessible experience.
 - **Scope:** Sprite/animation polish, mobile-responsive layout, turn timer UI, action replay animation, settings panel.
@@ -137,7 +137,7 @@ Refer to [Frontend README](frontend/README.md)
 
 - [ ] Mobile-responsive layout
 
-## Phase 5b: Add Computer Player with AI
+## Phase 5b: Add Computer Player with AI in Battle Mode
 
 - **Goal:** Introduce a single-player mode against an automated opponent.
 - **Scope:** Heuristic-based enemy unit logic running inside an asynchronous backend goroutine worker.
@@ -145,7 +145,8 @@ Refer to [Frontend README](frontend/README.md)
 
 ### TODO
 
-- [ ] Finite State Machine?
+- [ ] Advanced Finite State Machine for 5 CPU unit decision making
+- [ ] MatchsSettingScene enhancement
 
 ## Phase 6a: More Archetypes & Skills
 

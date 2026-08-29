@@ -7,7 +7,7 @@
 - **State Sandboxing Pattern**: At the start of a turn, the engine clones the definitive `GameState` into a temporary `WorkingState` sandbox. All mid-turn actions (moving, placing bombs, picking up power-ups) alter this sandbox layer.
   - A `/reset` or `ResetTurn()` command discards the sandbox and re-clones the definitive checkpoint (`m.TrueState`), wiping any uncommitted player actions.
   - A `/commit` or `ResolveTurn()` command executes batch-resolution loops against the sandbox, advances the timeline, and permanently promotes the sandboxed state to the master history via a deep-copy clone.
-- **Batch Resolution**: All damage calculations, terrain updates, bomb explosions, and chain reactions are deferred until a turn is committed. The resolution engine runs synchronously and returns a chronological `Animation Event Queue` string/binary array payload to the client.
+- **Batch Resolution**: All damage calculations, terrain updates, bomb explosions, and chain reactions are deferred until a turn is committed. The resolution engine runs synchronously and `ResolveTurn()` returns two chronological event arrays to the client — `PlanGameEvents` and `ResolveTurnGameEvents`.
 - **Synchronous Execution Bound**: Given the low-density metrics (16x16 maximum matrix, <= 10 active characters), all grid lookups, BFS pathfinding, and explosion cascade evaluations are run synchronously to avoid multi-threaded race conditions.
 
 ## 2. Spatial Mapping & State Model Definitions
