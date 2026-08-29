@@ -326,7 +326,7 @@ describe('resolveUnitTextureKey', () => {
     warnSpy.mockRestore();
   });
 
-  it('resolves the Prologue Boss to unit_prologue_red for team 2 (P4-spec009 AC 5)', () => {
+  it('resolves the Prologue Boss to unit_prologue_red for team 2 (AC 5)', () => {
     expect(resolveUnitTextureKey('Prologue', 2)).toBe('unit_prologue_red');
   });
 });
