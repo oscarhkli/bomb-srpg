@@ -8,22 +8,13 @@ title: "Phase 4.10: Refine 2-phase GameEvents Handling in ResolveTurn"
 
 `Match.ResolveTurn()` produces two phases of events: the planning events submitted through `ApplyTurnCommand`, followed by the resolution events produced by bomb detonation. The engine returns them as two slices, but `ServerStateManager.ResolveTurn` concatenates them, so `/resolve` hands the client one flat array with no marked seam.
 
-`MatchScene` copes by classifying on `GameEvtType`. `resolveTurnPlayer` handles only `bombCountdownUpdated`, `bombExploded`, `unitDamaged`, `unitDied` and `softBlockDestroyed`, so the Player's own `unitMoved`/`bombPlaced` prefix falls through the switch and is dropped — correctly, because those were already animated when the command was submitted.
+`MatchScene` copes by classifying on `GameEvtType`. `resolveTurnPlayer` handles only `bombCountdownUpdated`, `bombExploded`, `unitDamaged`, `unitDied` and `softBlockDestroyed`, so the Player's own `unitMoved`/`bombPlaced` prefix falls through the switch and is dropped correctly, because those were already animated when the command was submitted.
 
-That classification holds only while each `GameEvtType` belongs to exactly one phase. It is true today. This spec is **not scheduled work**; see Trigger.
+That classification holds only while each `GameEvtType` belongs to exactly one phase. It is true today, but will be invalid when Skills are introduced in future.
 
 [p4-spec009-cpu](p4-spec009-cpu.md) already consumes the two slices on the VS CPU path via `/cpu-status/consume`. This spec brings the VS Human path to the same shape.
 
 > **Shared vocabulary:** This spec relies on shared terms and design conventions — `Page`, `region`, `Panel`, `fadeTransition`, `BackButton`, `TeamBadge`, the `render*`/`draw*` split, etc. — defined in [`VISUAL_VOCAB.md`](./VISUAL_VOCAB.md). Read it first.
-
-## Trigger
-
-Implement this spec when the first engine change makes an event type span both phases. Two known shapes:
-
-- A skill that alters a bomb's countdown during planning. `bombCountdownUpdated` then reaches `resolveTurnPlayer` and animates as a resolution event, on top of already being animated at command-submission time.
-- A forced move during resolution — knockback, or a unit displaced by a blast. `unitMoved` is then silently dropped, and the unit teleports on the next state sync.
-
-Neither exists yet: every archetype in `engine/presets.go` is `PresetSkills: SkillNone`. Until one lands, the type filter is correct and this spec stays Draft.
 
 ## Goal
 
@@ -33,8 +24,8 @@ Neither exists yet: every archetype in `engine/presets.go` is `PresetSkills: Ski
 
 ## Non-Goal
 
-- Per-event phase stamping, or an append-only event journal. Both remain deferred.
-- Any change to how an individual event is animated. This spec changes only which events reach the animator.
+- Per-event phase stamping, or an append-only event journal.
+- Any change to how an individual event is animated.
 
 ## Scene Entry
 
@@ -47,19 +38,12 @@ No change.
 Landed outside this spec:
 
 - `ServerStateManager.ResolveTurn` stops concatenating and returns both slices.
-- `HandleResolveTurn` emits them as two fields. Both are non-nil at the JSON boundary, guaranteed by the function that produces them, per `AGENTS.md`.
-- `web/src/types/api.ts` replaces `resolveTurn()`'s bare `GameEvent[]` with:
-
-```ts
-export interface ResolveTurnResponse {
-  planGameEvents: GameEvent[];
-  resolveTurnGameEvents: GameEvent[];
-}
-```
+- `HandleResolveTurn` emits them as two fields.
+- `web/src/types/api.ts` replaces `resolveTurn()`'s bare `GameEvent[]` with `ResolveTurnResponse`
 
 ## Match Scene
 
-`MatchScene`'s resolve handler passes **only** `resolveTurnGameEvents` to `playResolveTurnEvents`. `planGameEvents` is discarded — it is the echo of what `submitTurnCommand` already animated during planning.
+`MatchScene`'s resolve handler passes **only** `resolveTurnGameEvents` to `playResolveTurnEvents`. `planGameEvents` is skiped. This is what `submitTurnCommand` already animated during planning.
 
 The discard is deliberate and positional. It does not depend on which types appear in either array, which is the property the current filter lacks.
 
@@ -74,7 +58,7 @@ Error handling, the generation guard, and the `turnPanel` refresh are unchanged.
 
 ## VS CPU
 
-Unchanged. The CPU branch introduced in p4-spec008 already consumes two arrays; after this spec both paths share one shape and the plan/resolve split is expressed identically on each.
+Unchanged. The CPU branch introduced in Phase 4.9 already consumes two arrays; after this spec both paths share one shape and the plan/resolve split is expressed identically on each.
 
 ---
 

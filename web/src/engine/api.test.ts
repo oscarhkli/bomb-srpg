@@ -29,6 +29,7 @@ import type {
   StagePreset,
   Catalog,
   CpuStatusResponse,
+  ResolveTurnResponse,
 } from '../types/api';
 
 const mockFetch = vi.fn();
@@ -318,7 +319,10 @@ describe('api.ts', () => {
   });
 
   describe('resolveTurn', () => {
-    const fixture: GameEvent[] = [{ type: 'bombExploded', bombId: 1 }];
+    const fixture: ResolveTurnResponse = {
+      planGameEvents: [{ type: 'unitMoved', unitId: 1, from: { x: 1, y: 0 }, to: { x: 1, y: 1 } }],
+      resolveTurnGameEvents: [{ type: 'bombExploded', bombId: 1 }],
+    };
 
     it('should POST with auth and return events', async () => {
       mockOk(200, fixture);
