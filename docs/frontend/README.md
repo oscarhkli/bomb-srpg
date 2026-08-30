@@ -32,7 +32,7 @@ Specs will be written prior to development—partly handcrafted, and partly gene
 | [Phase 4.7: Auto Resize Canvas](p4-spec007-canvas.md) | Canvas | Done | 2026-08-16 |
 | [Phase 4.8: Fix PlaceBomb Button Problem in Match Scene](p4-spec008-match.md) | Match | Done | 2026-08-28 |
 | [Phase 4.9: Add Story Mode to TitleScene and Initiate Prologue Match](p4-spec009-cpu.md) | Story | Done | 2026-08-29 |
-| [Phase 4.10: Refine 2-phase GameEvents Handling in ResolveTurn](p4-spec010-match.md) | Match | Ready | — |
+| [Phase 4.10: Refine 2-phase GameEvents Handling in ResolveTurn](p4-spec010-match.md) | Match | Done | 2026-08-30 |
 | [Phase 4.11: Swapping Sprites for Existing Vector Graphics in MatchSummaryPanel](p4-spec011-sprites.md) | Sprites | Draft | — |
 | [Phase 4.12: Refine UX in MatchScene on TurnCommand Buttons](p4-spec012-sprites.md) | Sprites | Draft | — |
 <!-- END SPEC TABLE -->

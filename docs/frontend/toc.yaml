@@ -80,9 +80,9 @@ specs:
     category: Story
     completion-date: 2026-08-29
   - file: p4-spec010-match.md
-    status: Ready
+    status: Done
     category: Match
-    completion-date:
+    completion-date: 2026-08-30
   - file: p4-spec011-sprites.md
     status: Draft
     category: Sprites
