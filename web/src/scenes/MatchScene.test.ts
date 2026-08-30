@@ -871,12 +871,14 @@ describe('MatchScene', () => {
     );
   });
 
-  it('on confirmed resolve: inits the active team token, calls resolveTurn, hands events to the player, then loops back into beginTurn for the next turn', async () => {
+  it('on confirmed resolve: inits the active team token, calls resolveTurn, hands resolveTurnGameEvents to the player, then loops back into beginTurn for the next turn', async () => {
     await setUpEmptyBoardAndClickResolve(2);
     expect(initToken).toHaveBeenCalledWith('team2-token');
     vi.mocked(getMatchState).mockResolvedValue(makeState({ grid: [[plainTile()]], activeTeam: 1 }));
-    const events: GameEvent[] = [{ type: 'bombCountdownUpdated', bombId: 1, countdown: 2 }];
-    vi.mocked(resolveTurn).mockResolvedValue(events);
+    const resolveTurnGameEvents: GameEvent[] = [
+      { type: 'bombCountdownUpdated', bombId: 1, countdown: 2 },
+    ];
+    vi.mocked(resolveTurn).mockResolvedValue({ planGameEvents: [], resolveTurnGameEvents });
 
     // ConfirmDialog's Yes button is the most-recently-created graphics among the last 3.
     const [yesButtonContainer] = lastContainers(2);
@@ -886,7 +888,7 @@ describe('MatchScene', () => {
     expect(resolveTurn).toHaveBeenCalledOnce();
     expect(playResolveTurnEvents).toHaveBeenCalledOnce();
     const [calledEvents, deps] = vi.mocked(playResolveTurnEvents).mock.calls[0]!;
-    expect(calledEvents).toBe(events);
+    expect(calledEvents).toBe(resolveTurnGameEvents);
     expect(deps.gameStateSnapshot.activeTeam).toBe(2);
 
     // A fresh beginTurn() ran for the next turn: startTurn() called again, and initToken
@@ -894,6 +896,28 @@ describe('MatchScene', () => {
     // only from beginTurn().
     expect(startTurn).toHaveBeenCalledTimes(2);
     expect(initToken).toHaveBeenCalledWith('team1-token');
+  });
+
+  // planGameEvents was already animated live during submitTurnCommand — handleResolveTurn
+  // must discard it by position, not replay it through playResolveTurnEvents.
+  it('discards planGameEvents from the resolve response instead of replaying them', async () => {
+    await setUpEmptyBoardAndClickResolve();
+    const planGameEvents: GameEvent[] = [
+      { type: 'unitMoved', unitId: 1, from: { x: 0, y: 0 }, to: { x: 1, y: 0 } },
+    ];
+    const resolveTurnGameEvents: GameEvent[] = [
+      { type: 'bombExploded', bombId: 1, position: { x: 1, y: 0 }, affectedPositions: [] },
+    ];
+    vi.mocked(resolveTurn).mockResolvedValue({ planGameEvents, resolveTurnGameEvents });
+
+    const [yesButtonContainer] = lastContainers(2);
+    pointerDownOf(yesButtonContainer!)();
+    await flush();
+
+    expect(playResolveTurnEvents).toHaveBeenCalledOnce();
+    const [calledEvents] = vi.mocked(playResolveTurnEvents).mock.calls[0]!;
+    expect(calledEvents).toBe(resolveTurnGameEvents);
+    expect(calledEvents).not.toContain(planGameEvents[0]);
   });
 
   it('always refreshes state even when resolveTurn() itself rejects', async () => {
@@ -913,9 +937,6 @@ describe('MatchScene', () => {
     expect(playResolveTurnEvents).not.toHaveBeenCalled();
   });
 
-  // AC3: after a successful resolve, the animated end-state left by playResolveTurnEvents stands —
-  // no wholesale occupant swap follows (which would snap sprites out of their finished animation).
-  // turnPanel still refreshes. MatchSummaryButton itself is static and isn't re-rendered per turn.
   it('keeps the animated end-state on a successful resolve (no occupant rebuild) but refreshes turnPanel', async () => {
     const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
     queueMatchStates(
@@ -923,7 +944,7 @@ describe('MatchScene', () => {
       // The post-resolve refetch reports a new turn number so turnPanel.update is observable.
       makeState({ grid: [[plainTile()]], turn: 5, activeTeam: 2, units: [unit] })
     );
-    vi.mocked(resolveTurn).mockResolvedValue([]);
+    vi.mocked(resolveTurn).mockResolvedValue({ planGameEvents: [], resolveTurnGameEvents: [] });
 
     await bootScene({ playerTokens: ['team1-token', 'team2-token'] });
 
@@ -1081,9 +1102,6 @@ describe('MatchScene', () => {
         typeof mockScene.add.container
       >;
 
-      // restY (tileCenter of {x:1,y:0}) is 24; the start position must sit BOMB_SIZE above it
-      // (-24), not `restY - cameras.main.height` (-336 for the default 360px-tall mock camera) —
-      // a fixed camera-height offset only clears the screen for tiles near the top of the board.
       expect(bombContainer.y).toBe(-24);
     });
 
@@ -1114,9 +1132,10 @@ describe('MatchScene', () => {
       // triggered by inSuddenDeath so gameState.bombs picks up the server-injected bomb.
       expect(getMatchState).toHaveBeenCalledTimes(3);
 
-      vi.mocked(resolveTurn).mockResolvedValue([
-        { type: 'bombCountdownUpdated', bombId: 999, countdown: 2 },
-      ]);
+      vi.mocked(resolveTurn).mockResolvedValue({
+        planGameEvents: [],
+        resolveTurnGameEvents: [{ type: 'bombCountdownUpdated', bombId: 999, countdown: 2 }],
+      });
       clickSummaryPanelButton('resolve');
       const [yesButtonContainer] = lastContainers(2);
       pointerDownOf(yesButtonContainer!)();
@@ -1500,7 +1519,10 @@ describe('MatchScene', () => {
       await setUpEmptyBoardAndClickResolve();
       const event: GameEvent =
         winnerTeamId === undefined ? { type: 'matchEnded' } : { type: 'matchEnded', winnerTeamId };
-      vi.mocked(resolveTurn).mockResolvedValue([event]);
+      vi.mocked(resolveTurn).mockResolvedValue({
+        planGameEvents: [],
+        resolveTurnGameEvents: [event],
+      });
 
       const [yesButtonContainer] = lastContainers(2);
       pointerDownOf(yesButtonContainer!)();
@@ -1544,7 +1566,10 @@ describe('MatchScene', () => {
       const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
       queueMatchStates(makeState({ grid: [[plainTile()]], activeTeam: 1, units: [unit] }));
       await bootScene();
-      vi.mocked(resolveTurn).mockResolvedValue([{ type: 'matchEnded', winnerTeamId: 1 }]);
+      vi.mocked(resolveTurn).mockResolvedValue({
+        planGameEvents: [],
+        resolveTurnGameEvents: [{ type: 'matchEnded', winnerTeamId: 1 }],
+      });
 
       clickSummaryPanelButton('resolve');
       const [yesButtonContainer] = lastContainers(2);
