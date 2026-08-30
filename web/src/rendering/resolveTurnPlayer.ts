@@ -117,7 +117,13 @@ function validate(events: GameEvent[], snapshot: GameState): string | null {
         }
         break;
       }
+      case 'matchEnded':
+        // MatchScene handles this one, not us.
+        break;
       default:
+        if (import.meta.env.DEV) {
+          console.warn(`playResolveTurnEvents received an unhandled event type: ${event.type}`);
+        }
         break;
     }
   }

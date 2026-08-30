@@ -722,15 +722,15 @@ export default class MatchScene extends Phaser.Scene {
     const gen = this.generation;
     this.isSubmitting = true;
     this.clearErrors();
-    let events: GameEvent[] = [];
+    let resolveTurnGameEvents: GameEvent[] = [];
     let succeeded = false;
     try {
       try {
-        events = await resolveTurn();
+        ({ resolveTurnGameEvents } = await resolveTurn());
         if (gen !== this.generation) {
           return;
         }
-        const { ok, done } = playResolveTurnEvents(events, {
+        const { ok, done } = playResolveTurnEvents(resolveTurnGameEvents, {
           scene: this,
           gameStateSnapshot: this.gameState,
           unitSpritesById: this.unitSpritesById,
@@ -758,7 +758,7 @@ export default class MatchScene extends Phaser.Scene {
       if (gen !== this.generation) {
         return;
       }
-      const matchEndedEvent = events.find(event => event.type === 'matchEnded');
+      const matchEndedEvent = resolveTurnGameEvents.find(event => event.type === 'matchEnded');
       if (matchEndedEvent) {
         this.handleMatchEnded(matchEndedEvent);
       } else {

@@ -1922,13 +1922,16 @@ func TestHandleResolveTurn(t *testing.T) {
 			t.Errorf("Handler returned wrong content type: got %v want %v", contentType, expectedHeader)
 		}
 
-		var response []engine.GameEvent
+		var response ResolveTurnResponse
 		if err := json.NewDecoder(rr.Body).Decode(&response); err != nil {
 			t.Fatalf("Failed to decode response JSON payload: %v", err)
 		}
 
-		if got, want := response, 6; len(got) != want {
-			t.Errorf("Expected %d gameEvents returned, got %#v", want, got)
+		if got, want := response.PlanGameEvents, 1; len(got) != want {
+			t.Errorf("Expected %d PlanGameEvents returned, got %#v", want, got)
+		}
+		if got, want := response.ResolveTurnGameEvents, 5; len(got) != want {
+			t.Errorf("Expected %d ResolveTurnGameEvents returned, got %#v", want, got)
 		}
 		if got, want := room.Match.WorkingState.Units[unitID].HP, 0; got != want {
 			t.Errorf("Expected Unit %#X HP %v, got %v", 16, want, got)
@@ -2007,18 +2010,24 @@ func TestHandleResolveTurn(t *testing.T) {
 		rr := httptest.NewRecorder()
 		testMux("POST /api/match-rooms/{roomID}/match/resolve", h.HandleResolveTurn).ServeHTTP(rr, req)
 
-		assertArrayContract(t, rr.Body.Bytes(),
-			[]string{"type", "unitId", "bombId", "position", "range", "countdown",
-				"newHp"}, // unrelated to this GameEvent
-			func(t *testing.T, item map[string]any) {
+		assertObjectContract(t, rr.Body.Bytes(), []string{"planGameEvents", "resolveTurnGameEvents"},
+			func(t *testing.T, raw map[string]any) {
 				t.Helper()
-				positionField := item["position"].(map[string]any)
-				for _, field := range []string{"x", "y"} {
-					if _, exists := positionField[field]; !exists {
-						t.Errorf("Contract Broken: position missing key '%s'", field)
+				events, ok := raw["planGameEvents"].([]any)
+				if !ok || len(events) == 0 {
+					t.Fatalf("Expected non-empty planGameEvents, got %#v", raw["planGameEvents"])
+				}
+				evt := events[0].(map[string]any)
+				for _, field := range []string{"type", "unitId", "bombId", "position", "range", "countdown"} {
+					if _, exists := evt[field]; !exists {
+						t.Errorf("Contract Broken: planGameEvents[0] missing key '%s'", field)
 					}
 				}
+				if _, ok := raw["resolveTurnGameEvents"].([]any); !ok {
+					t.Errorf("Expected resolveTurnGameEvents array, got %#v", raw["resolveTurnGameEvents"])
+				}
 			})
+
 	})
 
 	t.Run("Failure: missing Authorization header", func(t *testing.T) {

@@ -78,6 +78,13 @@ type CPUStatusResponse struct {
 	ResolveTurnGameEvents []engine.GameEvent  `json:"resolveTurnGameEvents"`
 }
 
+// ResolveTurnResponse wraps HumanTurnPhase and the Human Player turn's gameEvents, split by phase so the
+// client can animate only the resolveTurnGameEvents.
+type ResolveTurnResponse struct {
+	PlanGameEvents        []engine.GameEvent `json:"planGameEvents"`
+	ResolveTurnGameEvents []engine.GameEvent `json:"resolveTurnGameEvents"`
+}
+
 // HandleGetCatalog returns all available unit archetypes and stages for the client to display in the lobby.
 // It encodes the archetype and stagePreset definitions as JSON and writes them to the response.
 func (h *Handler) HandleGetCatalog(w http.ResponseWriter, r *http.Request) {
@@ -364,7 +371,7 @@ func (h *Handler) HandleResetTurn(w http.ResponseWriter, r *http.Request) {
 }
 
 // HandleResolveTurn sends ResolveTurn signal to engine to calculate the impacts of the Player's action in a given MatchRoom.
-// It encodes the gameEvents as JSON and writes them to the response.
+// It encodes the ResolveTurnStatusResponse as JSON and writes them to the response.
 func (h *Handler) HandleResolveTurn(w http.ResponseWriter, r *http.Request) {
 	roomID := r.PathValue("roomID")
 
@@ -383,15 +390,13 @@ func (h *Handler) HandleResolveTurn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: to be resolved before p4-spec009-match.md. This will be split into 2 slices instead of combined one
-	planGameEvents = append(planGameEvents, resolveTurnGameEvents...)
-
+	res := ResolveTurnResponse{PlanGameEvents: planGameEvents, ResolveTurnGameEvents: resolveTurnGameEvents}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 
-	if err := json.NewEncoder(w).Encode(planGameEvents); err != nil {
-		h.Logger.Error("encode gameEvents failed", "error", err)
-		http.Error(w, "Failed to encode gameEvents", http.StatusInternalServerError)
+	if err := json.NewEncoder(w).Encode(res); err != nil {
+		h.Logger.Error("encode ResolveTurnStatusResponse failed", "error", err)
+		http.Error(w, "Failed to encode ResolveTurnStatusResponse", http.StatusInternalServerError)
 		return
 	}
 }

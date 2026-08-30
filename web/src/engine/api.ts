@@ -12,6 +12,7 @@ import type {
   StartTurnResponse,
   Catalog,
   CpuStatusResponse,
+  ResolveTurnResponse,
 } from '../types/api';
 
 let roomId: string | undefined;
@@ -159,13 +160,13 @@ export async function resetTurn(): Promise<void> {
   }
 }
 
-export async function resolveTurn(): Promise<GameEvent[]> {
+export async function resolveTurn(): Promise<ResolveTurnResponse> {
   const roomId = requireRoomId();
   const res = await fetch(buildUrl(`/api/match-rooms/${roomId}/match/resolve`), {
     method: 'POST',
     headers: authHeaders(),
   });
-  return handleResponse<GameEvent[]>(res);
+  return handleResponse<ResolveTurnResponse>(res);
 }
 
 export async function surrender(req: SurrenderRequest): Promise<GameEvent[]> {

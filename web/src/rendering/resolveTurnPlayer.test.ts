@@ -819,3 +819,40 @@ describe('playResolveTurnEvents — done promise', () => {
     expect(settled).toBe(true);
   });
 });
+
+describe('playResolveTurnEvents — unhandled event types', () => {
+  it('logs a dev-mode warning naming the type when it is neither handled nor ignored', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    playResolveTurnEvents(
+      [{ type: 'unitMoved', unitId: 1, from: { x: 0, y: 0 }, to: { x: 1, y: 0 } }],
+      {
+        scene: mockScene as never,
+        gameStateSnapshot: baseState(),
+        unitSpritesById: new Map(),
+        bombGraphicsById: new Map(),
+        softBlockSpritesById: new Map(),
+        onError: vi.fn(),
+      }
+    );
+
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('unitMoved'));
+    warnSpy.mockRestore();
+  });
+
+  it('does not warn for an ignore-listed type (matchEnded)', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    playResolveTurnEvents([{ type: 'matchEnded', winnerTeamId: 1 }], {
+      scene: mockScene as never,
+      gameStateSnapshot: baseState(),
+      unitSpritesById: new Map(),
+      bombGraphicsById: new Map(),
+      softBlockSpritesById: new Map(),
+      onError: vi.fn(),
+    });
+
+    expect(warnSpy).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+});
