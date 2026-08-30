@@ -43,7 +43,7 @@ Landed outside this spec:
 
 ## Match Scene
 
-`MatchScene`'s resolve handler passes **only** `resolveTurnGameEvents` to `playResolveTurnEvents`. `planGameEvents` is skiped. This is what `submitTurnCommand` already animated during planning.
+`MatchScene`'s resolve handler passes **only** `resolveTurnGameEvents` to `playResolveTurnEvents`. `planGameEvents` is skipped. This is what `submitTurnCommand` already animated during planning.
 
 The discard is deliberate and positional. It does not depend on which types appear in either array, which is the property the current filter lacks.
 
@@ -53,7 +53,7 @@ Error handling, the generation guard, and the `turnPanel` refresh are unchanged.
 
 `resolveTurnPlayer` keeps its per-type cases but stops relying on fall-through as classification:
 
-- Types it deliberately ignores are named in an explicit ignore-list, so the assumption is stated in code rather than implied by omission.
+- Types it deliberately ignores are named in an explicit ignore-list, so the assumption is stated in code rather than implied by omission. Today that list holds only `matchEnded` — the one `GameEvtType` that legitimately reaches `resolveTurnGameEvents` without `resolveTurnPlayer` animating it, since `MatchScene` handles it separately. `unitMoved`/`bombPlaced` don't need a slot on the list: they never appear in `resolveTurnGameEvents` under the current phase split.
 - Any type outside both the handled set and the ignore-list logs a dev-mode warning naming the type. A future phase-spanning event then surfaces instead of misrendering.
 
 ## VS CPU
@@ -64,7 +64,7 @@ Unchanged. The CPU branch introduced in Phase 4.9 already consumes two arrays; a
 
 ## Acceptance Criteria
 
-1. Given a Player turn with a move and a bomb placement, when the turn is resolved, then each unit animates its move exactly once.
+1. Given a Player turn with a move and a bomb placement, when the turn is resolved, then the unit's move animates exactly once, during planning — resolving the turn does not replay it.
 2. Given a Player turn placing a bomb that detonates in the same turn, when the turn is resolved, then the explosion animates and no planning-phase `unitMoved` is replayed.
 3. Given a turn whose resolution produces no events, when the turn is resolved, then `resolveTurnGameEvents` is an empty array and the Player advances to the next turn without error.
 4. Given a VS CPU match, when the CPU turn is consumed, then rendering is unchanged from p4-spec008.
