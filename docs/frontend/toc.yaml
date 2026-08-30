@@ -91,3 +91,7 @@ specs:
     status: Draft
     category: Sprites
     completion-date:
+  - file: p4-spec100-error.md
+    status: Parked Draft
+    category: ErrorReporting
+    completion-date:

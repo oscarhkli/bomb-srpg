@@ -35,6 +35,7 @@ Specs will be written prior to development—partly handcrafted, and partly gene
 | [Phase 4.10: Refine 2-phase GameEvents Handling in ResolveTurn](p4-spec010-match.md) | Match | Done | 2026-08-30 |
 | [Phase 4.11: Swapping Sprites for Existing Vector Graphics in MatchSummaryPanel](p4-spec011-sprites.md) | Sprites | Draft | — |
 | [Phase 4.12: Refine UX in MatchScene on TurnCommand Buttons](p4-spec012-sprites.md) | Sprites | Draft | — |
+| [Phase 4.X: Error & Warning Reporting Taxonomy](p4-spec100-error.md) | ErrorReporting | Parked Draft | — |
 <!-- END SPEC TABLE -->
 
 ## Workflow
