@@ -53,40 +53,48 @@ func (m *Match) ApplyTurnCommand(cmd TurnCommand) ([]GameEvent, error) {
 	}
 }
 
-// CommandMoveUnit executes a unit relocation after verifying game rule compliance.
-// It calculates the active range, updates the board matrix, and commits a UnitMovedEvent.
-// Returns GameEvents produced or an error if the pathing rules are violated or if the target cell is blocked.
+// CommandMoveUnit wraps WorkingState MoveUnit and submit the result for mid-turn planning step.
+// Returns GameEvents produced or an error if MoveUnit validation gate doesn't pass.
 func (m *Match) CommandMoveUnit(unitID UnitID, target Coordinate) ([]GameEvent, error) {
-	unit, err := m.WorkingState.validateActiveUnit(unitID)
+	gameEvent, err := m.WorkingState.MoveUnit(unitID, target)
 	if err != nil {
 		return nil, err
 	}
+	m.SubmitAction(gameEvent)
+	return []GameEvent{gameEvent}, nil
+}
+
+// MoveUnit executes a unit relocation after verifying game rule compliance.
+// It calculates the active range, updates the board matrix, and commits a UnitMovedEvent.
+// Returns GameEvents produced or an error if the pathing rules are violated or if the target cell is blocked.
+func (gs *GameState) MoveUnit(unitID UnitID, target Coordinate) (GameEvent, error) {
+	unit, err := gs.validateActiveUnit(unitID)
+	if err != nil {
+		return GameEvent{}, err
+	}
 
 	if unit.HasMoved {
-		return nil, fmt.Errorf("%w: unit %#x already moved this turn", ErrAlreadyMoved, unitID)
+		return GameEvent{}, fmt.Errorf("%w: unit %#x already moved this turn", ErrAlreadyMoved, unitID)
 	}
 
-	tiles := m.WorkingState.FindReachableTiles(unit.Position, unit.NewMovementRule())
+	tiles := gs.FindReachableTiles(unit.Position, unit.NewMovementRule())
 
 	if _, ok := tiles[target]; !ok {
-		return nil, ErrOutOfMoveRange
+		return GameEvent{}, ErrOutOfMoveRange
 	}
 
-	// err will always be nil at the moment, not testable until the Skills implementation in Phase 4
-	if err = m.WorkingState.IsLandingLegal(target, OccupantUnit); err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrInvalidLanding, err)
+	// err will always be nil at the moment, not testable until the Skills implementation in Phase 4+
+	if err = gs.IsLandingLegal(target, OccupantUnit); err != nil {
+		return GameEvent{}, fmt.Errorf("%w: %w", ErrInvalidLanding, err)
 	}
 
 	oldPos := unit.Position
-	m.WorkingState.ClearStageTile(oldPos)
-	m.WorkingState.UpdateStageOccupant(target, OccupantUnit, int64(unitID))
+	gs.ClearStageTile(oldPos)
+	gs.UpdateStageOccupant(target, OccupantUnit, int64(unitID))
 	unit.Position = target
 	unit.HasMoved = true
 
-	gameEvent := NewUnitMovedEvent(unitID, oldPos, target)
-	m.SubmitAction(gameEvent)
-
-	return []GameEvent{gameEvent}, nil
+	return NewUnitMovedEvent(unitID, oldPos, target), nil
 }
 
 func (gs *GameState) validateActiveUnit(unitID UnitID) (*Unit, error) {
@@ -110,8 +118,8 @@ func (gs *GameState) validateActiveUnit(unitID UnitID) (*Unit, error) {
 	return unit, nil
 }
 
-// CommandPlaceBomb wraps WorkingState PlaceBomb and submit the result for mid-turn planning step
-// Returns GameEvents produced or an error if PlaceBomb validation gate doesn't pass
+// CommandPlaceBomb wraps WorkingState PlaceBomb and submit the result for mid-turn planning step.
+// Returns GameEvents produced or an error if PlaceBomb validation gate doesn't pass.
 func (m *Match) CommandPlaceBomb(unitID UnitID, target Coordinate) ([]GameEvent, error) {
 	gameEvent, err := m.WorkingState.PlaceBomb(unitID, target)
 	if err != nil {
@@ -178,7 +186,7 @@ func (gs *GameState) PlaceBomb(unitID UnitID, target Coordinate) (GameEvent, err
 
 // IsLandingLegal checks if the target is legal to be landed by a certain occupantType.
 // In Phase 1 it's used by placing Bomb only, but in future it will be used for skills like jump.
-func (gs GameState) IsLandingLegal(target Coordinate, occupantType OccupantType) error {
+func (gs *GameState) IsLandingLegal(target Coordinate, occupantType OccupantType) error {
 	if !gs.IsWithinBounds(target) {
 		return fmt.Errorf("%w: coordinate %v out of bounds", ErrOutOfBounds, target)
 	}
