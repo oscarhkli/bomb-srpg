@@ -57,7 +57,7 @@ func (m *Match) ApplyTurnCommand(cmd TurnCommand) ([]GameEvent, error) {
 // It calculates the active range, updates the board matrix, and commits a UnitMovedEvent.
 // Returns GameEvents produced or an error if the pathing rules are violated or if the target cell is blocked.
 func (m *Match) CommandMoveUnit(unitID UnitID, target Coordinate) ([]GameEvent, error) {
-	unit, err := m.validateActiveUnit(unitID)
+	unit, err := m.WorkingState.validateActiveUnit(unitID)
 	if err != nil {
 		return nil, err
 	}
@@ -89,78 +89,91 @@ func (m *Match) CommandMoveUnit(unitID UnitID, target Coordinate) ([]GameEvent, 
 	return []GameEvent{gameEvent}, nil
 }
 
-func (m *Match) validateActiveUnit(unitID UnitID) (*Unit, error) {
-	unit, ok := m.WorkingState.Units[unitID]
+func (gs *GameState) validateActiveUnit(unitID UnitID) (*Unit, error) {
+	unit, ok := gs.Units[unitID]
 	if !ok {
 		return nil, fmt.Errorf("%w: unit %#x does not exist", ErrUnitNotFound, unitID)
 	}
 	if unit.HP <= 0 {
 		return nil, fmt.Errorf("%w: unit %#x is dead", ErrUnitDead, unitID)
 	}
-	if unit.Team != m.WorkingState.ActiveTeam {
+	if unit.Team != gs.ActiveTeam {
 		return nil, fmt.Errorf("%w: unit %#x not active team", ErrNotActiveTeam, unitID)
 	}
-	if !m.WorkingState.IsWithinBounds(unit.Position) {
+	if !gs.IsWithinBounds(unit.Position) {
 		return nil, fmt.Errorf("%w: unit %#x out of bounds", ErrOutOfBounds, unitID)
 	}
-	cell := m.WorkingState.Grid[unit.Position.Y][unit.Position.X]
+	cell := gs.Grid[unit.Position.Y][unit.Position.X]
 	if cell.OccupantType != OccupantUnit || cell.OccupantID != int64(unitID) {
 		return nil, fmt.Errorf("%w: unit %#x desynced at %v", ErrDesynced, unitID, unit.Position)
 	}
 	return unit, nil
 }
 
-// CommandPlaceBomb executes a bomb deployment after verifying unit's bomb availability and grid compliance.
-// It validates placement range, registers a new Bomb state tracking instance, and commits a BombPlacedEvent.
-// Returns GameEvents produced or an error if the unit is running out of bombs, the target is out of range, or the cell is blocked.
+// CommandPlaceBomb wraps WorkingState PlaceBomb and submit the result for mid-turn planning step
+// Returns GameEvents produced or an error if PlaceBomb validation gate doesn't pass
 func (m *Match) CommandPlaceBomb(unitID UnitID, target Coordinate) ([]GameEvent, error) {
-	// identify the unit and check the availability
-	unit, err := m.validateActiveUnit(unitID)
+	gameEvent, err := m.WorkingState.PlaceBomb(unitID, target)
 	if err != nil {
 		return nil, err
 	}
-
-	if unit.HasUsedSkill {
-		return nil, fmt.Errorf("%w: unit %#x already used skill this turn", ErrAlreadyUsedSkill, unitID)
-	}
-
-	if unit.BombUsed >= unit.MaxBombCount {
-		return nil, fmt.Errorf("%w: unit %#x out of bombs", ErrOutOfBombs, unitID)
-	}
-
-	tiles := m.WorkingState.FindReachableTiles(unit.Position, unit.NewBombPlacementRule())
-
-	if _, ok := tiles[target]; !ok {
-		return nil, ErrOutOfBombRange
-	}
-
-	if err = m.WorkingState.IsLandingLegal(target, OccupantBomb); err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrInvalidLanding, err)
-	}
-
-	gameEvents := m.placeBomb(unitID, target, unit.BombPower)
-	unit.BombUsed++
-	unit.HasUsedSkill = true
-
-	return gameEvents, nil
+	m.SubmitAction(gameEvent)
+	return []GameEvent{gameEvent}, nil
 }
 
-func (m *Match) placeBomb(unitID UnitID, target Coordinate, bombPower int) []GameEvent {
-	m.WorkingState.TurnBombCounter++
+// PlaceBomb executes a bomb deployment after verifying unit's bomb availability and grid compliance.
+// It validates placement range, registers a new Bomb state tracking instance, and commits a BombPlacedEvent.
+// Returns GameEvents produced or an error if the unit is running out of bombs, the target is out of range, or the cell is blocked.
+func (gs *GameState) PlaceBomb(unitID UnitID, target Coordinate) (GameEvent, error) {
+	bombPower := BombDefaultPower
+	var unit *Unit
+
+	// identify the unit and check the availability for real Units only
+	if unitID != SystemUnitID {
+		var err error
+		unit, err = gs.validateActiveUnit(unitID)
+		if err != nil {
+			return GameEvent{}, err
+		}
+
+		if unit.HasUsedSkill {
+			return GameEvent{}, fmt.Errorf("%w: unit %#x already used skill this turn", ErrAlreadyUsedSkill, unitID)
+		}
+
+		if unit.BombUsed >= unit.MaxBombCount {
+			return GameEvent{}, fmt.Errorf("%w: unit %#x out of bombs", ErrOutOfBombs, unitID)
+		}
+
+		tiles := gs.FindReachableTiles(unit.Position, unit.NewBombPlacementRule())
+
+		if _, ok := tiles[target]; !ok {
+			return GameEvent{}, ErrOutOfBombRange
+		}
+
+		if err = gs.IsLandingLegal(target, OccupantBomb); err != nil {
+			return GameEvent{}, fmt.Errorf("%w: %w", ErrInvalidLanding, err)
+		}
+
+		bombPower = unit.BombPower
+	}
+
+	gs.TurnBombCounter++
 	bomb := &Bomb{
-		ID:        NewBombID(m.WorkingState.Turn, m.WorkingState.TurnBombCounter, unitID),
+		ID:        NewBombID(gs.Turn, gs.TurnBombCounter, unitID),
 		OwnerID:   unitID,
 		Position:  target,
 		Range:     bombPower,
-		Countdown: m.WorkingState.DeduceBombCountDown(target),
+		Countdown: gs.DeduceBombCountDown(target),
 	}
-	m.WorkingState.Bombs[bomb.ID] = bomb
-	m.WorkingState.UpdateStageOccupant(target, OccupantBomb, int64(bomb.ID))
+	gs.Bombs[bomb.ID] = bomb
+	gs.UpdateStageOccupant(target, OccupantBomb, int64(bomb.ID))
 
-	evt := NewBombPlacedEvent(unitID, bomb.ID, target, bomb.Range, bomb.Countdown)
-	m.SubmitAction(evt)
+	if unit != nil {
+		unit.BombUsed++
+		unit.HasUsedSkill = true
+	}
 
-	return []GameEvent{evt}
+	return NewBombPlacedEvent(unitID, bomb.ID, target, bomb.Range, bomb.Countdown), nil
 }
 
 // IsLandingLegal checks if the target is legal to be landed by a certain occupantType.
@@ -228,7 +241,13 @@ func (m *Match) injectSuddenDeathHazards() {
 	limit := min(len(emptyTilePos), SuddenDeathBombs)
 
 	for _, target := range emptyTilePos[:limit] {
-		m.placeBomb(SystemUnitID, target, BombDefaultPower)
+		gameEvent, err := m.WorkingState.PlaceBomb(SystemUnitID, target)
+		if err != nil {
+			// Pre-filtered to empty, non-block tiles. A rejection here just means one
+			// fewer sudden-death bomb this round. Skip the error, not worth failing the turn.
+			continue
+		}
+		m.SubmitAction(gameEvent)
 	}
 }
 
