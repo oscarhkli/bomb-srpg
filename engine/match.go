@@ -305,65 +305,81 @@ func (m *Match) ResolveTurn() (planGameEvents, resolveTurnGameEvents []GameEvent
 	return planGameEvents, resolveTurnGameEvents
 }
 
-// resolveBombExplosionAndDamage resolves bomb explosion, chain reaction and the damages made, and fire related GameEvents.
+// resolveBombExplosionAndDamage wraps WorkingState's ResolveBombExplosionAndDamage and fire related GameEvents obtained.
+func (m *Match) resolveBombExplosionAndDamage() {
+	m.PlaybackLog = append(m.PlaybackLog, m.WorkingState.ResolveBombExplosionAndDamage()...)
+}
+
+// ResolveBombExplosionAndDamage resolves bomb explosion, chain reaction and the damages made, and fire related GameEvents.
 // Note: All cascading chain reactions occur at the exact same physical millisecond within a turn.
 // Soft block / Item destroyed by an early explosion must continue to exist as a solid, ray-blocking obstacle for all subsequent waves of bombs
 // until the entire chain reaction loop is completely finished.
-func (m *Match) resolveBombExplosionAndDamage() {
-	explosionQueue, ignitedBombs := m.tickCountdownsAndQueueFuses()
+// Returns all GameEvents related to the Bombs
+func (gs *GameState) ResolveBombExplosionAndDamage() []GameEvent {
+	var gameEvents []GameEvent
 
-	frozenGrid := m.WorkingState.cloneGridSnapshot()
+	explosionQueue, ignitedBombs, bombCountdownUpdatedEvents := gs.tickCountdownsAndQueueFuses()
+	gameEvents = append(gameEvents, bombCountdownUpdatedEvents...)
+
+	frozenGrid := gs.cloneGridSnapshot()
 
 	// Setup delayed batch damange handling
 	damagedUnits := make(map[UnitID]bool)
 	destroyedSoftBlocks := make(map[int]bool)
 	destroyedItems := make(map[int]bool)
 
-	m.processChainDetonations(explosionQueue, ignitedBombs, frozenGrid, damagedUnits, destroyedSoftBlocks, destroyedItems)
-	m.handleDelayedBatchDamage(damagedUnits, destroyedSoftBlocks)
+	bombExplodedEvents := gs.processChainDetonations(explosionQueue, ignitedBombs, frozenGrid, damagedUnits, destroyedSoftBlocks, destroyedItems)
+	gameEvents = append(gameEvents, bombExplodedEvents...)
+	damagedEvents := gs.handleDelayedBatchDamage(damagedUnits, destroyedSoftBlocks)
+	gameEvents = append(gameEvents, damagedEvents...)
+
+	return gameEvents
 }
 
-func (m *Match) tickCountdownsAndQueueFuses() ([]BombID, map[BombID]bool) {
+func (gs *GameState) tickCountdownsAndQueueFuses() ([]BombID, map[BombID]bool, []GameEvent) {
 	var queue []BombID
 	ignited := make(map[BombID]bool)
 
-	for id, bomb := range m.WorkingState.Bombs {
+	var gameEvents []GameEvent
+	for id, bomb := range gs.Bombs {
 		if bomb.Countdown < 0 {
 			continue // Skip non-countdown bombs
 		}
 
 		bomb.Countdown--
-		m.PlaybackLog = append(m.PlaybackLog, NewBombCountdownUpdatedEvent(id, bomb.Position, bomb.Countdown))
+		gameEvents = append(gameEvents, NewBombCountdownUpdatedEvent(id, bomb.Position, bomb.Countdown))
 		if bomb.Countdown == 0 {
 			queue = append(queue, id)
 			ignited[id] = true
 		}
 	}
-	return queue, ignited
+	return queue, ignited, gameEvents
 }
 
 // processChainDetonations handles Occupant Destruction & Chain reaction.
-func (m *Match) processChainDetonations(
+// returns BombExplodedEvents caused by the chain reaction
+func (gs *GameState) processChainDetonations(
 	explosionQueue []BombID,
 	ignitedBombs map[BombID]bool,
 	frozenGrid [][]Tile,
 	damagedUnits map[UnitID]bool,
 	destroyedSoftBlocks map[int]bool,
 	destroyedItems map[int]bool,
-) {
+) []GameEvent {
+	var gameEvents []GameEvent
 	for len(explosionQueue) > 0 {
 		currBombID := explosionQueue[0]
 		explosionQueue = explosionQueue[1:]
 
-		currBomb, ok := m.WorkingState.Bombs[currBombID]
+		currBomb, ok := gs.Bombs[currBombID]
 		if !ok {
 			continue
 		}
-		if owner, ok := m.WorkingState.Units[currBomb.OwnerID]; ok {
+		if owner, ok := gs.Units[currBomb.OwnerID]; ok {
 			owner.BombUsed = max(owner.BombUsed-1, 0)
 		}
 
-		affectedTiles := m.WorkingState.FindReachableTilesOnSnapshot(currBomb.Position, frozenGrid, MovementRule{
+		affectedTiles := gs.FindReachableTilesOnSnapshot(currBomb.Position, frozenGrid, MovementRule{
 			MaxSteps:              currBomb.Range,
 			Pattern:               PatternCardinal,
 			PassPermissions:       PassUnits,
@@ -375,7 +391,7 @@ func (m *Match) processChainDetonations(
 		for pos := range affectedTiles {
 			affectedPos = append(affectedPos, pos)
 
-			tile := &m.WorkingState.Grid[pos.Y][pos.X]
+			tile := &gs.Grid[pos.Y][pos.X]
 			switch tile.OccupantType {
 			case OccupantBomb:
 				// chain reaction
@@ -384,7 +400,7 @@ func (m *Match) processChainDetonations(
 					continue
 				}
 
-				nextBomb, ok := m.WorkingState.Bombs[nextBombID]
+				nextBomb, ok := gs.Bombs[nextBombID]
 				if !ok {
 					continue
 				}
@@ -402,10 +418,11 @@ func (m *Match) processChainDetonations(
 			}
 		}
 
-		m.WorkingState.ClearStageTile(currBomb.Position)
-		delete(m.WorkingState.Bombs, currBombID)
-		m.PlaybackLog = append(m.PlaybackLog, NewBombExplodedEvent(currBombID, currBomb.Position, affectedPos))
+		gs.ClearStageTile(currBomb.Position)
+		delete(gs.Bombs, currBombID)
+		gameEvents = append(gameEvents, NewBombExplodedEvent(currBombID, currBomb.Position, affectedPos))
 	}
+	return gameEvents
 }
 
 // cloneGridSnapshot captures the exact state of the board before any bomb goes off.
@@ -419,39 +436,43 @@ func (gs *GameState) cloneGridSnapshot() [][]Tile {
 	return frozenGrid
 }
 
-// handleDelayedBatchDamage handles delayed batch damange after all ignited bombs detonated
-func (m *Match) handleDelayedBatchDamage(
+// handleDelayedBatchDamage handles delayed batch damange after all ignited bombs detonated.
+// Returns GameEvents related to damaging.
+func (gs *GameState) handleDelayedBatchDamage(
 	damagedUnits map[UnitID]bool,
 	destroyedSoftBlocks map[int]bool,
 	// destroyedItems map[int]bool,
-) {
+) []GameEvent {
+	var gameEvents []GameEvent
 	for unitID := range damagedUnits {
-		unit, ok := m.WorkingState.Units[unitID]
+		unit, ok := gs.Units[unitID]
 		if !ok {
 			continue
 		}
 
 		unit.HP -= 1
-		m.PlaybackLog = append(m.PlaybackLog, NewUnitDamagedEvent(unitID, unit.Position, unit.HP))
+		gameEvents = append(gameEvents, NewUnitDamagedEvent(unitID, unit.Position, unit.HP))
 
 		if unit.HP <= 0 {
-			m.WorkingState.ClearStageTile(unit.Position)
-			m.PlaybackLog = append(m.PlaybackLog, NewUnitDiedEvent(unitID, unit.Position))
+			gs.ClearStageTile(unit.Position)
+			gameEvents = append(gameEvents, NewUnitDiedEvent(unitID, unit.Position))
 		}
 	}
 
 	for softBlockID := range destroyedSoftBlocks {
-		softBlock, ok := m.WorkingState.SoftBlocks[softBlockID]
+		softBlock, ok := gs.SoftBlocks[softBlockID]
 		if !ok {
 			continue
 		}
 
-		m.WorkingState.ClearStageTile(softBlock.Position)
-		delete(m.WorkingState.SoftBlocks, softBlockID)
-		m.PlaybackLog = append(m.PlaybackLog, NewSoftBlockDestroyedEvent(softBlockID, softBlock.Position))
+		gs.ClearStageTile(softBlock.Position)
+		delete(gs.SoftBlocks, softBlockID)
+		gameEvents = append(gameEvents, NewSoftBlockDestroyedEvent(softBlockID, softBlock.Position))
 	}
 
 	// TODO: Item destruction in future phase
+
+	return gameEvents
 }
 
 // evaluateVictoryConditions defines each team's
