@@ -3,6 +3,8 @@ package cpu
 import (
 	"bomb-srpg/engine"
 	"fmt"
+	"slices"
+	"strings"
 )
 
 const (
@@ -12,11 +14,11 @@ const (
 	IdleScore = 0 // Neutral score.
 )
 
-// Candidate represent a possible action a Unit can take and what it scores.
-type Candidate struct {
-	TurnCommands []engine.TurnCommand // Multiple TurnCommands can be done in each Turn.
-	Score        int                  // The higher the better.
-	Tag          string               // Debug/log label.
+// candidate represents a possible action a Unit can take and what it scores.
+type candidate struct {
+	turnCommands []engine.TurnCommand // Multiple TurnCommands can be done in each Turn.
+	score        int                  // The higher the better.
+	tag          string               // Debug/log label.
 }
 
 // Decide computes the CPU's plan for the given sandbox state.
@@ -39,50 +41,124 @@ func Decide(gs *engine.GameState) []engine.TurnCommand {
 	}
 
 	for range maxRounds {
-		var best *Candidate
+		var best *candidate
 		for _, unit := range allies {
-			candidate, err := bestCandidateFor(unit, sandbox, allies, opponents)
+			c, err := bestCandidateFor(unit, sandbox, allies, opponents)
 			if err != nil {
 				// Sandbox hasn't been mutated yet, so if unexpected error occurs,
-				// skip this unit from the current round of Candidate selection.
+				// skip this unit from the current round of candidate selection.
 				continue
 			}
-			if best == nil || candidate.Score > best.Score {
-				best = &candidate
+			if best == nil || c.score > best.score {
+				best = &c
 			}
 		}
 
-		if best == nil || best.Score <= IdleScore {
+		if best == nil || best.score <= IdleScore {
 			break
 		}
 
-		err := applyCandidate(sandbox, *best)
-		if err != nil {
+		if err := applyCandidate(sandbox, *best); err != nil {
 			// Sandbox may now be partially mutated by best's own earlier commands this round.
 			// Stop here and return only the plan confirmed by prior, fully-applied rounds.
 			break
 		}
 
-		cmds = append(cmds, best.TurnCommands...)
+		cmds = append(cmds, best.turnCommands...)
 	}
 
 	return cmds
 }
 
-func bestCandidateFor(unit *engine.Unit, gs *engine.GameState, allies []*engine.Unit, opponents []*engine.Unit) (Candidate, error) {
-	// TODO:
-	// 1. Gather all the possible actions, idle/move/bomb/move+bomb/bomb+move
-	// 2. Evaluate all the result and get the score
-	// 3. Return the Candidate with the best score
-	return Candidate{[]engine.TurnCommand{}, IdleScore, "Idle"}, nil
+func bestCandidateFor(unit *engine.Unit, gs *engine.GameState, allies []*engine.Unit, opponents []*engine.Unit) (candidate, error) {
+	var candidates []candidate
+	for _, p := range plansFor(unit, gs) {
+		c, err := evaluate(unit, gs, allies, opponents, p)
+		if err != nil {
+			return candidate{}, err
+		}
+		candidates = append(candidates, c)
+	}
+	return slices.MaxFunc(candidates, func(a, b candidate) int {
+		return b.score - a.score
+	}), nil
 }
 
-func evaluate(unit *engine.Unit, gs *engine.GameState, allies []*engine.Unit, opponents []*engine.Unit, cmds []engine.TurnCommand) (Candidate, error) {
-	scratch := gs.DeepCopy()
-	err := applyCandidate(scratch, Candidate{TurnCommands: cmds})
-	if err != nil {
-		return Candidate{}, err
+// plansFor gathers all the possible actions, currently they should cover idle/move/bomb/move+bomb/bomb+move.
+// Refactor to include allies and opponents when working with Skills in future.
+// Returns all possible plans (slice of slice of TurnCommand) a Unit can take.
+func plansFor(unit *engine.Unit, gs *engine.GameState) [][]engine.TurnCommand {
+	movePlans := movePlansFor(unit, gs)
+	placeBombPlans := placeBombPlansFor(unit, gs)
+
+	plans := [][]engine.TurnCommand{{}} // Idle is an option
+	plans = append(plans, movePlans...)
+	plans = append(plans, placeBombPlans...)
+	plans = append(plans, combinePlans(unit, gs, movePlans, placeBombPlansFor)...)
+	plans = append(plans, combinePlans(unit, gs, placeBombPlans, movePlansFor)...)
+
+	return plans
+}
+
+// combinePlans pairs each of firstPlans with every plan second produces once firstPlans has been applied.
+// Return all possible plans under the specific combinations.
+func combinePlans(
+	unit *engine.Unit,
+	gs *engine.GameState,
+	firstPlans [][]engine.TurnCommand,
+	secondAction func(*engine.Unit, *engine.GameState) [][]engine.TurnCommand,
+) [][]engine.TurnCommand {
+	var plans [][]engine.TurnCommand
+	for _, first := range firstPlans {
+		scratch := gs.DeepCopy()
+		if err := applyCandidate(scratch, candidate{turnCommands: first}); err != nil {
+			continue
+		}
+		for _, next := range secondAction(unit, scratch) {
+			plans = append(plans, slices.Concat(first, next))
+		}
 	}
+	return plans
+}
+
+func movePlansFor(unit *engine.Unit, gs *engine.GameState) [][]engine.TurnCommand {
+	if unit.HasMoved {
+		return nil
+	}
+	return singleCommandPlans(unit, gs, engine.TurnCmdMove, engine.NewMoveCommand)
+}
+
+func placeBombPlansFor(unit *engine.Unit, gs *engine.GameState) [][]engine.TurnCommand {
+	if unit.HasUsedSkill || unit.BombUsed >= unit.MaxBombCount {
+		return nil
+	}
+	return singleCommandPlans(unit, gs, engine.TurnCmdPlaceBomb, engine.NewPlaceBombCommand)
+}
+
+func singleCommandPlans(unit *engine.Unit, gs *engine.GameState, turnCmdType engine.TurnCmdType, newCmd func(engine.UnitID, engine.Coordinate) engine.TurnCommand) [][]engine.TurnCommand {
+	var plans [][]engine.TurnCommand
+
+	allowedTiles, err := gs.FindAllowedTilesForCommand(unit.ID, turnCmdType)
+	if err != nil {
+		// Should never happen unless there are coding issues. Though it shouldn't affect much on the game play. Just shortcut it.
+		return plans
+	}
+
+	for pos := range allowedTiles {
+		plans = append(plans, []engine.TurnCommand{newCmd(unit.ID, pos)})
+	}
+
+	return plans
+}
+
+// evaluate forecasts the consequence if the Unit take certain actions.
+// Returns candidate with score and tags
+func evaluate(unit *engine.Unit, gs *engine.GameState, allies []*engine.Unit, opponents []*engine.Unit, cmds []engine.TurnCommand) (candidate, error) {
+	scratch := gs.DeepCopy()
+	if err := applyCandidate(scratch, candidate{turnCommands: cmds}); err != nil {
+		return candidate{}, err
+	}
+	tag := planTag(cmds)
 	// TODO:
 	// 3. Do 5 rounds of ResolveBombExplosionAndDamage
 	// 4. For each round, capture the AffectedPos, calculate various scores based on the AffectedPos
@@ -95,11 +171,23 @@ func evaluate(unit *engine.Unit, gs *engine.GameState, allies []*engine.Unit, op
 	// Distance between Current Ally and Opponent King - distSoftBlockClearForOpponentKing(dist, turn)
 	// distOpponentKing(dist, turn) + weighted sum(distOpponent(unit, dist, turn)) - distAllyKing(dist, turn) - weighted sum(distAlly(unit, dist, turn)) + distItem(unit, dist) + softblockClear(unit, dist)
 
-	return Candidate{[]engine.TurnCommand{}, IdleScore, "Idle"}, nil
+	return candidate{cmds, IdleScore, tag}, nil
 }
 
-func applyCandidate(gs *engine.GameState, candidate Candidate) error {
-	for _, cmd := range candidate.TurnCommands {
+func planTag(plan []engine.TurnCommand) string {
+	if len(plan) == 0 {
+		return "Idle"
+	}
+
+	parts := make([]string, len(plan))
+	for i, cmd := range plan {
+		parts[i] = fmt.Sprintf("%s(%d,%d)", cmd.Type, cmd.Target.X, cmd.Target.Y)
+	}
+	return strings.Join(parts, "+")
+}
+
+func applyCandidate(gs *engine.GameState, c candidate) error {
+	for _, cmd := range c.turnCommands {
 		var err error
 		switch cmd.Type {
 		case engine.TurnCmdMove:
