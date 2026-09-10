@@ -2,31 +2,31 @@ package cpu
 
 import (
 	"bomb-srpg/engine"
-	"maps"
 )
 
 const (
 	maxForecastTurn = 5 // Max number of turns to forcast the damage area for the future bomb.
 )
 
-// scoreContext holds the parameters stable across a candidate's whole 5-turn forecast.
-// Fields that vary per simulated turn live in turnResult instead.
+// scoreContext identifies the units a candidate's forecast scores against.
 type scoreContext struct {
-	unit      *engine.Unit
-	allies    []*engine.Unit
-	opponents []*engine.Unit
+	actorID        engine.UnitID
+	allyIDs        []engine.UnitID
+	opponentIDs    []engine.UnitID
+	allyKingID     engine.UnitID
+	opponentKingID engine.UnitID
 }
 
 // turnResult holds one simulated turn's outcome, rebuilt fresh each forecast iteration.
 type turnResult struct {
-	turn               int
-	blastTiles         map[engine.Coordinate]bool // this turn's AffectedPositions
-	cumulatedDeadUnits map[engine.UnitID]bool     // dead Units so far
-	distToKingBefore   int                        // unit's reachability to opponent King, before this turn resolved
-	distToKingAfter    int                        // unit's reachability to opponent King, after this turn resolved
+	turn                int                            // the nth next turn, not the exact turn number
+	affectedTiles       map[engine.Coordinate]struct{} // this turn's AffectedPositions
+	destroyedSoftBlocks int                            // this turn's softBlockDestroyed count
+	distToKingBefore    int                            // unit's reachability to opponent King, before this turn resolved
+	distToKingAfter     int                            // unit's reachability to opponent King, after this turn resolved
 }
 
-type scoreFactor func(sc scoreContext, tr turnResult) int
+type scoreFactor func(gs *engine.GameState, sc scoreContext, tr turnResult) int
 
 // evaluate forecasts the consequence if the Unit take certain actions.
 // Returns candidate with score and tags
@@ -36,41 +36,41 @@ func evaluate(sc scoreContext, gs *engine.GameState, cmds []engine.TurnCommand) 
 		return candidate{}, err
 	}
 
-	deadUnits := make(map[engine.UnitID]bool)
 	factors := scoreFactorsRegistry()
+	profile := defaultWeightProfile()
 	total := 0
 	for t := range maxForecastTurn {
-		distBefore := 0
-		gameEvents := scratch.ResolveBombExplosionAndDamage()
-		distAfter := 0
+		actor := scratch.Units[sc.actorID]
+		opponentKing := scratch.Units[sc.opponentKingID]
 
-		blastTiles := make(map[engine.Coordinate]bool)
+		distToKingBefore := reachDist(scratch, actor, opponentKing.Position)
+		gameEvents := scratch.ResolveBombExplosionAndDamage()
+		distToKingAfter := reachDist(scratch, actor, opponentKing.Position)
+
+		affectedTiles := make(map[engine.Coordinate]struct{})
+		destroyedSoftBlocks := 0
 		for _, evt := range gameEvents {
 			switch evt.Type {
 			case engine.GameEvtBombExploded:
 				for _, pos := range evt.AffectedPositions {
-					blastTiles[pos] = true
+					affectedTiles[pos] = struct{}{}
 				}
-			case engine.GameEvtUnitDied:
-				deadUnits[evt.UnitID] = true
+			case engine.GameEvtSoftBlockDestroyed:
+				destroyedSoftBlocks++
 			}
 		}
 
 		tr := turnResult{
-			turn:               t,
-			blastTiles:         blastTiles,
-			cumulatedDeadUnits: maps.Clone(deadUnits),
-			distToKingBefore:   distBefore,
-			distToKingAfter:    distAfter,
+			turn:                t,
+			affectedTiles:       affectedTiles,
+			destroyedSoftBlocks: destroyedSoftBlocks,
+			distToKingBefore:    distToKingBefore,
+			distToKingAfter:     distToKingAfter,
 		}
-		for _, factor := range factors {
-			total += factor(sc, tr)
+		for _, entry := range factors {
+			total += profile[entry.id] * entry.factor(scratch, sc, tr)
 		}
 	}
 
 	return candidate{cmds, total, planTag(cmds)}, nil
-}
-
-func dist(gs *engine.GameState, unit *engine.Unit, target engine.Coordinate) int {
-	return 0
 }

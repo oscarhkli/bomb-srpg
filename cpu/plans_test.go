@@ -28,7 +28,7 @@ func TestPlansFor(t *testing.T) {
 				center := engine.Coordinate{X: 4, Y: 4}
 				unit := addFighter(gs, engine.NewUnitID(1, 1), center)
 				for _, off := range crossOffsets(unit.Speed) {
-					setHardBlock(gs, engine.Coordinate{X: center.X + off.X, Y: center.Y + off.Y})
+					setTerrainBlock(gs, engine.Coordinate{X: center.X + off.X, Y: center.Y + off.Y})
 				}
 				return gs, unit
 			},

@@ -38,7 +38,7 @@ func addFighter(gs *engine.GameState, id engine.UnitID, pos engine.Coordinate) *
 	return u
 }
 
-func setHardBlock(gs *engine.GameState, pos engine.Coordinate) {
+func setTerrainBlock(gs *engine.GameState, pos engine.Coordinate) {
 	gs.Grid[pos.Y][pos.X] = engine.Tile{Type: engine.TerrainBlock}
 }
 

@@ -27,21 +27,36 @@ func Decide(gs *engine.GameState) []engine.TurnCommand {
 
 	allies := []*engine.Unit{}
 	opponents := []*engine.Unit{}
+	var allyKing *engine.Unit
+	var opponentKing *engine.Unit
 	for _, u := range gs.Units {
-		if u.HP <= 0 {
-			continue
-		}
 		if team, _ := u.ID.Decode(); team == 2 {
 			allies = append(allies, u)
+			if u.Role == engine.RoleKing || u.Role == engine.RoleBoss {
+				allyKing = u
+			}
 		} else {
 			opponents = append(opponents, u)
+			if u.Role == engine.RoleKing || u.Role == engine.RoleBoss {
+				opponentKing = u
+			}
 		}
+
+	}
+
+	allyIDs := make([]engine.UnitID, len(allies))
+	for i, u := range allies {
+		allyIDs[i] = u.ID
+	}
+	opponentIDs := make([]engine.UnitID, len(opponents))
+	for i, u := range opponents {
+		opponentIDs[i] = u.ID
 	}
 
 	for range maxAttempts {
 		var best *candidate
 		for _, unit := range allies {
-			sc := scoreContext{unit: unit, allies: allies, opponents: opponents}
+			sc := scoreContext{actorID: unit.ID, allyIDs: allyIDs, opponentIDs: opponentIDs, allyKingID: allyKing.ID, opponentKingID: opponentKing.ID}
 			c, err := bestCandidateFor(sc, sandbox)
 			if err != nil {
 				// Sandbox hasn't been mutated yet, so if unexpected error occurs,
@@ -71,7 +86,7 @@ func Decide(gs *engine.GameState) []engine.TurnCommand {
 
 func bestCandidateFor(sc scoreContext, gs *engine.GameState) (candidate, error) {
 	var candidates []candidate
-	for _, p := range plansFor(sc.unit, gs) {
+	for _, p := range plansFor(gs.Units[sc.actorID], gs) {
 		c, err := evaluate(sc, gs, p)
 		if err != nil {
 			return candidate{}, err

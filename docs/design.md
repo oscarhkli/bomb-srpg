@@ -160,7 +160,11 @@ bomb-srpg
 │       └── main.go
 │
 ├── cpu/                        <-- Pure CPU planner
-│   └── decisions.go            <-- Proposes a plan from a sandbox snapshot for CPU's turn
+│   ├── decisions.go            <-- Decide() entry point: proposes a plan from a sandbox snapshot
+│   ├── plans.go                <-- Enumerates a unit's candidate move/bomb TurnCommand combinations
+│   ├── scoring.go              <-- Scores a candidate plan by forecasting turns and summing weighted factors
+│   ├── factors.go              <-- Individual scoreFactor funcs (threat, risk, advance) feeding scoring
+│   └── distance.go             <-- Walking-distance helper
 │
 ├── server/                     <-- Phase 2: HTTP Web server package
 │   ├── http_handlers.go        <-- REST HTTP interface boundary
