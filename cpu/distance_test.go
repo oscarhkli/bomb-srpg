@@ -64,6 +64,16 @@ func TestReachDist(t *testing.T) {
 			target: engine.Coordinate{X: 0, Y: 0},
 			want:   -1,
 		},
+		{
+			name:    "Reachable through a bomb on the path",
+			newUnit: addFighter,
+			unitPos: engine.Coordinate{X: 2, Y: 2},
+			setupBoard: func(gs *engine.GameState, unit *engine.Unit) {
+				addBomb(gs, engine.NewBombID(1, 0, unit.ID), engine.Coordinate{X: 2, Y: 1})
+			},
+			target: engine.Coordinate{X: 2, Y: 0},
+			want:   2,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -19,14 +19,33 @@ type scoreContext struct {
 
 // turnResult holds one simulated turn's outcome, rebuilt fresh each forecast iteration.
 type turnResult struct {
-	turn                int                            // the nth next turn, not the exact turn number
-	affectedTiles       map[engine.Coordinate]struct{} // this turn's AffectedPositions
-	destroyedSoftBlocks int                            // this turn's softBlockDestroyed count
-	distToKingBefore    int                            // unit's reachability to opponent King, before this turn resolved
-	distToKingAfter     int                            // unit's reachability to opponent King, after this turn resolved
+	turn                 int                            // the nth next turn, not the exact turn number
+	affectedTiles        map[engine.Coordinate]struct{} // this turn's AffectedPositions
+	destroyedSoftBlocks  int                            // this turn's softBlockDestroyed count
+	diedUnits            map[engine.UnitID]struct{}     // this turn's dead units
+	distToKingBefore     int                            // unit's reachability to opponent King, before this turn resolved
+	distToKingAfter      int                            // unit's reachability to opponent King, after this turn resolved
+	aliveOpponentsBefore int                            // opponent non-King units alive, before this turn resolved
+	aliveOpponentsAfter  int                            // opponent non-King units alive, after this turn resolved
+	aliveAlliesBefore    int                            // ally non-King units alive, before this turn resolved
+	aliveAlliesAfter     int                            // ally non-King units alive, after this turn resolved
 }
 
 type scoreFactor func(gs *engine.GameState, sc scoreContext, tr turnResult) int
+
+// aliveCount returns how many of ids are alive in gs, excluding King.
+func aliveCount(gs *engine.GameState, ids []engine.UnitID, kingID engine.UnitID) int {
+	count := 0
+	for _, id := range ids {
+		if id == kingID {
+			continue
+		}
+		if u, ok := gs.Units[id]; ok && u.HP > 0 {
+			count++
+		}
+	}
+	return count
+}
 
 // evaluate forecasts the consequence if the Unit take certain actions.
 // Returns candidate with score and tags
@@ -44,11 +63,16 @@ func evaluate(sc scoreContext, gs *engine.GameState, cmds []engine.TurnCommand) 
 		opponentKing := scratch.Units[sc.opponentKingID]
 
 		distToKingBefore := reachDist(scratch, actor, opponentKing.Position)
+		aliveOpponentsBefore := aliveCount(scratch, sc.opponentIDs, sc.opponentKingID)
+		aliveAlliesBefore := aliveCount(scratch, sc.allyIDs, sc.allyKingID)
 		gameEvents := scratch.ResolveBombExplosionAndDamage()
 		distToKingAfter := reachDist(scratch, actor, opponentKing.Position)
+		aliveOpponentsAfter := aliveCount(scratch, sc.opponentIDs, sc.opponentKingID)
+		aliveAlliesAfter := aliveCount(scratch, sc.allyIDs, sc.allyKingID)
 
 		affectedTiles := make(map[engine.Coordinate]struct{})
 		destroyedSoftBlocks := 0
+		diedUnits := make(map[engine.UnitID]struct{})
 		for _, evt := range gameEvents {
 			switch evt.Type {
 			case engine.GameEvtBombExploded:
@@ -57,15 +81,22 @@ func evaluate(sc scoreContext, gs *engine.GameState, cmds []engine.TurnCommand) 
 				}
 			case engine.GameEvtSoftBlockDestroyed:
 				destroyedSoftBlocks++
+			case engine.GameEvtUnitDied:
+				diedUnits[evt.UnitID] = struct{}{}
 			}
 		}
 
 		tr := turnResult{
-			turn:                t,
-			affectedTiles:       affectedTiles,
-			destroyedSoftBlocks: destroyedSoftBlocks,
-			distToKingBefore:    distToKingBefore,
-			distToKingAfter:     distToKingAfter,
+			turn:                 t,
+			affectedTiles:        affectedTiles,
+			destroyedSoftBlocks:  destroyedSoftBlocks,
+			diedUnits:            diedUnits,
+			distToKingBefore:     distToKingBefore,
+			distToKingAfter:      distToKingAfter,
+			aliveOpponentsBefore: aliveOpponentsBefore,
+			aliveOpponentsAfter:  aliveOpponentsAfter,
+			aliveAlliesBefore:    aliveAlliesBefore,
+			aliveAlliesAfter:     aliveAlliesAfter,
 		}
 		for _, entry := range factors {
 			total += profile[entry.id] * entry.factor(scratch, sc, tr)

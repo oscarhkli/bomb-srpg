@@ -2,12 +2,14 @@ package cpu
 
 import "bomb-srpg/engine"
 
-// reachDist returns the walking distance from unit to target.
+// reachDist returns the walking distance from unit to target, ignoring bombs
+// so a unit's own still-ticking bomb doesn't distort its reachability.
 // Returns -1 if target is unreachable.
 func reachDist(gs *engine.GameState, unit *engine.Unit, target engine.Coordinate) int {
 	rule := unit.NewMovementRule()
 	rule.MaxSteps = -1
 	rule.CanTurn = true
+	rule.PassPermissions |= engine.PassBombs
 
 	if d, ok := gs.FindReachableTiles(unit.Position, rule)[target]; ok {
 		return d

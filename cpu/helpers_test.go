@@ -19,8 +19,8 @@ func newTestGameState(width, height int) *engine.GameState {
 	}
 }
 
-func addFighter(gs *engine.GameState, id engine.UnitID, pos engine.Coordinate) *engine.Unit {
-	archetype, _ := engine.GetArchetype("Fighter")
+func addUnit(gs *engine.GameState, id engine.UnitID, pos engine.Coordinate, archetypeName string, role engine.UnitRole) *engine.Unit {
+	archetype, _ := engine.GetArchetype(archetypeName)
 	u := &engine.Unit{
 		ID:           id,
 		Type:         archetype,
@@ -32,10 +32,19 @@ func addFighter(gs *engine.GameState, id engine.UnitID, pos engine.Coordinate) *
 		MaxBombCount: archetype.MaxBombCount,
 		Team:         1,
 		HP:           archetype.BaseHP,
+		Role:         role,
 	}
 	gs.Units[id] = u
 	gs.Grid[pos.Y][pos.X] = engine.Tile{Type: engine.TerrainPlain, OccupantType: engine.OccupantUnit, OccupantID: int64(id)}
 	return u
+}
+
+func addFighter(gs *engine.GameState, id engine.UnitID, pos engine.Coordinate) *engine.Unit {
+	return addUnit(gs, id, pos, "Fighter", engine.RoleNormal)
+}
+
+func addKing(gs *engine.GameState, id engine.UnitID, pos engine.Coordinate) *engine.Unit {
+	return addUnit(gs, id, pos, "King", engine.RoleKing)
 }
 
 func setTerrainBlock(gs *engine.GameState, pos engine.Coordinate) {
