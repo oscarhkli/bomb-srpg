@@ -178,14 +178,11 @@ const (
 // exposureIndex deduces a unit's exposure to the nearest affected tile, as a 0..1 ratio.
 // turnOffset is how many turns of this unit's certain-kill window have already elapsed.
 func exposureIndex(gs *engine.GameState, unitID engine.UnitID, tr turnResult, turnOffset int) float64 {
-	if tr.turn <= turnOffset || len(tr.affectedTiles) == 0 {
+	if len(tr.affectedTiles) == 0 {
 		return 0
 	}
 
 	unit := gs.Units[unitID]
-	if unit.HP <= 0 {
-		return 0
-	}
 
 	dist := nearestAffectedDist(gs, unit, tr.affectedTiles)
 	if dist == -1 {
@@ -198,7 +195,7 @@ func exposureIndex(gs *engine.GameState, unitID engine.UnitID, tr turnResult, tu
 	}
 
 	distRisk := decayRatio(dist, riskFreeDist, kDist)
-	turnRisk := decayRatio(tr.turn-turnOffset, maxForecastTurn, kTurn)
+	turnRisk := decayRatio(max(tr.turn-turnOffset, 0), maxForecastTurn, kTurn)
 
 	return distRisk * turnRisk * escapeRatio
 }
@@ -213,10 +210,23 @@ func riskAllyKing(gs *engine.GameState, sc scoreContext, tr turnResult) int {
 	return int(float64(riskKingScore) * exposureIndex(gs, sc.allyKingID, tr, 1))
 }
 
+// nonKingCount returns how many of ids aren't kingID, alive or not — the fixed group size
+// to average risk/threat exposure over, so a wipeout still scores instead of dividing by zero.
+func nonKingCount(ids []engine.UnitID, kingID engine.UnitID) int {
+	count := 0
+	for _, id := range ids {
+		if id != kingID {
+			count++
+		}
+	}
+	return count
+}
+
 // threatOpponents deduces the average score based on the distance between Opponents and bomb affected tile triggered in which Turns.
 func threatOpponents(gs *engine.GameState, sc scoreContext, tr turnResult) int {
 	turnOffset := 0
-	if tr.turn <= turnOffset || len(tr.affectedTiles) == 0 || tr.aliveOpponentsAfter == 0 {
+	total := nonKingCount(sc.opponentIDs, sc.opponentKingID)
+	if len(tr.affectedTiles) == 0 || total == 0 {
 		return 0
 	}
 
@@ -228,13 +238,14 @@ func threatOpponents(gs *engine.GameState, sc scoreContext, tr turnResult) int {
 		sum += exposureIndex(gs, unitID, tr, turnOffset)
 	}
 
-	return int(float64(riskUnitScore) * sum / float64(tr.aliveOpponentsAfter))
+	return int(float64(riskUnitScore) * sum / float64(total))
 }
 
 // riskAllies deduces the average score based on the distance between Allies and bomb affected tile triggered in which Turns.
 func riskAllies(gs *engine.GameState, sc scoreContext, tr turnResult) int {
 	turnOffset := 1
-	if tr.turn <= turnOffset || len(tr.affectedTiles) == 0 || tr.aliveAlliesAfter == 0 {
+	total := nonKingCount(sc.allyIDs, sc.allyKingID)
+	if len(tr.affectedTiles) == 0 || total == 0 {
 		return 0
 	}
 
@@ -246,5 +257,5 @@ func riskAllies(gs *engine.GameState, sc scoreContext, tr turnResult) int {
 		sum += exposureIndex(gs, unitID, tr, turnOffset)
 	}
 
-	return int(float64(riskUnitScore) * sum / float64(tr.aliveAlliesAfter))
+	return int(float64(riskUnitScore) * sum / float64(total))
 }

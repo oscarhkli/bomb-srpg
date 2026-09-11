@@ -8,8 +8,6 @@ import (
 
 const (
 	maxAttempts = 15 // Max attempt for candidates selection. Defensive way to prevent from infinite loop.
-
-	neutralScore = 0
 )
 
 // candidate represents a possible action a Unit can take and what it scores.
@@ -74,7 +72,7 @@ func Decide(gs *engine.GameState) []engine.TurnCommand {
 			}
 		}
 
-		if best == nil || best.score <= neutralScore {
+		if best == nil || len(best.turnCommands) == 0 {
 			break
 		}
 

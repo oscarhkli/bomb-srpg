@@ -349,13 +349,13 @@ var kingExposureCases = []struct {
 		k: 1, want: 0,
 	},
 	{
-		name: "King already dead",
+		name: "King already dead: still scores frozen-position exposure",
 		setup: func(gs *engine.GameState) (*engine.Unit, map[engine.Coordinate]struct{}) {
 			king := addKing(gs, engine.NewUnitID(2, 1), engine.Coordinate{X: 2, Y: 2})
 			king.HP = 0
 			return king, map[engine.Coordinate]struct{}{{X: 0, Y: 0}: {}}
 		},
-		k: 1, want: 0,
+		k: 1, want: 1794,
 	},
 	{
 		name: "Affected tile unreachable: King boxed in by TerrainBlocks",
@@ -386,13 +386,13 @@ var kingExposureCases = []struct {
 }
 
 func TestThreatOpponentKing(t *testing.T) {
-	t.Run("Excluded at T+0", func(t *testing.T) {
+	t.Run("At T+0: scores as urgent, not excluded", func(t *testing.T) {
 		gs := newTestGameState(9, 9)
 		king := addKing(gs, engine.NewUnitID(2, 1), engine.Coordinate{X: 2, Y: 2})
 		sc := scoreContext{opponentKingID: king.ID}
 		tr := turnResult{turn: 0, affectedTiles: map[engine.Coordinate]struct{}{{X: 2, Y: 2}: {}}}
-		if got := threatOpponentKing(gs, sc, tr); got != 0 {
-			t.Errorf("threatOpponentKing() = %d, want 0", got)
+		if got, want := threatOpponentKing(gs, sc, tr), 2500; got != want {
+			t.Errorf("threatOpponentKing() = %d, want %d", got, want)
 		}
 	})
 	for _, tt := range kingExposureCases {
@@ -411,13 +411,13 @@ func TestThreatOpponentKing(t *testing.T) {
 
 func TestRiskAllyKing(t *testing.T) {
 	for _, turn := range []int{0, 1} {
-		t.Run(fmt.Sprintf("Excluded at T+%d", turn), func(t *testing.T) {
+		t.Run(fmt.Sprintf("At T+%d: scores as urgent, not excluded", turn), func(t *testing.T) {
 			gs := newTestGameState(9, 9)
 			king := addKing(gs, engine.NewUnitID(1, 1), engine.Coordinate{X: 2, Y: 2})
 			sc := scoreContext{allyKingID: king.ID}
 			tr := turnResult{turn: turn, affectedTiles: map[engine.Coordinate]struct{}{{X: 2, Y: 2}: {}}}
-			if got := riskAllyKing(gs, sc, tr); got != 0 {
-				t.Errorf("riskAllyKing() = %d, want 0", got)
+			if got, want := riskAllyKing(gs, sc, tr), 2500; got != want {
+				t.Errorf("riskAllyKing() = %d, want %d", got, want)
 			}
 		})
 	}
@@ -454,13 +454,13 @@ func twoAlliesAveraged(gs *engine.GameState) (unitIDs []engine.UnitID, kingID en
 }
 
 func TestThreatOpponents(t *testing.T) {
-	t.Run("Excluded at T+0", func(t *testing.T) {
+	t.Run("At T+0: scores as urgent, not excluded", func(t *testing.T) {
 		gs := newTestGameState(9, 9)
 		unitIDs, kingID, affectedTiles := twoOpponentsAveraged(gs)
 		sc := scoreContext{opponentIDs: unitIDs, opponentKingID: kingID}
 		tr := turnResult{turn: 0, affectedTiles: affectedTiles, aliveOpponentsAfter: 2}
-		if got := threatOpponents(gs, sc, tr); got != 0 {
-			t.Errorf("threatOpponents() = %d, want 0", got)
+		if got, want := threatOpponents(gs, sc, tr), 250; got != want {
+			t.Errorf("threatOpponents() = %d, want %d", got, want)
 		}
 	})
 	t.Run("No affected tile this tick", func(t *testing.T) {
@@ -472,13 +472,27 @@ func TestThreatOpponents(t *testing.T) {
 			t.Errorf("threatOpponents() = %d, want 0", got)
 		}
 	})
-	t.Run("No alive opponents", func(t *testing.T) {
+	t.Run("Empty opponent roster (King only)", func(t *testing.T) {
 		gs := newTestGameState(9, 9)
-		unitIDs, kingID, affectedTiles := twoOpponentsAveraged(gs)
-		sc := scoreContext{opponentIDs: unitIDs, opponentKingID: kingID}
+		_, kingID, affectedTiles := twoOpponentsAveraged(gs)
+		sc := scoreContext{opponentIDs: []engine.UnitID{kingID}, opponentKingID: kingID}
 		tr := turnResult{turn: 1, affectedTiles: affectedTiles, aliveOpponentsAfter: 0}
 		if got := threatOpponents(gs, sc, tr); got != 0 {
 			t.Errorf("threatOpponents() = %d, want 0", got)
+		}
+	})
+	t.Run("All opponents dead: still scores their frozen-position exposure", func(t *testing.T) {
+		gs := newTestGameState(9, 9)
+		unitIDs, kingID, affectedTiles := twoOpponentsAveraged(gs)
+		for _, id := range unitIDs {
+			if id != kingID {
+				gs.Units[id].HP = 0
+			}
+		}
+		sc := scoreContext{opponentIDs: unitIDs, opponentKingID: kingID}
+		tr := turnResult{turn: 1, affectedTiles: affectedTiles, aliveOpponentsAfter: 0}
+		if got, want := threatOpponents(gs, sc, tr), 239; got != want {
+			t.Errorf("threatOpponents() = %d, want %d", got, want)
 		}
 	})
 
@@ -505,13 +519,13 @@ func TestThreatOpponents(t *testing.T) {
 
 func TestRiskAllies(t *testing.T) {
 	for _, turn := range []int{0, 1} {
-		t.Run(fmt.Sprintf("Excluded at T+%d", turn), func(t *testing.T) {
+		t.Run(fmt.Sprintf("At T+%d: scores as urgent, not excluded", turn), func(t *testing.T) {
 			gs := newTestGameState(9, 9)
 			unitIDs, kingID, affectedTiles := twoAlliesAveraged(gs)
 			sc := scoreContext{allyIDs: unitIDs, allyKingID: kingID}
 			tr := turnResult{turn: turn, affectedTiles: affectedTiles, aliveAlliesAfter: 2}
-			if got := riskAllies(gs, sc, tr); got != 0 {
-				t.Errorf("riskAllies() = %d, want 0", got)
+			if got, want := riskAllies(gs, sc, tr), 250; got != want {
+				t.Errorf("riskAllies() = %d, want %d", got, want)
 			}
 		})
 	}
@@ -524,13 +538,27 @@ func TestRiskAllies(t *testing.T) {
 			t.Errorf("riskAllies() = %d, want 0", got)
 		}
 	})
-	t.Run("No alive allies", func(t *testing.T) {
+	t.Run("Empty ally roster (King only)", func(t *testing.T) {
 		gs := newTestGameState(9, 9)
-		unitIDs, kingID, affectedTiles := twoAlliesAveraged(gs)
-		sc := scoreContext{allyIDs: unitIDs, allyKingID: kingID}
+		_, kingID, affectedTiles := twoAlliesAveraged(gs)
+		sc := scoreContext{allyIDs: []engine.UnitID{kingID}, allyKingID: kingID}
 		tr := turnResult{turn: 2, affectedTiles: affectedTiles, aliveAlliesAfter: 0}
 		if got := riskAllies(gs, sc, tr); got != 0 {
 			t.Errorf("riskAllies() = %d, want 0", got)
+		}
+	})
+	t.Run("All allies dead: still scores their frozen-position exposure", func(t *testing.T) {
+		gs := newTestGameState(9, 9)
+		unitIDs, kingID, affectedTiles := twoAlliesAveraged(gs)
+		for _, id := range unitIDs {
+			if id != kingID {
+				gs.Units[id].HP = 0
+			}
+		}
+		sc := scoreContext{allyIDs: unitIDs, allyKingID: kingID}
+		tr := turnResult{turn: 2, affectedTiles: affectedTiles, aliveAlliesAfter: 0}
+		if got, want := riskAllies(gs, sc, tr), 239; got != want {
+			t.Errorf("riskAllies() = %d, want %d", got, want)
 		}
 	})
 

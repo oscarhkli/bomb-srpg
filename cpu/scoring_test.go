@@ -101,11 +101,11 @@ func TestEvaluate(t *testing.T) {
 		{
 			name: "Immediate kill, isolated from other factors",
 			setup: func() (*engine.GameState, scoreContext, []engine.TurnCommand) {
-				gs := newTestGameState(5, 5)
-				actor := addFighter(gs, engine.NewUnitID(1, 1), engine.Coordinate{X: 0, Y: 0})
+				gs := newTestGameState(16, 16)
+				actor := addFighter(gs, engine.NewUnitID(1, 1), engine.Coordinate{X: 10, Y: 10})
 				opponent := addFighter(gs, engine.NewUnitID(2, 1), engine.Coordinate{X: 2, Y: 2})
-				allyKing := addKing(gs, engine.NewUnitID(1, 2), engine.Coordinate{X: 0, Y: 4})
-				opponentKing := addKing(gs, engine.NewUnitID(2, 2), engine.Coordinate{X: 4, Y: 0})
+				allyKing := addKing(gs, engine.NewUnitID(1, 2), engine.Coordinate{X: 15, Y: 15})
+				opponentKing := addKing(gs, engine.NewUnitID(2, 2), engine.Coordinate{X: 0, Y: 15})
 
 				bombID := engine.NewBombID(0, 0, actor.ID)
 				bombPos := engine.Coordinate{X: 1, Y: 2}
@@ -121,7 +121,7 @@ func TestEvaluate(t *testing.T) {
 				}
 				return gs, sc, nil
 			},
-			wantTotal: killUnitScore,
+			wantTotal: killUnitScore + 500,
 			wantTag:   "Idle",
 		},
 		{

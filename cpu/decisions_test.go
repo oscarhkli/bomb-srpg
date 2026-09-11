@@ -152,8 +152,8 @@ func TestBestCandidateFor(t *testing.T) {
 		if want := "move(1,0)"; got.tag != want {
 			t.Errorf("bestCandidateFor() tag = %q, want %q (score %d)", got.tag, want, got.score)
 		}
-		if got.score != neutralScore {
-			t.Errorf("bestCandidateFor() score = %d, want %d", got.score, neutralScore)
+		if want := -491; got.score != want {
+			t.Errorf("bestCandidateFor() score = %d, want %d", got.score, want)
 		}
 	})
 
@@ -177,8 +177,8 @@ func TestBestCandidateFor(t *testing.T) {
 		if want := "Idle"; got.tag != want {
 			t.Errorf("bestCandidateFor() tag = %q, want %q", got.tag, want)
 		}
-		if got.score != neutralScore {
-			t.Errorf("bestCandidateFor() score = %d, want %d", got.score, neutralScore)
+		if got.score != 0 {
+			t.Errorf("bestCandidateFor() score = %d, want %d", got.score, 0)
 		}
 	})
 }
@@ -306,6 +306,83 @@ func TestDecide_MoveCommandWinsOnItsOwn(t *testing.T) {
 	}
 	if !reflect.DeepEqual(gs, before) {
 		t.Errorf("Decide() mutated its input GameState")
+	}
+}
+
+func TestDecide_MovesEvenWhenEveryPlanScoresBelowNeutral(t *testing.T) {
+	gs := newTestGameState(20, 20)
+	allyKing := addKing(gs, engine.NewUnitID(2, 1), engine.Coordinate{X: 4, Y: 4})
+	allyKing.HP = 5
+	allyKing.BombUsed = allyKing.MaxBombCount
+	addKing(gs, engine.NewUnitID(1, 1), engine.Coordinate{X: 19, Y: 19})
+
+	bombID := engine.BombID(1)
+	bombPos := engine.Coordinate{X: 4, Y: 5}
+	gs.Bombs[bombID] = &engine.Bomb{ID: bombID, OwnerID: engine.NewUnitID(0, 0), Position: bombPos, Range: 1, Countdown: 3}
+	gs.Grid[bombPos.Y][bombPos.X] = engine.Tile{Type: engine.TerrainPlain, OccupantType: engine.OccupantBomb, OccupantID: int64(bombID)}
+
+	before := gs.DeepCopy()
+
+	got := Decide(gs)
+
+	if len(got) != 1 || got[0].Type != engine.TurnCmdMove || got[0].UnitID != allyKing.ID {
+		t.Fatalf("Decide() = %+v, want a single move from %v", got, allyKing.ID)
+	}
+	if !reflect.DeepEqual(gs, before) {
+		t.Errorf("Decide() mutated its input GameState")
+	}
+}
+
+func TestDecide_PrefersFartherSafeTile(t *testing.T) {
+	gs := newTestGameState(20, 20)
+	boss := addUnit(gs, engine.NewUnitID(2, 1), engine.Coordinate{X: 4, Y: 2}, "Prologue", engine.RoleBoss)
+	boss.HP = 1
+	boss.BombUsed = boss.MaxBombCount
+	addKing(gs, engine.NewUnitID(1, 1), engine.Coordinate{X: 19, Y: 19})
+
+	bombA := engine.BombID(1)
+	bombAPos := engine.Coordinate{X: 4, Y: 3}
+	gs.Bombs[bombA] = &engine.Bomb{ID: bombA, OwnerID: engine.NewUnitID(1, 0), Position: bombAPos, Range: 1, Countdown: 1}
+	gs.Grid[bombAPos.Y][bombAPos.X] = engine.Tile{Type: engine.TerrainPlain, OccupantType: engine.OccupantBomb, OccupantID: int64(bombA)}
+
+	bombB := engine.BombID(2)
+	bombBPos := engine.Coordinate{X: 2, Y: 2}
+	gs.Bombs[bombB] = &engine.Bomb{ID: bombB, OwnerID: engine.NewUnitID(1, 0), Position: bombBPos, Range: 2, Countdown: 2}
+	gs.Grid[bombBPos.Y][bombBPos.X] = engine.Tile{Type: engine.TerrainPlain, OccupantType: engine.OccupantBomb, OccupantID: int64(bombB)}
+
+	got := Decide(gs)
+
+	if len(got) != 1 || got[0].Type != engine.TurnCmdMove || got[0].UnitID != boss.ID {
+		t.Fatalf("Decide() = %+v, want a single move from %v", got, boss.ID)
+	}
+	if got[0].Target == (engine.Coordinate{X: 5, Y: 2}) {
+		t.Errorf("Decide() moved to %+v, want a tile farther from bombB's blast", got[0].Target)
+	}
+}
+
+func TestDecide_MovesToFarthestSafeTile(t *testing.T) {
+	gs := newTestGameState(20, 20)
+	boss := addUnit(gs, engine.NewUnitID(2, 1), engine.Coordinate{X: 5, Y: 3}, "Prologue", engine.RoleBoss)
+	boss.HP = 5
+	boss.BombUsed = boss.MaxBombCount
+	addKing(gs, engine.NewUnitID(1, 1), engine.Coordinate{X: 19, Y: 19})
+
+	bombB := engine.BombID(1)
+	bombBPos := engine.Coordinate{X: 5, Y: 4}
+	gs.Bombs[bombB] = &engine.Bomb{ID: bombB, OwnerID: boss.ID, Position: bombBPos, Range: 2, Countdown: 3}
+	gs.Grid[bombBPos.Y][bombBPos.X] = engine.Tile{Type: engine.TerrainPlain, OccupantType: engine.OccupantBomb, OccupantID: int64(bombB)}
+
+	bombA := engine.BombID(2)
+	bombAPos := engine.Coordinate{X: 3, Y: 3}
+	gs.Bombs[bombA] = &engine.Bomb{ID: bombA, OwnerID: engine.NewUnitID(1, 0), Position: bombAPos, Range: 2, Countdown: 4}
+	gs.Grid[bombAPos.Y][bombAPos.X] = engine.Tile{Type: engine.TerrainPlain, OccupantType: engine.OccupantBomb, OccupantID: int64(bombA)}
+
+	farTiles := []engine.Coordinate{{X: 5, Y: 1}, {X: 7, Y: 3}}
+
+	got := Decide(gs)
+
+	if len(got) != 1 || got[0].Type != engine.TurnCmdMove || got[0].UnitID != boss.ID || !slices.Contains(farTiles, got[0].Target) {
+		t.Errorf("Decide() = %+v, want a single move from %v to one of %+v", got, boss.ID, farTiles)
 	}
 }
 
