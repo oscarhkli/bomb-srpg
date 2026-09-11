@@ -2,6 +2,8 @@ package cpu
 
 import (
 	"bomb-srpg/engine"
+	"fmt"
+	"math"
 	"testing"
 )
 
@@ -248,6 +250,306 @@ func TestKillAllyKing(t *testing.T) {
 
 			if got := killAllyKing(nil, sc, tr); got != tt.want {
 				t.Errorf("killAllyKing() = %d, want %d", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDecayRatio(t *testing.T) {
+	tests := []struct {
+		name string
+		x    int
+		t    int
+		k    float64
+		want float64
+	}{
+		{name: "x=0: full weight", x: 0, t: 5, k: 0.6, want: 1.0},
+		{name: "x=t: fully decayed", x: 5, t: 5, k: 0.6, want: 0.0},
+		{name: "x>t: past the boundary", x: 6, t: 5, k: 0.6, want: 0.0},
+		{name: "interior, turn axis scale", x: 2, t: 5, k: 0.6, want: 0.8784358579},
+		{name: "interior, dist axis scale", x: 3, t: riskFreeDist, k: kDist, want: 0.8807970780},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := decayRatio(tt.x, tt.t, tt.k); math.Abs(got-tt.want) > 1e-9 {
+				t.Errorf("decayRatio(%d,%d,%v) = %v, want %v", tt.x, tt.t, tt.k, got, tt.want)
+			}
+		})
+	}
+}
+
+// onAffectedTile, hasAnOut and nearNotOnIt are shared setups for TestThreatOpponentKing
+// and TestRiskAllyKing: same King, only the affected tiles around it differ.
+func onAffectedTile(gs *engine.GameState) (*engine.Unit, map[engine.Coordinate]struct{}) {
+	king := addKing(gs, engine.NewUnitID(2, 1), engine.Coordinate{X: 2, Y: 2})
+	return king, map[engine.Coordinate]struct{}{
+		{X: 2, Y: 2}: {}, {X: 2, Y: 1}: {}, {X: 2, Y: 3}: {}, {X: 1, Y: 2}: {}, {X: 3, Y: 2}: {},
+	}
+}
+
+func hasAnOut(gs *engine.GameState) (*engine.Unit, map[engine.Coordinate]struct{}) {
+	king := addKing(gs, engine.NewUnitID(2, 1), engine.Coordinate{X: 2, Y: 2})
+	return king, map[engine.Coordinate]struct{}{{X: 2, Y: 2}: {}}
+}
+
+func nearNotOnIt(gs *engine.GameState) (*engine.Unit, map[engine.Coordinate]struct{}) {
+	king := addKing(gs, engine.NewUnitID(2, 1), engine.Coordinate{X: 2, Y: 2})
+	return king, map[engine.Coordinate]struct{}{{X: 2, Y: 5}: {}}
+}
+
+func TestEscapable(t *testing.T) {
+	tests := []struct {
+		name  string
+		setup func(gs *engine.GameState) (*engine.Unit, map[engine.Coordinate]struct{})
+		want  bool
+	}{
+		{name: "Has an out", setup: hasAnOut, want: true},
+		{name: "Cornered", setup: onAffectedTile, want: false},
+		{
+			name: "Unit not registered in gs.Units: treated as escapable",
+			setup: func(gs *engine.GameState) (*engine.Unit, map[engine.Coordinate]struct{}) {
+				return &engine.Unit{ID: engine.NewUnitID(9, 9)}, map[engine.Coordinate]struct{}{}
+			},
+			want: true,
+		},
+		{
+			name: "Unit dead: treated as escapable",
+			setup: func(gs *engine.GameState) (*engine.Unit, map[engine.Coordinate]struct{}) {
+				king := addKing(gs, engine.NewUnitID(2, 1), engine.Coordinate{X: 2, Y: 2})
+				king.HP = 0
+				return king, map[engine.Coordinate]struct{}{{X: 2, Y: 2}: {}}
+			},
+			want: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gs := newTestGameState(9, 9)
+			unit, affectedTiles := tt.setup(gs)
+			if got := escapable(gs, unit, affectedTiles); got != tt.want {
+				t.Errorf("escapable() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+// kingExposureCases is shared by TestThreatOpponentKing and TestRiskAllyKing: k is the
+// countable tick (turnOffset applied by each test), verified equal for both factors.
+var kingExposureCases = []struct {
+	name  string
+	setup func(gs *engine.GameState) (king *engine.Unit, affectedTiles map[engine.Coordinate]struct{})
+	k     int
+	want  int
+}{
+	{
+		name: "No affected tile this tick",
+		setup: func(gs *engine.GameState) (*engine.Unit, map[engine.Coordinate]struct{}) {
+			return addKing(gs, engine.NewUnitID(2, 1), engine.Coordinate{X: 2, Y: 2}), nil
+		},
+		k: 1, want: 0,
+	},
+	{
+		name: "King already dead",
+		setup: func(gs *engine.GameState) (*engine.Unit, map[engine.Coordinate]struct{}) {
+			king := addKing(gs, engine.NewUnitID(2, 1), engine.Coordinate{X: 2, Y: 2})
+			king.HP = 0
+			return king, map[engine.Coordinate]struct{}{{X: 0, Y: 0}: {}}
+		},
+		k: 1, want: 0,
+	},
+	{
+		name: "Affected tile unreachable: King boxed in by TerrainBlocks",
+		setup: func(gs *engine.GameState) (*engine.Unit, map[engine.Coordinate]struct{}) {
+			king := addKing(gs, engine.NewUnitID(2, 1), engine.Coordinate{X: 2, Y: 2})
+			setTerrainBlock(gs, engine.Coordinate{X: 2, Y: 1})
+			setTerrainBlock(gs, engine.Coordinate{X: 2, Y: 3})
+			setTerrainBlock(gs, engine.Coordinate{X: 1, Y: 2})
+			setTerrainBlock(gs, engine.Coordinate{X: 3, Y: 2})
+			return king, map[engine.Coordinate]struct{}{{X: 0, Y: 0}: {}}
+		},
+		k: 1, want: 0,
+	},
+	{
+		name: "Beyond risk-free horizon",
+		setup: func(gs *engine.GameState) (*engine.Unit, map[engine.Coordinate]struct{}) {
+			king := addKing(gs, engine.NewUnitID(2, 1), engine.Coordinate{X: 0, Y: 0})
+			return king, map[engine.Coordinate]struct{}{{X: 0, Y: riskFreeDist}: {}}
+		},
+		k: 1, want: 0,
+	},
+	{name: "On an affected tile, cornered: k=1", setup: onAffectedTile, k: 1, want: 4784},
+	{name: "On an affected tile, cornered: k=3", setup: onAffectedTile, k: 3, want: 3677},
+	{name: "On an affected tile, has an out: k=1", setup: hasAnOut, k: 1, want: 2392},
+	{name: "On an affected tile, has an out: k=3", setup: hasAnOut, k: 3, want: 1838},
+	{name: "Near an affected tile, not on it: k=1", setup: nearNotOnIt, k: 1, want: 2107},
+	{name: "Near an affected tile, not on it: k=3", setup: nearNotOnIt, k: 3, want: 1619},
+}
+
+func TestThreatOpponentKing(t *testing.T) {
+	t.Run("Excluded at T+0", func(t *testing.T) {
+		gs := newTestGameState(9, 9)
+		king := addKing(gs, engine.NewUnitID(2, 1), engine.Coordinate{X: 2, Y: 2})
+		sc := scoreContext{opponentKingID: king.ID}
+		tr := turnResult{turn: 0, affectedTiles: map[engine.Coordinate]struct{}{{X: 2, Y: 2}: {}}}
+		if got := threatOpponentKing(gs, sc, tr); got != 0 {
+			t.Errorf("threatOpponentKing() = %d, want 0", got)
+		}
+	})
+	for _, tt := range kingExposureCases {
+		t.Run(tt.name, func(t *testing.T) {
+			gs := newTestGameState(9, 9)
+			king, affectedTiles := tt.setup(gs)
+			sc := scoreContext{opponentKingID: king.ID}
+			tr := turnResult{turn: tt.k, affectedTiles: affectedTiles}
+
+			if got := threatOpponentKing(gs, sc, tr); got != tt.want {
+				t.Errorf("threatOpponentKing() = %d, want %d", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestRiskAllyKing(t *testing.T) {
+	for _, turn := range []int{0, 1} {
+		t.Run(fmt.Sprintf("Excluded at T+%d", turn), func(t *testing.T) {
+			gs := newTestGameState(9, 9)
+			king := addKing(gs, engine.NewUnitID(1, 1), engine.Coordinate{X: 2, Y: 2})
+			sc := scoreContext{allyKingID: king.ID}
+			tr := turnResult{turn: turn, affectedTiles: map[engine.Coordinate]struct{}{{X: 2, Y: 2}: {}}}
+			if got := riskAllyKing(gs, sc, tr); got != 0 {
+				t.Errorf("riskAllyKing() = %d, want 0", got)
+			}
+		})
+	}
+	for _, tt := range kingExposureCases {
+		t.Run(tt.name, func(t *testing.T) {
+			gs := newTestGameState(9, 9)
+			king, affectedTiles := tt.setup(gs)
+			sc := scoreContext{allyKingID: king.ID}
+			tr := turnResult{turn: tt.k + 1, affectedTiles: affectedTiles}
+
+			if got := riskAllyKing(gs, sc, tr); got != tt.want {
+				t.Errorf("riskAllyKing() = %d, want %d", got, tt.want)
+			}
+		})
+	}
+}
+
+// twoOpponentsAveraged and twoAlliesAveraged build 2 non-King units plus a third unit sharing
+// the King's ID, proving the King is excluded from the average rather than merely absent.
+func twoOpponentsAveraged(gs *engine.GameState) (unitIDs []engine.UnitID, kingID engine.UnitID, affectedTiles map[engine.Coordinate]struct{}) {
+	unitA := addFighter(gs, engine.NewUnitID(1, 1), engine.Coordinate{X: 0, Y: 0})
+	unitB := addFighter(gs, engine.NewUnitID(1, 2), engine.Coordinate{X: 0, Y: riskFreeDist})
+	king := addFighter(gs, engine.NewUnitID(1, 3), engine.Coordinate{X: 1, Y: 0})
+	affectedTiles = map[engine.Coordinate]struct{}{{X: 0, Y: 0}: {}, {X: 1, Y: 0}: {}}
+	return []engine.UnitID{unitA.ID, unitB.ID, king.ID}, king.ID, affectedTiles
+}
+
+func twoAlliesAveraged(gs *engine.GameState) (unitIDs []engine.UnitID, kingID engine.UnitID, affectedTiles map[engine.Coordinate]struct{}) {
+	unitA := addFighter(gs, engine.NewUnitID(2, 1), engine.Coordinate{X: 0, Y: 0})
+	unitB := addFighter(gs, engine.NewUnitID(2, 2), engine.Coordinate{X: 0, Y: riskFreeDist})
+	king := addFighter(gs, engine.NewUnitID(2, 3), engine.Coordinate{X: 1, Y: 0})
+	affectedTiles = map[engine.Coordinate]struct{}{{X: 0, Y: 0}: {}, {X: 1, Y: 0}: {}}
+	return []engine.UnitID{unitA.ID, unitB.ID, king.ID}, king.ID, affectedTiles
+}
+
+func TestThreatOpponents(t *testing.T) {
+	t.Run("Excluded at T+0", func(t *testing.T) {
+		gs := newTestGameState(9, 9)
+		unitIDs, kingID, affectedTiles := twoOpponentsAveraged(gs)
+		sc := scoreContext{opponentIDs: unitIDs, opponentKingID: kingID}
+		tr := turnResult{turn: 0, affectedTiles: affectedTiles, aliveOpponentsAfter: 2}
+		if got := threatOpponents(gs, sc, tr); got != 0 {
+			t.Errorf("threatOpponents() = %d, want 0", got)
+		}
+	})
+	t.Run("No affected tile this tick", func(t *testing.T) {
+		gs := newTestGameState(9, 9)
+		unitIDs, kingID, _ := twoOpponentsAveraged(gs)
+		sc := scoreContext{opponentIDs: unitIDs, opponentKingID: kingID}
+		tr := turnResult{turn: 1, aliveOpponentsAfter: 2}
+		if got := threatOpponents(gs, sc, tr); got != 0 {
+			t.Errorf("threatOpponents() = %d, want 0", got)
+		}
+	})
+	t.Run("No alive opponents", func(t *testing.T) {
+		gs := newTestGameState(9, 9)
+		unitIDs, kingID, affectedTiles := twoOpponentsAveraged(gs)
+		sc := scoreContext{opponentIDs: unitIDs, opponentKingID: kingID}
+		tr := turnResult{turn: 1, affectedTiles: affectedTiles, aliveOpponentsAfter: 0}
+		if got := threatOpponents(gs, sc, tr); got != 0 {
+			t.Errorf("threatOpponents() = %d, want 0", got)
+		}
+	})
+
+	tests := []struct {
+		name string
+		k    int
+		want int
+	}{
+		{name: "Averages across alive opponents, King excluded: k=1", k: 1, want: 239},
+		{name: "Averages across alive opponents, King excluded: k=3", k: 3, want: 183},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gs := newTestGameState(9, 9)
+			unitIDs, kingID, affectedTiles := twoOpponentsAveraged(gs)
+			sc := scoreContext{opponentIDs: unitIDs, opponentKingID: kingID}
+			tr := turnResult{turn: tt.k, affectedTiles: affectedTiles, aliveOpponentsAfter: 2}
+			if got := threatOpponents(gs, sc, tr); got != tt.want {
+				t.Errorf("threatOpponents() = %d, want %d", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestRiskAllies(t *testing.T) {
+	for _, turn := range []int{0, 1} {
+		t.Run(fmt.Sprintf("Excluded at T+%d", turn), func(t *testing.T) {
+			gs := newTestGameState(9, 9)
+			unitIDs, kingID, affectedTiles := twoAlliesAveraged(gs)
+			sc := scoreContext{allyIDs: unitIDs, allyKingID: kingID}
+			tr := turnResult{turn: turn, affectedTiles: affectedTiles, aliveAlliesAfter: 2}
+			if got := riskAllies(gs, sc, tr); got != 0 {
+				t.Errorf("riskAllies() = %d, want 0", got)
+			}
+		})
+	}
+	t.Run("No affected tile this tick", func(t *testing.T) {
+		gs := newTestGameState(9, 9)
+		unitIDs, kingID, _ := twoAlliesAveraged(gs)
+		sc := scoreContext{allyIDs: unitIDs, allyKingID: kingID}
+		tr := turnResult{turn: 2, aliveAlliesAfter: 2}
+		if got := riskAllies(gs, sc, tr); got != 0 {
+			t.Errorf("riskAllies() = %d, want 0", got)
+		}
+	})
+	t.Run("No alive allies", func(t *testing.T) {
+		gs := newTestGameState(9, 9)
+		unitIDs, kingID, affectedTiles := twoAlliesAveraged(gs)
+		sc := scoreContext{allyIDs: unitIDs, allyKingID: kingID}
+		tr := turnResult{turn: 2, affectedTiles: affectedTiles, aliveAlliesAfter: 0}
+		if got := riskAllies(gs, sc, tr); got != 0 {
+			t.Errorf("riskAllies() = %d, want 0", got)
+		}
+	})
+
+	tests := []struct {
+		name string
+		k    int
+		want int
+	}{
+		{name: "Averages across alive allies, King excluded: k=1", k: 1, want: 239},
+		{name: "Averages across alive allies, King excluded: k=3", k: 3, want: 183},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gs := newTestGameState(9, 9)
+			unitIDs, kingID, affectedTiles := twoAlliesAveraged(gs)
+			sc := scoreContext{allyIDs: unitIDs, allyKingID: kingID}
+			tr := turnResult{turn: tt.k + 1, affectedTiles: affectedTiles, aliveAlliesAfter: 2}
+			if got := riskAllies(gs, sc, tr); got != tt.want {
+				t.Errorf("riskAllies() = %d, want %d", got, tt.want)
 			}
 		})
 	}

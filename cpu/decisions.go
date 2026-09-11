@@ -30,6 +30,9 @@ func Decide(gs *engine.GameState) []engine.TurnCommand {
 	var allyKing *engine.Unit
 	var opponentKing *engine.Unit
 	for _, u := range gs.Units {
+		if u.HP <= 0 {
+			continue
+		}
 		if team, _ := u.ID.Decode(); team == 2 {
 			allies = append(allies, u)
 			if u.Role == engine.RoleKing || u.Role == engine.RoleBoss {
@@ -42,6 +45,10 @@ func Decide(gs *engine.GameState) []engine.TurnCommand {
 			}
 		}
 
+	}
+
+	if allyKing == nil || opponentKing == nil {
+		return cmds
 	}
 
 	allyIDs := make([]engine.UnitID, len(allies))
@@ -59,8 +66,7 @@ func Decide(gs *engine.GameState) []engine.TurnCommand {
 			sc := scoreContext{actorID: unit.ID, allyIDs: allyIDs, opponentIDs: opponentIDs, allyKingID: allyKing.ID, opponentKingID: opponentKing.ID}
 			c, err := bestCandidateFor(sc, sandbox)
 			if err != nil {
-				// Sandbox hasn't been mutated yet, so if unexpected error occurs,
-				// skip this unit from the current round of candidate selection.
+				// Sandbox is untouched here; skip this unit for the round.
 				continue
 			}
 			if best == nil || c.score > best.score {
@@ -73,8 +79,7 @@ func Decide(gs *engine.GameState) []engine.TurnCommand {
 		}
 
 		if err := applyCandidate(sandbox, *best); err != nil {
-			// Sandbox may now be partially mutated by best's own earlier commands this round.
-			// Stop here and return only the plan confirmed by prior, fully-applied rounds.
+			// Sandbox may be partially mutated by best's own earlier commands; stop here.
 			break
 		}
 
@@ -94,7 +99,7 @@ func bestCandidateFor(sc scoreContext, gs *engine.GameState) (candidate, error) 
 		candidates = append(candidates, c)
 	}
 	return slices.MaxFunc(candidates, func(a, b candidate) int {
-		return b.score - a.score
+		return a.score - b.score
 	}), nil
 }
 

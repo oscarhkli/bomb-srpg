@@ -8,7 +8,6 @@ import (
 )
 
 // plansFor gathers all the possible actions, currently they should cover idle/move/bomb/move+bomb/bomb+move.
-// Refactor to include allies and opponents when working with Skills in future.
 // Returns all possible plans (slice of slice of TurnCommand) a Unit can take.
 func plansFor(unit *engine.Unit, gs *engine.GameState) [][]engine.TurnCommand {
 	movePlans := movePlansFor(unit, gs)
@@ -63,7 +62,7 @@ func singleCommandPlans(unit *engine.Unit, gs *engine.GameState, turnCmdType eng
 
 	allowedTiles, err := gs.FindAllowedTilesForCommand(unit.ID, turnCmdType)
 	if err != nil {
-		// Should never happen unless there are coding issues. Though it shouldn't affect much on the game play. Just shortcut it.
+		// Should never happen; return no plans rather than propagate.
 		return plans
 	}
 
