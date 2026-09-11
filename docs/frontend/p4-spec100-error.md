@@ -25,7 +25,7 @@ The backend already has the taxonomy this spec needs: `mapError()` (`server/serv
 
 ## Non-Goal
 
-- A remote log sink (Sentry-like telemetry) — speculative infra, not requested.
+- Third-party telemetry (Sentry-like remote error tracking) — the dev diagnostic sink below is a local, dev-only file write, not a hosted service.
 - Changing `mapError()` or the server's HTTP status taxonomy — it's already correct; this spec only consumes it.
 - `ConfirmDialog` changes — confirmed out of scope by the audit above.
 - Removing/gating `console.log` debug leftovers (`MatchScene.ts:885`, `boardRenderer.ts:195,204`) — these are dev-time noise, not part of the error/warning taxonomy; worth a separate cleanup pass.
@@ -53,6 +53,15 @@ reportError(err: unknown, context: { op: string; detail?: unknown }): string
 - Classifies by `err instanceof ApiError ? err.status : undefined`; anything not an `ApiError` (network/parse failure, thrown `TypeError`) is Infra.
 - Diagnostic and Operational sites don't call this — they stay direct `console.warn`/`console.error` calls, since no player message is ever produced.
 
+## Dev Diagnostic Sink
+
+Motivating case: [p4-spec011](p4-spec011-match.md)'s CPU stale-snapshot bug was diagnosed from a screenshot of `ErrorPanel`, because that was the only artifact reachable outside the browser. `console.error`/`console.warn` output isn't copy-pasteable in every environment this gets played in, and the payload (`context.detail` — the offending event, the `gameStateSnapshot`) never left the browser at all. This section makes that payload reachable outside the browser.
+
+- Every `console.error`/`console.warn` call this spec produces — both from `reportError()` (Domain/Session/Infra) and the direct Diagnostic/Operational call sites — also goes through one sink function, `logDiagnostic(tier, op, detail)`. It keeps calling `console.*` exactly as before; it additionally fire-and-forgets a `POST` of `{ tier, op, message, detail, timestamp }` to a new dev-only server route, `POST /debug/log`.
+- `POST /debug/log` (new, flat under `/server` per the existing package rule) does nothing but append the received JSON as one line to `server/.debug/client-log.jsonl`, no auth, no response body beyond 204. It exists only so the log is a file on disk instead of a browser console — not a queryable store, not a dashboard.
+- Both ends are dev-only: the client only calls the sink when built in dev mode (Vite's `import.meta.env.DEV`), and the server route is registered only when the server is started with the existing dev flag/build (never reachable from a production build). A failed `POST` (route missing, network drop) is swallowed — the sink must never itself throw or show `ErrorPanel`.
+- `context.detail` on `reportError()` and the payload passed to the existing Diagnostic/Operational `console.warn`/`console.error` sites must carry enough to reproduce: the offending event and, where one is in scope, the current `gameStateSnapshot`. This was already true for most sites migrated below; the migration table's "Current" column is where to check whether `detail` needs to be added, not just relocated.
+
 ## Call Site Migration
 
 Existing sites this spec's implementation must re-route, per the audit:
@@ -76,6 +85,9 @@ Existing sites this spec's implementation must re-route, per the audit:
 3. Given `getCatalog()` rejects for any reason, when the catch handler runs, then `console.error` is always called — no catch block silently discards `err`.
 4. Given any 500, network, or parse failure, when shown to the player, then `ErrorPanel` never displays the raw error text or stack.
 5. Given a Diagnostic or Operational failure (missing texture, unhandled event type, best-effort `deleteMatch()`), when it occurs, then no `ErrorPanel` message is shown and the flow continues unaffected.
+6. Given any tier logs via `console.error`/`console.warn` in a dev build, when it fires, then `server/.debug/client-log.jsonl` gains one matching line with `tier`, `op`, `message`, `detail`, and `timestamp` — readable from disk without touching the browser.
+7. Given a production build, when any error/warning fires, then no request reaches `/debug/log` and the route itself is not registered server-side.
+8. Given `/debug/log` is unreachable (route missing, network drop), when the sink fires, then no exception escapes it and `ErrorPanel`/the rest of the flow is unaffected.
 
 ## Log
 

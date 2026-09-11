@@ -83,11 +83,15 @@ specs:
     status: Done
     category: Match
     completion-date: 2026-08-30
-  - file: p4-spec011-sprites.md
+  - file: p4-spec011-match.md
+    status: Ready
+    category: Match
+    completion-date:
+  - file: p4-spec021-sprites.md
     status: Draft
     category: Sprites
     completion-date:
-  - file: p4-spec012-sprites.md
+  - file: p4-spec022-sprites.md
     status: Draft
     category: Sprites
     completion-date:
