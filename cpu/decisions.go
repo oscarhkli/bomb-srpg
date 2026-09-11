@@ -9,9 +9,7 @@ import (
 const (
 	maxAttempts = 15 // Max attempt for candidates selection. Defensive way to prevent from infinite loop.
 
-	idleScore     = 0      // Neutral score.
-	killKingScore = 100000 // Very high score to make a result guaranteed.
-	killUnitScore = 10000  // Lower than killKingScore: a predicted, not guaranteed, outcome.
+	neutralScore = 0
 )
 
 // candidate represents a possible action a Unit can take and what it scores.
@@ -70,7 +68,7 @@ func Decide(gs *engine.GameState) []engine.TurnCommand {
 			}
 		}
 
-		if best == nil || best.score <= idleScore {
+		if best == nil || best.score <= neutralScore {
 			break
 		}
 

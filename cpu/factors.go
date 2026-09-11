@@ -1,6 +1,9 @@
 package cpu
 
-import "bomb-srpg/engine"
+import (
+	"bomb-srpg/engine"
+	"math"
+)
 
 // factorID identifies a scoreFactor for weight lookup, independent of func identity.
 type factorID int
@@ -12,10 +15,10 @@ const (
 	FactorKillAllyKing
 	FactorKillOpponents
 	FactorKillAllies
-	FactorRiskAllyKing
 	FactorThreatOpponentKing
-	FactorRiskAllies
+	FactorRiskAllyKing
 	FactorThreatOpponents
+	FactorRiskAllies
 )
 
 // scoreFactorEntry pairs a scoreFactor with the identity used to look up its weight.
@@ -33,10 +36,10 @@ func scoreFactorsRegistry() []scoreFactorEntry {
 		{FactorKillAllyKing, killAllyKing},
 		{FactorKillOpponents, killOpponents},
 		{FactorKillAllies, killAllies},
-		{FactorRiskAllyKing, riskAllyKing},
 		{FactorThreatOpponentKing, threatOpponentKing},
-		{FactorRiskAllies, riskAllies},
+		{FactorRiskAllyKing, riskAllyKing},
 		{FactorThreatOpponents, threatOpponents},
+		{FactorRiskAllies, riskAllies},
 	}
 }
 
@@ -50,12 +53,21 @@ func defaultWeightProfile() map[factorID]int {
 		FactorKillAllyKing:                    -1,
 		FactorKillOpponents:                   1,
 		FactorKillAllies:                      -1,
-		FactorRiskAllyKing:                    -1,
 		FactorThreatOpponentKing:              1,
-		FactorRiskAllies:                      -1,
+		FactorRiskAllyKing:                    -1,
 		FactorThreatOpponents:                 1,
+		FactorRiskAllies:                      -1,
 	}
 }
+
+// Score magnitudes, tiered so a certain outcome always outranks a predicted one:
+// killKingScore > killUnitScore > riskKingScore > riskUnitScore.
+const (
+	killKingScore = 100000 // Very high score to make a result guaranteed.
+	killUnitScore = 10000  // Lower than killKingScore: a predicted, not guaranteed, outcome.
+	riskKingScore = 5000
+	riskUnitScore = 1000
+)
 
 // advanceOpponentKingReachability deduces score based on reachability gained toward the opponent King when a SoftBlock is cleared this Turn.
 func advanceOpponentKingReachability(gs *engine.GameState, sc scoreContext, tr turnResult) int {
@@ -132,26 +144,107 @@ func killAllies(gs *engine.GameState, sc scoreContext, tr turnResult) int {
 	return killUnitScore * killed / tr.aliveAlliesBefore
 }
 
-// riskAllyKing deduces score based on the distance between Ally King and bomb affected tile triggered in which Turns.
-// Also consider the escapability.
-func riskAllyKing(gs *engine.GameState, sc scoreContext, tr turnResult) int {
-	return 0
+func escapable(gs *engine.GameState, unit *engine.Unit, affectedTiles map[engine.Coordinate]struct{}) bool {
+	tiles, err := gs.FindAllowedTilesForCommand(unit.ID, engine.TurnCmdMove)
+	if err != nil {
+		// exposureIndex already guarantees a live, existing unit. Treat unexpected error as escapable rather than propagating it.
+		return true
+	}
+
+	for tile := range tiles {
+		if _, ok := affectedTiles[tile]; !ok {
+			return true
+		}
+	}
+
+	return false
+}
+
+// decayRatio returns 1 at x = 0, decaying to 0 at x = t. k > 0 shapes the plateau-then-cliff curve.
+func decayRatio(x, t int, k float64) float64 {
+	if x >= t {
+		return 0
+	}
+	kt := k * float64(t)
+	return (math.Exp(kt) - math.Exp(k*float64(x))) / (math.Exp(kt) - 1)
+}
+
+const (
+	riskFreeDist = 6                     // distance (tiles) beyond which threat is considered negligible
+	kDist        = 4.0 / riskFreeDist    // decayRatio's k for the distance axis
+	kTurn        = 3.0 / maxForecastTurn // decayRatio's k for the turn axis
+)
+
+// exposureIndex deduces a unit's exposure to the nearest affected tile, as a 0..1 ratio.
+// turnOffset is how many turns of this unit's certain-kill window have already elapsed.
+func exposureIndex(gs *engine.GameState, unitID engine.UnitID, tr turnResult, turnOffset int) float64 {
+	if tr.turn <= turnOffset || len(tr.affectedTiles) == 0 {
+		return 0
+	}
+
+	unit := gs.Units[unitID]
+	if unit.HP <= 0 {
+		return 0
+	}
+
+	dist := nearestAffectedDist(gs, unit, tr.affectedTiles)
+	if dist == -1 {
+		return 0
+	}
+
+	escapeRatio := 1.0
+	if dist > 0 || (dist == 0 && escapable(gs, unit, tr.affectedTiles)) {
+		escapeRatio *= 0.5
+	}
+
+	distRisk := decayRatio(dist, riskFreeDist, kDist)
+	turnRisk := decayRatio(tr.turn-turnOffset, maxForecastTurn, kTurn)
+
+	return distRisk * turnRisk * escapeRatio
 }
 
 // threatOpponentKing deduces score based on the distance between Opponent King and nearest bomb affected tile triggered in which Turns.
-// Also consider the escapability.
 func threatOpponentKing(gs *engine.GameState, sc scoreContext, tr turnResult) int {
-	return 0
+	return int(float64(riskKingScore) * exposureIndex(gs, sc.opponentKingID, tr, 0))
 }
 
-// riskAllies deduces score based on the distance between Ally and bomb affected tile triggered in which Turns.
-// Also consider the escapability.
-func riskAllies(gs *engine.GameState, sc scoreContext, tr turnResult) int {
-	return 0
+// riskAllyKing deduces score based on the distance between Ally King and bomb affected tile triggered in which Turns.
+func riskAllyKing(gs *engine.GameState, sc scoreContext, tr turnResult) int {
+	return int(float64(riskKingScore) * exposureIndex(gs, sc.allyKingID, tr, 1))
 }
 
-// threatOpponents deduces score based on the distance between Opponent and bomb affected tile triggered in which Turns.
-// Also consider the escapability.
+// threatOpponents deduces the average score based on the distance between Opponents and bomb affected tile triggered in which Turns.
 func threatOpponents(gs *engine.GameState, sc scoreContext, tr turnResult) int {
-	return 0
+	turnOffset := 0
+	if tr.turn <= turnOffset || len(tr.affectedTiles) == 0 || tr.aliveOpponentsAfter == 0 {
+		return 0
+	}
+
+	sum := 0.0
+	for _, unitID := range sc.opponentIDs {
+		if unitID == sc.opponentKingID {
+			continue
+		}
+		sum += exposureIndex(gs, unitID, tr, turnOffset)
+	}
+
+	return int(float64(riskUnitScore) * sum / float64(tr.aliveOpponentsAfter))
+}
+
+// riskAllies deduces the average score based on the distance between Allies and bomb affected tile triggered in which Turns.
+func riskAllies(gs *engine.GameState, sc scoreContext, tr turnResult) int {
+	turnOffset := 1
+	if tr.turn <= turnOffset || len(tr.affectedTiles) == 0 || tr.aliveAlliesAfter == 0 {
+		return 0
+	}
+
+	sum := 0.0
+	for _, unitID := range sc.allyIDs {
+		if unitID == sc.allyKingID {
+			continue
+		}
+		sum += exposureIndex(gs, unitID, tr, turnOffset)
+	}
+
+	return int(float64(riskUnitScore) * sum / float64(tr.aliveAlliesAfter))
 }
