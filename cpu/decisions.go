@@ -17,6 +17,14 @@ type candidate struct {
 	tag          string               // Debug/log label.
 }
 
+// priority breaks a score tie: move+bomb is worse than other action.
+func (c candidate) priority() int {
+	if len(c.turnCommands) == 2 && c.turnCommands[0].Type == engine.TurnCmdMove {
+		return 0
+	}
+	return 1
+}
+
 // Decide computes the CPU's plan for the given sandbox state.
 // Returns the TurnCommands to apply, in order; an empty result means no action.
 func Decide(gs *engine.GameState) []engine.TurnCommand {
@@ -104,7 +112,10 @@ func bestCandidateFor(sc scoreContext, gs *engine.GameState) (candidate, error) 
 		candidates = append(candidates, c)
 	}
 	return slices.MaxFunc(candidates, func(a, b candidate) int {
-		return a.score - b.score
+		if d := a.score - b.score; d != 0 {
+			return d
+		}
+		return a.priority() - b.priority()
 	}), nil
 }
 

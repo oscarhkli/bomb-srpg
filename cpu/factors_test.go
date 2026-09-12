@@ -383,7 +383,7 @@ func TestDecayRatio(t *testing.T) {
 		{name: "x=t: fully decayed", x: 5, t: 5, k: 0.6, want: 0.0},
 		{name: "x>t: past the boundary", x: 6, t: 5, k: 0.6, want: 0.0},
 		{name: "interior, turn axis scale", x: 2, t: 5, k: 0.6, want: 0.8784358579},
-		{name: "interior, dist axis scale", x: 3, t: riskFreeDist, k: kDist, want: 0.8807970780},
+		{name: "interior, dist axis scale", x: 3, t: riskFreeDist, k: kDistThreat, want: 0.8807970780},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -394,8 +394,6 @@ func TestDecayRatio(t *testing.T) {
 	}
 }
 
-// onAffectedTile, hasAnOut and nearNotOnIt are shared setups for TestThreatOpponentKing
-// and TestRiskAllyKing: same King, only the affected tiles around it differ.
 func onAffectedTile(gs *engine.GameState) (*engine.Unit, map[engine.Coordinate]struct{}) {
 	king := addKing(gs, engine.NewUnitID(2, 1), engine.Coordinate{X: 2, Y: 2})
 	return king, map[engine.Coordinate]struct{}{
@@ -449,9 +447,7 @@ func TestEscapable(t *testing.T) {
 	}
 }
 
-// kingExposureCases is shared by TestThreatOpponentKing and TestRiskAllyKing: k is the
-// countable tick (turnOffset applied by each test), verified equal for both factors.
-var kingExposureCases = []struct {
+var threatKingExposureCases = []struct {
 	name  string
 	setup func(gs *engine.GameState) (king *engine.Unit, affectedTiles map[engine.Coordinate]struct{})
 	k     int
@@ -501,6 +497,40 @@ var kingExposureCases = []struct {
 	{name: "Near an affected tile, not on it: k=3", setup: nearNotOnIt, k: 3, want: 1619},
 }
 
+var riskKingExposureCases = []struct {
+	name  string
+	setup func(gs *engine.GameState) (king *engine.Unit, affectedTiles map[engine.Coordinate]struct{})
+	k     int
+	want  int
+}{
+	{
+		name:  "No affected tile this tick",
+		setup: threatKingExposureCases[0].setup,
+		k:     1, want: 0,
+	},
+	{
+		name:  "King already dead: still scores frozen-position exposure",
+		setup: threatKingExposureCases[1].setup,
+		k:     1, want: 1072,
+	},
+	{
+		name:  "Affected tile unreachable: King boxed in by TerrainBlocks",
+		setup: threatKingExposureCases[2].setup,
+		k:     1, want: 0,
+	},
+	{
+		name:  "Beyond risk-free horizon",
+		setup: threatKingExposureCases[3].setup,
+		k:     1, want: 0,
+	},
+	{name: "On an affected tile, cornered: k=1", setup: onAffectedTile, k: 1, want: 4784},
+	{name: "On an affected tile, cornered: k=3", setup: onAffectedTile, k: 3, want: 3677},
+	{name: "On an affected tile, has an out: k=1", setup: hasAnOut, k: 1, want: 2392},
+	{name: "On an affected tile, has an out: k=3", setup: hasAnOut, k: 3, want: 1838},
+	{name: "Near an affected tile, not on it: k=1", setup: nearNotOnIt, k: 1, want: 1489},
+	{name: "Near an affected tile, not on it: k=3", setup: nearNotOnIt, k: 3, want: 1144},
+}
+
 func TestThreatOpponentKing(t *testing.T) {
 	t.Run("At T+0: scores as urgent, not excluded", func(t *testing.T) {
 		gs := newTestGameState(9, 9)
@@ -511,7 +541,7 @@ func TestThreatOpponentKing(t *testing.T) {
 			t.Errorf("threatOpponentKing() = %d, want %d", got, want)
 		}
 	})
-	for _, tt := range kingExposureCases {
+	for _, tt := range threatKingExposureCases {
 		t.Run(tt.name, func(t *testing.T) {
 			gs := newTestGameState(9, 9)
 			king, affectedTiles := tt.setup(gs)
@@ -537,7 +567,7 @@ func TestRiskAllyKing(t *testing.T) {
 			}
 		})
 	}
-	for _, tt := range kingExposureCases {
+	for _, tt := range riskKingExposureCases {
 		t.Run(tt.name, func(t *testing.T) {
 			gs := newTestGameState(9, 9)
 			king, affectedTiles := tt.setup(gs)
@@ -551,8 +581,6 @@ func TestRiskAllyKing(t *testing.T) {
 	}
 }
 
-// twoOpponentsAveraged and twoAlliesAveraged build 2 non-King units plus a third unit sharing
-// the King's ID, proving the King is excluded from the average rather than merely absent.
 func twoOpponentsAveraged(gs *engine.GameState) (unitIDs []engine.UnitID, kingID engine.UnitID, affectedTiles map[engine.Coordinate]struct{}) {
 	unitA := addFighter(gs, engine.NewUnitID(1, 1), engine.Coordinate{X: 0, Y: 0})
 	unitB := addFighter(gs, engine.NewUnitID(1, 2), engine.Coordinate{X: 0, Y: riskFreeDist})

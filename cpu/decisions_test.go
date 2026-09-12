@@ -148,12 +148,33 @@ func TestBestCandidateFor(t *testing.T) {
 			t.Fatalf("bestCandidateFor() unexpected err = %v", err)
 		}
 
-		// move(1,0) is the only reachable plan outside the pre-existing bomb's blast radius.
 		if want := "move(1,0)"; got.tag != want {
 			t.Errorf("bestCandidateFor() tag = %q, want %q (score %d)", got.tag, want, got.score)
 		}
-		if want := -496; got.score != want {
+		if want := -7; got.score != want {
 			t.Errorf("bestCandidateFor() score = %d, want %d", got.score, want)
+		}
+	})
+
+	t.Run("Exact tie: move+bomb never wins a tie it shares with a same-shaped alternative", func(t *testing.T) {
+		gs := newTestGameState(9, 2)
+		allyFighter := corridorWithBreakthrough(gs)
+
+		sc := scoreContext{
+			actorID:        allyFighter.ID,
+			allyIDs:        []engine.UnitID{allyFighter.ID},
+			allyKingID:     engine.NewUnitID(2, 2),
+			opponentKingID: engine.NewUnitID(1, 1),
+			actorOrigin:    allyFighter.Position,
+		}
+
+		got, err := bestCandidateFor(sc, gs)
+		if err != nil {
+			t.Fatalf("bestCandidateFor() unexpected err = %v", err)
+		}
+
+		if len(got.turnCommands) == 2 && got.turnCommands[0].Type == engine.TurnCmdMove {
+			t.Errorf("bestCandidateFor() = %+v (tag %q), move+bomb must not win a tie (score %d)", got.turnCommands, got.tag, got.score)
 		}
 	})
 
@@ -213,9 +234,6 @@ func TestDecide_DeadAllyExcludedFromPlanning(t *testing.T) {
 	}
 }
 
-// corridorWithBreakthrough builds a 9x2 board where the sole scoring action is an ally
-// Fighter's bomb clearing a SoftBlock toward the opponent King. The ally King's pocket at
-// (8,1) sits exactly at riskFreeDist, so it's kept out of the blast.
 func corridorWithBreakthrough(gs *engine.GameState) (allyFighter *engine.Unit) {
 	for x := range 9 {
 		setTerrainBlock(gs, engine.Coordinate{X: x, Y: 1})
@@ -227,9 +245,6 @@ func corridorWithBreakthrough(gs *engine.GameState) (allyFighter *engine.Unit) {
 	return allyFighter
 }
 
-// twinCorridorWithBreakthrough is two corridorWithBreakthrough-style setups (rows 0 and 3).
-// Only Fighter1's corridor sits near the opponent King, so it alone scores threatOpponentKing;
-// Fighter2's corridor instead scores threatOpponents via a nearby opponent Fighter.
 func twinCorridorWithBreakthrough(gs *engine.GameState) (fighter1, fighter2 *engine.Unit) {
 	fighter1 = addFighter(gs, engine.NewUnitID(2, 1), engine.Coordinate{X: 0, Y: 0})
 	fighter1.HasMoved = true
@@ -246,7 +261,6 @@ func twinCorridorWithBreakthrough(gs *engine.GameState) (fighter1, fighter2 *eng
 	fighter2 = addFighter(gs, engine.NewUnitID(2, 2), engine.Coordinate{X: 0, Y: 3})
 	fighter2.HasMoved = true
 	addSoftBlock(gs, 2, engine.Coordinate{X: 3, Y: 3})
-	// (2,2) sits close to Fighter2's blast without blocking Fighter2's own row-3 path to the King.
 	addFighter(gs, engine.NewUnitID(1, 2), engine.Coordinate{X: 2, Y: 2})
 
 	for x := range 9 {
@@ -280,9 +294,6 @@ func TestDecide_AppliesMoreThanOneRound(t *testing.T) {
 	}
 }
 
-// bombThreatensBothKings pre-places a Countdown-3 bomb whose exposure scores apply
-// regardless of the actor's action. Bombing is disabled on both allies, so moving
-// farther from the blast is the actor's only lever.
 func bombThreatensBothKings(gs *engine.GameState) (actor *engine.Unit) {
 	allyKing := addKing(gs, engine.NewUnitID(2, 1), engine.Coordinate{X: 8, Y: 1})
 	allyKing.BombUsed = allyKing.MaxBombCount
@@ -457,7 +468,6 @@ func TestDecide(t *testing.T) {
 
 			got := Decide(gs)
 
-			// The exact tile among tied-score options isn't asserted; tie-break order isn't a contract.
 			if len(got) != len(tt.want) {
 				t.Fatalf("Decide() = %+v, want %+v", got, tt.want)
 			}

@@ -196,13 +196,15 @@ func decayRatio(x, t int, k float64) float64 {
 
 const (
 	riskFreeDist = 6                     // distance (tiles) beyond which threat is considered negligible
-	kDist        = 4.0 / riskFreeDist    // decayRatio's k for the distance axis
+	kDistThreat  = 4.0 / riskFreeDist    // decayRatio's distance-axis k for offense (threatens opponents)
+	kDistRisk    = 1.0 / riskFreeDist    // decayRatio's distance-axis k for defense (own units' exposure)
 	kTurn        = 3.0 / maxForecastTurn // decayRatio's k for the turn axis
 )
 
 // exposureIndex deduces a unit's exposure to the nearest affected tile, as a 0..1 ratio.
 // turnOffset is how many turns of this unit's certain-kill window have already elapsed.
-func exposureIndex(gs *engine.GameState, unitID engine.UnitID, tr turnResult, turnOffset int) float64 {
+// k is the distance-axis decayRatio constant; offense and defense use different curves.
+func exposureIndex(gs *engine.GameState, unitID engine.UnitID, tr turnResult, turnOffset int, k float64) float64 {
 	if len(tr.affectedTiles) == 0 {
 		return 0
 	}
@@ -219,7 +221,7 @@ func exposureIndex(gs *engine.GameState, unitID engine.UnitID, tr turnResult, tu
 		escapeRatio *= 0.5
 	}
 
-	distRisk := decayRatio(dist, riskFreeDist, kDist)
+	distRisk := decayRatio(dist, riskFreeDist, k)
 	turnRisk := decayRatio(max(tr.turn-turnOffset, 0), maxForecastTurn, kTurn)
 
 	return distRisk * turnRisk * escapeRatio
@@ -227,12 +229,12 @@ func exposureIndex(gs *engine.GameState, unitID engine.UnitID, tr turnResult, tu
 
 // threatOpponentKing deduces score based on the distance between Opponent King and nearest bomb affected tile triggered in which Turns.
 func threatOpponentKing(gs *engine.GameState, sc scoreContext, tr turnResult) int {
-	return int(float64(riskKingScore) * exposureIndex(gs, sc.opponentKingID, tr, 0))
+	return int(float64(riskKingScore) * exposureIndex(gs, sc.opponentKingID, tr, 0, kDistThreat))
 }
 
 // riskAllyKing deduces score based on the distance between Ally King and bomb affected tile triggered in which Turns.
 func riskAllyKing(gs *engine.GameState, sc scoreContext, tr turnResult) int {
-	return int(float64(riskKingScore) * exposureIndex(gs, sc.allyKingID, tr, 1))
+	return int(float64(riskKingScore) * exposureIndex(gs, sc.allyKingID, tr, 1, kDistRisk))
 }
 
 // nonKingCount returns how many of ids aren't kingID, alive or not — the fixed group size
@@ -260,7 +262,7 @@ func threatOpponents(gs *engine.GameState, sc scoreContext, tr turnResult) int {
 		if unitID == sc.opponentKingID {
 			continue
 		}
-		sum += exposureIndex(gs, unitID, tr, turnOffset)
+		sum += exposureIndex(gs, unitID, tr, turnOffset, kDistThreat)
 	}
 
 	return int(float64(riskUnitScore) * sum / float64(total))
@@ -279,7 +281,7 @@ func riskAllies(gs *engine.GameState, sc scoreContext, tr turnResult) int {
 		if unitID == sc.allyKingID {
 			continue
 		}
-		sum += exposureIndex(gs, unitID, tr, turnOffset)
+		sum += exposureIndex(gs, unitID, tr, turnOffset, kDistRisk)
 	}
 
 	return int(float64(riskUnitScore) * sum / float64(total))
