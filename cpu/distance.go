@@ -2,19 +2,28 @@ package cpu
 
 import "bomb-srpg/engine"
 
-// reachDist returns the walking distance from unit to target, ignoring bombs
-// so a unit's own still-ticking bomb doesn't distort its reachability.
-// Returns -1 if target is unreachable.
-func reachDist(gs *engine.GameState, unit *engine.Unit, target engine.Coordinate) int {
+// reachDistToUnit returns the walking distance from fromPos to target's tile.
+// target's own tile is never reachable, so this takes the shortest distance to one of its four neighbors and adds 1.
+// Returns -1 if none are reachable.
+func reachDistToUnit(gs *engine.GameState, unit *engine.Unit, fromPos engine.Coordinate, target *engine.Unit) int {
 	rule := unit.NewMovementRule()
 	rule.MaxSteps = -1
 	rule.CanTurn = true
 	rule.PassPermissions |= engine.PassBombs
 
-	if d, ok := gs.FindReachableTiles(unit.Position, rule)[target]; ok {
-		return d
+	reachable := gs.FindReachableTiles(fromPos, rule)
+	dirs := []engine.Coordinate{{X: 0, Y: -1}, {X: 0, Y: 1}, {X: -1, Y: 0}, {X: 1, Y: 0}}
+	best := -1
+	for _, dir := range dirs {
+		adj := engine.Coordinate{X: target.Position.X + dir.X, Y: target.Position.Y + dir.Y}
+		if d, ok := reachable[adj]; ok && (best == -1 || d < best) {
+			best = d
+		}
 	}
-	return -1
+	if best == -1 {
+		return -1
+	}
+	return best + 1
 }
 
 // nearestAffectedDist returns the walking distance from unit to the nearest tile in affectedTiles.

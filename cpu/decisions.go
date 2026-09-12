@@ -61,7 +61,14 @@ func Decide(gs *engine.GameState) []engine.TurnCommand {
 	for range maxAttempts {
 		var best *candidate
 		for _, unit := range allies {
-			sc := scoreContext{actorID: unit.ID, allyIDs: allyIDs, opponentIDs: opponentIDs, allyKingID: allyKing.ID, opponentKingID: opponentKing.ID}
+			sc := scoreContext{
+				actorID:        unit.ID,
+				allyIDs:        allyIDs,
+				opponentIDs:    opponentIDs,
+				allyKingID:     allyKing.ID,
+				opponentKingID: opponentKing.ID,
+				actorOrigin:    unit.Position,
+			}
 			c, err := bestCandidateFor(sc, sandbox)
 			if err != nil {
 				// Sandbox is untouched here; skip this unit for the round.

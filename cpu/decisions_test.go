@@ -141,7 +141,7 @@ func TestBestCandidateFor(t *testing.T) {
 		gs.Bombs[bombID] = &engine.Bomb{ID: bombID, OwnerID: engine.NewUnitID(9, 9), Position: bombPos, Range: 2, Countdown: 1}
 		gs.Grid[bombPos.Y][bombPos.X] = engine.Tile{Type: engine.TerrainPlain, OccupantType: engine.OccupantBomb, OccupantID: int64(bombID)}
 
-		sc := scoreContext{actorID: actor.ID, allyIDs: []engine.UnitID{actor.ID}, allyKingID: allyKing.ID, opponentKingID: opponentKing.ID}
+		sc := scoreContext{actorID: actor.ID, allyIDs: []engine.UnitID{actor.ID}, allyKingID: allyKing.ID, opponentKingID: opponentKing.ID, actorOrigin: actor.Position}
 
 		got, err := bestCandidateFor(sc, gs)
 		if err != nil {
@@ -152,7 +152,7 @@ func TestBestCandidateFor(t *testing.T) {
 		if want := "move(1,0)"; got.tag != want {
 			t.Errorf("bestCandidateFor() tag = %q, want %q (score %d)", got.tag, want, got.score)
 		}
-		if want := -491; got.score != want {
+		if want := -496; got.score != want {
 			t.Errorf("bestCandidateFor() score = %d, want %d", got.score, want)
 		}
 	})
@@ -168,7 +168,7 @@ func TestBestCandidateFor(t *testing.T) {
 		}
 		opponentKing := addKing(gs, engine.NewUnitID(1, 1), engine.Coordinate{X: 8, Y: 8})
 
-		sc := scoreContext{actorID: actor.ID, allyIDs: []engine.UnitID{actor.ID}, allyKingID: allyKing.ID, opponentKingID: opponentKing.ID}
+		sc := scoreContext{actorID: actor.ID, allyIDs: []engine.UnitID{actor.ID}, allyKingID: allyKing.ID, opponentKingID: opponentKing.ID, actorOrigin: actor.Position}
 
 		got, err := bestCandidateFor(sc, gs)
 		if err != nil {
@@ -196,14 +196,20 @@ func TestDecide_NoKingOnASide_ReturnsEmpty(t *testing.T) {
 
 func TestDecide_DeadAllyExcludedFromPlanning(t *testing.T) {
 	gs := newTestGameState(9, 9)
-	addKing(gs, engine.NewUnitID(2, 1), engine.Coordinate{X: 0, Y: 0})
+	allyKing := addKing(gs, engine.NewUnitID(2, 1), engine.Coordinate{X: 0, Y: 0})
 	deadAlly := addFighter(gs, engine.NewUnitID(2, 2), engine.Coordinate{X: 0, Y: 8})
 	deadAlly.HP = 0
 	addKing(gs, engine.NewUnitID(1, 1), engine.Coordinate{X: 8, Y: 8})
 
-	// Nothing scores above neutral for the sole live actor, confirming the dead Fighter is excluded.
-	if got := Decide(gs); len(got) != 0 {
-		t.Errorf("Decide() = %+v, want empty", got)
+	got := Decide(gs)
+
+	if len(got) == 0 || got[0].UnitID != allyKing.ID {
+		t.Fatalf("Decide() = %+v, want at least one command from the live ally King %v", got, allyKing.ID)
+	}
+	for _, cmd := range got {
+		if cmd.UnitID == deadAlly.ID {
+			t.Errorf("Decide() = %+v, want no command from dead ally %v", got, deadAlly.ID)
+		}
 	}
 }
 
@@ -297,7 +303,10 @@ func TestDecide_MoveCommandWinsOnItsOwn(t *testing.T) {
 	actor := bombThreatensBothKings(gs)
 	before := gs.DeepCopy()
 
-	want := []engine.TurnCommand{engine.NewMoveCommand(actor.ID, engine.Coordinate{X: 7, Y: 0})}
+	want := []engine.TurnCommand{
+		engine.NewMoveCommand(actor.ID, engine.Coordinate{X: 7, Y: 0}),
+		engine.NewMoveCommand(engine.NewUnitID(2, 1), engine.Coordinate{X: 7, Y: 1}),
+	}
 
 	got := Decide(gs)
 
@@ -429,6 +438,16 @@ func TestDecide(t *testing.T) {
 				return gs
 			},
 			want: []engine.TurnCommand{{Type: engine.TurnCmdPlaceBomb, UnitID: engine.NewUnitID(2, 1)}},
+		},
+		{
+			name: "Open plain, no obstacles: ally King still advances toward the opponent King",
+			setup: func() *engine.GameState {
+				gs := newTestGameState(9, 9)
+				addKing(gs, engine.NewUnitID(2, 1), engine.Coordinate{X: 0, Y: 0})
+				addKing(gs, engine.NewUnitID(1, 1), engine.Coordinate{X: 8, Y: 8})
+				return gs
+			},
+			want: []engine.TurnCommand{{Type: engine.TurnCmdMove, UnitID: engine.NewUnitID(2, 1)}},
 		},
 	}
 	for _, tt := range tests {

@@ -9,12 +9,14 @@ const (
 )
 
 // scoreContext identifies the units a candidate's forecast scores against.
+// Its fields are fixed for the duration of one evaluate call.
 type scoreContext struct {
 	actorID        engine.UnitID
 	allyIDs        []engine.UnitID
 	opponentIDs    []engine.UnitID
 	allyKingID     engine.UnitID
 	opponentKingID engine.UnitID
+	actorOrigin    engine.Coordinate
 }
 
 // turnResult holds one simulated turn's outcome, rebuilt fresh each forecast iteration.
@@ -62,11 +64,11 @@ func evaluate(sc scoreContext, gs *engine.GameState, cmds []engine.TurnCommand) 
 		actor := scratch.Units[sc.actorID]
 		opponentKing := scratch.Units[sc.opponentKingID]
 
-		distToKingBefore := reachDist(scratch, actor, opponentKing.Position)
+		distToKingBefore := reachDistToUnit(scratch, actor, actor.Position, opponentKing)
 		aliveOpponentsBefore := aliveCount(scratch, sc.opponentIDs, sc.opponentKingID)
 		aliveAlliesBefore := aliveCount(scratch, sc.allyIDs, sc.allyKingID)
 		gameEvents := scratch.ResolveBombExplosionAndDamage()
-		distToKingAfter := reachDist(scratch, actor, opponentKing.Position)
+		distToKingAfter := reachDistToUnit(scratch, actor, actor.Position, opponentKing)
 		aliveOpponentsAfter := aliveCount(scratch, sc.opponentIDs, sc.opponentKingID)
 		aliveAlliesAfter := aliveCount(scratch, sc.allyIDs, sc.allyKingID)
 

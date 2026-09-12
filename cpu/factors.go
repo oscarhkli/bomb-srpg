@@ -11,6 +11,7 @@ type factorID int
 // King below also covers Boss - the two share the similar win/loss role.
 const (
 	FactorAdvanceOpponentKingReachability factorID = iota
+	FactorAdvanceOpponentKingDistance
 	FactorKillOpponentKing
 	FactorKillAllyKing
 	FactorKillOpponents
@@ -32,6 +33,7 @@ type scoreFactorEntry struct {
 func scoreFactorsRegistry() []scoreFactorEntry {
 	return []scoreFactorEntry{
 		{FactorAdvanceOpponentKingReachability, advanceOpponentKingReachability},
+		{FactorAdvanceOpponentKingDistance, advanceOpponentKingDistance},
 		{FactorKillOpponentKing, killOpponentKing},
 		{FactorKillAllyKing, killAllyKing},
 		{FactorKillOpponents, killOpponents},
@@ -49,6 +51,7 @@ func scoreFactorsRegistry() []scoreFactorEntry {
 func defaultWeightProfile() map[factorID]int {
 	return map[factorID]int{
 		FactorAdvanceOpponentKingReachability: 1,
+		FactorAdvanceOpponentKingDistance:     1,
 		FactorKillOpponentKing:                1,
 		FactorKillAllyKing:                    -1,
 		FactorKillOpponents:                   1,
@@ -69,6 +72,22 @@ const (
 	riskUnitScore = 1000
 )
 
+func distanceDeltaScore(before, after, val int) int {
+	if before == after {
+		return 0
+	}
+	if after == -1 {
+		return -val
+	}
+	if before == -1 {
+		return val
+	}
+	if before > after {
+		return val
+	}
+	return -val
+}
+
 // advanceOpponentKingReachability deduces score based on reachability gained toward the opponent King when a SoftBlock is cleared this Turn.
 func advanceOpponentKingReachability(gs *engine.GameState, sc scoreContext, tr turnResult) int {
 	if tr.destroyedSoftBlocks == 0 {
@@ -83,21 +102,27 @@ func advanceOpponentKingReachability(gs *engine.GameState, sc scoreContext, tr t
 		return 0
 	}
 
-	score := maxForecastTurn - tr.turn
+	return distanceDeltaScore(tr.distToKingBefore, tr.distToKingAfter, maxForecastTurn-tr.turn)
+}
 
-	if tr.distToKingBefore == tr.distToKingAfter {
+// advanceOpponentKingDistance deduces score based on distance changed toward the opponent King this Turn.
+// Only cares T+0: it's the only turn a move can occur before the forecast loop starts.
+func advanceOpponentKingDistance(gs *engine.GameState, sc scoreContext, tr turnResult) int {
+	if tr.turn > 0 {
 		return 0
 	}
-	if tr.distToKingAfter == -1 {
-		return -score
+	actor := gs.Units[sc.actorID]
+	if actor.HP <= 0 || actor.Position == sc.actorOrigin {
+		return 0
 	}
-	if tr.distToKingBefore == -1 {
-		return score
+	king := gs.Units[sc.opponentKingID]
+	if king.HP <= 0 {
+		return 0
 	}
-	if tr.distToKingBefore > tr.distToKingAfter {
-		return score
-	}
-	return -score
+
+	before := reachDistToUnit(gs, actor, sc.actorOrigin, king)
+	after := reachDistToUnit(gs, actor, actor.Position, king)
+	return distanceDeltaScore(before, after, maxForecastTurn-tr.turn)
 }
 
 // killOpponentKing deduces score based on whether the opponent King died this Turn.

@@ -144,6 +144,122 @@ func TestAdvanceOpponentKingReachability(t *testing.T) {
 	}
 }
 
+func TestAdvanceOpponentKingDistance(t *testing.T) {
+	boxIn := func(gs *engine.GameState, center engine.Coordinate) {
+		setTerrainBlock(gs, engine.Coordinate{X: center.X - 1, Y: center.Y})
+		setTerrainBlock(gs, engine.Coordinate{X: center.X + 1, Y: center.Y})
+		setTerrainBlock(gs, engine.Coordinate{X: center.X, Y: center.Y - 1})
+		setTerrainBlock(gs, engine.Coordinate{X: center.X, Y: center.Y + 1})
+	}
+
+	tests := []struct {
+		name   string
+		setup  func(gs *engine.GameState) (actor, king *engine.Unit)
+		origin engine.Coordinate
+		turn   int
+		want   int
+	}{
+		{
+			name: "Actor didn't move",
+			setup: func(gs *engine.GameState) (*engine.Unit, *engine.Unit) {
+				return addFighter(gs, engine.NewUnitID(1, 1), engine.Coordinate{X: 0, Y: 0}),
+					addKing(gs, engine.NewUnitID(2, 1), engine.Coordinate{X: 8, Y: 8})
+			},
+			origin: engine.Coordinate{X: 0, Y: 0},
+			want:   0,
+		},
+		{
+			name: "Actor dead",
+			setup: func(gs *engine.GameState) (*engine.Unit, *engine.Unit) {
+				actor := addFighter(gs, engine.NewUnitID(1, 1), engine.Coordinate{X: 1, Y: 0})
+				actor.HP = 0
+				return actor, addKing(gs, engine.NewUnitID(2, 1), engine.Coordinate{X: 8, Y: 8})
+			},
+			origin: engine.Coordinate{X: 0, Y: 0},
+			want:   0,
+		},
+		{
+			name: "King dead",
+			setup: func(gs *engine.GameState) (*engine.Unit, *engine.Unit) {
+				king := addKing(gs, engine.NewUnitID(2, 1), engine.Coordinate{X: 8, Y: 8})
+				king.HP = 0
+				return addFighter(gs, engine.NewUnitID(1, 1), engine.Coordinate{X: 1, Y: 0}), king
+			},
+			origin: engine.Coordinate{X: 0, Y: 0},
+			want:   0,
+		},
+		{
+			name: "Later forecast turn ignored",
+			setup: func(gs *engine.GameState) (*engine.Unit, *engine.Unit) {
+				return addFighter(gs, engine.NewUnitID(1, 1), engine.Coordinate{X: 1, Y: 0}),
+					addKing(gs, engine.NewUnitID(2, 1), engine.Coordinate{X: 8, Y: 8})
+			},
+			origin: engine.Coordinate{X: 0, Y: 0},
+			turn:   1,
+			want:   0,
+		},
+		{
+			name: "No distance change",
+			setup: func(gs *engine.GameState) (*engine.Unit, *engine.Unit) {
+				return addFighter(gs, engine.NewUnitID(1, 1), engine.Coordinate{X: 0, Y: 2}),
+					addKing(gs, engine.NewUnitID(2, 1), engine.Coordinate{X: 0, Y: 0})
+			},
+			origin: engine.Coordinate{X: 2, Y: 0},
+			want:   0,
+		},
+		{
+			name: "Normal improvement: got closer",
+			setup: func(gs *engine.GameState) (*engine.Unit, *engine.Unit) {
+				return addFighter(gs, engine.NewUnitID(1, 1), engine.Coordinate{X: 0, Y: 4}),
+					addKing(gs, engine.NewUnitID(2, 1), engine.Coordinate{X: 0, Y: 8})
+			},
+			origin: engine.Coordinate{X: 0, Y: 0},
+			want:   5,
+		},
+		{
+			name: "Regression: got farther",
+			setup: func(gs *engine.GameState) (*engine.Unit, *engine.Unit) {
+				return addFighter(gs, engine.NewUnitID(1, 1), engine.Coordinate{X: 0, Y: 0}),
+					addKing(gs, engine.NewUnitID(2, 1), engine.Coordinate{X: 0, Y: 8})
+			},
+			origin: engine.Coordinate{X: 0, Y: 4},
+			want:   -5,
+		},
+		{
+			name: "Breakthrough: origin was boxed in, now reachable",
+			setup: func(gs *engine.GameState) (*engine.Unit, *engine.Unit) {
+				boxIn(gs, engine.Coordinate{X: 4, Y: 4})
+				return addFighter(gs, engine.NewUnitID(1, 1), engine.Coordinate{X: 0, Y: 0}),
+					addKing(gs, engine.NewUnitID(2, 1), engine.Coordinate{X: 8, Y: 8})
+			},
+			origin: engine.Coordinate{X: 4, Y: 4},
+			want:   5,
+		},
+		{
+			name: "Newly unreachable: was reachable, now boxed in",
+			setup: func(gs *engine.GameState) (*engine.Unit, *engine.Unit) {
+				boxIn(gs, engine.Coordinate{X: 4, Y: 4})
+				return addFighter(gs, engine.NewUnitID(1, 1), engine.Coordinate{X: 4, Y: 4}),
+					addKing(gs, engine.NewUnitID(2, 1), engine.Coordinate{X: 8, Y: 8})
+			},
+			origin: engine.Coordinate{X: 0, Y: 0},
+			want:   -5,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gs := newTestGameState(9, 9)
+			actor, king := tt.setup(gs)
+			sc := scoreContext{actorID: actor.ID, opponentKingID: king.ID, actorOrigin: tt.origin}
+			tr := turnResult{turn: tt.turn}
+
+			if got := advanceOpponentKingDistance(gs, sc, tr); got != tt.want {
+				t.Errorf("advanceOpponentKingDistance() = %d, want %d", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestKillOpponentKing(t *testing.T) {
 	opponentKingID := engine.NewUnitID(2, 1)
 	tests := []struct {
