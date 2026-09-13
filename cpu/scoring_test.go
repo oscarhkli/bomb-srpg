@@ -163,6 +163,136 @@ func TestEvaluate(t *testing.T) {
 	}
 }
 
+func TestEvaluate_RiskAllyKingExcludesOwnBomb(t *testing.T) {
+	tests := []struct {
+		name      string
+		bombOwner func(allyID, opponentID engine.UnitID) engine.UnitID
+		want      int
+	}{
+		{
+			name:      "Ally-owned bomb: not scored as risk",
+			bombOwner: func(allyID, _ engine.UnitID) engine.UnitID { return allyID },
+			want:      0,
+		},
+		{
+			name:      "Opponent-owned bomb: scored as risk",
+			bombOwner: func(_, opponentID engine.UnitID) engine.UnitID { return opponentID },
+			want:      -1500,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gs := newTestGameState(9, 9)
+			allyKing := addKing(gs, engine.NewUnitID(1, 1), engine.Coordinate{X: 2, Y: 2})
+			allyKing.HP = 5
+			opponentKing := addKing(gs, engine.NewUnitID(2, 1), engine.Coordinate{X: 8, Y: 8})
+			owner := tt.bombOwner(allyKing.ID, opponentKing.ID)
+
+			bombID := engine.NewBombID(0, 0, owner)
+			bombPos := engine.Coordinate{X: 3, Y: 2}
+			gs.Bombs[bombID] = &engine.Bomb{ID: bombID, OwnerID: owner, Position: bombPos, Range: 1, Countdown: 1}
+			gs.Grid[bombPos.Y][bombPos.X] = engine.Tile{Type: engine.TerrainPlain, OccupantType: engine.OccupantBomb, OccupantID: int64(bombID)}
+
+			sc := scoreContext{
+				actorID:        allyKing.ID,
+				allyIDs:        []engine.UnitID{allyKing.ID},
+				opponentIDs:    []engine.UnitID{opponentKing.ID},
+				allyKingID:     allyKing.ID,
+				opponentKingID: opponentKing.ID,
+				actorOrigin:    allyKing.Position,
+			}
+
+			got, err := evaluate(sc, gs, nil)
+			if err != nil {
+				t.Fatalf("evaluate() unexpected err = %v", err)
+			}
+			if got.score != tt.want {
+				t.Errorf("evaluate() score = %d, want %d", got.score, tt.want)
+			}
+		})
+	}
+}
+
+func TestEvaluate_SuicideUncappedByTurn(t *testing.T) {
+	tests := []struct {
+		name      string
+		bombOwner func(allyID, opponentID engine.UnitID) engine.UnitID
+		want      int
+	}{
+		{
+			name:      "Ally-owned bomb: certain self-destruction vetoed regardless of fuse length",
+			bombOwner: func(allyID, _ engine.UnitID) engine.UnitID { return allyID },
+			want:      -killKingScore,
+		},
+		{
+			name:      "Opponent-owned bomb: not scored as self-destruction",
+			bombOwner: func(_, opponentID engine.UnitID) engine.UnitID { return opponentID },
+			want:      -782,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gs := newTestGameState(9, 9)
+			allyKing := addKing(gs, engine.NewUnitID(1, 1), engine.Coordinate{X: 2, Y: 2})
+			allyKing.HP = 1
+			opponentKing := addKing(gs, engine.NewUnitID(2, 1), engine.Coordinate{X: 8, Y: 8})
+			owner := tt.bombOwner(allyKing.ID, opponentKing.ID)
+
+			bombID := engine.NewBombID(0, 0, owner)
+			bombPos := engine.Coordinate{X: 3, Y: 2}
+			gs.Bombs[bombID] = &engine.Bomb{ID: bombID, OwnerID: owner, Position: bombPos, Range: 1, Countdown: 5}
+			gs.Grid[bombPos.Y][bombPos.X] = engine.Tile{Type: engine.TerrainPlain, OccupantType: engine.OccupantBomb, OccupantID: int64(bombID)}
+
+			sc := scoreContext{
+				actorID:        allyKing.ID,
+				allyIDs:        []engine.UnitID{allyKing.ID},
+				opponentIDs:    []engine.UnitID{opponentKing.ID},
+				allyKingID:     allyKing.ID,
+				opponentKingID: opponentKing.ID,
+				actorOrigin:    allyKing.Position,
+			}
+
+			got, err := evaluate(sc, gs, nil)
+			if err != nil {
+				t.Fatalf("evaluate() unexpected err = %v", err)
+			}
+			if got.score != tt.want {
+				t.Errorf("evaluate() score = %d, want %d", got.score, tt.want)
+			}
+		})
+	}
+}
+
+func TestEvaluate_MutualKingTradeNotDoubleCounted(t *testing.T) {
+	gs := newTestGameState(9, 9)
+	allyKing := addKing(gs, engine.NewUnitID(1, 1), engine.Coordinate{X: 2, Y: 2})
+	allyKing.HP = 1
+	opponentKing := addKing(gs, engine.NewUnitID(2, 1), engine.Coordinate{X: 4, Y: 2})
+	opponentKing.HP = 1
+
+	bombID := engine.NewBombID(0, 0, allyKing.ID)
+	bombPos := engine.Coordinate{X: 3, Y: 2}
+	gs.Bombs[bombID] = &engine.Bomb{ID: bombID, OwnerID: allyKing.ID, Position: bombPos, Range: 2, Countdown: 1}
+	gs.Grid[bombPos.Y][bombPos.X] = engine.Tile{Type: engine.TerrainPlain, OccupantType: engine.OccupantBomb, OccupantID: int64(bombID)}
+
+	sc := scoreContext{
+		actorID:        allyKing.ID,
+		allyIDs:        []engine.UnitID{allyKing.ID},
+		opponentIDs:    []engine.UnitID{opponentKing.ID},
+		allyKingID:     allyKing.ID,
+		opponentKingID: opponentKing.ID,
+		actorOrigin:    allyKing.Position,
+	}
+
+	got, err := evaluate(sc, gs, nil)
+	if err != nil {
+		t.Fatalf("evaluate() unexpected err = %v", err)
+	}
+	if got.score <= 0 {
+		t.Errorf("evaluate() score = %d, want a net-positive score for a winning King trade", got.score)
+	}
+}
+
 func TestEvaluate_OriginalGameStateUntouched(t *testing.T) {
 	gs := newTestGameState(5, 5)
 	actor := addFighter(gs, engine.NewUnitID(1, 1), engine.Coordinate{X: 2, Y: 2})

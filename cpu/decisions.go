@@ -82,12 +82,15 @@ func Decide(gs *engine.GameState) []engine.TurnCommand {
 				// Sandbox is untouched here; skip this unit for the round.
 				continue
 			}
+			if len(c.turnCommands) == 0 {
+				continue
+			}
 			if best == nil || c.score > best.score {
 				best = &c
 			}
 		}
 
-		if best == nil || len(best.turnCommands) == 0 {
+		if best == nil {
 			break
 		}
 

@@ -151,21 +151,21 @@ func TestBestCandidateFor(t *testing.T) {
 		if want := "move(1,0)"; got.tag != want {
 			t.Errorf("bestCandidateFor() tag = %q, want %q (score %d)", got.tag, want, got.score)
 		}
-		if want := -7; got.score != want {
+		if want := 942; got.score != want {
 			t.Errorf("bestCandidateFor() score = %d, want %d", got.score, want)
 		}
 	})
 
 	t.Run("Exact tie: move+bomb never wins a tie it shares with a same-shaped alternative", func(t *testing.T) {
-		gs := newTestGameState(9, 2)
-		allyFighter := corridorWithBreakthrough(gs)
+		gs := newTestGameState(9, 9)
+		actor, allyKing, opponentKing := isolatedKingsNeutral(gs)
 
 		sc := scoreContext{
-			actorID:        allyFighter.ID,
-			allyIDs:        []engine.UnitID{allyFighter.ID},
-			allyKingID:     engine.NewUnitID(2, 2),
-			opponentKingID: engine.NewUnitID(1, 1),
-			actorOrigin:    allyFighter.Position,
+			actorID:        actor.ID,
+			allyIDs:        []engine.UnitID{actor.ID},
+			allyKingID:     allyKing.ID,
+			opponentKingID: opponentKing.ID,
+			actorOrigin:    actor.Position,
 		}
 
 		got, err := bestCandidateFor(sc, gs)
@@ -245,9 +245,23 @@ func corridorWithBreakthrough(gs *engine.GameState) (allyFighter *engine.Unit) {
 	return allyFighter
 }
 
-func twinCorridorWithBreakthrough(gs *engine.GameState) (fighter1, fighter2 *engine.Unit) {
+func isolatedKingsNeutral(gs *engine.GameState) (actor, allyKing, opponentKing *engine.Unit) {
+	actor = addFighter(gs, engine.NewUnitID(2, 1), engine.Coordinate{X: 1, Y: 0})
+
+	allyKing = addKing(gs, engine.NewUnitID(2, 2), engine.Coordinate{X: 8, Y: 8})
+	setTerrainBlock(gs, engine.Coordinate{X: 7, Y: 8})
+	setTerrainBlock(gs, engine.Coordinate{X: 8, Y: 7})
+
+	opponentKing = addKing(gs, engine.NewUnitID(1, 1), engine.Coordinate{X: 0, Y: 8})
+	setTerrainBlock(gs, engine.Coordinate{X: 1, Y: 8})
+	setTerrainBlock(gs, engine.Coordinate{X: 0, Y: 7})
+
+	return actor, allyKing, opponentKing
+}
+
+func twinCorridorWithBreakthrough(gs *engine.GameState, frozen bool) (fighter1, fighter2 *engine.Unit) {
 	fighter1 = addFighter(gs, engine.NewUnitID(2, 1), engine.Coordinate{X: 0, Y: 0})
-	fighter1.HasMoved = true
+	fighter1.HasMoved = frozen
 	addSoftBlock(gs, 1, engine.Coordinate{X: 3, Y: 0})
 	addKing(gs, engine.NewUnitID(1, 1), engine.Coordinate{X: 8, Y: 0})
 
@@ -259,7 +273,7 @@ func twinCorridorWithBreakthrough(gs *engine.GameState) (fighter1, fighter2 *eng
 	}
 
 	fighter2 = addFighter(gs, engine.NewUnitID(2, 2), engine.Coordinate{X: 0, Y: 3})
-	fighter2.HasMoved = true
+	fighter2.HasMoved = frozen
 	addSoftBlock(gs, 2, engine.Coordinate{X: 3, Y: 3})
 	addFighter(gs, engine.NewUnitID(1, 2), engine.Coordinate{X: 2, Y: 2})
 
@@ -273,21 +287,45 @@ func twinCorridorWithBreakthrough(gs *engine.GameState) (fighter1, fighter2 *eng
 	return fighter1, fighter2
 }
 
-func TestDecide_AppliesMoreThanOneRound(t *testing.T) {
+func TestDecide_FrozenFighterNeverSuicides(t *testing.T) {
 	gs := newTestGameState(9, 5)
-	fighter1, fighter2 := twinCorridorWithBreakthrough(gs)
+	twinCorridorWithBreakthrough(gs, true)
 	before := gs.DeepCopy()
 
 	got := Decide(gs)
 
-	if len(got) != 2 {
-		t.Fatalf("Decide() = %+v, want 2 commands", got)
+	for _, cmd := range got {
+		if cmd.Type == engine.TurnCmdPlaceBomb {
+			t.Errorf("Decide() = %+v, must not place a bomb that guarantees self-destruction", got)
+		}
 	}
-	if got[0].Type != engine.TurnCmdPlaceBomb || got[0].UnitID != fighter1.ID {
-		t.Errorf("Decide()[0] = %+v, want a placeBomb from %v (higher-scoring, picked first)", got[0], fighter1.ID)
+	if !reflect.DeepEqual(gs, before) {
+		t.Errorf("Decide() mutated its input GameState")
 	}
-	if got[1].Type != engine.TurnCmdPlaceBomb || got[1].UnitID != fighter2.ID {
-		t.Errorf("Decide()[1] = %+v, want a placeBomb from %v (picked in the second round)", got[1], fighter2.ID)
+}
+
+func TestDecide_MobileFighterMovesThenBombsSafely(t *testing.T) {
+	gs := newTestGameState(9, 5)
+	fighter1, fighter2 := twinCorridorWithBreakthrough(gs, false)
+	before := gs.DeepCopy()
+
+	got := Decide(gs)
+
+	if len(got) != 4 {
+		t.Fatalf("Decide() = %+v, want 4 commands (move+bomb from each fighter)", got)
+	}
+	for _, fighter := range []*engine.Unit{fighter1, fighter2} {
+		var moved, bombed bool
+		for _, cmd := range got {
+			if cmd.UnitID != fighter.ID {
+				continue
+			}
+			moved = moved || cmd.Type == engine.TurnCmdMove
+			bombed = bombed || cmd.Type == engine.TurnCmdPlaceBomb
+		}
+		if !moved || !bombed {
+			t.Errorf("Decide() = %+v, want a move and a placeBomb from %v", got, fighter.ID)
+		}
 	}
 	if !reflect.DeepEqual(gs, before) {
 		t.Errorf("Decide() mutated its input GameState")
@@ -438,7 +476,10 @@ func TestDecide(t *testing.T) {
 				corridorWithBreakthrough(gs)
 				return gs
 			},
-			want: []engine.TurnCommand{{Type: engine.TurnCmdPlaceBomb, UnitID: engine.NewUnitID(2, 1)}},
+			want: []engine.TurnCommand{
+				{Type: engine.TurnCmdMove, UnitID: engine.NewUnitID(2, 1)},
+				{Type: engine.TurnCmdPlaceBomb, UnitID: engine.NewUnitID(2, 1)},
+			},
 		},
 		{
 			name: "Two allies: only the scoring one contributes",
@@ -448,7 +489,10 @@ func TestDecide(t *testing.T) {
 				addFighter(gs, engine.NewUnitID(2, 3), engine.Coordinate{X: 0, Y: 1})
 				return gs
 			},
-			want: []engine.TurnCommand{{Type: engine.TurnCmdPlaceBomb, UnitID: engine.NewUnitID(2, 1)}},
+			want: []engine.TurnCommand{
+				{Type: engine.TurnCmdMove, UnitID: engine.NewUnitID(2, 1)},
+				{Type: engine.TurnCmdPlaceBomb, UnitID: engine.NewUnitID(2, 1)},
+			},
 		},
 		{
 			name: "Open plain, no obstacles: ally King still advances toward the opponent King",

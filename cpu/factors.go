@@ -20,6 +20,8 @@ const (
 	FactorRiskAllyKing
 	FactorThreatOpponents
 	FactorRiskAllies
+	FactorSuicideAllyKing
+	FactorSuicideAllies
 )
 
 // scoreFactorEntry pairs a scoreFactor with the identity used to look up its weight.
@@ -42,6 +44,8 @@ func scoreFactorsRegistry() []scoreFactorEntry {
 		{FactorRiskAllyKing, riskAllyKing},
 		{FactorThreatOpponents, threatOpponents},
 		{FactorRiskAllies, riskAllies},
+		{FactorSuicideAllyKing, suicideAllyKing},
+		{FactorSuicideAllies, suicideAllies},
 	}
 }
 
@@ -60,16 +64,19 @@ func defaultWeightProfile() map[factorID]int {
 		FactorRiskAllyKing:                    -1,
 		FactorThreatOpponents:                 1,
 		FactorRiskAllies:                      -1,
+		FactorSuicideAllyKing:                 -1,
+		FactorSuicideAllies:                   -1,
 	}
 }
 
-// Score magnitudes, tiered so a certain outcome always outranks a predicted one:
-// killKingScore > killUnitScore > riskKingScore > riskUnitScore.
+// Score magnitudes, tiered so a certain outcome always outranks a predicted one
 const (
-	killKingScore = 100000 // Very high score to make a result guaranteed.
-	killUnitScore = 10000  // Lower than killKingScore: a predicted, not guaranteed, outcome.
-	riskKingScore = 5000
-	riskUnitScore = 1000
+	killKingScore         = 100000 // Very high score to make a result guaranteed.
+	killUnitScore         = 10000  // Lower than killKingScore: a predicted, not guaranteed, outcome.
+	riskOpponentKingScore = 5000
+	riskOpponentScore     = 1000
+	riskAllyKingScore     = 3000
+	riskAllyScore         = 600
 )
 
 func distanceDeltaScore(before, after, val int) int {
@@ -169,6 +176,38 @@ func killAllies(gs *engine.GameState, sc scoreContext, tr turnResult) int {
 	return killUnitScore * killed / tr.aliveAlliesBefore
 }
 
+// suicideAllyKing deduces score based on whether the ally King died from an ally-owned bomb.
+// Only fires at tr.turn>1: killAllyKing already covers tr.turn<=1 for any cause of death,
+// self-inflicted included, and this must not double-count that same death.
+func suicideAllyKing(gs *engine.GameState, sc scoreContext, tr turnResult) int {
+	if tr.turn <= 1 {
+		return 0
+	}
+	if _, ok := tr.suicides[sc.allyKingID]; ok {
+		return killKingScore
+	}
+	return 0
+}
+
+// suicideAllies deduces score based on the ally non-King survive rate lost to an ally-owned bomb.
+// Only fires at tr.turn>1, for the same reason as suicideAllyKing.
+func suicideAllies(gs *engine.GameState, sc scoreContext, tr turnResult) int {
+	total := nonKingCount(sc.allyIDs, sc.allyKingID)
+	if tr.turn <= 1 || total == 0 {
+		return 0
+	}
+	killed := 0
+	for _, id := range sc.allyIDs {
+		if id == sc.allyKingID {
+			continue
+		}
+		if _, ok := tr.suicides[id]; ok {
+			killed++
+		}
+	}
+	return killUnitScore * killed / total
+}
+
 func escapable(gs *engine.GameState, unit *engine.Unit, affectedTiles map[engine.Coordinate]struct{}) bool {
 	tiles, err := gs.FindAllowedTilesForCommand(unit.ID, engine.TurnCmdMove)
 	if err != nil {
@@ -195,46 +234,48 @@ func decayRatio(x, t int, k float64) float64 {
 }
 
 const (
-	riskFreeDist = 6                     // distance (tiles) beyond which threat is considered negligible
-	kDistThreat  = 4.0 / riskFreeDist    // decayRatio's distance-axis k for offense (threatens opponents)
-	kDistRisk    = 1.0 / riskFreeDist    // decayRatio's distance-axis k for defense (own units' exposure)
-	kTurn        = 3.0 / maxForecastTurn // decayRatio's k for the turn axis
+	riskFreeDist = 6                  // distance beyond which threat is considered negligible
+	kDistThreat  = 4.0 / riskFreeDist // decayRatio's distance-axis k for offense
+	kDistRisk    = 1.0 / riskFreeDist // decayRatio's distance-axis k for defense
+	riskFreeTurn = 5                  // turns beyond which a bomb's fuse is considered escapable
+	kTurn        = 1.0 / riskFreeTurn // decayRatio's k for the turn axis
 )
 
-// exposureIndex deduces a unit's exposure to the nearest affected tile, as a 0..1 ratio.
+// exposureIndex deduces a unit's exposure to the nearest tile in affectedTiles, as a 0..1 ratio.
 // turnOffset is how many turns of this unit's certain-kill window have already elapsed.
 // k is the distance-axis decayRatio constant; offense and defense use different curves.
-func exposureIndex(gs *engine.GameState, unitID engine.UnitID, tr turnResult, turnOffset int, k float64) float64 {
-	if len(tr.affectedTiles) == 0 {
+func exposureIndex(gs *engine.GameState, unitID engine.UnitID, affectedTiles map[engine.Coordinate]struct{}, tr turnResult, turnOffset int, k float64) float64 {
+	if len(affectedTiles) == 0 {
 		return 0
 	}
 
 	unit := gs.Units[unitID]
 
-	dist := nearestAffectedDist(gs, unit, tr.affectedTiles)
+	dist := nearestAffectedDist(gs, unit, affectedTiles)
 	if dist == -1 {
 		return 0
 	}
 
 	escapeRatio := 1.0
-	if dist > 0 || (dist == 0 && escapable(gs, unit, tr.affectedTiles)) {
+	if dist > 0 || (dist == 0 && escapable(gs, unit, affectedTiles)) {
 		escapeRatio *= 0.5
 	}
 
 	distRisk := decayRatio(dist, riskFreeDist, k)
-	turnRisk := decayRatio(max(tr.turn-turnOffset, 0), maxForecastTurn, kTurn)
+	turnRisk := decayRatio(max(tr.turn-turnOffset, 0), riskFreeTurn, kTurn)
 
 	return distRisk * turnRisk * escapeRatio
 }
 
 // threatOpponentKing deduces score based on the distance between Opponent King and nearest bomb affected tile triggered in which Turns.
 func threatOpponentKing(gs *engine.GameState, sc scoreContext, tr turnResult) int {
-	return int(float64(riskKingScore) * exposureIndex(gs, sc.opponentKingID, tr, 0, kDistThreat))
+	return int(float64(riskOpponentKingScore) * exposureIndex(gs, sc.opponentKingID, tr.affectedTiles, tr, 0, kDistThreat))
 }
 
-// riskAllyKing deduces score based on the distance between Ally King and bomb affected tile triggered in which Turns.
+// riskAllyKing deduces score based on the distance between Ally King and an opponent-owned bomb's affected tile.
+// A bomb the ally team itself placed isn't scored here: the team controls whether it keeps units near it.
 func riskAllyKing(gs *engine.GameState, sc scoreContext, tr turnResult) int {
-	return int(float64(riskKingScore) * exposureIndex(gs, sc.allyKingID, tr, 1, kDistRisk))
+	return int(float64(riskAllyKingScore) * exposureIndex(gs, sc.allyKingID, tr.opponentAffectedTiles, tr, 1, kDistRisk))
 }
 
 // nonKingCount returns how many of ids aren't kingID, alive or not — the fixed group size
@@ -262,17 +303,18 @@ func threatOpponents(gs *engine.GameState, sc scoreContext, tr turnResult) int {
 		if unitID == sc.opponentKingID {
 			continue
 		}
-		sum += exposureIndex(gs, unitID, tr, turnOffset, kDistThreat)
+		sum += exposureIndex(gs, unitID, tr.affectedTiles, tr, turnOffset, kDistThreat)
 	}
 
-	return int(float64(riskUnitScore) * sum / float64(total))
+	return int(float64(riskOpponentScore) * sum / float64(total))
 }
 
-// riskAllies deduces the average score based on the distance between Allies and bomb affected tile triggered in which Turns.
+// riskAllies deduces the average score based on the distance between Allies and an opponent-owned bomb's affected tile.
+// A bomb the ally team itself placed isn't scored here: the team controls whether it keeps units near it.
 func riskAllies(gs *engine.GameState, sc scoreContext, tr turnResult) int {
 	turnOffset := 1
 	total := nonKingCount(sc.allyIDs, sc.allyKingID)
-	if len(tr.affectedTiles) == 0 || total == 0 {
+	if len(tr.opponentAffectedTiles) == 0 || total == 0 {
 		return 0
 	}
 
@@ -281,8 +323,8 @@ func riskAllies(gs *engine.GameState, sc scoreContext, tr turnResult) int {
 		if unitID == sc.allyKingID {
 			continue
 		}
-		sum += exposureIndex(gs, unitID, tr, turnOffset, kDistRisk)
+		sum += exposureIndex(gs, unitID, tr.opponentAffectedTiles, tr, turnOffset, kDistRisk)
 	}
 
-	return int(float64(riskUnitScore) * sum / float64(total))
+	return int(float64(riskAllyScore) * sum / float64(total))
 }

@@ -2,6 +2,7 @@ package cpu
 
 import (
 	"bomb-srpg/engine"
+	"slices"
 )
 
 const (
@@ -21,16 +22,19 @@ type scoreContext struct {
 
 // turnResult holds one simulated turn's outcome, rebuilt fresh each forecast iteration.
 type turnResult struct {
-	turn                 int                            // the nth next turn, not the exact turn number
-	affectedTiles        map[engine.Coordinate]struct{} // this turn's AffectedPositions
-	destroyedSoftBlocks  int                            // this turn's softBlockDestroyed count
-	diedUnits            map[engine.UnitID]struct{}     // this turn's dead units
-	distToKingBefore     int                            // unit's reachability to opponent King, before this turn resolved
-	distToKingAfter      int                            // unit's reachability to opponent King, after this turn resolved
-	aliveOpponentsBefore int                            // opponent non-King units alive, before this turn resolved
-	aliveOpponentsAfter  int                            // opponent non-King units alive, after this turn resolved
-	aliveAlliesBefore    int                            // ally non-King units alive, before this turn resolved
-	aliveAlliesAfter     int                            // ally non-King units alive, after this turn resolved
+	turn                  int                            // the nth next turn, not the exact turn number
+	affectedTiles         map[engine.Coordinate]struct{} // this turn's AffectedPositions overall
+	allyAffectedTiles     map[engine.Coordinate]struct{} // this turn's AffectedPositions from an ally-owned bomb
+	opponentAffectedTiles map[engine.Coordinate]struct{} // this turn's AffectedPositions from an opponent-owned bomb
+	destroyedSoftBlocks   int                            // this turn's softBlockDestroyed count
+	diedUnits             map[engine.UnitID]struct{}     // this turn's dead units
+	suicides              map[engine.UnitID]struct{}     // this turn's dead allies killed by an ally-owned bomb
+	distToKingBefore      int                            // unit's reachability to opponent King, before this turn resolved
+	distToKingAfter       int                            // unit's reachability to opponent King, after this turn resolved
+	aliveOpponentsBefore  int                            // opponent non-King units alive, before this turn resolved
+	aliveOpponentsAfter   int                            // opponent non-King units alive, after this turn resolved
+	aliveAlliesBefore     int                            // ally non-King units alive, before this turn resolved
+	aliveAlliesAfter      int                            // ally non-King units alive, after this turn resolved
 }
 
 type scoreFactor func(gs *engine.GameState, sc scoreContext, tr turnResult) int
@@ -73,32 +77,50 @@ func evaluate(sc scoreContext, gs *engine.GameState, cmds []engine.TurnCommand) 
 		aliveAlliesAfter := aliveCount(scratch, sc.allyIDs, sc.allyKingID)
 
 		affectedTiles := make(map[engine.Coordinate]struct{})
+		allyAffectedTiles := make(map[engine.Coordinate]struct{})
+		opponentAffectedTiles := make(map[engine.Coordinate]struct{})
 		destroyedSoftBlocks := 0
 		diedUnits := make(map[engine.UnitID]struct{})
+		suicides := make(map[engine.UnitID]struct{})
 		for _, evt := range gameEvents {
 			switch evt.Type {
 			case engine.GameEvtBombExploded:
+				_, _, ownerID := evt.BombID.Decode()
+				dest := opponentAffectedTiles
+				if slices.Contains(sc.allyIDs, ownerID) {
+					dest = allyAffectedTiles
+				}
 				for _, pos := range evt.AffectedPositions {
 					affectedTiles[pos] = struct{}{}
+					dest[pos] = struct{}{}
 				}
 			case engine.GameEvtSoftBlockDestroyed:
 				destroyedSoftBlocks++
 			case engine.GameEvtUnitDied:
 				diedUnits[evt.UnitID] = struct{}{}
+				isAlly := evt.UnitID == sc.allyKingID || slices.Contains(sc.allyIDs, evt.UnitID)
+				if isAlly && evt.Position != nil {
+					if _, ok := allyAffectedTiles[*evt.Position]; ok {
+						suicides[evt.UnitID] = struct{}{}
+					}
+				}
 			}
 		}
 
 		tr := turnResult{
-			turn:                 t,
-			affectedTiles:        affectedTiles,
-			destroyedSoftBlocks:  destroyedSoftBlocks,
-			diedUnits:            diedUnits,
-			distToKingBefore:     distToKingBefore,
-			distToKingAfter:      distToKingAfter,
-			aliveOpponentsBefore: aliveOpponentsBefore,
-			aliveOpponentsAfter:  aliveOpponentsAfter,
-			aliveAlliesBefore:    aliveAlliesBefore,
-			aliveAlliesAfter:     aliveAlliesAfter,
+			turn:                  t,
+			affectedTiles:         affectedTiles,
+			allyAffectedTiles:     allyAffectedTiles,
+			opponentAffectedTiles: opponentAffectedTiles,
+			destroyedSoftBlocks:   destroyedSoftBlocks,
+			diedUnits:             diedUnits,
+			suicides:              suicides,
+			distToKingBefore:      distToKingBefore,
+			distToKingAfter:       distToKingAfter,
+			aliveOpponentsBefore:  aliveOpponentsBefore,
+			aliveOpponentsAfter:   aliveOpponentsAfter,
+			aliveAlliesBefore:     aliveAlliesBefore,
+			aliveAlliesAfter:      aliveAlliesAfter,
 		}
 		for _, entry := range factors {
 			total += profile[entry.id] * entry.factor(scratch, sc, tr)
