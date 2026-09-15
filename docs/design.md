@@ -136,59 +136,16 @@ Surrender: `POST /surrender` (either team, any time).
 
 ## 10. VS CPU
 
-- **VS-CPU Turn Handoff**: The CPU's turn runs in a goroutine kicked off from `StartTurn()`, buffering its events on `Match.CPU` until the frontend polls them. See [VS-CPU Turn Sequence](diagrams/vs-cpu-turn-sequence.md) for the full handshake.
-- **CPU Turn Opens Like a Human One**: the launch sits after `Match.StartTurn()` rather than after the human's `ResolveTurn()`, so sudden-death hazards are on the board before `Decide()` reads it — injection lives only in `StartTurn()`, and a CPU turn that skipped it would plan against a stale board.
-- **Boss Prologue over Full VS-COM**: Rather than build general-purpose CPU heuristics for a full team, the first CPU opponent is a single `RoleBoss` unit on the `Prologue` archetype against a 5-unit human team — a narrower rules surface (`evaluateVictoryConditions()` gained a Boss-type goal alongside the King-type one) that ships a playable single-player mode sooner. The Boss/Prologue shape isn't throwaway scaffolding: it doubles as the natural seed for a future Tutorial or Story Mode encounter.
-- **CPU Decision Boundary (`cpu` package)**: `cpu.Decide()` is a pure function — no engine mutation, no lock awareness, no HTTP. `server.runCPUTurn` (holding the room mutex for the full CPU turn) is the sole caller; it applies the returned commands to the real `WorkingState` via `ApplyTurnCommand`.
-- **Propose-Then-Validate**: `cpu` never pre-validates a plan — `ApplyTurnCommand`'s existing legality checks are the sole authority. A failed apply mid-plan is the expected divergence signal, not a contract violation.
-- **Bounded Replan on Divergence**: a failed apply triggers one re-`Decide()` call against the current `WorkingState` for the remaining scope, capped per turn; exhausting the cap aborts the remainder and resolves with whatever committed. Replanning is event-triggered on failure, never per-command. There is no rollback between attempts: commands that already applied are legal, and the mutated `WorkingState` *is* the remaining-scope bookkeeping, so a `ResetTurn()` there would discard valid work. The corollary is a standing constraint on `Decide()` — when the *first* command is rejected nothing has mutated, so the next attempt only progresses if `Decide()` varies its output for an identical state.
+- **VS-CPU Turn Handoff**: The CPU's turn runs in a goroutine kicked off from `StartTurn()`, buffering events on `Match.CPU` until the frontend polls them. See [VS-CPU Turn Sequence](diagrams/vs-cpu-turn-sequence.md).
+- **Boss Prologue over Full VS-COM**: the first CPU opponent is a single `RoleBoss` unit against a 5-unit human team. This is a narrower rules surface that ships single-player sooner and acs a future Tutorial/Story Mode.
+- **CPU Decision Boundary**: `cpu.Decide()` is a pure function. `server.runCPUTurn` is the sole caller, applying returned commands to the real `WorkingState` via `ApplyTurnCommand` under the room mutex.
+- **Propose-Then-Validate, Bounded Replan**: `cpu` never pre-validates a plan. `ApplyTurnCommand`'s legality checks are the sole authority, and a failed apply mid-plan triggers one re-`Decide()` for the remaining scope rather than being treated as a contract violation.
 
-## File Structure (WIP)
+## 11. CPU Decision Making
 
-```text
-bomb-srpg
-├── cli/                        <-- Phase 1: Interactive terminal CLI package
-│   ├── match_controller.go     <-- Reads inputs and maps to engine actions
-│   ├── views.go                <-- Defines the read-only MatchView interface
-│   └── terminal_view.go        <-- Implements the ASCII map grid rendering logic
-│
-├── cmd/
-│   ├── srpg-cli/               <-- Phase 1 Terminal entry point (v0.1.0-cli)
-│   │   └── main.go
-│   │
-│   └── srpg-web/               <-- Phase 2+ HTTP entry point
-│       └── main.go
-│
-├── cpu/                        <-- Pure CPU planner
-│   ├── decisions.go            <-- Decide() entry point: proposes a plan from a sandbox snapshot
-│   ├── plans.go                <-- Enumerates a unit's candidate move/bomb TurnCommand combinations
-│   ├── scoring.go              <-- Scores a candidate plan by forecasting turns and summing weighted factors
-│   ├── factors.go              <-- Individual scoreFactor funcs (threat, risk, advance) feeding scoring
-│   └── distance.go             <-- Walking-distance helper
-│
-├── server/                     <-- Phase 2: HTTP Web server package
-│   ├── http_handlers.go        <-- REST HTTP interface boundary
-│   ├── middleware.go           <-- HTTP middleware: security headers, panic recovery
-│   ├── routes.go               <-- HTTP route registration
-│   ├── server_manager.go       <-- Web server memory manager, state locks & housekeeper
-│   └── ws_hub.go               <-- Phase 5+: WebSocket connection event pump
-│
-├── docs/                       <-- Design, roadmap and other docs
-├── engine/                     <-- Pure core logic
-│   ├── codecs.go               <-- Bitmask encoders, decoders for UnitID and BombID
-│   ├── commands.go             <-- TurnCommand types & constructors
-│   ├── errors.go               <-- Error types deduced by engine
-│   ├── events.go               <-- GameEvent types & constructors
-│   ├── game.go                 <-- Game initializer
-│   ├── match.go                <-- Match life cycle transactions
-│   ├── models.go               <-- Pure blueprints
-│   ├── pathfinding.go          <-- Stage navigation
-│   ├── presets.go              <-- Static database
-│   └── stage.go                <-- Centralized Stage verification and manipulation (IsInBound, ClearTile, UpdateTileOccupant, etc.)
-│
-├── Makefile                    <-- Build/Test Automation
-└── web/public                  <-- Phase 3: Phaser.js Frontend UI
-```
+- **Utility AI + Greedy Allocation**: Each unit's candidate plans are scored independently by a weighted sum of `scoreFactor`s (utility AI); `Decide()` then greedily assigns the single best-scoring unit/plan pair per round, repeating against the mutated sandbox until no positive assignment remains, rather than searching joint multi-unit plans.
+- **Forecast-by-Replay Scoring**: A candidate isn't scored off the immediate post-move state. `evaluate()` applies it to a scratch sandbox, then replays `ResolveBombExplosionAndDamage()` forward for `maxForecastTurn` turns, accumulating weighted factor output each turn. This lets delayed-fuse bomb outcomes score correctly instead of only what's true the instant the plan is applied.
+- **Self-Destruction Veto via Suicide Attribution**: `evaluate()` tags an ally death as a suicide when the death tile falls inside that turn's ally-owned blast set (`allyAffectedTiles`), letting `suicideAllyKing`/`suicideAllies` factors carry a steep negative weight independent of the general `killAllies` factor.
 
 ## Gameplay
 
