@@ -16,7 +16,15 @@ import {
   delayedCallAt,
   drainDelayedCalls,
 } from '../test/sceneHelpers';
-import { makeCfg, makeState, plainTile, tileOf, makeUnit, makeBomb } from '../test/fixtures';
+import {
+  makeCfg,
+  makeState,
+  plainTile,
+  tileOf,
+  makeUnit,
+  makeBomb,
+  makeBombPlacedEvent,
+} from '../test/fixtures';
 import {
   initRoom,
   initToken,
@@ -52,6 +60,7 @@ import {
   CONFIRM_TEXT_RESET,
   CPU_POLL_BACKOFF_MS,
   CPU_PLAN_RESOLVE_HOLD_MS,
+  CPU_PLAN_EVENT_STEP_MS,
 } from '../constants';
 
 vi.mock('../engine/api');
@@ -1275,6 +1284,104 @@ describe('MatchScene', () => {
       // Player's turn opened next: 2 startTurn calls total (CPU's, then the Player's).
       expect(startTurn).toHaveBeenCalledTimes(2);
       expect(turnBannerPlay).toHaveBeenCalledWith(1);
+    });
+
+    it("locally reflects the CPU's own bombPlaced plan event in gameStateSnapshot, without a server round trip (AC 1, 3)", async () => {
+      const preState = makeState({ grid: [[plainTile()]], activeTeam: 2, turn: 1 });
+      const nextTurnState = makeState({ grid: [[plainTile()]], activeTeam: 1, turn: 2 });
+      queueMatchStates(preState, nextTurnState);
+      const bombPlacedEvent = makeBombPlacedEvent({ bombId: 5 });
+      const countdownEvent: GameEvent = { type: 'bombCountdownUpdated', bombId: 5, countdown: 2 };
+      vi.mocked(consumeCpuStatus).mockResolvedValue(
+        readyStatus({
+          planGameEvents: [bombPlacedEvent],
+          resolveTurnGameEvents: [countdownEvent],
+        })
+      );
+
+      await bootScene();
+      await flush();
+      delayedCallAt(CPU_PLAN_RESOLVE_HOLD_MS)();
+      await flush();
+
+      const [events, options] = vi.mocked(playResolveTurnEvents).mock.calls.at(-1)!;
+      expect(events).toEqual([countdownEvent]);
+      expect(options.gameStateSnapshot.bombs).toContainEqual({
+        id: 5,
+        ownerId: 0,
+        position: { x: 0, y: 0 },
+        range: 2,
+        countdown: 3,
+      });
+    });
+
+    it("keeps a bomb from an earlier turn in gameStateSnapshot even though it explodes during this turn's resolution", async () => {
+      const oldBomb = makeBomb({ id: 9 });
+      const preState = makeState({
+        grid: [[plainTile()]],
+        activeTeam: 2,
+        turn: 6,
+        bombs: [oldBomb],
+      });
+      const nextTurnState = makeState({ grid: [[plainTile()]], activeTeam: 1, turn: 7 });
+      queueMatchStates(preState, nextTurnState);
+      const countdownEvent: GameEvent = { type: 'bombCountdownUpdated', bombId: 9, countdown: 0 };
+      const explodedEvent: GameEvent = {
+        type: 'bombExploded',
+        bombId: 9,
+        position: { x: 0, y: 0 },
+        affectedPositions: [],
+      };
+      vi.mocked(consumeCpuStatus).mockResolvedValue(
+        readyStatus({ resolveTurnGameEvents: [countdownEvent, explodedEvent] })
+      );
+
+      await bootScene();
+      await flush();
+
+      const [events, options] = vi.mocked(playResolveTurnEvents).mock.calls.at(-1)!;
+      expect(events).toEqual([countdownEvent, explodedEvent]);
+      expect(options.gameStateSnapshot.bombs).toContainEqual(oldBomb);
+    });
+
+    it('animates planGameEvents one at a time, holding CPU_PLAN_EVENT_STEP_MS between each (AC 2)', async () => {
+      const unitA = makeUnit({ id: 0x21, team: 2, position: { x: 0, y: 0 } });
+      const unitB = makeUnit({ id: 0x22, team: 2, position: { x: 0, y: 0 } });
+      queueMatchStates(
+        makeState({
+          grid: [[plainTile()]],
+          activeTeam: 2,
+          turn: 1,
+          units: [unitA, unitB],
+        }),
+        makeState({ grid: [[plainTile()]], activeTeam: 1, turn: 2, units: [unitA, unitB] })
+      );
+      const firstMove: GameEvent = {
+        type: 'unitMoved',
+        unitId: 0x21,
+        from: { x: 0, y: 0 },
+        to: { x: 0, y: 0 },
+      };
+      const secondMove: GameEvent = {
+        type: 'unitMoved',
+        unitId: 0x22,
+        from: { x: 0, y: 0 },
+        to: { x: 0, y: 0 },
+      };
+      vi.mocked(consumeCpuStatus).mockResolvedValue(
+        readyStatus({ planGameEvents: [firstMove, secondMove] })
+      );
+
+      await bootScene();
+      await flush();
+      await flush();
+
+      expect(mockScene.tweens.add).toHaveBeenCalledTimes(1);
+
+      delayedCallAt(CPU_PLAN_EVENT_STEP_MS)();
+      await flush();
+
+      expect(mockScene.tweens.add).toHaveBeenCalledTimes(2);
     });
 
     it('skips the 600ms hold when planGameEvents is empty (AC 10)', async () => {

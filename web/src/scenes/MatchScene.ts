@@ -46,6 +46,7 @@ import {
   CPU_POLL_BACKOFF_MS,
   CPU_POLL_BUDGET_MS,
   CPU_PLAN_RESOLVE_HOLD_MS,
+  CPU_PLAN_EVENT_STEP_MS,
 } from '../constants';
 import type {
   Coordinate,
@@ -313,8 +314,8 @@ export default class MatchScene extends Phaser.Scene {
     }
   }
 
-  // Animates planGameEvents, holds, then animates resolveTurnGameEvents through the same
-  // renderer /resolve uses. Falls back to recoverFromCpuPollFailure() on a poll failure.
+  // Animates planGameEvents one at a time, holds, then animates resolveTurnGameEvents through
+  // the same renderer /resolve uses. Falls back to recoverFromCpuPollFailure() on a poll failure.
   private async runCpuTurn(pollPromise: Promise<CpuPollResult>, gen: number): Promise<void> {
     const result = await pollPromise;
     if (gen !== this.generation) {
@@ -326,9 +327,21 @@ export default class MatchScene extends Phaser.Scene {
     }
 
     const { planGameEvents, resolveTurnGameEvents } = result.status;
-    for (const event of planGameEvents) {
+    const planSnapshot: GameState = {
+      ...this.gameState,
+      units: [...this.gameState.units],
+      bombs: [...this.gameState.bombs],
+    };
+    for (const [i, event] of planGameEvents.entries()) {
       if (!this.applyGameEvent(event)) {
         return;
+      }
+      this.applyPlanEventToSnapshot(planSnapshot, event);
+      if (i < planGameEvents.length - 1) {
+        await this.delayShutdownSafe(CPU_PLAN_EVENT_STEP_MS);
+        if (gen !== this.generation) {
+          return;
+        }
       }
     }
     if (planGameEvents.length > 0) {
@@ -340,7 +353,7 @@ export default class MatchScene extends Phaser.Scene {
 
     const { ok, done } = playResolveTurnEvents(resolveTurnGameEvents, {
       scene: this,
-      gameStateSnapshot: this.gameState,
+      gameStateSnapshot: planSnapshot,
       unitSpritesById: this.unitSpritesById,
       bombGraphicsById: this.bombGraphicsById,
       softBlockSpritesById: this.softBlockSpritesById,
@@ -556,6 +569,37 @@ export default class MatchScene extends Phaser.Scene {
     });
 
     return true;
+  }
+
+  // Mirrors a plan event's effect into a pre-resolution GameState snapshot.
+  private applyPlanEventToSnapshot(snapshot: GameState, event: GameEvent): void {
+    switch (event.type) {
+      case 'unitMoved': {
+        const { unitId, to } = event;
+        if (unitId === undefined || !to) {
+          return;
+        }
+        const idx = snapshot.units.findIndex(u => u.id === unitId);
+        if (idx !== -1) {
+          snapshot.units[idx] = { ...snapshot.units[idx]!, position: to };
+        }
+        break;
+      }
+      case 'bombPlaced': {
+        const { unitId, bombId, position, countdown, range } = event;
+        if (unitId === undefined || bombId === undefined || !position || countdown === undefined) {
+          return;
+        }
+        snapshot.bombs.push({
+          id: bombId,
+          ownerId: unitId,
+          position,
+          range: range ?? 0,
+          countdown,
+        });
+        break;
+      }
+    }
   }
 
   // Refetches gameState. On success, adopts it without redrawing (optimistic visuals already

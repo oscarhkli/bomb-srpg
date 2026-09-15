@@ -304,6 +304,7 @@ func (h *Handler) HandleStartTurn(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, msg, code)
 		return
 	}
+	h.Logger.Debug("start turn", "roomID", roomID, "gameEvents", gameEvents)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -335,6 +336,7 @@ func (h *Handler) HandleConsumeCPUStatus(w http.ResponseWriter, r *http.Request)
 		http.Error(w, msg, code)
 		return
 	}
+	h.Logger.Debug("consume cpu status", "roomID", roomID, "turnPhase", turnPhase, "planGameEvents", planGameEvents, "resolveTurnGameEvents", resolveTurnGameEvents)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -389,6 +391,7 @@ func (h *Handler) HandleResolveTurn(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, msg, code)
 		return
 	}
+	h.Logger.Debug("resolve turn", "roomID", roomID, "planGameEvents", planGameEvents, "resolveTurnGameEvents", resolveTurnGameEvents)
 
 	res := ResolveTurnResponse{PlanGameEvents: planGameEvents, ResolveTurnGameEvents: resolveTurnGameEvents}
 	w.Header().Set("Content-Type", "application/json")

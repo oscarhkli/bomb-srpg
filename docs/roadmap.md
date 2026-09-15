@@ -125,10 +125,10 @@ Refer to [Frontend README](frontend/README.md)
 - [x] Frontend
   - [x] Prologue stage (Human with 5 units vs 1 Boss)
 - [x] goroutine setup to decouple resolve-response from CPU computation
-- [ ] Utility AI + Greedy Allocation for 1 CPU decision making
-  - [ ] Attack range
-  - [ ] Bomb blast-footprint query
-  - [ ] Candidate creation and selection
+- [x] Utility AI + Greedy Allocation for 5 CPU decision making
+  - [x] Attack range
+  - [x] Bomb blast-footprint query
+  - [x] Candidate creation and selection
 
 ## Phase 5a: UI Refinement
 
@@ -148,8 +148,7 @@ Refer to [Frontend README](frontend/README.md)
 
 ### TODO
 
-- [ ] Advanced Utility AI + Greedy Allocation for 5 CPU unit decision making
-- [ ] MatchsSettingScene enhancement
+- [ ] MatchsSettingScene enhancement to allow VS CPU in Battle Mode
 
 ## Phase 6a: More Archetypes & Skills
 

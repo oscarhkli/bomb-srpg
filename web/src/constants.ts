@@ -116,6 +116,7 @@ export const TURN_BANNER_HOLD_MS = 2000;
 export const CPU_POLL_BACKOFF_MS = [250, 500, 1000, 2000] as const;
 export const CPU_POLL_BUDGET_MS = 30000;
 export const CPU_PLAN_RESOLVE_HOLD_MS = 600;
+export const CPU_PLAN_EVENT_STEP_MS = 500;
 
 // SuddenDeathCutscene
 export const SUDDEN_DEATH_CUTSCENE_DURATION_MS = 3000;
