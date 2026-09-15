@@ -29,10 +29,10 @@ func (c candidate) priority() int {
 // Returns the TurnCommands to apply, in order; an empty result means no action.
 func Decide(gs *engine.GameState) []engine.TurnCommand {
 	sandbox := gs.DeepCopy()
-	cmds := []engine.TurnCommand{}
+	var cmds []engine.TurnCommand
 
-	allies := []*engine.Unit{}
-	opponents := []*engine.Unit{}
+	var allies []*engine.Unit
+	var opponents []*engine.Unit
 	var allyKing *engine.Unit
 	var opponentKing *engine.Unit
 	for _, u := range gs.Units {

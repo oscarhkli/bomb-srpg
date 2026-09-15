@@ -678,18 +678,10 @@ func TestRiskAllyKing(t *testing.T) {
 	}
 }
 
-func twoOpponentsAveraged(gs *engine.GameState) (unitIDs []engine.UnitID, kingID engine.UnitID, affectedTiles map[engine.Coordinate]struct{}) {
-	unitA := addFighter(gs, engine.NewUnitID(1, 1), engine.Coordinate{X: 0, Y: 0})
-	unitB := addFighter(gs, engine.NewUnitID(1, 2), engine.Coordinate{X: 0, Y: riskFreeDist})
-	king := addFighter(gs, engine.NewUnitID(1, 3), engine.Coordinate{X: 1, Y: 0})
-	affectedTiles = map[engine.Coordinate]struct{}{{X: 0, Y: 0}: {}, {X: 1, Y: 0}: {}}
-	return []engine.UnitID{unitA.ID, unitB.ID, king.ID}, king.ID, affectedTiles
-}
-
-func twoAlliesAveraged(gs *engine.GameState) (unitIDs []engine.UnitID, kingID engine.UnitID, affectedTiles map[engine.Coordinate]struct{}) {
-	unitA := addFighter(gs, engine.NewUnitID(2, 1), engine.Coordinate{X: 0, Y: 0})
-	unitB := addFighter(gs, engine.NewUnitID(2, 2), engine.Coordinate{X: 0, Y: riskFreeDist})
-	king := addFighter(gs, engine.NewUnitID(2, 3), engine.Coordinate{X: 1, Y: 0})
+func twoUnitsAveraged(gs *engine.GameState, teamID int) (unitIDs []engine.UnitID, kingID engine.UnitID, affectedTiles map[engine.Coordinate]struct{}) {
+	unitA := addFighter(gs, engine.NewUnitID(teamID, 1), engine.Coordinate{X: 0, Y: 0})
+	unitB := addFighter(gs, engine.NewUnitID(teamID, 2), engine.Coordinate{X: 0, Y: riskFreeDist})
+	king := addFighter(gs, engine.NewUnitID(teamID, 3), engine.Coordinate{X: 1, Y: 0})
 	affectedTiles = map[engine.Coordinate]struct{}{{X: 0, Y: 0}: {}, {X: 1, Y: 0}: {}}
 	return []engine.UnitID{unitA.ID, unitB.ID, king.ID}, king.ID, affectedTiles
 }
@@ -697,7 +689,7 @@ func twoAlliesAveraged(gs *engine.GameState) (unitIDs []engine.UnitID, kingID en
 func TestThreatOpponents(t *testing.T) {
 	t.Run("At T+0: scores as urgent, not excluded", func(t *testing.T) {
 		gs := newTestGameState(9, 9)
-		unitIDs, kingID, affectedTiles := twoOpponentsAveraged(gs)
+		unitIDs, kingID, affectedTiles := twoUnitsAveraged(gs, 1)
 		sc := scoreContext{opponentIDs: unitIDs, opponentKingID: kingID}
 		tr := turnResult{turn: 0, affectedTiles: affectedTiles, aliveOpponentsAfter: 2}
 		if got, want := threatOpponents(gs, sc, tr), 250; got != want {
@@ -706,7 +698,7 @@ func TestThreatOpponents(t *testing.T) {
 	})
 	t.Run("No affected tile this tick", func(t *testing.T) {
 		gs := newTestGameState(9, 9)
-		unitIDs, kingID, _ := twoOpponentsAveraged(gs)
+		unitIDs, kingID, _ := twoUnitsAveraged(gs, 1)
 		sc := scoreContext{opponentIDs: unitIDs, opponentKingID: kingID}
 		tr := turnResult{turn: 1, aliveOpponentsAfter: 2}
 		if got := threatOpponents(gs, sc, tr); got != 0 {
@@ -715,7 +707,7 @@ func TestThreatOpponents(t *testing.T) {
 	})
 	t.Run("Empty opponent roster (King only)", func(t *testing.T) {
 		gs := newTestGameState(9, 9)
-		_, kingID, affectedTiles := twoOpponentsAveraged(gs)
+		_, kingID, affectedTiles := twoUnitsAveraged(gs, 1)
 		sc := scoreContext{opponentIDs: []engine.UnitID{kingID}, opponentKingID: kingID}
 		tr := turnResult{turn: 1, affectedTiles: affectedTiles, aliveOpponentsAfter: 0}
 		if got := threatOpponents(gs, sc, tr); got != 0 {
@@ -724,7 +716,7 @@ func TestThreatOpponents(t *testing.T) {
 	})
 	t.Run("All opponents dead: still scores their frozen-position exposure", func(t *testing.T) {
 		gs := newTestGameState(9, 9)
-		unitIDs, kingID, affectedTiles := twoOpponentsAveraged(gs)
+		unitIDs, kingID, affectedTiles := twoUnitsAveraged(gs, 1)
 		for _, id := range unitIDs {
 			if id != kingID {
 				gs.Units[id].HP = 0
@@ -748,7 +740,7 @@ func TestThreatOpponents(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			gs := newTestGameState(9, 9)
-			unitIDs, kingID, affectedTiles := twoOpponentsAveraged(gs)
+			unitIDs, kingID, affectedTiles := twoUnitsAveraged(gs, 1)
 			sc := scoreContext{opponentIDs: unitIDs, opponentKingID: kingID}
 			tr := turnResult{turn: tt.k, affectedTiles: affectedTiles, aliveOpponentsAfter: 2}
 			if got := threatOpponents(gs, sc, tr); got != tt.want {
@@ -762,7 +754,7 @@ func TestRiskAllies(t *testing.T) {
 	for _, turn := range []int{0, 1} {
 		t.Run(fmt.Sprintf("At T+%d: scores as urgent, not excluded", turn), func(t *testing.T) {
 			gs := newTestGameState(9, 9)
-			unitIDs, kingID, affectedTiles := twoAlliesAveraged(gs)
+			unitIDs, kingID, affectedTiles := twoUnitsAveraged(gs, 2)
 			sc := scoreContext{allyIDs: unitIDs, allyKingID: kingID}
 			tr := turnResult{turn: turn, opponentAffectedTiles: affectedTiles, aliveAlliesAfter: 2}
 			if got, want := riskAllies(gs, sc, tr), 150; got != want {
@@ -772,7 +764,7 @@ func TestRiskAllies(t *testing.T) {
 	}
 	t.Run("No affected tile this tick", func(t *testing.T) {
 		gs := newTestGameState(9, 9)
-		unitIDs, kingID, _ := twoAlliesAveraged(gs)
+		unitIDs, kingID, _ := twoUnitsAveraged(gs, 2)
 		sc := scoreContext{allyIDs: unitIDs, allyKingID: kingID}
 		tr := turnResult{turn: 2, aliveAlliesAfter: 2}
 		if got := riskAllies(gs, sc, tr); got != 0 {
@@ -781,7 +773,7 @@ func TestRiskAllies(t *testing.T) {
 	})
 	t.Run("Empty ally roster (King only)", func(t *testing.T) {
 		gs := newTestGameState(9, 9)
-		_, kingID, affectedTiles := twoAlliesAveraged(gs)
+		_, kingID, affectedTiles := twoUnitsAveraged(gs, 2)
 		sc := scoreContext{allyIDs: []engine.UnitID{kingID}, allyKingID: kingID}
 		tr := turnResult{turn: 2, opponentAffectedTiles: affectedTiles, aliveAlliesAfter: 0}
 		if got := riskAllies(gs, sc, tr); got != 0 {
@@ -790,7 +782,7 @@ func TestRiskAllies(t *testing.T) {
 	})
 	t.Run("All allies dead: still scores their frozen-position exposure", func(t *testing.T) {
 		gs := newTestGameState(9, 9)
-		unitIDs, kingID, affectedTiles := twoAlliesAveraged(gs)
+		unitIDs, kingID, affectedTiles := twoUnitsAveraged(gs, 2)
 		for _, id := range unitIDs {
 			if id != kingID {
 				gs.Units[id].HP = 0
@@ -814,7 +806,7 @@ func TestRiskAllies(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			gs := newTestGameState(9, 9)
-			unitIDs, kingID, affectedTiles := twoAlliesAveraged(gs)
+			unitIDs, kingID, affectedTiles := twoUnitsAveraged(gs, 2)
 			sc := scoreContext{allyIDs: unitIDs, allyKingID: kingID}
 			tr := turnResult{turn: tt.k + 1, opponentAffectedTiles: affectedTiles, aliveAlliesAfter: 2}
 			if got := riskAllies(gs, sc, tr); got != tt.want {
