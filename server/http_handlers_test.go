@@ -3,6 +3,7 @@ package server
 import (
 	"bomb-srpg/engine"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"slices"
@@ -141,6 +142,38 @@ func testEncodeFailure(t *testing.T, handler http.Handler, setup func() *http.Re
 	handler.ServeHTTP(brokenWriter, req)
 	if brokenWriter.Code != expectedStatus {
 		t.Errorf("Expected initial header setup to attempt status %d, got %d", expectedStatus, brokenWriter.Code)
+	}
+}
+
+func TestHandler_extractBearerToken(t *testing.T) {
+	tests := []struct {
+		name      string
+		authValue string
+		omitAuth  bool
+		wantToken string
+		wantErr   error
+	}{
+		{"Missing header", "", true, "", ErrInvalidToken},
+		{"Missing Bearer prefix", "abc123", false, "", ErrInvalidToken},
+		{"Valid Bearer token", "Bearer abc123", false, "abc123", nil},
+	}
+
+	h := NewHandler(NewServerStateManager())
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := httptest.NewRequest(http.MethodGet, "/", nil)
+			if !tt.omitAuth {
+				r.Header.Set("Authorization", tt.authValue)
+			}
+
+			token, err := h.extractBearerToken(r)
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("extractBearerToken() error = %v, want %v", err, tt.wantErr)
+			}
+			if token != tt.wantToken {
+				t.Errorf("extractBearerToken() token = %q, want %q", token, tt.wantToken)
+			}
+		})
 	}
 }
 
