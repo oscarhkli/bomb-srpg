@@ -144,6 +144,56 @@ func testEncodeFailure(t *testing.T, handler http.Handler, setup func() *http.Re
 	}
 }
 
+func TestHandleHealthCheck(t *testing.T) {
+	h := NewHandler(NewServerStateManager())
+
+	t.Run("Success: returns ok status", func(t *testing.T) {
+		req, err := http.NewRequest("GET", "/api/health", nil)
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+
+		rr := httptest.NewRecorder()
+
+		http.HandlerFunc(h.HandleHealthCheck).ServeHTTP(rr, req)
+
+		if status := rr.Code; status != http.StatusOK {
+			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusOK)
+		}
+
+		expectedHeader := "application/json"
+		if contentType := rr.Header().Get("Content-Type"); contentType != expectedHeader {
+			t.Errorf("Handler returned wrong content type: got %v want %v", contentType, expectedHeader)
+		}
+
+		var response HealthCheckResponse
+		if err := json.NewDecoder(rr.Body).Decode(&response); err != nil {
+			t.Fatalf("Failed to decode response JSON payload: %v", err)
+		}
+
+		if got, want := response.Status, "ok"; got != want {
+			t.Errorf("Handler returned unexpected status: got %v want %v", got, want)
+		}
+	})
+
+	t.Run("Failure: failed to Encode", func(t *testing.T) {
+		testEncodeFailure(t, http.HandlerFunc(h.HandleHealthCheck),
+			func() *http.Request {
+				req, _ := http.NewRequest("GET", "/api/health", nil)
+				return req
+			}, http.StatusOK)
+	})
+
+	t.Run("Test Contract", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/api/health", nil)
+		rr := httptest.NewRecorder()
+
+		http.HandlerFunc(h.HandleHealthCheck).ServeHTTP(rr, req)
+
+		assertObjectContract(t, rr.Body.Bytes(), []string{"status"}, nil)
+	})
+}
+
 func TestHandleGetCatalog(t *testing.T) {
 	h := NewHandler(NewServerStateManager())
 

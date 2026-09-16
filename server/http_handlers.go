@@ -38,6 +38,12 @@ func NewHandler(m *ServerStateManager, opts ...HandlerOption) *Handler {
 	return h
 }
 
+// HealthCheckResponse wraps the status (typically OK) when health check is called.
+type HealthCheckResponse struct {
+	Status string `json:"status"`
+}
+
+// CatalogResopnse is returned when the Match Catelog is requested.
 type CatalogResopnse struct {
 	Archetypes   []engine.Archetype   `json:"archetypes"`
 	StagePresets []engine.StagePreset `json:"stagePresets"`
@@ -83,6 +89,19 @@ type CPUStatusResponse struct {
 type ResolveTurnResponse struct {
 	PlanGameEvents        []engine.GameEvent `json:"planGameEvents"`
 	ResolveTurnGameEvents []engine.GameEvent `json:"resolveTurnGameEvents"`
+}
+
+// HandleHealthCheck returns OK as a server health check.
+func (h *Handler) HandleHealthCheck(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	res := HealthCheckResponse{Status: "ok"}
+	if err := json.NewEncoder(w).Encode(res); err != nil {
+		h.Logger.Error("encode health check failed", "error", err)
+		http.Error(w, "Failed to encode health check definitions", http.StatusInternalServerError)
+		return
+	}
 }
 
 // HandleGetCatalog returns all available unit archetypes and stages for the client to display in the lobby.
