@@ -130,17 +130,29 @@ Refer to [Frontend README](frontend/README.md)
   - [x] Bomb blast-footprint query
   - [x] Candidate creation and selection
 
-## Phase 5a: UI Refinement
+## Phase 4d: Add Cleric and Pray
 
-- **Goal:** Elevate the rough local client to a presentable, responsive, accessible experience.
-- **Scope:** Sprite/animation polish, mobile-responsive layout, turn timer UI, action replay animation, settings panel.
-- **DoD:** Game feels "finished" visually. Works well on desktop + mobile browsers. No placeholder art remains.
+- **Goal:** Introduce a new Archetype with active skill.
+- **Scope:** Add Cleric and Pray (extending the bomb countdown).
+- **DoD:** A player can choose Cleric in Match and use the skill in-game.
 
 ### TODO
 
-- [ ] Mobile-responsive layout
+- [ ] Engine
+  - [ ] Skill definition
+  - [ ] Active/Passive skill
+  - [ ] Skill Turn Command
+- [ ] Server
+  - [ ] Various HTTP APIs plumbing
+- [ ] Frontend
+  - [ ] Sprites
+    - [ ] Cleric
+    - [ ] New buttons
+  - [ ] Visual effects of Pray
+- [ ] VS CPU
+  - [ ] New decision making model for Skills
 
-## Phase 5b: Add Computer Player with AI in Battle Mode
+## Phase 5a: Add Computer Player with AI in Battle Mode
 
 - **Goal:** Introduce a single-player mode against an automated opponent.
 - **Scope:** Heuristic-based enemy unit logic running inside an asynchronous backend goroutine worker.
@@ -148,7 +160,19 @@ Refer to [Frontend README](frontend/README.md)
 
 ### TODO
 
-- [ ] MatchsSettingScene enhancement to allow VS CPU in Battle Mode
+- [ ] MatchSettingsScene enhancement to allow VS CPU in Battle Mode
+
+## Phase 5b: Observability & Ops Tuning
+
+- **Goal:** Make production operation (logs, config, secrets) sustainable as traffic and collaborators grow beyond solo/zero-traffic testing.
+- **Scope:** Request-level access logging, hot-tunable `LOG_LEVEL`, and a Docker management UI (e.g. Portainer), each added once its trigger occurs rather than upfront.
+- **DoD:** Production issues are diagnosable and config is adjustable without a rebuild.
+
+### TODO
+
+- [ ] Request-level access logging middleware
+- [ ] Hot-tunable `LOG_LEVEL`
+- [ ] Portainer (or equivalent)
 
 ## Phase 6a: More Archetypes & Skills
 
@@ -158,13 +182,13 @@ Refer to [Frontend README](frontend/README.md)
 
 ### TODO
 
-- [ ] Skill, e.g., prolonging the count down
-- [ ] Advance path finding algorithm (e.g., float, jump, etc.)
+- [ ] Active skills, e.g., Shoot, Kick, Cut, etc.
+- [ ] Advance path finding algorithm, e.g., float, jump, etc.
 
 ## Phase 6b: Terrain & Power-Up Items
 
 - **Goal:** Expand game depth by adding reactive terrain effects and power-up items. The latter will dynamically alter the character's stats during turn validation.
-- **Scope:** Power-up spawn math, movement resolution interceptors, and dynamic terrain modifiers (mud slowing navigation, lava shortern bomb countdown, water extinguishing explosives).
+- **Scope:** Power-up spawn math, movement resolution interceptors, and dynamic terrain modifiers (mud slowing navigation, lava shorterns bomb countdown, water extinguishing explosives).
 - **DoD:** A character can move across varied terrain with accurate movement point deductions, roll back gathered power-ups correctly on turn reset, and permanently collect buffs that modify backend stats upon commitment.
 
 ### TODO
@@ -186,10 +210,21 @@ Refer to [Frontend README](frontend/README.md)
   - [ ] Join/leave match
   - [ ] GameCfg + Team formation
   - [ ] Interruption handling
+  - [ ] Turn timer UI
 - [ ] Room config mutability after creation
+
+## Phase 7: UI Refinement
+
+- **Goal:** Elevate the rough local client to a presentable, responsive, accessible experience.
+- **Scope:** Sprite/animation polish, mobile-responsive layout, action replay animation, settings panel.
+- **DoD:** Game feels "finished" visually. Works well on desktop + mobile browsers. No placeholder art remains.
+
+### TODO
+
+- [ ] Mobile-responsive layout
 
 ## Wish list
 
-- Story Mode (pre-req: Computer Player)
+- Story Mode other than Prologue stage
 - Replay (pre-req: Database)
-- Resume the game when encountering interuption, e.g., network drop, accidentally refresh the page, etc.
+- Resume the game when encountering interruption, e.g., network drop, accidentally refresh the page, etc.
