@@ -17,13 +17,7 @@ import (
 	"time"
 )
 
-const (
-	roomIDBytes           = 5
-	RoomInactivityTimeout = 60 * time.Minute
-	CleanupInterval       = 60 * time.Minute
-
-	maxCPUReplanAttempts = 5
-)
+const CleanupInterval = 60 * time.Minute
 
 var (
 	ErrRoomNotFound    = errors.New("room not found")
@@ -119,6 +113,8 @@ func NewServerStateManager(opts ...Option) *ServerStateManager {
 
 	return manager
 }
+
+const roomIDBytes = 5
 
 // CreateMatchRoom generates a unique room ID and registers an empty MatchRoom.
 // It retries up to 5 times on ID collision. Returns the room ID or an error if exhausted.
@@ -399,6 +395,8 @@ func (s *ServerStateManager) StartTurn(roomID, token string) (bool, []engine.Gam
 	return room.Match.WorkingState.InSuddenDeath, gameEvents, nil
 }
 
+const maxCPUReplanAttempts = 5
+
 // runCPUTurn plays the CPU's turn to completion, holding the room lock throughout.
 // It abandons if the match was replaced, deleted, or already won while the goroutine was queued.
 func (s *ServerStateManager) runCPUTurn(room *MatchRoom, match *engine.Match) {
@@ -638,13 +636,15 @@ func (s *ServerStateManager) StartCleanupLoop(ctx context.Context, interval time
 	}()
 }
 
-// cleanupInactiveRooms removes rooms inactive > RoomInactivityTimeout.
+const roomInactivityTimeout = 60 * time.Minute
+
+// cleanupInactiveRooms removes rooms inactive > roomInactivityTimeout.
 func (s *ServerStateManager) cleanupInactiveRooms() {
 	now := time.Now()
 	s.Rooms.Range(func(key, value any) bool {
 		room := value.(*MatchRoom)
 		room.mu.Lock()
-		inactive := now.Sub(room.LastActivity) > RoomInactivityTimeout
+		inactive := now.Sub(room.LastActivity) > roomInactivityTimeout
 		room.mu.Unlock()
 
 		if inactive {
