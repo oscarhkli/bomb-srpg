@@ -85,7 +85,8 @@ Refer to [Frontend README](frontend/README.md)
 - [ ] Choose hosting
 - [ ] CI/CD
 - [ ] HTTPS + custom domain
-- [ ] Health endpoint + graceful shutdown verification
+- [x] Health endpoint
+- [ ] Graceful shutdown verification
 - [ ] Load test?
 
 ## Phase 4b: Pixel Art Adoption
