@@ -4,6 +4,11 @@
 @token2 = {{createMatch.response.body.playerTokens.1}}
 
 
+### Health Check
+GET http://localhost:8080/api/health
+Content-Type: application/json
+
+
 ### Get Catalog
 GET http://localhost:8080/api/catalog
 Content-Type: application/json

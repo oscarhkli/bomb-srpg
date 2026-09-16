@@ -3,6 +3,7 @@ package server
 import (
 	"bomb-srpg/engine"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"slices"
@@ -144,6 +145,88 @@ func testEncodeFailure(t *testing.T, handler http.Handler, setup func() *http.Re
 	}
 }
 
+func TestHandler_extractBearerToken(t *testing.T) {
+	tests := []struct {
+		name      string
+		authValue string
+		omitAuth  bool
+		wantToken string
+		wantErr   error
+	}{
+		{"Missing header", "", true, "", ErrInvalidToken},
+		{"Missing Bearer prefix", "abc123", false, "", ErrInvalidToken},
+		{"Valid Bearer token", "Bearer abc123", false, "abc123", nil},
+	}
+
+	h := NewHandler(NewServerStateManager())
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := httptest.NewRequest(http.MethodGet, "/", nil)
+			if !tt.omitAuth {
+				r.Header.Set("Authorization", tt.authValue)
+			}
+
+			token, err := h.extractBearerToken(r)
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("extractBearerToken() error = %v, want %v", err, tt.wantErr)
+			}
+			if token != tt.wantToken {
+				t.Errorf("extractBearerToken() token = %q, want %q", token, tt.wantToken)
+			}
+		})
+	}
+}
+
+func TestHandleHealthCheck(t *testing.T) {
+	h := NewHandler(NewServerStateManager())
+
+	t.Run("Success: returns ok status", func(t *testing.T) {
+		req, err := http.NewRequest("GET", "/api/health", nil)
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+
+		rr := httptest.NewRecorder()
+
+		http.HandlerFunc(h.HandleHealthCheck).ServeHTTP(rr, req)
+
+		if status := rr.Code; status != http.StatusOK {
+			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusOK)
+		}
+
+		expectedHeader := "application/json"
+		if contentType := rr.Header().Get("Content-Type"); contentType != expectedHeader {
+			t.Errorf("Handler returned wrong content type: got %v want %v", contentType, expectedHeader)
+		}
+
+		var response HealthCheckResponse
+		if err := json.NewDecoder(rr.Body).Decode(&response); err != nil {
+			t.Fatalf("Failed to decode response JSON payload: %v", err)
+		}
+
+		if got, want := response.Status, "ok"; got != want {
+			t.Errorf("Handler returned unexpected status: got %v want %v", got, want)
+		}
+	})
+
+	t.Run("Failure: failed to Encode", func(t *testing.T) {
+		testEncodeFailure(t, http.HandlerFunc(h.HandleHealthCheck),
+			func() *http.Request {
+				req, _ := http.NewRequest("GET", "/api/health", nil)
+				return req
+			}, http.StatusOK)
+	})
+
+	t.Run("Test Contract", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/api/health", nil)
+		rr := httptest.NewRecorder()
+
+		http.HandlerFunc(h.HandleHealthCheck).ServeHTTP(rr, req)
+
+		assertObjectContract(t, rr.Body.Bytes(), []string{"status"}, nil)
+	})
+}
+
 func TestHandleGetCatalog(t *testing.T) {
 	h := NewHandler(NewServerStateManager())
 
@@ -166,7 +249,7 @@ func TestHandleGetCatalog(t *testing.T) {
 			t.Errorf("Handler returned wrong content type: got %v want %v", contentType, expectedHeader)
 		}
 
-		var response CatalogResopnse
+		var response CatalogResponse
 		if err := json.NewDecoder(rr.Body).Decode(&response); err != nil {
 			t.Fatalf("Failed to decode response JSON payload: %v", err)
 		}

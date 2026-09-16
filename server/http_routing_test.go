@@ -28,6 +28,18 @@ func TestHTTPRouting(t *testing.T) {
 		wantStatus int
 	}{
 		{
+			name:       "GET /api/health",
+			method:     "GET",
+			path:       "/api/health",
+			wantStatus: http.StatusOK,
+		},
+		{
+			name:       "POST /api/health (405)",
+			method:     "POST",
+			path:       "/api/health",
+			wantStatus: http.StatusMethodNotAllowed,
+		},
+		{
 			name:       "GET /api/catalog",
 			method:     "GET",
 			path:       "/api/catalog",

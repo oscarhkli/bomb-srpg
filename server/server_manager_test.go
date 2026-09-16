@@ -770,6 +770,17 @@ func TestServerStateManager_SubmitTurnCommand(t *testing.T) {
 			},
 		},
 		{
+			name: "Invalid TeamID (out of range)",
+			setup: func(t *testing.T) (string, *ServerStateManager, engine.TurnCommand, string) {
+				roomID, _, s := createTestRoom(t)
+				unitID := engine.NewUnitID(3, 0)
+				newPos := engine.Coordinate{X: 4, Y: 7}
+				cmd := engine.NewMoveCommand(unitID, newPos)
+				return roomID, s, cmd, "dummy-token"
+			},
+			wantErr: ErrInvalidConfig,
+		},
+		{
 			name: "Room Not Found",
 			setup: func(t *testing.T) (string, *ServerStateManager, engine.TurnCommand, string) {
 				s := NewServerStateManager()

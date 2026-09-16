@@ -38,51 +38,58 @@ func NewHandler(m *ServerStateManager, opts ...HandlerOption) *Handler {
 	return h
 }
 
-type CatalogResopnse struct {
+func (h *Handler) requireToken(w http.ResponseWriter, r *http.Request) (string, bool) {
+	token, err := h.extractBearerToken(r)
+	if err != nil {
+		code, msg := mapError(err)
+		http.Error(w, msg, code)
+		return "", false
+	}
+	return token, true
+}
+
+func (h *Handler) handleError(w http.ResponseWriter, err error, logMsg string, args ...any) {
+	code, msg := mapError(err)
+	h.Logger.Warn(logMsg, append(args, "error", err)...)
+	http.Error(w, msg, code)
+}
+
+func (h *Handler) writeJSON(w http.ResponseWriter, status int, res any, logMsg string, args ...any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	if err := json.NewEncoder(w).Encode(res); err != nil {
+		h.Logger.Error(logMsg, append(args, "error", err)...)
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+	}
+}
+
+func (h *Handler) extractBearerToken(r *http.Request) (string, error) {
+	auth := r.Header.Get("Authorization")
+	if auth == "" {
+		return "", ErrInvalidToken
+	}
+	token := strings.TrimPrefix(auth, "Bearer ")
+	if token == auth {
+		return "", ErrInvalidToken
+	}
+	return token, nil
+}
+
+// HealthCheckResponse wraps the status (typically OK) when health check is called.
+type HealthCheckResponse struct {
+	Status string `json:"status"`
+}
+
+// HandleHealthCheck returns OK as a server health check.
+func (h *Handler) HandleHealthCheck(w http.ResponseWriter, r *http.Request) {
+	res := HealthCheckResponse{Status: "ok"}
+	h.writeJSON(w, http.StatusOK, res, "encode health check failed")
+}
+
+// CatalogResponse is returned when the Match Catalog is requested.
+type CatalogResponse struct {
 	Archetypes   []engine.Archetype   `json:"archetypes"`
 	StagePresets []engine.StagePreset `json:"stagePresets"`
-}
-
-// CreateMatchRoomResponse is returned when a new match room is created.
-type CreateMatchRoomResponse struct {
-	ID string `json:"id"`
-}
-
-// CreateMatchResponse is returned when a new match is created.
-type CreateMatchResponse struct {
-	Success      bool      `json:"success"`
-	PlayerTokens [2]string `json:"playerTokens"`
-}
-
-// CreateMatchRequest wraps GameCfg for backward compatibility with existing clients.
-type CreateMatchRequest struct {
-	GameCfg engine.GameCfg `json:"gameCfg"`
-}
-
-// SurrenderRequest wraps TeamID for backward compatibility with existing clients.
-type SurrenderRequest struct {
-	TeamID int `json:"teamId"`
-}
-
-// StartTurnResponse is returned to provide the result of Sudden Death
-type StartTurnResponse struct {
-	InSuddenDeath bool               `json:"inSuddenDeath"`
-	GameEvents    []engine.GameEvent `json:"gameEvents"`
-}
-
-// CPUStatusResponse wraps CPUTurnPhase and the CPU turn's gameEvents, split by phase so the
-// client can animate the CPU's actions and their resolution apart.
-type CPUStatusResponse struct {
-	TurnPhase             engine.CPUTurnPhase `json:"turnPhase"`
-	PlanGameEvents        []engine.GameEvent  `json:"planGameEvents"`
-	ResolveTurnGameEvents []engine.GameEvent  `json:"resolveTurnGameEvents"`
-}
-
-// ResolveTurnResponse wraps HumanTurnPhase and the Human Player turn's gameEvents, split by phase so the
-// client can animate only the resolveTurnGameEvents.
-type ResolveTurnResponse struct {
-	PlanGameEvents        []engine.GameEvent `json:"planGameEvents"`
-	ResolveTurnGameEvents []engine.GameEvent `json:"resolveTurnGameEvents"`
 }
 
 // HandleGetCatalog returns all available unit archetypes and stages for the client to display in the lobby.
@@ -91,22 +98,19 @@ func (h *Handler) HandleGetCatalog(w http.ResponseWriter, r *http.Request) {
 	archetypes := engine.GetAllArchetypes()
 	stagePresets := engine.GetAllStagePresets()
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
+	res := CatalogResponse{Archetypes: archetypes, StagePresets: stagePresets}
+	h.writeJSON(w, http.StatusOK, res, "encode catalog failed")
+}
 
-	res := CatalogResopnse{Archetypes: archetypes, StagePresets: stagePresets}
-	if err := json.NewEncoder(w).Encode(res); err != nil {
-		h.Logger.Error("encode catalog failed", "error", err)
-		http.Error(w, "Failed to encode catalog definitions", http.StatusInternalServerError)
-		return
-	}
+// CreateMatchRoomResponse is returned when a new match room is created.
+type CreateMatchRoomResponse struct {
+	ID string `json:"id"`
 }
 
 // HandleCreateMatchRoom creates a new match room and returns its unique ID.
 // The room is initialized without a match instance; the match is created when players join.
 func (h *Handler) HandleCreateMatchRoom(w http.ResponseWriter, r *http.Request) {
 	id, err := h.Manager.CreateMatchRoom()
-
 	if err != nil {
 		h.Logger.Error("create match room failed", "error", err)
 		http.Error(w, "Failed to create new MatchRoom", http.StatusInternalServerError)
@@ -115,17 +119,22 @@ func (h *Handler) HandleCreateMatchRoom(w http.ResponseWriter, r *http.Request) 
 
 	location := fmt.Sprintf("/api/match-rooms/%s", id)
 	w.Header().Set("Location", location)
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
 
 	res := CreateMatchRoomResponse{ID: id}
-	if err := json.NewEncoder(w).Encode(res); err != nil {
-		h.Logger.Error("encode match room response failed", "roomID", id, "error", err)
-		http.Error(w, "Failed to encode MatchRoom ID", http.StatusInternalServerError)
-		return
-	}
+	h.writeJSON(w, http.StatusCreated, res, "encode match room failed", "roomID", id)
 
 	h.Logger.Info("match room created", "roomID", id)
+}
+
+// CreateMatchRequest wraps GameCfg for backward compatibility with existing clients.
+type CreateMatchRequest struct {
+	GameCfg engine.GameCfg `json:"gameCfg"`
+}
+
+// CreateMatchResponse is returned when a new match is created.
+type CreateMatchResponse struct {
+	Success      bool      `json:"success"`
+	PlayerTokens [2]string `json:"playerTokens"`
 }
 
 // HandleCreateMatch creates a new match with given RoomID and GameCfg
@@ -150,22 +159,12 @@ func (h *Handler) HandleCreateMatch(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) handleCreateMatch(tokens [2]string, err error, roomID string, w http.ResponseWriter) bool {
 	if err != nil {
-		code, msg := mapError(err)
-		h.Logger.Warn("create match failed", "roomID", roomID, "error", err)
-		http.Error(w, msg, code)
+		h.handleError(w, err, "create match failed", "roomID", roomID)
 		return false
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
 
 	res := CreateMatchResponse{Success: true, PlayerTokens: tokens}
-	if err := json.NewEncoder(w).Encode(res); err != nil {
-		h.Logger.Error("encode match response failed", "roomID", roomID, "error", err)
-		http.Error(w, "Failed to encode success indicator", http.StatusInternalServerError)
-		return false
-	}
-
+	h.writeJSON(w, http.StatusCreated, res, "encode match failed", "roomID", roomID)
 	return true
 }
 
@@ -173,10 +172,8 @@ func (h *Handler) handleCreateMatch(tokens [2]string, err error, roomID string, 
 func (h *Handler) HandleRematch(w http.ResponseWriter, r *http.Request) {
 	roomID := r.PathValue("roomID")
 
-	token, err := h.extractBearerToken(r)
-	if err != nil {
-		code, msg := mapError(err)
-		http.Error(w, msg, code)
+	token, ok := h.requireToken(w, r)
+	if !ok {
 		return
 	}
 
@@ -193,17 +190,13 @@ func (h *Handler) HandleRematch(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) HandleDeleteMatch(w http.ResponseWriter, r *http.Request) {
 	roomID := r.PathValue("roomID")
 
-	token, err := h.extractBearerToken(r)
-	if err != nil {
-		code, msg := mapError(err)
-		http.Error(w, msg, code)
+	token, ok := h.requireToken(w, r)
+	if !ok {
 		return
 	}
 
 	if err := h.Manager.DeleteMatch(roomID, token); err != nil {
-		code, msg := mapError(err)
-		h.Logger.Warn("delete match failed", "roomID", roomID, "error", err)
-		http.Error(w, msg, code)
+		h.handleError(w, err, "delete match failed", "roomID", roomID)
 		return
 	}
 
@@ -218,22 +211,12 @@ func (h *Handler) HandleGetMatchState(w http.ResponseWriter, r *http.Request) {
 	roomID := r.PathValue("roomID")
 
 	gs, err := h.Manager.GetMatchState(roomID)
-
 	if err != nil {
-		code, msg := mapError(err)
-		h.Logger.Warn("get match state failed", "roomID", roomID, "error", err)
-		http.Error(w, msg, code)
+		h.handleError(w, err, "get match state failed", "roomID", roomID)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-
-	if err := json.NewEncoder(w).Encode(gs); err != nil {
-		h.Logger.Error("encode gameState failed", "error", err)
-		http.Error(w, "Failed to encode gameState", http.StatusInternalServerError)
-		return
-	}
+	h.writeJSON(w, http.StatusOK, gs, "encode gameState failed")
 }
 
 // HandleSubmitTurnCommand delivers TurnCommand to engine to move a Unit or place a bomb in a given MatchRoom.
@@ -248,41 +231,24 @@ func (h *Handler) HandleSubmitTurnCommand(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	token, err := h.extractBearerToken(r)
-	if err != nil {
-		code, msg := mapError(err)
-		http.Error(w, msg, code)
+	token, ok := h.requireToken(w, r)
+	if !ok {
 		return
 	}
 
 	gameEvents, err := h.Manager.SubmitTurnCommand(roomID, req, token)
 	if err != nil {
-		code, msg := mapError(err)
-		h.Logger.Warn("submit turn command failed", "roomID", roomID, "error", err)
-		http.Error(w, msg, code)
+		h.handleError(w, err, "submit turn command failed", "roomID", roomID)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-
-	if err := json.NewEncoder(w).Encode(gameEvents); err != nil {
-		h.Logger.Error("encode gameEvents failed", "error", err)
-		http.Error(w, "Failed to encode gameEvents", http.StatusInternalServerError)
-		return
-	}
+	h.writeJSON(w, http.StatusOK, gameEvents, "encode gameEvents failed")
 }
 
-func (h *Handler) extractBearerToken(r *http.Request) (string, error) {
-	auth := r.Header.Get("Authorization")
-	if auth == "" {
-		return "", ErrInvalidToken
-	}
-	token := strings.TrimPrefix(auth, "Bearer ")
-	if token == auth {
-		return "", ErrInvalidToken
-	}
-	return token, nil
+// StartTurnResponse is returned to provide the result of Sudden Death
+type StartTurnResponse struct {
+	InSuddenDeath bool               `json:"inSuddenDeath"`
+	GameEvents    []engine.GameEvent `json:"gameEvents"`
 }
 
 // HandleStartTurn sends StartTurn signal engine to start a new turn in a given MatchRoom.
@@ -290,31 +256,28 @@ func (h *Handler) extractBearerToken(r *http.Request) (string, error) {
 func (h *Handler) HandleStartTurn(w http.ResponseWriter, r *http.Request) {
 	roomID := r.PathValue("roomID")
 
-	token, err := h.extractBearerToken(r)
-	if err != nil {
-		code, msg := mapError(err)
-		http.Error(w, msg, code)
+	token, ok := h.requireToken(w, r)
+	if !ok {
 		return
 	}
 
 	inSuddenDeath, gameEvents, err := h.Manager.StartTurn(roomID, token)
 	if err != nil {
-		code, msg := mapError(err)
-		h.Logger.Warn("start turn failed", "roomID", roomID, "error", err)
-		http.Error(w, msg, code)
+		h.handleError(w, err, "start turn failed", "roomID", roomID)
 		return
 	}
 	h.Logger.Debug("start turn", "roomID", roomID, "gameEvents", gameEvents)
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-
 	res := StartTurnResponse{InSuddenDeath: inSuddenDeath, GameEvents: gameEvents}
-	if err := json.NewEncoder(w).Encode(res); err != nil {
-		h.Logger.Error("encode startTurnResponse failed", "error", err)
-		http.Error(w, "Failed to encode startTurnResponse", http.StatusInternalServerError)
-		return
-	}
+	h.writeJSON(w, http.StatusOK, res, "encode start turn response failed")
+}
+
+// CPUStatusResponse wraps CPUTurnPhase and the CPU turn's gameEvents, split by phase so the
+// client can animate the CPU's actions and their resolution apart.
+type CPUStatusResponse struct {
+	TurnPhase             engine.CPUTurnPhase `json:"turnPhase"`
+	PlanGameEvents        []engine.GameEvent  `json:"planGameEvents"`
+	ResolveTurnGameEvents []engine.GameEvent  `json:"resolveTurnGameEvents"`
 }
 
 // HandleConsumeCPUStatus consumes current CPU Turn States in given MatchRoom and reset the state if CPU TurnPhase is in Ready - planning is done.
@@ -322,31 +285,20 @@ func (h *Handler) HandleStartTurn(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) HandleConsumeCPUStatus(w http.ResponseWriter, r *http.Request) {
 	roomID := r.PathValue("roomID")
 
-	token, err := h.extractBearerToken(r)
-	if err != nil {
-		code, msg := mapError(err)
-		http.Error(w, msg, code)
+	token, ok := h.requireToken(w, r)
+	if !ok {
 		return
 	}
 
 	turnPhase, planGameEvents, resolveTurnGameEvents, err := h.Manager.ConsumeCPUStatus(roomID, token)
 	if err != nil {
-		code, msg := mapError(err)
-		h.Logger.Warn("consume cpu status failed", "roomID", roomID, "error", err)
-		http.Error(w, msg, code)
+		h.handleError(w, err, "consume cpu status failed", "roomID", roomID)
 		return
 	}
 	h.Logger.Debug("consume cpu status", "roomID", roomID, "turnPhase", turnPhase, "planGameEvents", planGameEvents, "resolveTurnGameEvents", resolveTurnGameEvents)
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-
 	res := CPUStatusResponse{TurnPhase: turnPhase, PlanGameEvents: planGameEvents, ResolveTurnGameEvents: resolveTurnGameEvents}
-	if err := json.NewEncoder(w).Encode(res); err != nil {
-		h.Logger.Error("encode cpuStatusResponse failed", "error", err)
-		http.Error(w, "Failed to encode cpuStatusResponse", http.StatusInternalServerError)
-		return
-	}
+	h.writeJSON(w, http.StatusOK, res, "encode cpu status response failed")
 }
 
 // HandleResetTurn sends ResetTurn signal to engine to drop the current WorkingState and reset to TrueState in a given MatchRoom.
@@ -354,22 +306,24 @@ func (h *Handler) HandleConsumeCPUStatus(w http.ResponseWriter, r *http.Request)
 func (h *Handler) HandleResetTurn(w http.ResponseWriter, r *http.Request) {
 	roomID := r.PathValue("roomID")
 
-	token, err := h.extractBearerToken(r)
-	if err != nil {
-		code, msg := mapError(err)
-		http.Error(w, msg, code)
+	token, ok := h.requireToken(w, r)
+	if !ok {
 		return
 	}
 
-	err = h.Manager.ResetTurn(roomID, token)
-	if err != nil {
-		code, msg := mapError(err)
-		h.Logger.Warn("reset turn failed", "roomID", roomID, "error", err)
-		http.Error(w, msg, code)
+	if err := h.Manager.ResetTurn(roomID, token); err != nil {
+		h.handleError(w, err, "reset turn failed", "roomID", roomID)
 		return
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// ResolveTurnResponse wraps HumanTurnPhase and the Human Player turn's gameEvents, split by phase so the
+// client can animate only the resolveTurnGameEvents.
+type ResolveTurnResponse struct {
+	PlanGameEvents        []engine.GameEvent `json:"planGameEvents"`
+	ResolveTurnGameEvents []engine.GameEvent `json:"resolveTurnGameEvents"`
 }
 
 // HandleResolveTurn sends ResolveTurn signal to engine to calculate the impacts of the Player's action in a given MatchRoom.
@@ -377,31 +331,25 @@ func (h *Handler) HandleResetTurn(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) HandleResolveTurn(w http.ResponseWriter, r *http.Request) {
 	roomID := r.PathValue("roomID")
 
-	token, err := h.extractBearerToken(r)
-	if err != nil {
-		code, msg := mapError(err)
-		http.Error(w, msg, code)
+	token, ok := h.requireToken(w, r)
+	if !ok {
 		return
 	}
 
 	planGameEvents, resolveTurnGameEvents, err := h.Manager.ResolveTurn(roomID, token)
 	if err != nil {
-		code, msg := mapError(err)
-		h.Logger.Warn("res turn failed", "roomID", roomID, "error", err)
-		http.Error(w, msg, code)
+		h.handleError(w, err, "resolve turn failed", "roomID", roomID)
 		return
 	}
 	h.Logger.Debug("resolve turn", "roomID", roomID, "planGameEvents", planGameEvents, "resolveTurnGameEvents", resolveTurnGameEvents)
 
 	res := ResolveTurnResponse{PlanGameEvents: planGameEvents, ResolveTurnGameEvents: resolveTurnGameEvents}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
+	h.writeJSON(w, http.StatusOK, res, "encode resolve turn response failed")
+}
 
-	if err := json.NewEncoder(w).Encode(res); err != nil {
-		h.Logger.Error("encode ResolveTurnStatusResponse failed", "error", err)
-		http.Error(w, "Failed to encode ResolveTurnStatusResponse", http.StatusInternalServerError)
-		return
-	}
+// SurrenderRequest wraps TeamID for backward compatibility with existing clients.
+type SurrenderRequest struct {
+	TeamID int `json:"teamId"`
 }
 
 // HandleSurrender sends Surrender signal to engine to egnd the current Match in a given MatchRoom.
@@ -416,29 +364,18 @@ func (h *Handler) HandleSurrender(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := h.extractBearerToken(r)
-	if err != nil {
-		code, msg := mapError(err)
-		http.Error(w, msg, code)
+	token, ok := h.requireToken(w, r)
+	if !ok {
 		return
 	}
 
 	gameEvents, err := h.Manager.Surrender(roomID, req.TeamID, token)
 	if err != nil {
-		code, msg := mapError(err)
-		h.Logger.Warn("res turn failed", "roomID", roomID, "error", err)
-		http.Error(w, msg, code)
+		h.handleError(w, err, "surrender failed", "roomID", roomID)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-
-	if err := json.NewEncoder(w).Encode(gameEvents); err != nil {
-		h.Logger.Error("encode gameState failed", "error", err)
-		http.Error(w, "Failed to encode gameEvents", http.StatusInternalServerError)
-		return
-	}
+	h.writeJSON(w, http.StatusOK, gameEvents, "encode gameEvents failed")
 }
 
 // HandleGetMatchConfig gets the GameCfg of the current Match in a given MatchRoom
@@ -446,20 +383,11 @@ func (h *Handler) HandleGetMatchConfig(w http.ResponseWriter, r *http.Request) {
 	roomID := r.PathValue("roomID")
 	gameCfg, err := h.Manager.GetMatchConfig(roomID)
 	if err != nil {
-		code, msg := mapError(err)
-		h.Logger.Warn("res turn failed", "roomID", roomID, "error", err)
-		http.Error(w, msg, code)
+		h.handleError(w, err, "get match config failed", "roomID", roomID)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-
-	if err := json.NewEncoder(w).Encode(gameCfg); err != nil {
-		h.Logger.Error("encode gameConfig failed", "error", err)
-		http.Error(w, "Failed to encode gameConfig", http.StatusInternalServerError)
-		return
-	}
+	h.writeJSON(w, http.StatusOK, gameCfg, "encode gameConfig failed")
 }
 
 // HandlesGetAllowedTiles gets the hints for Player to identify which tiles are available according to the TurnCmdAction
@@ -481,18 +409,9 @@ func (h *Handler) HandleGetAllowedTiles(w http.ResponseWriter, r *http.Request) 
 
 	allowed, err := h.Manager.GetAllowedTiles(roomID, engine.UnitID(unitID), engine.TurnCmdType(turnCmdType))
 	if err != nil {
-		code, msg := mapError(err)
-		h.Logger.Warn("res turn failed", "roomID", roomID, "error", err)
-		http.Error(w, msg, code)
+		h.handleError(w, err, "get allowed tiles failed", "roomID", roomID)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-
-	if err := json.NewEncoder(w).Encode(allowed); err != nil {
-		h.Logger.Error("encode gameConfig failed", "error", err)
-		http.Error(w, "Failed to encode gameConfig", http.StatusInternalServerError)
-		return
-	}
+	h.writeJSON(w, http.StatusOK, allowed, "encode allowedTiles failed")
 }
