@@ -81,8 +81,9 @@ Refer to [Frontend README](frontend/README.md)
 ### TODO
 
 - [x] Security Checks - OWASP, etc.
-- [ ] Dockerfile
-- [ ] Choose hosting
+- [x] Dockerfile
+- [ ] Deploy to EC2
+  - [ ] Caddy adoption in existing EC2
 - [ ] CI/CD
 - [ ] HTTPS + custom domain
 - [x] Health endpoint

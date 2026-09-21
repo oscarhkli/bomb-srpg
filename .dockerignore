@@ -1,0 +1,11 @@
+.git
+bin
+node_modules
+web/node_modules
+web/dist
+web/coverage
+coverage.txt
+cover.out
+*.log
+docs
+.DS_Store

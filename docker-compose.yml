@@ -1,0 +1,22 @@
+name: bomb-srpg
+services:
+  bomb-srpg:
+    build: .
+    container_name: bomb-srpg
+    image: bomb-srpg:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:61010:8080"
+    env_file:
+      - .env
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
