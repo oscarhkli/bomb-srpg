@@ -82,10 +82,10 @@ Refer to [Frontend README](frontend/README.md)
 
 - [x] Security Checks - OWASP, etc.
 - [x] Dockerfile
-- [ ] Deploy to EC2
-  - [ ] Caddy adoption in existing EC2
+- [x] Deploy to EC2
+  - [x] Caddy adoption in existing EC2
 - [ ] CI/CD
-- [ ] HTTPS + custom domain
+- [x] HTTPS + custom domain
 - [x] Health endpoint
 - [ ] Graceful shutdown verification
 - [ ] Load test?
