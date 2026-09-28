@@ -2,6 +2,7 @@ name: bomb-srpg
 services:
   bomb-srpg:
     build: .
+    platform: linux/amd64
     container_name: bomb-srpg
     image: bomb-srpg:latest
     restart: unless-stopped
