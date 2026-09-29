@@ -75,8 +75,8 @@ Refer to [Frontend README](frontend/README.md)
 ## Phase 4a: Cloud Deployment
 
 - **Goal:** Deploy the game publicly so anyone can play via a URL without local setup.
-- **Scope:** Containerize, provision cloud VM / managed service, configure HTTPS, domain, health checks, graceful shutdown. CI/CD pipeline.
-- **DoD:** Game accessible at a stable public URL. Two players on different networks can complete a match. Zero local build required.
+- **Scope:** Containerize, provision cloud VM, configure HTTPS, domain, health checks, graceful shutdown.
+- **DoD:** Game accessible at a stable public URL. Players need zero local build to play.
 
 ### TODO
 
@@ -84,11 +84,9 @@ Refer to [Frontend README](frontend/README.md)
 - [x] Dockerfile
 - [x] Deploy to EC2
   - [x] Caddy adoption in existing EC2
-- [ ] CI/CD
 - [x] HTTPS + custom domain
 - [x] Health endpoint
-- [ ] Graceful shutdown verification
-- [ ] Load test?
+- [x] Graceful shutdown verification
 
 ## Phase 4b: Pixel Art Adoption
 
@@ -166,15 +164,17 @@ Refer to [Frontend README](frontend/README.md)
 
 ## Phase 5b: Observability & Ops Tuning
 
-- **Goal:** Make production operation (logs, config, secrets) sustainable as traffic and collaborators grow beyond solo/zero-traffic testing.
-- **Scope:** Request-level access logging, hot-tunable `LOG_LEVEL`, and a Docker management UI (e.g. Portainer), each added once its trigger occurs rather than upfront.
-- **DoD:** Production issues are diagnosable and config is adjustable without a rebuild.
+- **Goal:** Make production operation (logs, config, secrets, deploys) sustainable as traffic and collaborators grow beyond solo/zero-traffic testing.
+- **Scope:** Request-level access logging, hot-tunable `LOG_LEVEL`, a Docker management UI (e.g. Portainer), CI/CD, and load testing — each added once its trigger occurs rather than upfront.
+- **DoD:** Production issues are diagnosable, config is adjustable without a rebuild, and deploys no longer require a manual SSH runbook.
 
 ### TODO
 
 - [ ] Request-level access logging middleware
 - [ ] Hot-tunable `LOG_LEVEL`
 - [ ] Portainer (or equivalent)
+- [ ] CI/CD
+- [ ] Load test?
 
 ## Phase 6a: More Archetypes & Skills
 
@@ -198,7 +198,7 @@ Refer to [Frontend README](frontend/README.md)
 - [ ] Terrains: Lava, Water
 - [ ] Softblock with / without items
 
-## Phase 6c: Add WebSockets
+## Phase 7: Add WebSockets
 
 - **Goal:** Upgrade the networking layer to support live, real-time online multiplayer between separate machines.
 - **Scope:** Connection pool management in Go, game room/lobby routers, and client disconnect handling.
@@ -215,7 +215,7 @@ Refer to [Frontend README](frontend/README.md)
   - [ ] Turn timer UI
 - [ ] Room config mutability after creation
 
-## Phase 7: UI Refinement
+## Phase 8: UI Refinement
 
 - **Goal:** Elevate the rough local client to a presentable, responsive, accessible experience.
 - **Scope:** Sprite/animation polish, mobile-responsive layout, action replay animation, settings panel.
