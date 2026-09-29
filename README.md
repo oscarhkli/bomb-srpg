@@ -3,7 +3,7 @@ Turn-based Strategy Game
 
 ## Current Status
 
-Phase 4 (Cloud Deployment and Pixel Art) — In progress. See [docs/roadmap.md](/docs/roadmap.md) for the full phase breakdown.
+Phase 4 (Pixel Art, Add Cleric and Pray) — In progress. See [docs/roadmap.md](/docs/roadmap.md) for the full phase breakdown.
 
 ## Prerequisites
 
@@ -35,7 +35,7 @@ make web-dev
 
 Then go to http://localhost:5173.
 
-### For Deployment
+### Local Production-Mode Run
 
 Execute the following:
 
