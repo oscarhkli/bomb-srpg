@@ -86,10 +86,11 @@ export default class MatchSettingsScene extends Phaser.Scene {
         this.buildPages(catalog);
         this.showPage(0);
       })
-      .catch(() => {
+      .catch(err => {
         if (gen !== this.generation) {
           return;
         }
+        console.error('Failed to load match catalog', err);
         this.errorPanel.show('Failed to load match catalog');
       });
   }
