@@ -26,6 +26,10 @@ func logLevelFromEnv(env string) slog.Level {
 }
 
 func main() {
+	if checkHealth(os.Args[1:]) {
+		os.Exit(runHealthCheck("http://localhost:8080/api/health"))
+	}
+
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: logLevelFromEnv(os.Getenv("LOG_LEVEL"))}))
 
 	// Context cancelled on SIGINT (Ctrl+C) or SIGTERM
