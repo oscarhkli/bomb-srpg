@@ -13,7 +13,6 @@ func (gs *GameState) FindReachableTilesOnSnapshot(start Coordinate, snapshot [][
 	return gs.findReachableTiles(start, rule, snapshot)
 }
 
-// findReachableTiles uses a breadth-first search to find all tiles reachable from the starting position.
 func (gs *GameState) findReachableTiles(startPos Coordinate, rule MovementRule, grid [][]Tile) map[Coordinate]int {
 	if len(grid) == 0 || len(grid[0]) == 0 {
 		return make(map[Coordinate]int)
@@ -22,12 +21,12 @@ func (gs *GameState) findReachableTiles(startPos Coordinate, rule MovementRule, 
 	type QueueItem struct {
 		Pos  Coordinate
 		Step int
-		Dir  Coordinate // used when working on straight-line movement
+		Dir  Coordinate
 	}
 
 	steps := map[Coordinate]int{startPos: 0}
 	queue := []QueueItem{{Pos: startPos, Step: 0}}
-	dirs := []Coordinate{{0, -1}, {0, 1}, {-1, 0}, {1, 0}} // Up, Down, Left, Right
+	dirs := []Coordinate{{0, -1}, {0, 1}, {-1, 0}, {1, 0}}
 
 	for len(queue) > 0 {
 		current := queue[0]
@@ -38,7 +37,6 @@ func (gs *GameState) findReachableTiles(startPos Coordinate, rule MovementRule, 
 		}
 
 		for _, dir := range dirs {
-			// Straight-line validation
 			if !rule.CanTurn && current.Step > 0 && dir != current.Dir {
 				continue
 			}
@@ -64,7 +62,6 @@ func (gs *GameState) findReachableTiles(startPos Coordinate, rule MovementRule, 
 				continue
 			}
 
-			// short-circuit if we've already found a shorter or equal path to this tile
 			if oldSteps, ok := steps[nextPos]; ok && oldSteps <= nextStep {
 				continue
 			}
@@ -120,7 +117,6 @@ func (mr MovementRule) CheckPassability(tile Tile) (canPass bool, canLand bool) 
 }
 
 // NewMovementRule builds a snapshot configuration for a unit's movement action.
-// Currently restricted to simple Phase 1 walking rules.
 func (u Unit) NewMovementRule() MovementRule {
 	return MovementRule{
 		MaxSteps:        u.Speed,
@@ -130,7 +126,6 @@ func (u Unit) NewMovementRule() MovementRule {
 }
 
 // NewBombPlacementRule builds a snapshot configuration for a unit's bomb placement action.
-// It covers almost all situation, unless we want to add MinStep in far future
 func (u Unit) NewBombPlacementRule() MovementRule {
 	return MovementRule{
 		MaxSteps: u.BombMaxRange,

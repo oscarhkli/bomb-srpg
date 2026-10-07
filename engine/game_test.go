@@ -23,7 +23,7 @@ func TestInitGameState_Suite(t *testing.T) {
 				P1Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}, {Archetype: "Witch", Role: RoleNormal}, {Archetype: "Fighter", Role: RoleNormal}, {Archetype: "Fighter", Role: RoleNormal}},
 				P2Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}, {Archetype: "Witch", Role: RoleNormal}, {Archetype: "Bandit", Role: RoleNormal}, {Archetype: "Witch", Role: RoleNormal}},
 			},
-			expectedTotalUnits: 10, // 5 for each player
+			expectedTotalUnits: 10,
 		},
 		{
 			name: "Success: Minimum Teams (2 vs 2) with Plain Stage",
@@ -32,7 +32,7 @@ func TestInitGameState_Suite(t *testing.T) {
 				P1Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
 				P2Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
 			},
-			expectedTotalUnits: 4, // 2 for each player
+			expectedTotalUnits: 4,
 		},
 		{
 			name: "Success: Mixed Teams (3 vs 2) with Standard Stage",
@@ -41,7 +41,7 @@ func TestInitGameState_Suite(t *testing.T) {
 				P1Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}, {Archetype: "Witch", Role: RoleNormal}},
 				P2Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
 			},
-			expectedTotalUnits: 5, // 3 for Player 1, 2 for Player 2
+			expectedTotalUnits: 5,
 		},
 		{
 			name: "Success: With NO_UNIT",
@@ -50,7 +50,7 @@ func TestInitGameState_Suite(t *testing.T) {
 				P1Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: NoUnit}, {Archetype: "Fighter", Role: RoleNormal}},
 				P2Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
 			},
-			expectedTotalUnits: 4, // 2 for each player
+			expectedTotalUnits: 4,
 		},
 		{
 			name: "Failure: Player 1 has no King",
@@ -412,7 +412,6 @@ func TestInitGameState_Suite(t *testing.T) {
 				return
 			}
 
-			// Verify turn starts at 1
 			if gameState.Turn != 1 {
 				t.Errorf("Expected turn to start at 1, got %d", gameState.Turn)
 			}
@@ -421,7 +420,6 @@ func TestInitGameState_Suite(t *testing.T) {
 				t.Errorf("Expected %d total units, got %d", tt.expectedTotalUnits, len(gameState.Units))
 			}
 
-			// Additional checks for unit attributes, grid initialization, etc. can be added here
 			preset, _ := GetStagePreset(tt.cfg.StagePreset)
 			if len(gameState.Grid) != preset.Height {
 				t.Errorf("Expected grid height %d, got %d", preset.Height, len(gameState.Grid))
@@ -432,9 +430,7 @@ func TestInitGameState_Suite(t *testing.T) {
 				}
 			}
 
-			// Verify that all units have valid initial stats and starting positions
 			for id, unit := range gameState.Units {
-				// Validate every initial stats of the unit against the archetype
 				expectedArchetype, exists := GetArchetype(unit.Type.Name)
 				if !exists {
 					t.Errorf("Unit ID %d has unknown archetype %s", id, unit.Type.Name)
@@ -442,7 +438,6 @@ func TestInitGameState_Suite(t *testing.T) {
 				}
 
 				t.Run(fmt.Sprintf("Verify initial stats for Unit %d (%s)", id, unit.Type.Name), func(t *testing.T) {
-					// Overridable attributes should be checked against the game config overrides if they are set
 					if tt.cfg.GlobalSpeedOverride > 0 {
 						expectedArchetype.BaseSpeed = tt.cfg.GlobalSpeedOverride
 					}
@@ -494,12 +489,10 @@ func TestInitGameState_Suite(t *testing.T) {
 				}
 			}
 
-			// Verify bombs initialization
 			if len(gameState.Bombs) != 0 {
 				t.Errorf("Expected no bombs at game start, got %d", len(gameState.Bombs))
 			}
 
-			// Verify soft blocks initialization. Will have real tests later when we have stage presets with soft blocks
 			if len(gameState.SoftBlocks) != 0 {
 				t.Errorf("Expected no soft blocks in 'Plain' stage, got %d", len(gameState.SoftBlocks))
 			}
@@ -510,7 +503,7 @@ func TestInitGameState_Suite(t *testing.T) {
 func TestInitGameState_LayoutGridCompilation(t *testing.T) {
 	tests := []struct {
 		name         string
-		customPreset StagePreset // mock sandbox layout for testing
+		customPreset StagePreset
 		expectError  bool
 	}{
 		{
@@ -579,7 +572,7 @@ func TestInitGameState_LayoutGridCompilation(t *testing.T) {
 			}
 
 			if tt.expectError {
-				return // No need to check further if we expected an error
+				return
 			}
 
 			expectedMatrix := [][]TerrainType{

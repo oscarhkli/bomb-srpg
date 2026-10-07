@@ -25,7 +25,6 @@ func (c *MatchController) StartInputLoop() {
 	scanner := bufio.NewScanner(c.input)
 
 	for {
-		// Always render the latest situation
 		gameEvents := c.Match.StartTurn()
 		_ = c.View.RenderGameEvents(gameEvents)
 
@@ -33,7 +32,6 @@ func (c *MatchController) StartInputLoop() {
 			log.Fatalf("Critical Interface Failure: %v", err)
 		}
 
-		// State check: Victory / Surrender
 		if c.Match.WinnerTeamID != 0 {
 			var message string
 			if c.Match.WinnerTeamID == -1 {
@@ -56,7 +54,6 @@ func (c *MatchController) StartInputLoop() {
 			continue // Skip processing if user typed whitespace
 		}
 
-		// 4. Intercept system shortcuts
 		if strings.HasPrefix(line, "/") {
 			c.handleSystemCommand(line)
 			continue
@@ -96,7 +93,6 @@ func (c *MatchController) handleSystemCommand(cmd string) {
 }
 
 // routeGameAction handles movement and bomb placement command
-// CLI version doesn't and won't have view stats / reachable info - will work directly in Web version instead
 func (c *MatchController) routeGameAction(cmd string) {
 	token := strings.Fields(strings.ToLower(cmd))
 

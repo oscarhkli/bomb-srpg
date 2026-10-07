@@ -24,8 +24,6 @@ func NewTerminalView(o io.Writer) *TerminalView {
 }
 
 // RenderBoard prints a 2D ASCII grid representation of the map.
-// Since this func is for Phase 1 testing only, some terrains/occupants are skipped.
-// Test coverage may suffer.
 func (v *TerminalView) RenderBoard(gs *engine.GameState) error {
 	if gs == nil {
 		return errors.New("cannot render board: GameState pointer is nil")
@@ -48,25 +46,19 @@ func (v *TerminalView) RenderBoard(gs *engine.GameState) error {
 		return err
 	}
 
-	// 1. Print top X coordinate header
 	fmt.Fprint(v.output, "Y\\X  ") // Space for the left Y column padding
 	for x := range gs.Grid {
 		fmt.Fprintf(v.output, " %-3d", x)
 	}
 	fmt.Fprintln(v.output)
 
-	// Create the horizontal divider line (e.g., +---+---+---+)
 	horizontalDivider := "   +" + strings.Repeat("---+", len(gs.Grid))
 
-	// 2. Loop through rows (Y-axis)
 	for y, row := range gs.Grid {
-		// Print the divider line above each row
 		fmt.Fprintln(v.output, horizontalDivider)
 
-		// Print left Y coordinate header and start the row border
 		fmt.Fprintf(v.output, "%-2d |", y)
 
-		// Loop through columns (X-axis)
 		for _, tile := range row {
 			cellStr := "   " // Default blank for TerrainPlain / empty
 
@@ -87,18 +79,14 @@ func (v *TerminalView) RenderBoard(gs *engine.GameState) error {
 				}
 			}
 
-			// Format to ensure exactly 3 characters wide inside the cell borders
 			fmt.Fprintf(v.output, "%-3s|", cellStr)
 		}
 
-		// Print right Y coordinate header
 		fmt.Fprintf(v.output, " %d\n", y)
 	}
 
-	// Print the very bottom border line
 	fmt.Fprintln(v.output, horizontalDivider)
 
-	// 3. Print bottom X coordinate header
 	fmt.Fprint(v.output, "     ")
 	for x := range gs.Grid {
 		fmt.Fprintf(v.output, " %-3d", x)

@@ -74,7 +74,6 @@ func TestSecurityHeaders(t *testing.T) {
 		}
 	}
 
-	// CSP value is tuned per deploy/feature (Phaser, bulletin board); assert only presence.
 	if rec.Header().Get("Content-Security-Policy") == "" {
 		t.Error("Content-Security-Policy header missing")
 	}

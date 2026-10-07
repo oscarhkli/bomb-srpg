@@ -54,8 +54,8 @@ func TestHTTPRouting(t *testing.T) {
 		{
 			name:       "POST /api/match-rooms/{roomID}/match",
 			method:     "POST",
-			path:       "/api/match-rooms/DUMMY/match", // Use a dummy roomID for routing test
-			wantStatus: http.StatusNotFound,            // Room doesn't exist yet
+			path:       "/api/match-rooms/DUMMY/match",
+			wantStatus: http.StatusNotFound, // Room doesn't exist yet
 		},
 		{
 			name:       "GET /api/match-rooms/{roomID}/match (405)",
@@ -364,7 +364,6 @@ func TestHTTPRouting(t *testing.T) {
 			if body != nil {
 				req.Header.Set("Content-Type", "application/json")
 			}
-			// Add dummy token for mutating endpoints that require auth
 			if strings.Contains(tt.name, "turn-commands") || strings.Contains(tt.name, "start-turn") ||
 				strings.Contains(tt.name, "reset") || strings.Contains(tt.name, "resolve") ||
 				strings.Contains(tt.name, "cpu-status") ||
@@ -383,7 +382,6 @@ func TestHTTPRouting(t *testing.T) {
 				t.Errorf("Status code: got %d want %d", resp.StatusCode, tt.wantStatus)
 			}
 
-			// Consume body to allow connection reuse
 			_, _ = io.Copy(io.Discard, resp.Body)
 		})
 	}

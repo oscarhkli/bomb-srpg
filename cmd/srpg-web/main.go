@@ -32,14 +32,12 @@ func main() {
 
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: logLevelFromEnv(os.Getenv("LOG_LEVEL"))}))
 
-	// Context cancelled on SIGINT (Ctrl+C) or SIGTERM
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
 	serverState := server.NewServerStateManager(server.WithLogger(logger))
 	handler := server.NewHandler(serverState, server.WithHandlerLogger(logger))
 
-	// Start background cleanup
 	serverState.StartCleanupLoop(ctx, server.CleanupInterval)
 
 	r := http.NewServeMux()
@@ -55,7 +53,6 @@ func main() {
 		WriteTimeout: 5 * time.Second,
 	}
 
-	// Run server in goroutine
 	go func() {
 		logger.Info("Bomb Tactics Server running on http://localhost:8080")
 		logger.Info("Open http://localhost:8080 in your browser to view the Title Screen!")
@@ -64,11 +61,9 @@ func main() {
 		}
 	}()
 
-	// Wait for shutdown signal
 	<-ctx.Done()
 	logger.Info("Shutdown signal received")
 
-	// Graceful shutdown with timeout
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := s.Shutdown(shutdownCtx); err != nil {

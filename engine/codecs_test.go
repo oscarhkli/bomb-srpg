@@ -21,12 +21,10 @@ func TestUnitIDCodecs(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			packedID := NewUnitID(tt.teamID, tt.localIndex)
 
-			// Validate raw bitwise layout composition
 			if uint8(packedID) != tt.wantRawHex {
 				t.Errorf("NewUnitID() raw binary corrupt! Got 0x%02X, want 0x%02X", uint8(packedID), tt.wantRawHex)
 			}
 
-			// Validate Method-Style decoding symmetry
 			gotTeam, gotIndex := packedID.Decode()
 			if gotTeam != tt.teamID {
 				t.Errorf("Decode() gotTeam = %d, want %d", gotTeam, tt.teamID)
@@ -45,7 +43,7 @@ func TestBombIDCodecs(t *testing.T) {
 		bombCounter int
 		teamID      int
 		localIndex  int
-		wantRawHex  uint32 // 👑 Independent raw benchmark validation
+		wantRawHex  uint32
 	}{
 		{"Turn 1, Team 1, P1, Bomb 1", 1, 1, 1, 0, 0x10010001},
 		{"Turn 1, Team 1, P5, Bomb 8", 1, 8, 1, 4, 0x14010008},
@@ -60,12 +58,10 @@ func TestBombIDCodecs(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			unitID := NewUnitID(tt.teamID, tt.localIndex)
 			packedBombID := NewBombID(tt.turn, tt.bombCounter, unitID)
-			// Validate raw bitwise layout composition
 			if uint32(packedBombID) != tt.wantRawHex {
 				t.Errorf("NewBombID() raw binary corrupt! Got 0x%08X, want 0x%08X", uint32(packedBombID), tt.wantRawHex)
 			}
 
-			// Validate Method-Style decoding symmetry
 			gotTurn, gotCounter, gotOwnerID := packedBombID.Decode()
 			gotTeam, gotIndex := gotOwnerID.Decode()
 
@@ -86,7 +82,6 @@ func TestBombIDCodecs(t *testing.T) {
 }
 
 // TestCombinatorialExhaustive loops through every valid game asset combination
-// to guarantee 100% safety with no bitwise leaks or overlapping corruptions.
 func TestCombinatorialExhaustive(t *testing.T) {
 	maxTeams := 2
 	maxPlayersPerTeam := 5

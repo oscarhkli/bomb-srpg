@@ -18,7 +18,7 @@ import (
 
 func TestMain(m *testing.M) {
 	slog.SetDefault(slog.New(slog.NewTextHandler(nil, &slog.HandlerOptions{
-		Level: slog.LevelError + 1, // Discard all logs
+		Level: slog.LevelError + 1,
 	})))
 	m.Run()
 }
@@ -229,7 +229,6 @@ func TestServerStateManager_LastActivityUpdated(t *testing.T) {
 				s.Surrender(roomID, 1, tokens[0])
 			},
 			validate: func(t *testing.T, s *ServerStateManager, roomID string) {
-				// Surrender doesn't delete the room, verify it's still here
 				if _, ok := s.Rooms.Load(roomID); !ok {
 					t.Error("Expected room not to be deleted after surrender")
 				}
@@ -315,14 +314,12 @@ func TestMapError(t *testing.T) {
 		wantCode int
 		wantMsg  string
 	}{
-		// Server errors
 		{"room not found", ErrRoomNotFound, 404, "room not found"},
 		{"match not found", ErrMatchNotFound, 404, "match not found"},
 		{"match exists", ErrMatchExists, 409, "match already exists"},
 		{"invalid config", ErrInvalidConfig, 400, "invalid game config"},
 		{"invalid player token", ErrInvalidToken, 401, "invalid player token"},
 
-		// Engine config errors (InitGame): 400
 		{"invalid stage preset", engine.ErrInvalidStagePreset, 400, "invalid stage preset"},
 		{"invalid team size", engine.ErrInvalidTeamSize, 400, "invalid team size"},
 		{"missing king", engine.ErrMissingKing, 400, "missing king"},
@@ -330,7 +327,6 @@ func TestMapError(t *testing.T) {
 		{"invalid terrain", engine.ErrInvalidTerrain, 400, "invalid terrain"},
 		{"unknown archetype", engine.ErrUnknownArchetype, 400, "unknown archetype"},
 
-		// Engine gameplay errors: 409
 		{"unit not found", engine.ErrUnitNotFound, 409, "unit not found"},
 		{"unit dead", engine.ErrUnitDead, 409, "unit is dead"},
 		{"not active team", engine.ErrNotActiveTeam, 409, "not active team"},
@@ -343,11 +339,9 @@ func TestMapError(t *testing.T) {
 		{"unsupported command", engine.ErrUnsupportedCommand, 409, "unsupported command type"},
 		{"invalid landing", engine.ErrInvalidLanding, 409, "invalid landing position"},
 
-		// Internal bugs: 409 (game rule violations)
 		{"desynced", fmt.Errorf("%w: unit %#x desynced at %v", engine.ErrDesynced, 1, engine.Coordinate{}), 409, "desynced: unit 0x1 desynced at {0 0}"},
 		{"out of bounds", fmt.Errorf("%w: unit %#x out of bounds", engine.ErrOutOfBounds, 1), 409, "out of bounds: unit 0x1 out of bounds"},
 
-		// Unknown: 500
 		{"unknown", fmt.Errorf("something else"), 500, "internal error"},
 	}
 	for _, tt := range tests {
@@ -463,7 +457,7 @@ func TestServerStateManager_Rematch(t *testing.T) {
 				roomID, _ := s.CreateMatchRoom()
 				tokens, _ := s.CreateMatch(roomID, validGameCfg())
 				room := mustRoom(t, s, roomID)
-				room.Match = nil // kill the match
+				room.Match = nil
 				gameCfg := validGameCfg()
 				room.GameCfg = &gameCfg
 				return roomID, s, tokens
@@ -556,7 +550,7 @@ func TestServerStateManager_DeleteMatch(t *testing.T) {
 				roomID, _ := s.CreateMatchRoom()
 				tokens, _ := s.CreateMatch(roomID, validGameCfg())
 				room := mustRoom(t, s, roomID)
-				room.Match = nil // kill the match
+				room.Match = nil
 				return roomID, s, tokens
 			},
 			wantErr: nil,
@@ -568,7 +562,7 @@ func TestServerStateManager_DeleteMatch(t *testing.T) {
 				roomID, _ := s.CreateMatchRoom()
 				tokens, _ := s.CreateMatch(roomID, validGameCfg())
 				room := mustRoom(t, s, roomID)
-				room.Match.WinnerTeamID = 1 // conclude the match
+				room.Match.WinnerTeamID = 1
 				return roomID, s, tokens
 			},
 			wantErr: nil,
@@ -1644,7 +1638,6 @@ func TestServerStateManager_Surrender(t *testing.T) {
 				if got, want := gameEvents[0].WinnerTeamID, 2; got != want {
 					t.Errorf("Expected gameEvent WinnerTeamID = %v, got %v", want, got)
 				}
-				// Room should not be deleted after surrender
 				if _, ok := s.Rooms.Load(roomID); !ok {
 					t.Error("Expected room not to be deleted after surrender")
 				}
@@ -1858,11 +1851,9 @@ func TestServerStateManager_GetAllowedTiles(t *testing.T) {
 func TestServerStateManager_cleanupInactiveRooms(t *testing.T) {
 	s := NewServerStateManager()
 
-	// Room 1: active (recent activity)
 	roomID1, _ := s.CreateMatchRoom()
 	s.CreateMatch(roomID1, validGameCfg())
 
-	// Room 2: inactive (old LastActivity)
 	roomID2, _ := s.CreateMatchRoom()
 	s.CreateMatch(roomID2, validGameCfg())
 	room := mustRoom(t, s, roomID2)
@@ -1870,7 +1861,6 @@ func TestServerStateManager_cleanupInactiveRooms(t *testing.T) {
 	room.LastActivity = time.Now().Add(-120 * time.Minute)
 	room.mu.Unlock()
 
-	// Room 3: ended match
 	roomID3, _ := s.CreateMatchRoom()
 	s.CreateMatch(roomID3, validGameCfg())
 	room = mustRoom(t, s, roomID3)
@@ -1878,10 +1868,8 @@ func TestServerStateManager_cleanupInactiveRooms(t *testing.T) {
 	room.Match.WinnerTeamID = 1
 	room.mu.Unlock()
 
-	// Run cleanup
 	s.cleanupInactiveRooms()
 
-	// Verify
 	_, ok1 := s.Rooms.Load(roomID1)
 	_, ok2 := s.Rooms.Load(roomID2)
 	_, ok3 := s.Rooms.Load(roomID3)
@@ -1906,7 +1894,6 @@ func TestServerStateManager_StartCleanupLoop_Cancellation(t *testing.T) {
 	cancel()
 	time.Sleep(10 * time.Millisecond) // let goroutine exit
 
-	// No panic/leak = success
 }
 
 func TestServerStateManager_WithLoggerOption(t *testing.T) {

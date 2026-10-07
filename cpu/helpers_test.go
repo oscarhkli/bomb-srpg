@@ -61,8 +61,6 @@ func addBomb(gs *engine.GameState, id engine.BombID, pos engine.Coordinate) {
 	gs.Grid[pos.Y][pos.X] = engine.Tile{Type: engine.TerrainPlain, OccupantType: engine.OccupantBomb, OccupantID: int64(id)}
 }
 
-// crossOffsets returns the straight cardinal-line offsets reachable up to radius steps
-// in each of the 4 directions (movement/bomb rules in this repo don't allow turning mid-path).
 func crossOffsets(radius int) []engine.Coordinate {
 	dirs := []engine.Coordinate{{X: 0, Y: -1}, {X: 0, Y: 1}, {X: -1, Y: 0}, {X: 1, Y: 0}}
 	var offsets []engine.Coordinate

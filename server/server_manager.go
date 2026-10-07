@@ -544,7 +544,7 @@ func (s *ServerStateManager) ResolveTurn(roomID, token string) ([]engine.GameEve
 	return planGameEvents, resolveTurnGameEvents, nil
 }
 
-// ResetTurn sends Surrender signal to engine to end the current Match in a given MatchRoom.
+// Surrender sends Surrender signal to engine to end the current Match in a given MatchRoom.
 // Returns the gameEvents or an error if any pre-check is violated
 func (s *ServerStateManager) Surrender(roomID string, teamID int, token string) ([]engine.GameEvent, error) {
 	if teamID != 1 && teamID != 2 {

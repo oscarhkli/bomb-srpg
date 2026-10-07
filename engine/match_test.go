@@ -165,7 +165,7 @@ func TestMatch_CommandMoveUnit(t *testing.T) {
 	})
 
 	t.Run("Failure: MoveUnit error propagates unchanged", func(t *testing.T) {
-		m := newTestMatch(2, 2) // Empty map, no units
+		m := newTestMatch(2, 2)
 
 		gameEvents, err := m.CommandMoveUnit(NewUnitID(3, 3), validTarget)
 		if err == nil || !strings.Contains(err.Error(), "does not exist") {
@@ -200,10 +200,10 @@ func TestGameState_MoveUnit(t *testing.T) {
 	tests := []testCase{
 		{
 			name:   "Failure: Unit does not exist",
-			unitID: NewUnitID(3, 3), // Missing ID
+			unitID: NewUnitID(3, 3),
 			target: validTarget,
 			setupState: func() *GameState {
-				return newTestMatch(2, 2).WorkingState // Empty map, no units
+				return newTestMatch(2, 2).WorkingState
 			},
 			wantErr:     true,
 			errContains: "unit 0x33 does not exist",
@@ -226,12 +226,12 @@ func TestGameState_MoveUnit(t *testing.T) {
 			target: validTarget,
 			setupState: func() *GameState {
 				gs := newTestMatch(2, 2).WorkingState
-				gs.Turn = 1 // Team 1's turn
+				gs.Turn = 1
 				gs.ActiveTeam = 1
 				gs.Units[validUnitID] = &Unit{
 					ID:       validUnitID,
 					HP:       1,
-					Team:     2, // Team 2 Unit
+					Team:     2,
 					Position: origin,
 				}
 				return gs
@@ -239,9 +239,6 @@ func TestGameState_MoveUnit(t *testing.T) {
 			wantErr:     true,
 			errContains: "unit 0x10 not active team",
 		},
-		// { This test is not available at the moment - not until the Skills implementation in Phase 4
-		// 	name:   "Failure: Unit passes through but cannot land on HardRock",
-		// },
 		{
 			name:   "Failure: Data corruption - unit out of bounds",
 			unitID: validUnitID,
@@ -251,15 +248,13 @@ func TestGameState_MoveUnit(t *testing.T) {
 				gs.Turn = 1
 				gs.ActiveTeam = 1
 
-				// Intentionally corrupt the position data
 				gs.Units[validUnitID] = &Unit{
 					ID:       validUnitID,
 					HP:       1,
 					Team:     1,
-					Position: Coordinate{-5, -5}, // Out of stage bounds
+					Position: Coordinate{-5, -5},
 					Speed:    3,
 				}
-				// Do not add it to the Grid matrix since the coordinate is invalid
 				return gs
 			},
 			wantErr:     true,
@@ -280,7 +275,6 @@ func TestGameState_MoveUnit(t *testing.T) {
 					Position: origin,
 				}
 				gs.Grid[origin.Y][origin.X] = Tile{OccupantType: OccupantNone}
-				// Intentionally do NOT put the unit into gs.Grid matrix to trigger desync
 				return gs
 			},
 			wantErr:     true,
@@ -429,7 +423,7 @@ func TestMatch_CommandPlaceBomb(t *testing.T) {
 	})
 
 	t.Run("Failure: PlaceBomb error propagates unchanged", func(t *testing.T) {
-		m := newTestMatch(2, 2) // Empty map, no units
+		m := newTestMatch(2, 2)
 
 		gameEvents, err := m.CommandPlaceBomb(NewUnitID(3, 3), validTarget)
 		if err == nil || !strings.Contains(err.Error(), "does not exist") {
@@ -464,10 +458,10 @@ func TestGameState_PlaceBomb(t *testing.T) {
 	tests := []testCase{
 		{
 			name:   "Failure: Unit does not exist",
-			unitID: NewUnitID(3, 3), // Missing ID
+			unitID: NewUnitID(3, 3),
 			target: validTarget,
 			setupState: func() *GameState {
-				return newTestMatch(2, 2).WorkingState // Empty map, no units
+				return newTestMatch(2, 2).WorkingState
 			},
 			wantErr:     true,
 			errContains: "unit 0x33 does not exist",
@@ -490,12 +484,12 @@ func TestGameState_PlaceBomb(t *testing.T) {
 			target: validTarget,
 			setupState: func() *GameState {
 				gs := newTestMatch(2, 2).WorkingState
-				gs.Turn = 1 // Team 1's turn
+				gs.Turn = 1
 				gs.ActiveTeam = 1
 				gs.Units[validUnitID] = &Unit{
 					ID:       validUnitID,
 					HP:       1,
-					Team:     2, // Team 2 Unit
+					Team:     2,
 					Position: origin,
 				}
 				return gs
@@ -515,7 +509,7 @@ func TestGameState_PlaceBomb(t *testing.T) {
 					ID:       validUnitID,
 					HP:       1,
 					Team:     1,
-					Position: Coordinate{-5, -5}, // Out of stage bounds
+					Position: Coordinate{-5, -5},
 				}
 				return gs
 			},
@@ -556,7 +550,7 @@ func TestGameState_PlaceBomb(t *testing.T) {
 					Team:         1,
 					Position:     origin,
 					MaxBombCount: 2,
-					BombUsed:     2, // All bombs deployed
+					BombUsed:     2,
 				}
 				gs.Grid[origin.Y][origin.X] = Tile{OccupantType: OccupantUnit, OccupantID: int64(validUnitID)}
 				return gs
@@ -607,7 +601,7 @@ func TestGameState_PlaceBomb(t *testing.T) {
 					MaxBombCount: 2,
 					BombUsed:     0,
 				}
-				gs.Grid[validTarget.Y][validTarget.X].Type = TerrainBlock // make the target tile illegal to place a bomb
+				gs.Grid[validTarget.Y][validTarget.X].Type = TerrainBlock
 				gs.Grid[origin.Y][origin.X] = Tile{OccupantType: OccupantUnit, OccupantID: int64(validUnitID)}
 				return gs
 			},
@@ -749,7 +743,6 @@ func TestGameState_PlaceBomb(t *testing.T) {
 	}
 }
 
-// newTestMatch generates a clean slate grid environment
 func newTestMatch(width, height int) *Match {
 	grid := make([][]Tile, height)
 	for y, row := range grid {
@@ -886,7 +879,7 @@ func TestGameState_IsLandingLegal_OccupantBomb(t *testing.T) {
 				if !strings.Contains(err.Error(), tt.errorContains) {
 					t.Errorf("Expected error to contain '%s', got '%s'", tt.errorContains, err.Error())
 				}
-				return // No need to check further if we expected an error
+				return
 			}
 
 			if err != nil {
@@ -1454,7 +1447,6 @@ func TestMatch_ResolveTurn_TimelineSystemTransitions(t *testing.T) {
 }
 
 // AddUnit adds a unit to the match's WorkingState and syncs the grid.
-// Test-only helper.
 func (m *Match) AddUnit(team, idx int, archetype Archetype, role UnitRole, pos Coordinate, hp int) *Unit {
 	id := NewUnitID(team, idx)
 	u := &Unit{
@@ -1482,7 +1474,6 @@ func (m *Match) AddUnit(team, idx int, archetype Archetype, role UnitRole, pos C
 }
 
 // AddBomb adds a bomb to the match's WorkingState and syncs the grid.
-// Test-only helper.
 func (m *Match) AddBomb(turn, counter int, owner UnitID, pos Coordinate, range_, cd int) *Bomb {
 	b := &Bomb{
 		ID:        NewBombID(turn, counter, owner),
@@ -1501,7 +1492,6 @@ func (m *Match) AddBomb(turn, counter int, owner UnitID, pos Coordinate, range_,
 }
 
 // AddSoftBlock adds a soft block to the match's WorkingState and syncs the grid.
-// Test-only helper.
 func (m *Match) AddSoftBlock(id int, pos Coordinate) *SoftBlock {
 	sb := &SoftBlock{ID: id, Position: pos}
 	m.WorkingState.SoftBlocks[id] = sb
@@ -1589,14 +1579,12 @@ func TestMatch_Resolve_VictoryCondition_Suite(t *testing.T) {
 		p2                  teamFormation
 		expectedWinningTeam int
 	}{
-		// King vs King
 		{
 			name:                "Standard gameplay state",
 			p1:                  teamFormation{King: boolPtr(true), OrdinaryUnitsAlive: []bool{true, true, false, true}},
 			p2:                  teamFormation{King: boolPtr(true), OrdinaryUnitsAlive: []bool{true, true, false, false}},
 			expectedWinningTeam: MatchInProgress,
 		},
-		// P1 Wins
 		{
 			name:                "P1 Wins: P2 misses non-king",
 			p1:                  teamFormation{King: boolPtr(true), OrdinaryUnitsAlive: []bool{true, true, false, true}},
@@ -1621,7 +1609,6 @@ func TestMatch_Resolve_VictoryCondition_Suite(t *testing.T) {
 			p2:                  teamFormation{King: boolPtr(false), OrdinaryUnitsAlive: []bool{false, false, false, false}},
 			expectedWinningTeam: 1,
 		},
-		// P2 Wins
 		{
 			name:                "P2 Wins: P1 misses non-king",
 			p1:                  teamFormation{King: boolPtr(true), OrdinaryUnitsAlive: []bool{false, false, false, false}},
@@ -1646,7 +1633,6 @@ func TestMatch_Resolve_VictoryCondition_Suite(t *testing.T) {
 			p2:                  teamFormation{King: boolPtr(true), OrdinaryUnitsAlive: []bool{false, false, false, false}},
 			expectedWinningTeam: 2,
 		},
-		// Draw Conditions
 		{
 			name:                "Draw: Both Kings dead",
 			p1:                  teamFormation{King: boolPtr(false), OrdinaryUnitsAlive: []bool{false, true, false, false}},
@@ -1677,7 +1663,6 @@ func TestMatch_Resolve_VictoryCondition_Suite(t *testing.T) {
 			p2:                  teamFormation{King: boolPtr(true), OrdinaryUnitsAlive: []bool{false, false, false, false}},
 			expectedWinningTeam: MatchDrawn,
 		},
-		// Boss vs Boss
 		{
 			name:                "Standard: Both Boss teams alive",
 			p1:                  teamFormation{BossesAlive: []bool{true}},
@@ -1702,7 +1687,6 @@ func TestMatch_Resolve_VictoryCondition_Suite(t *testing.T) {
 			p2:                  teamFormation{BossesAlive: []bool{false}, OrdinaryUnitsAlive: []bool{true, true}},
 			expectedWinningTeam: MatchDrawn,
 		},
-		// Boss(P1) vs King(P2)
 		{
 			name:                "Standard: P1 Boss alive vs P2 full team",
 			p1:                  teamFormation{BossesAlive: []bool{true}},
@@ -1739,7 +1723,6 @@ func TestMatch_Resolve_VictoryCondition_Suite(t *testing.T) {
 			p2:                  teamFormation{King: boolPtr(false), OrdinaryUnitsAlive: []bool{true}},
 			expectedWinningTeam: MatchDrawn,
 		},
-		// King(P1) vs Boss(P2)
 		{
 			name:                "Standard: P2 Boss alive vs P1 full team",
 			p1:                  teamFormation{King: boolPtr(true), OrdinaryUnitsAlive: []bool{true}},
@@ -1776,7 +1759,6 @@ func TestMatch_Resolve_VictoryCondition_Suite(t *testing.T) {
 			p2:                  teamFormation{BossesAlive: []bool{false}},
 			expectedWinningTeam: MatchDrawn,
 		},
-		// Multi-Boss
 		{
 			name:                "Standard: P1 multi-Boss, one alive keeps team going",
 			p1:                  teamFormation{BossesAlive: []bool{false, true}},
@@ -1809,7 +1791,7 @@ func TestMatch_Resolve_VictoryCondition_Suite(t *testing.T) {
 				if foundEndedEvent {
 					t.Errorf("MatchEndedEvent should not be captured, but got one")
 				}
-				return // all the subsequent verifications aren't related to MatchInProgress
+				return
 			}
 			if !foundEndedEvent {
 				t.Error("Missing critical MatchEndedEvent token inside returned telemetry array stream")
