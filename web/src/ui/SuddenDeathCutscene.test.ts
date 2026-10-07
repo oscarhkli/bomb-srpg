@@ -97,11 +97,11 @@ describe('SuddenDeathCutscene', () => {
       resolved = true;
     });
 
-    fireDelayedCall(SUDDEN_DEATH_BOMB_DROP_DELAY_MS); // triggers dropBomb, still pending
-    fireDelayedCall(SUDDEN_DEATH_CUTSCENE_DURATION_MS); // pulse duration elapses
+    fireDelayedCall(SUDDEN_DEATH_BOMB_DROP_DELAY_MS);
+    fireDelayedCall(SUDDEN_DEATH_CUTSCENE_DURATION_MS);
     await Promise.resolve();
     await Promise.resolve();
-    expect(resolved).toBe(false); // dropBomb promise still pending
+    expect(resolved).toBe(false);
 
     resolveDrop();
     await playPromise;
@@ -121,7 +121,7 @@ describe('SuddenDeathCutscene', () => {
     fireDelayedCall(SUDDEN_DEATH_BOMB_DROP_DELAY_MS);
     await Promise.resolve();
     await Promise.resolve();
-    expect(resolved).toBe(false); // pulse duration hasn't elapsed yet
+    expect(resolved).toBe(false);
 
     fireDelayedCall(SUDDEN_DEATH_CUTSCENE_DURATION_MS);
     await playPromise;

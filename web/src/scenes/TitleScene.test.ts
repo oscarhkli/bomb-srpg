@@ -81,7 +81,7 @@ describe('TitleScene — game mode option hover', () => {
 
     fireTextPointerEvent(option, 'pointerover');
     const bomb = textByContent('💣');
-    fireTextPointerEvent(option, 'pointerdown'); // no pointerout fired first
+    fireTextPointerEvent(option, 'pointerdown');
 
     expect(bomb.destroy).toHaveBeenCalled();
   });
@@ -101,13 +101,12 @@ describe('TitleScene — Start Game submenu (AC 1, 2)', () => {
       const option = textByContent(label);
       expect(option.setVisible).toHaveBeenCalledWith(true);
       const optionCall = textCalls().find(c => c[2] === label)!;
-      expect(optionCall[0]).toBe(rootCall[0]); // same x as root
+      expect(optionCall[0]).toBe(rootCall[0]);
       expect(optionCall[3]).toMatchObject({
         fontFamily: (rootCall[3] as { fontFamily: string }).fontFamily,
       });
       ys.push(optionCall[1]);
     }
-    // Distinct, ascending y — a vertical list, not 3 lines stacked on the exact same spot.
     expect(new Set(ys).size).toBe(3);
     expect(ys).toEqual([...ys].sort((a, b) => a - b));
   });

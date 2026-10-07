@@ -59,7 +59,6 @@ import type {
   Unit,
 } from '../types/api';
 
-// pollCpuStatus()'s outcome: a successful TurnPhaseReady, or a failure reason for the caller's recovery.
 type CpuPollResult =
   | { ok: true; status: CpuStatusResponse }
   | { ok: false; reason: 'timeout' | 'idle' };
@@ -67,8 +66,6 @@ type CpuPollResult =
 export interface MatchSceneData {
   roomId: string;
   playerTokens: [string, string];
-  // Set when re-entering via Rematch: create() calls rematch() (same room, same gameCfg)
-  // before its usual getMatchState() bootstrap, and fades the scene back in.
   isRematch?: boolean;
 }
 
@@ -77,13 +74,9 @@ export default class MatchScene extends Phaser.Scene {
   private playerTokens!: [string, string];
   private gameState!: GameState;
   private gameCfg!: GameCfg;
-  // Resolved once per scene entry from create()'s getMatchConfig() call.
   private gameCfgPromise!: Promise<GameCfg>;
-  // Tracks whether this entry's own fetch has landed, since gameState/gameCfg are never reset.
   private gameStateLoaded = false;
   private gameCfgLoaded = false;
-  // The Stage background is painted once per scene entry into this persistent layer;
-  // occupantObjects is the swappable layer.
   private terrainObjects: Phaser.GameObjects.GameObject[] = [];
   private occupantObjects: Phaser.GameObjects.GameObject[] = [];
   private unitSpritesById = new Map<number, Phaser.GameObjects.Sprite>();
@@ -100,11 +93,8 @@ export default class MatchScene extends Phaser.Scene {
   private victoryCutscene!: VictoryCutscene;
   private isSubmitting = false;
   private interactionsEnabled = false;
-  // Whether MatchSummaryPanel is currently open; folded into isLocked().
   private summaryPanelOpen = false;
-  // Whether a lifecycle button's (Resolve/Reset/Surrender) own ConfirmDialog is pending Yes/No.
   private lifecycleConfirmOpen = false;
-  // Guards VictoryCutscene's Rematch/Return buttons against a double-click queuing two actions.
   private victoryActionTaken = false;
   // Bumped on 'shutdown'; async callbacks compare against this to detect a torn-down scene.
   private generation = 0;
@@ -209,8 +199,6 @@ export default class MatchScene extends Phaser.Scene {
     }
   }
 
-  // Per-turn startTurn() sequence: refresh state, start the turn, play sudden-death/turn-banner
-  // cutscenes. Interactions are disabled for the duration and re-enabled in `finally`.
   private async beginTurn(): Promise<void> {
     const gen = this.generation;
     this.interactionsEnabled = false;
@@ -234,7 +222,6 @@ export default class MatchScene extends Phaser.Scene {
         return;
       }
 
-      // Polling starts as soon as gameCfg is known; the render itself waits on bannerDone.
       void this.gameCfgPromise.then(cfg => {
         if (gen !== this.generation || !(cfg.vsCpu && state.activeTeam === 2)) {
           return;
@@ -250,7 +237,6 @@ export default class MatchScene extends Phaser.Scene {
       });
 
       if (resp.inSuddenDeath) {
-        // Refetch so gameState.bombs includes the hazards startTurn() just injected server-side.
         this.gameState = await getMatchState();
         if (gen !== this.generation) {
           return;
@@ -286,7 +272,6 @@ export default class MatchScene extends Phaser.Scene {
     });
   }
 
-  // Polls consumeCpuStatus() with backoff until TurnPhaseReady, budget exhaustion, or TurnPhaseIdle.
   private async pollCpuStatus(gen: number): Promise<CpuPollResult> {
     const startedAt = Date.now();
     let attempt = 0;
@@ -314,8 +299,6 @@ export default class MatchScene extends Phaser.Scene {
     }
   }
 
-  // Animates planGameEvents one at a time, holds, then animates resolveTurnGameEvents through
-  // the same renderer /resolve uses. Falls back to recoverFromCpuPollFailure() on a poll failure.
   private async runCpuTurn(pollPromise: Promise<CpuPollResult>, gen: number): Promise<void> {
     const result = await pollPromise;
     if (gen !== this.generation) {
@@ -407,7 +390,6 @@ export default class MatchScene extends Phaser.Scene {
     this.showError('CPU turn did not complete');
   }
 
-  // Renders a sudden-death bomb dropping in from off-screen onto its tile, via renderBomb().
   private dropSuddenDeathBomb(event: GameEvent): Promise<void> {
     const { unitId, bombId, position, countdown } = event;
     if (bombId === undefined || !position || countdown === undefined || !this.inBounds(position)) {
@@ -482,7 +464,6 @@ export default class MatchScene extends Phaser.Scene {
         succeeded = true;
         for (const event of gameEvents) {
           if (!this.applyGameEvent(event)) {
-            // applyGameEvent already surfaced the specific "Invalid …" error.
             succeeded = false;
             break;
           }
@@ -571,7 +552,6 @@ export default class MatchScene extends Phaser.Scene {
     return true;
   }
 
-  // Mirrors a plan event's effect into a pre-resolution GameState snapshot.
   private applyPlanEventToSnapshot(snapshot: GameState, event: GameEvent): void {
     switch (event.type) {
       case 'unitMoved': {
@@ -602,8 +582,6 @@ export default class MatchScene extends Phaser.Scene {
     }
   }
 
-  // Refetches gameState. On success, adopts it without redrawing (optimistic visuals already
-  // match). On failure, rebuilds the occupant layer from truth to resync.
   private async resyncFromServer(
     gen: number,
     succeeded: boolean,
@@ -628,12 +606,10 @@ export default class MatchScene extends Phaser.Scene {
     }
   }
 
-  // True while a server call is in flight or a fresh render hasn't finished yet.
   private isBusy(): boolean {
     return this.isSubmitting || !this.interactionsEnabled;
   }
 
-  // Gates unit clicks, TurnCommandPanel, and MatchSummaryButton.
   private isLocked(): boolean {
     return this.isBusy() || this.summaryPanelOpen;
   }
@@ -652,8 +628,6 @@ export default class MatchScene extends Phaser.Scene {
     this.matchSummaryPanel.close();
   }
 
-  // Gates the Resolve/Reset/Surrender lifecycle buttons; narrower than isLocked() since these
-  // are only reachable while MatchSummaryPanel is open.
   private isLifecycleButtonBusy(): boolean {
     return this.isBusy() || this.lifecycleConfirmOpen;
   }
@@ -696,7 +670,6 @@ export default class MatchScene extends Phaser.Scene {
     this.showLifecycleConfirm(() => void this.handleSurrender(), CONFIRM_TEXT_SURRENDER);
   }
 
-  // Masks the occupant rebuild behind a camera fade-out/fade-in.
   private async handleResetTurn(): Promise<void> {
     if (this.isSubmitting) {
       return;
@@ -706,7 +679,7 @@ export default class MatchScene extends Phaser.Scene {
     this.clearErrors();
     this.cameras.main.fadeOut(FADE_MS, 0, 0, 0);
     try {
-      await resetTurn(); // 204 No Content — no body to adopt
+      await resetTurn();
       if (gen !== this.generation) {
         return;
       }
@@ -714,7 +687,7 @@ export default class MatchScene extends Phaser.Scene {
       if (gen !== this.generation) {
         return;
       }
-      this.renderBoard(freshState); // occupant-only rebuild — terrain untouched
+      this.renderBoard(freshState);
     } catch (err) {
       if (gen !== this.generation) {
         return;
@@ -728,7 +701,6 @@ export default class MatchScene extends Phaser.Scene {
     }
   }
 
-  // Reuses handleMatchEnded()'s VictoryCutscene rendering; surrender just delivers the event differently.
   private async handleSurrender(): Promise<void> {
     if (this.isSubmitting) {
       return;
@@ -826,7 +798,6 @@ export default class MatchScene extends Phaser.Scene {
       this.showError('Invalid matchEnded event received from server');
       return;
     }
-    // Permanently locked: the match is over, so interactions never need to re-enable.
     this.interactionsEnabled = false;
     const isVsCpu = this.gameCfgLoaded && this.gameCfg.vsCpu;
     const returnLabel = isVsCpu ? 'Return to Title' : 'Return to Match Settings';
@@ -852,7 +823,6 @@ export default class MatchScene extends Phaser.Scene {
     });
   }
 
-  // Fades out and deletes the match concurrently; a delete failure is logged, never blocking.
   private async fadeOutAndDeleteMatch(): Promise<void> {
     const fadeDone = new Promise<void>(resolve => {
       this.cameras.main.fadeOut(FADE_MS, 0, 0, 0);
@@ -887,14 +857,12 @@ export default class MatchScene extends Phaser.Scene {
     });
   }
 
-  // Destroy-and-repaint the occupant layer from server truth; terrain is never touched.
   private renderBoard(state: GameState): void {
     this.gameState = state;
     this.gameStateLoaded = true;
     renderOccupants(this.boardCtx(), state);
   }
 
-  // No-ops until both gameState and gameCfg have loaded this entry, then renders once.
   private tryRenderStageBackground(): void {
     if (!this.gameStateLoaded || !this.gameCfgLoaded) {
       return;
@@ -902,8 +870,6 @@ export default class MatchScene extends Phaser.Scene {
     renderStageBackground(this.boardCtx(), this.gameState.grid, this.gameCfg.stagePreset);
   }
 
-  // The renderer draws occupants and wires their clicks; the scene keeps ownership of state and
-  // the click semantics (which is why onUnitClicked lives here, not in boardRenderer).
   private boardCtx(): BoardRenderContext {
     return {
       scene: this,
@@ -936,7 +902,6 @@ export default class MatchScene extends Phaser.Scene {
     this.errorPanel.show(message);
   }
 
-  // Clears the error log at the start of each new user-initiated action.
   private clearErrors(): void {
     this.errorPanel.clear();
   }

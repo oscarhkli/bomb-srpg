@@ -69,8 +69,6 @@ describe('TurnCommandPanel', () => {
 
     panel.openFor(makeUnit());
 
-    // GameControlRegion is 480..640 wide (centerX=560); the mocked button_neutral frame is
-    // 100x100, so the 3-row stack (with 4px gaps) is 308 tall, bottom-anchored 40px above y=360.
     const centerX = GAME_CONTROL_REGION_X + GAME_CONTROL_REGION_WIDTH / 2;
     const buttonHeight = 100;
     const stackHeight = 3 * buttonHeight + 2 * SPRITE_BUTTON_ROW_SPACING;
@@ -238,7 +236,6 @@ describe('TurnCommandPanel', () => {
     clickPointerdown(backButtonContainer!);
 
     overlayGraphics.forEach(g => expect(g.destroy).toHaveBeenCalled());
-    // The panel's own 3 buttons are untouched — only the overlay was popped, not the whole panel.
     [moveButtonContainer, backButtonContainer].forEach(c =>
       expect(c!.destroy).not.toHaveBeenCalled()
     );
@@ -277,7 +274,7 @@ describe('TurnCommandPanel', () => {
     await Promise.resolve();
 
     expect(onError).toHaveBeenCalledWith('network down');
-    expect(allGraphics()).toHaveLength(0); // no overlay tiles drawn
+    expect(allGraphics()).toHaveLength(0);
   });
 
   it('calls showConfirm with a target-bound onYes; invoking it calls onConfirmedSubmit', async () => {

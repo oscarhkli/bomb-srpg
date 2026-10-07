@@ -133,7 +133,7 @@ async function submitViaUI(
   unitGraphics: ReturnType<typeof mockScene.add.sprite>,
   buttonIndex: 0 | 1 // 0 = Move, 1 = Bomb
 ): Promise<void> {
-  pointerDownOf(unitGraphics)(); // opens TurnCommandPanel
+  pointerDownOf(unitGraphics)();
   const actionButtonContainer = lastContainers(3)[buttonIndex];
   pointerDownOf(actionButtonContainer!)();
   await flush();
@@ -169,7 +169,6 @@ describe('MatchScene', () => {
     await bootScene({ roomId: 'room-abc' });
 
     expect(initRoom).toHaveBeenCalledWith('room-abc');
-    // Once for the initial board render, once more for beginTurn()'s per-turn refresh.
     expect(getMatchState).toHaveBeenCalledTimes(2);
   });
 
@@ -252,14 +251,13 @@ describe('MatchScene', () => {
 
     const onUnitPointerDown = pointerDownOf(occupantSprite(0));
 
-    // Open the panel, click Move, close it, reopen, click Move again.
     onUnitPointerDown();
     const [moveButtonContainer] = lastContainers(3);
     const clickMove = (): void => pointerDownOf(moveButtonContainer!)();
     clickMove();
     await flush();
 
-    onUnitPointerDown(); // closes and reopens the panel for the same unit
+    onUnitPointerDown();
     onUnitPointerDown();
     clickMove();
     await flush();
@@ -296,7 +294,6 @@ describe('MatchScene', () => {
 
     await bootScene();
 
-    // No occupant Graphics for the dead unit: MatchSummaryButton + 2 TurnPanel header refreshes.
     expect(mockScene.add.graphics).toHaveBeenCalledTimes(3);
   });
 
@@ -311,8 +308,6 @@ describe('MatchScene', () => {
       'Failed to load match state',
       expect.objectContaining({})
     );
-    // Only the error panel's own background Graphics exists — no board (grid) was rendered,
-    // and beginTurn() never ran since the initial getMatchState() rejected.
     expect(mockScene.add.graphics).toHaveBeenCalledTimes(1);
     expect(mockScene.cameras.main.centerOn).not.toHaveBeenCalled();
     expect(startTurn).not.toHaveBeenCalled();
@@ -349,8 +344,6 @@ describe('MatchScene', () => {
     await flush();
 
     expect(submitTurnCommand).toHaveBeenCalledWith({ type: 'move', unitId: 7, target });
-    // On this 1x2 grid, centered in GameBoardRegion: toCenter.cx=256 (moved one tile right from
-    // fromCenter.cx=224); groundY for row 0 is 212 (unaffected — same row).
     expect(mockScene.tweens.add).toHaveBeenCalledWith(
       expect.objectContaining({ targets: unitGraphics, x: 256, y: 212, ease: 'Linear' })
     );
@@ -389,9 +382,6 @@ describe('MatchScene', () => {
     await flush();
 
     expect(submitTurnCommand).toHaveBeenCalledWith({ type: 'placeBomb', unitId: 7, target });
-    // In-place render (renderBomb), not a wholesale swap: a bomb container is drawn at the
-    // target tile center (tileCenter of {x:1,y:0} on this 1x2 grid, centered in GameBoardRegion
-    // => 256,180) and the initial unit graphics survives.
     expect(mockScene.add.container).toHaveBeenCalledWith(256, 180, expect.any(Array));
     expect(unitGraphics.destroy).not.toHaveBeenCalled();
   });
@@ -434,18 +424,15 @@ describe('MatchScene', () => {
     await bootScene();
 
     const unitGraphics = occupantSprite(0);
-    await submitViaUI(unitGraphics, 1); // clicks Bomb (index 1)
+    await submitViaUI(unitGraphics, 1);
     await flush();
 
-    // Same Graphics object, no rebuild — click it again for a second look at the panel.
     pointerDownOf(unitGraphics)();
     const [, placeBombButtonContainer] = lastContainers(3);
 
     expect(placeBombButtonContainer!.setInteractive).not.toHaveBeenCalled();
   });
 
-  // AC4: a rejected command surfaces the *actual* server error and resyncs by rebuilding the
-  // occupant layer from truth, while the terrain layer survives the swap.
   it('shows the actual error and resyncs by rebuilding occupants (terrain untouched) when submitTurnCommand rejects', async () => {
     const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
     const initialGrid: Tile[][] = [[plainTile(), plainTile()]];
@@ -468,9 +455,7 @@ describe('MatchScene', () => {
       'stale token',
       expect.objectContaining({})
     );
-    // Occupant layer rebuilt from the recovery refetch (old unit graphics destroyed)...
     expect(unitGraphics.destroy).toHaveBeenCalled();
-    // ...but the terrain layer is never in scope of an occupant swap.
     expect(gridGraphics.destroy).not.toHaveBeenCalled();
   });
 
@@ -481,7 +466,6 @@ describe('MatchScene', () => {
 
     queueMatchStates(makeState({ grid: initialGrid, activeTeam: 1, units: [unit] }));
     vi.mocked(getAllowedTiles).mockResolvedValue([target]);
-    // `to` is out-of-bounds for a 1x2 grid — structurally malformed, regardless of legality.
     const events: GameEvent[] = [
       { type: 'unitMoved', unitId: 7, from: { x: 0, y: 0 }, to: { x: 99, y: 99 } },
     ];
@@ -529,8 +513,6 @@ describe('MatchScene', () => {
     await submitViaUI(unitGraphics, 0);
     await flush();
 
-    // On this 1x2 grid, centered in GameBoardRegion: fromCenter.cx=224, toCenter.cx=256 (moved
-    // one tile right, delta +32); groundY for row 0 is 212 (unaffected — same row).
     expect(mockScene.tweens.add).toHaveBeenCalledWith(
       expect.objectContaining({ targets: unitGraphics, x: 256, y: 212, ease: 'Linear' })
     );
@@ -554,7 +536,6 @@ describe('MatchScene', () => {
       makeState({ grid: initialGrid, activeTeam: 2, units: [pushedUnit] })
     );
     vi.mocked(getAllowedTiles).mockResolvedValue([requestedTarget]);
-    // Server reports the unit actually landed one tile further than the client requested.
     const events: GameEvent[] = [
       { type: 'unitMoved', unitId: 7, from: { x: 0, y: 0 }, to: actualTo },
     ];
@@ -566,9 +547,6 @@ describe('MatchScene', () => {
     await submitViaUI(unitGraphics, 0);
     await flush();
 
-    // The tween follows the server's `to` (x:2), not the requested x:1, and no error is raised —
-    // the client renders the server's authoritative event verbatim. On this 1x3 grid, centered
-    // in GameBoardRegion: toCenter.cx=272 (vs. the requested tile's 240); groundY row 0 is 212.
     expect(mockScene.tweens.add).toHaveBeenCalledWith(
       expect.objectContaining({ targets: unitGraphics, x: 272, y: 212, ease: 'Linear' })
     );
@@ -580,9 +558,6 @@ describe('MatchScene', () => {
     );
   });
 
-  // AC1 + AC2: a successful move updates the board in place — no wholesale occupant swap follows,
-  // the terrain layer survives, and the per-op gameState refetch still runs. (The former
-  // proactive-diff "out of sync" flag on the happy path was removed in spec007.)
   it('updates in place on a successful move: no occupant rebuild, terrain survives, state refetched', async () => {
     const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
     const initialGrid: Tile[][] = [[plainTile(), plainTile()]];
@@ -600,18 +575,15 @@ describe('MatchScene', () => {
 
     await bootScene();
 
-    const gridGraphics = stageBackgroundImage(); // painted once at scene entry
+    const gridGraphics = stageBackgroundImage();
     const unitGraphics = occupantSprite(0);
     const refetchesBefore = vi.mocked(getMatchState).mock.calls.length;
 
     await submitViaUI(unitGraphics, 0);
     await flush();
 
-    // In-place tween — the initial unit graphics is never destroyed (no occupant rebuild)...
     expect(unitGraphics.destroy).not.toHaveBeenCalled();
-    // ...and the terrain layer is untouched by the happy path.
     expect(gridGraphics.destroy).not.toHaveBeenCalled();
-    // The per-op gameState refetch still ran.
     expect(vi.mocked(getMatchState).mock.calls.length).toBeGreaterThan(refetchesBefore);
   });
 
@@ -758,7 +730,6 @@ describe('MatchScene', () => {
     await bootScene();
 
     expect(getMatchConfig).toHaveBeenCalledOnce();
-    // TurnPanel renders "Turn" label text among the added texts.
     expect(mockScene.add.text).toHaveBeenCalledWith(
       expect.any(Number),
       expect.any(Number),
@@ -848,8 +819,6 @@ describe('MatchScene', () => {
 
     await bootScene();
 
-    // Drive the Move flow until the shared ConfirmDialog is open (click unit -> Move ->
-    // allowed tile). At this point confirmDialog.isOpen is true.
     pointerDownOf(occupantSprite(0))();
     const [moveButtonContainer] = lastContainers(3);
     pointerDownOf(moveButtonContainer!)();
@@ -889,7 +858,6 @@ describe('MatchScene', () => {
     ];
     vi.mocked(resolveTurn).mockResolvedValue({ planGameEvents: [], resolveTurnGameEvents });
 
-    // ConfirmDialog's Yes button is the most-recently-created graphics among the last 3.
     const [yesButtonContainer] = lastContainers(2);
     pointerDownOf(yesButtonContainer!)();
     await flush();
@@ -950,7 +918,6 @@ describe('MatchScene', () => {
     const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
     queueMatchStates(
       makeState({ grid: [[plainTile()]], activeTeam: 1, units: [unit] }),
-      // The post-resolve refetch reports a new turn number so turnPanel.update is observable.
       makeState({ grid: [[plainTile()]], turn: 5, activeTeam: 2, units: [unit] })
     );
     vi.mocked(resolveTurn).mockResolvedValue({ planGameEvents: [], resolveTurnGameEvents: [] });
@@ -964,9 +931,7 @@ describe('MatchScene', () => {
     pointerDownOf(yesButtonContainer!)();
     await flush();
 
-    // No wholesale occupant swap after playback — the unit graphics is never destroyed.
     expect(unitGraphics.destroy).not.toHaveBeenCalled();
-    // turnPanel refreshed with the post-resolve turn number...
     expect(mockScene.add.text).toHaveBeenCalledWith(
       expect.any(Number),
       expect.any(Number),
@@ -996,7 +961,6 @@ describe('MatchScene', () => {
     const staleErrorText = textByContent('tiles unavailable');
     expect(staleErrorText.destroy).not.toHaveBeenCalled();
 
-    // Now successfully submit a Move for the same unit — a fresh turn-command action.
     vi.mocked(getAllowedTiles).mockResolvedValue([target]);
     vi.mocked(submitTurnCommand).mockResolvedValue([
       { type: 'unitMoved', unitId: 7, from: { x: 0, y: 0 }, to: target },
@@ -1079,7 +1043,6 @@ describe('MatchScene', () => {
         onComplete: () => void;
       };
       expect(tweenCfg.targets).toBe(bombContainer);
-      // tileCenter of {x:1,y:0} on this 1x2 grid, centered in GameBoardRegion: cy = 0*32+16+164
       expect(tweenCfg.y).toBe(180);
       expect(tweenCfg.duration).toBe(SUDDEN_DEATH_BOMB_DROP_DURATION_MS);
       expect(bombContainer.setDepth).toHaveBeenCalledWith(DEPTH_SUDDEN_DEATH_BOMB);
@@ -1268,12 +1231,9 @@ describe('MatchScene', () => {
       );
 
       await bootScene();
-      // The CPU-turn chain (gameCfg -> poll -> bannerDone -> runCpuTurn) is a couple of extra
-      // promise hops beyond bootScene()'s own settle.
       await flush();
 
       expect(consumeCpuStatus).toHaveBeenCalled();
-      // Hold happens between plan and resolve — fire it to let the CPU turn finish resolving.
       delayedCallAt(CPU_PLAN_RESOLVE_HOLD_MS)();
       await flush();
 
@@ -1281,7 +1241,6 @@ describe('MatchScene', () => {
         [damagedEvent],
         expect.objectContaining({})
       );
-      // Player's turn opened next: 2 startTurn calls total (CPU's, then the Player's).
       expect(startTurn).toHaveBeenCalledTimes(2);
       expect(turnBannerPlay).toHaveBeenCalledWith(1);
     });
@@ -1469,7 +1428,6 @@ describe('MatchScene', () => {
       await bootScene();
 
       expect(victoryCutscenePlay).toHaveBeenCalledWith(2, expect.any(String), expect.any(Object));
-      // Only the CPU's own startTurn — the match ended before a next turn could open.
       expect(startTurn).toHaveBeenCalledTimes(1);
     });
 
@@ -1596,7 +1554,6 @@ describe('MatchScene', () => {
         type: 'unitMoved',
         unitId: 1,
         from: { x: 0, y: 0 },
-        // to is missing — applyUnitMoved() rejects it and returns false.
       };
       vi.mocked(consumeCpuStatus).mockResolvedValue(
         readyStatus({
@@ -1646,7 +1603,6 @@ describe('MatchScene', () => {
           expect.any(String),
           expect.any(Object)
         );
-        // Only one startTurn() call (the very first turn) — no second beginTurn() ran.
         expect(startTurn).toHaveBeenCalledTimes(1);
       }
     );
@@ -1843,8 +1799,6 @@ describe('MatchScene', () => {
       resolveStaleState(makeState({ grid: [[plainTile(), plainTile()]] }));
       await flush();
 
-      // The stale fetch's own board dimensions (2 cols) never reach centerOn — no new call at all
-      // from it, since it bails out on the generation mismatch.
       expect(mockScene.cameras.main.centerOn.mock.calls.length).toBe(
         centerOnCallsBeforeStaleResolve
       );
@@ -1879,7 +1833,6 @@ describe('MatchScene', () => {
       scene.create({ roomId: 'room-abc', playerTokens: ['t1', 't2'], isRematch: true });
       await flush();
 
-      // gameState resolved for the new entry, but no repaint happened yet — no stale 'Plain'.
       expect(mockScene.add.image.mock.calls.length).toBe(imageCallsBeforeRematch);
 
       resolveFreshCfg(makeCfg({ stagePreset: 'Divided' }));
@@ -1917,7 +1870,6 @@ describe('MatchScene', () => {
       scene.create({ roomId: 'room-abc', playerTokens: ['t1', 't2'], isRematch: true });
       await flush();
 
-      // gameCfg resolved for the new entry, but no repaint happened yet — no stale grid.
       expect(mockScene.add.image.mock.calls.length).toBe(imageCallsBeforeRematch);
 
       resolveFreshState(makeState({ grid: [[plainTile()]] }));
@@ -1953,7 +1905,6 @@ describe('MatchScene', () => {
       scene.create({ roomId: 'room-abc', playerTokens: ['t1', 't2'], isRematch: true });
       await flush();
 
-      // Only the stale '12' would repaint here — the fresh gameCfg hasn't resolved yet.
       const textCallsDuringRematch = mockScene.add.text.mock.calls.slice(textCallsBeforeRematch);
       expect(textCallsDuringRematch).not.toContainEqual([
         expect.any(Number),
@@ -1992,14 +1943,12 @@ describe('MatchScene', () => {
       const [yesButtonContainer] = lastContainers(2);
       pointerDownOf(yesButtonContainer!)();
 
-      // fadeOut() runs synchronously before the first await.
       expect(mockScene.cameras.main.fadeOut).toHaveBeenCalledWith(200, 0, 0, 0);
       expect(mockScene.cameras.main.fadeIn).not.toHaveBeenCalled();
 
       await flush();
 
       expect(resetTurn).toHaveBeenCalledOnce();
-      // initial board render + beginTurn()'s per-turn refresh + Reset's own post-resetTurn() refetch.
       expect(getMatchState).toHaveBeenCalledTimes(3);
       expect(grid.destroy).not.toHaveBeenCalled();
       // Unlike a successful Resolve (no rebuild), Reset always rebuilds the occupant layer.
@@ -2049,7 +1998,6 @@ describe('MatchScene', () => {
         'reset failed',
         expect.objectContaining({})
       );
-      // resetTurn() itself rejected, so there's no post-reset getMatchState() refetch.
       expect(getMatchState).toHaveBeenCalledTimes(2);
 
       const containersBefore = mockScene.add.container.mock.calls.length;
@@ -2150,9 +2098,9 @@ describe('MatchScene', () => {
       queueMatchStates(makeState({ grid: [[plainTile()]], activeTeam: 1 }));
       await bootScene();
 
-      pointerDownOf(matchSummaryButtonGraphics())(); // opens MatchSummaryPanel
+      pointerDownOf(matchSummaryButtonGraphics())();
       const [, , resetGraphics, surrenderGraphics] = lastGraphics(5);
-      pointerDownOf(resetGraphics!)(); // opens Reset's own confirm — still pending, no Yes/No yet
+      pointerDownOf(resetGraphics!)();
 
       const textCallsBefore = mockScene.add.text.mock.calls.length;
       pointerDownOf(surrenderGraphics!)(); // must be a no-op: Reset's confirm hasn't resolved
@@ -2170,7 +2118,6 @@ describe('MatchScene', () => {
 
       await bootScene();
 
-      // Drive the Move flow until TurnCommandPanel's own ConfirmDialog is open.
       pointerDownOf(occupantSprite(0))();
       const [moveButtonContainer] = lastContainers(3);
       pointerDownOf(moveButtonContainer!)();

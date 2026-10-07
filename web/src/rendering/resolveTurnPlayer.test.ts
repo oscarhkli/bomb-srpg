@@ -81,8 +81,6 @@ describe('playResolveTurnEvents — bombCountdownUpdated', () => {
   });
 
   it('does not throw when the bomb graphics map has no entry for a validated bombId', () => {
-    // bombGraphicsById deliberately left empty — validate() only checks the snapshot,
-    // not that the graphics map is in sync with it.
     playResolveTurnEvents([{ type: 'bombCountdownUpdated', bombId: 1, countdown: 3 }], {
       scene: mockScene as never,
       gameStateSnapshot: baseState(),
@@ -339,8 +337,6 @@ describe('playResolveTurnEvents — validation', () => {
     expect(result.ok).toBe(true);
     expect(onError).not.toHaveBeenCalled();
     delayedCallAt(0)();
-    // The bomb graphics are still cleaned up, but no beam is drawn since the only
-    // affected position has no cardinal direction from the bomb.
     expect(mockScene.tweens.add).not.toHaveBeenCalled();
   });
 });
@@ -393,7 +389,7 @@ describe('playResolveTurnEvents — bombExploded (non-chain)', () => {
 
     expect(mockScene.tweens.add).toHaveBeenCalledOnce();
     const tweenCfg = mockScene.tweens.add.mock.calls[0]![0] as { len: number; duration: number };
-    expect(tweenCfg.len).toBe(2 * TILE_SIZE); // 2 tiles east
+    expect(tweenCfg.len).toBe(2 * TILE_SIZE);
     expect(tweenCfg.duration).toBe(2 * BLAST_SPEED_MS_PER_TILE);
   });
 
@@ -432,8 +428,6 @@ describe('playResolveTurnEvents — bombExploded (non-chain)', () => {
 
     expect(result.ok).toBe(true);
     expect(onError).not.toHaveBeenCalled();
-    // The origin tile no longer aborts rendering — the outward beam is still scheduled
-    // once the explosion's delayedCall(0) fires.
     delayedCallAt(0)();
     expect(mockScene.tweens.add).toHaveBeenCalledOnce();
   });
@@ -512,8 +506,6 @@ describe('playResolveTurnEvents — chain reactions', () => {
       }
     );
 
-    // bomb 2 sits at (2,0), which is in bomb 1's affectedPositions => chain reaction,
-    // delayed by reachTime((0,0), (2,0)) = 2 tiles * 60ms = 120ms from bomb 1's blast-start (0).
     const chainDelays = mockScene.time.delayedCall.mock.calls
       .map(c => c[0] as number)
       .filter(d => d === 120);
@@ -537,7 +529,6 @@ describe('playResolveTurnEvents — chain reactions', () => {
 
     playResolveTurnEvents(
       [
-        // Bomb 1 (earliest in array, but farther): reaches (3,0) via 3 tiles => 180ms.
         {
           type: 'bombExploded',
           bombId: 1,
@@ -547,14 +538,12 @@ describe('playResolveTurnEvents — chain reactions', () => {
             { x: 3, y: 0 },
           ],
         },
-        // Bomb 2 (later in array, but closer): reaches (3,0) via 1 tile => 60ms.
         {
           type: 'bombExploded',
           bombId: 2,
           position: { x: 2, y: 0 },
           affectedPositions: [{ x: 3, y: 0 }],
         },
-        // Bomb 3 sits at (3,0) — a chain reaction caused by both 1 and 2.
         {
           type: 'bombExploded',
           bombId: 3,
@@ -572,7 +561,6 @@ describe('playResolveTurnEvents — chain reactions', () => {
       }
     );
 
-    // Smallest-delay tie-break must pick bomb 2's 60ms, not bomb 1's (earlier-in-array) 180ms.
     const delays = mockScene.time.delayedCall.mock.calls.map(c => c[0] as number);
     expect(delays).toContain(60);
     expect(delays).not.toContain(180);
@@ -622,7 +610,6 @@ describe('playResolveTurnEvents — occupant events', () => {
       }
     );
 
-    // reachTime((0,0), (2,0)) = 2 * 60 = 120ms.
     const delays = mockScene.time.delayedCall.mock.calls.map(c => c[0] as number);
     expect(delays).toContain(120);
   });
@@ -659,11 +646,9 @@ describe('playResolveTurnEvents — occupant events', () => {
       }
     );
 
-    // unitDamaged (offset 0, newHp<=0) draws the fire but schedules no auto-removal.
     delayedCallAt(0)();
     expect(unitGraphics.destroy).not.toHaveBeenCalled();
 
-    // unitDied is scheduled at offset(0) + FIRE_DURATION_MS.
     delayedCallAt(FIRE_DURATION_MS)();
     expect(unitGraphics.destroy).toHaveBeenCalled();
   });
@@ -676,7 +661,6 @@ describe('playResolveTurnEvents — render fidelity oracle', () => {
     name: string;
     initial: GameState;
     events: GameEvent[];
-    // The occupants that must remain after playback (live units, surviving bombs/softBlocks).
     expected: GameState;
   }
 
@@ -768,7 +752,6 @@ describe('playResolveTurnEvents — render fidelity oracle', () => {
     });
     const bombGraphicsById = new Map<number, BombGraphics>([[1, makeBombGraphics()]]);
 
-    // Play NO events, so the bomb graphics linger — but expected end-state has no bombs.
     playResolveTurnEvents([], {
       scene: mockScene as never,
       gameStateSnapshot: initial,
@@ -808,7 +791,6 @@ describe('playResolveTurnEvents — done promise', () => {
       }
     );
 
-    // 1 tile away => BLAST_SPEED_MS_PER_TILE growth + BLAST_DURATION_MS lingering tail.
     let settled = false;
     void result.done.then(() => {
       settled = true;

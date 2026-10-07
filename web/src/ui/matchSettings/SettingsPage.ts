@@ -21,13 +21,8 @@ export interface SettingsPageNav {
 // A swappable content view within MatchSettingsScene's body (VISUAL_VOCAB "Page"). The scene's
 // chrome (HeaderRegion/NavRegion) stays put while the active Page's render*/destroy methods run.
 export interface SettingsPage {
-  // Renders this Page's title into HeaderRegion, right of BackButton + spacer. (x, y) is the
-  // left-anchor point, vertically centered at y.
   renderHeaderTitle(scene: Phaser.Scene, x: number, y: number): void;
-  // Renders this Page's content into the body region (the middle region between HeaderRegion and
-  // NavRegion).
   renderBody(scene: Phaser.Scene, bounds: PageBounds): void;
-  // Renders this Page's Next/Start Match button into NavRegion.
   renderNav(scene: Phaser.Scene, bounds: PageBounds): void;
   // What BackButton does while this Page is active (no-op, or navigate to a prior Page).
   handleBack(): void;

@@ -89,8 +89,6 @@ export default class MatchSummaryPanel {
 
   renderButton(): void {
     destroyAll(this.buttonObjects);
-    // Centered in the GameControlRegion gap between TurnPanel's bottom edge and
-    // TurnCommandPanel's top edge, so it never overlaps either.
     const x = GAME_CONTROL_REGION_X + (GAME_CONTROL_REGION_WIDTH - MATCH_SUMMARY_BUTTON_SIZE) / 2;
     const gapTop = TURN_PANEL_TOP_MARGIN + TURN_PANEL_HEIGHT;
     const gapBottom =
@@ -237,7 +235,6 @@ export default class MatchSummaryPanel {
     return { livingUnits: livingUnits.length, availableBombs };
   }
 
-  // The button block is bottom-aligned against panelBottomY, not top-anchored below mid-section.
   private renderButtons(x0: number, panelBottomY: number, cfg: GameCfg): void {
     const x = x0 + MATCH_SUMMARY_PANEL_WIDTH / 2 - MATCH_SUMMARY_BUTTON_WIDTH / 2;
     const resetEnabled = cfg.allowResetTurn;

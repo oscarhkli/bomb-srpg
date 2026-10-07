@@ -9,8 +9,7 @@ export interface PillButtonStyle {
   borderWidth: number;
 }
 
-// Shared by any clickable Graphics rect (pill buttons here, and MatchSummaryPanel's square
-// "≡" icon button) so the hit-area/interactive wiring only lives in one place.
+// Wires the interactive hit area and click handling onto a Graphics rect.
 export function attachRectClickHandler(
   target: Phaser.GameObjects.Graphics,
   x: number,
@@ -26,9 +25,7 @@ export function attachRectClickHandler(
   target.on('pointerdown', onClick);
 }
 
-// Y position of the i-th button in a vertical stack starting at startY, each buttonHeight tall
-// with spacing between them. Shared by MatchSummaryPanel (bottom-anchored block) and
-// VictoryCutscene (top-anchored pair) so their spacing math can't silently drift apart.
+// Y position of the i-th button in a vertical stack of the given height and spacing.
 export function verticalButtonY(
   startY: number,
   index: number,
@@ -38,9 +35,7 @@ export function verticalButtonY(
   return startY + index * (buttonHeight + spacing);
 }
 
-// Draws a pill-shape button (rounded rect + border + centered label) per the shared styling
-// used by MatchSummaryPanel, VictoryCutscene, UnitPage, and StagePage.
-// Returns the created GameObjects so the caller can track them for later destroy().
+// Draws a pill-shaped button (rounded rect, border, centered label); returns its GameObjects.
 export function drawPillButton(
   scene: Phaser.Scene,
   x: number,

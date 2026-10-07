@@ -69,8 +69,6 @@ describe('MatchSummaryPanel button', () => {
     panel.renderButton();
 
     const button = firstGraphics();
-    // (480,360)-based region math — see TurnPanel.ts/TurnCommandPanel.ts for the edges this
-    // sits between. Independent literals, not the same expression the code computes.
     expect(button.fillRoundedRect).toHaveBeenCalledWith(
       536,
       97,
@@ -175,17 +173,16 @@ describe('MatchSummaryPanel.open', () => {
     const state = makeState({
       units: [
         makeUnit({ id: 1, team: 1, hp: 1, maxBombCount: 3, bombUsed: 1 }),
-        makeUnit({ id: 2, team: 1, hp: 0, maxBombCount: 3, bombUsed: 0 }), // dead — excluded
+        makeUnit({ id: 2, team: 1, hp: 0, maxBombCount: 3, bombUsed: 0 }),
         makeUnit({ id: 3, team: 2, hp: 1, maxBombCount: 2, bombUsed: 0 }),
       ],
     });
 
     panel.open(state, makeCfg());
 
-    // Team 1: 1 living unit, 2 available bombs (3 - 1). Team 2: 1 living unit, 2 available bombs.
     const textValues = textCalls().map(c => c[2]);
-    expect(textValues).toContain('1'); // living units, both teams
-    expect(textValues).toContain('2'); // available bombs, both teams
+    expect(textValues).toContain('1');
+    expect(textValues).toContain('2');
   });
 
   it('renders the 4 buttons: Resolve, Reset, Surrender, Back', () => {
@@ -234,7 +231,6 @@ describe('MatchSummaryPanel.open', () => {
 
     panel.open(makeState(), makeCfg());
 
-    // Last 4 graphics are always [Resolve, Reset, Surrender, Back].
     const [resolveG, resetG, surrenderG, backG] = allGraphics().slice(-4);
     clickPointerdown(resolveG!);
     expect(onResolveButtonClicked).toHaveBeenCalledOnce();
@@ -293,8 +289,6 @@ describe('MatchSummaryPanel.open', () => {
     const backCall = backG!.fillRoundedRect.mock.calls[0]!;
     expect(resolveCall[3]).toBe(MATCH_SUMMARY_BUTTON_HEIGHT);
 
-    // Camera height is 360; the content box is vertically centered around it. The Back button
-    // (bottom-most) should end 12px above the box's bottom edge (y0 + MATCH_SUMMARY_PANEL_HEIGHT).
     const y0 = (360 - MATCH_SUMMARY_PANEL_HEIGHT) / 2;
     const boxBottom = y0 + MATCH_SUMMARY_PANEL_HEIGHT;
     const backBottomEdge = (backCall[1] as number) + MATCH_SUMMARY_BUTTON_HEIGHT;

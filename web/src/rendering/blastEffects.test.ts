@@ -58,7 +58,7 @@ describe('drawGrowingBeam', () => {
 
     const cfg = tweenConfig();
     expect(cfg.targets.len).toBe(0);
-    expect(cfg.len).toBe(3 * TILE_SIZE); // 96px
+    expect(cfg.len).toBe(3 * TILE_SIZE);
     expect(cfg.duration).toBe(360);
   });
 
@@ -72,7 +72,7 @@ describe('drawGrowingBeam', () => {
     ) as unknown as ReturnType<typeof mockScene.add.graphics>;
     const cfg = tweenConfig();
 
-    cfg.targets.len = TILE_SIZE; // exactly the first third of 3*TILE_SIZE
+    cfg.targets.len = TILE_SIZE;
     cfg.onUpdate();
 
     expect(g.clear).toHaveBeenCalledTimes(1);
@@ -140,7 +140,7 @@ describe('drawGrowingBeam', () => {
     ) as unknown as ReturnType<typeof mockScene.add.graphics>;
     const cfg = tweenConfig();
 
-    cfg.targets.len = 10; // shorter than BLAST_BEAM_WIDTH (21), so radius must clamp to 10/2=5
+    cfg.targets.len = 10;
     cfg.onUpdate();
 
     expect(g.fillRoundedRect).toHaveBeenCalledExactlyOnceWith(

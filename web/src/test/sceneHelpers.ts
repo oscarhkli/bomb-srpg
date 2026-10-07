@@ -32,8 +32,7 @@ export function allGraphics(): ReturnType<typeof mockScene.add.graphics>[] {
   );
 }
 
-// Last `n` Graphics instances created so far, in creation order — e.g. the 3 buttons a just-opened
-// TurnCommandPanel drew (Move/Bomb/Back), or the 1 overlay tile just rendered.
+// Last `n` Graphics instances created so far, in creation order.
 export function lastGraphics(n: number): ReturnType<typeof mockScene.add.graphics>[] {
   return allGraphics().slice(-n);
 }
@@ -76,8 +75,7 @@ export function fireTextPointerEvent(
   (call[1] as () => void)();
 }
 
-// Accepts any mock with an `on` spy — Graphics, Sprite, Container, etc. all register listeners
-// the same way.
+// Accepts any mock with an `on` spy.
 export function pointerDownOf(g: { on: { mock: { calls: unknown[][] } } }): () => void {
   return g.on.mock.calls.find(call => call[0] === 'pointerdown')?.[1] as () => void;
 }
@@ -108,8 +106,7 @@ export function allContainers(): ReturnType<typeof mockScene.add.container>[] {
   );
 }
 
-// Last `n` Container instances created so far, in creation order — mirrors lastGraphics(n) for
-// the SpriteButton-backed TurnCommandPanel/ConfirmDialog buttons.
+// Last `n` Container instances created so far, in creation order.
 export function lastContainers(n: number): ReturnType<typeof mockScene.add.container>[] {
   return allContainers().slice(-n);
 }

@@ -30,7 +30,6 @@ describe('occupantsMatch', () => {
       units: [{ id: 1, hp: 1 } as never, { id: 2, hp: 0 } as never],
     });
 
-    // Only the live unit (id 1) has a graphics entry — the dead unit must not count.
     expect(
       occupantsMatch(fresh, new Map([[1, createMockGraphics() as never]]), new Map(), new Map())
     ).toBe(true);
@@ -46,8 +45,6 @@ describe('occupantsMatch', () => {
   });
 
   it('is false when the graphics map holds an occupant that truth no longer has', () => {
-    // Truth says no occupants exist, but a stale graphics entry lingers — the exact apply-code
-    // bug this oracle exists to catch.
     expect(
       occupantsMatch(state(), new Map([[1, createMockGraphics() as never]]), new Map(), new Map())
     ).toBe(false);

@@ -114,8 +114,6 @@ export default class StagePage implements SettingsPage {
     destroyAll(this.navObjects);
   }
 
-  // ---- StagesPanel ----
-
   private renderStagesPanel(): void {
     const scene = this.scene;
     const bounds = this.bodyBounds;
@@ -180,8 +178,6 @@ export default class StagePage implements SettingsPage {
     });
   }
 
-  // ---- StageDetailPanel / InnerPanel ----
-
   private innerPanelBounds(bounds: PageBounds): PageBounds {
     const panelX = bounds.x + bounds.width * STAGES_PANEL_WIDTH_RATIO;
     const panelWidth = bounds.width * STAGE_DETAIL_PANEL_WIDTH_RATIO;
@@ -195,7 +191,6 @@ export default class StagePage implements SettingsPage {
     };
   }
 
-  // Adds a detailPanelObjects Text at the shared 24px/white base style, with per-call overrides.
   private addDetailText(
     scene: Phaser.Scene,
     x: number,
@@ -320,8 +315,6 @@ export default class StagePage implements SettingsPage {
     this.gameCfg.maxTurns = this.currentMaxTurns;
     this.renderStageDetailPanel();
   }
-
-  // ---- NavRegion ----
 
   private renderStartMatchButton(): void {
     const scene = this.scene;

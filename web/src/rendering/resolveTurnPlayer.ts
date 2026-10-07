@@ -118,7 +118,6 @@ function validate(events: GameEvent[], snapshot: GameState): string | null {
         break;
       }
       case 'matchEnded':
-        // MatchScene handles this one, not us.
         break;
       default:
         if (import.meta.env.DEV) {
@@ -230,8 +229,6 @@ export function playResolveTurnEvents(
     deps.scene.time.delayedCall(offset, () => {
       const bg = deps.bombGraphicsById.get(bombId);
       if (!bg) {
-        // Tolerated: a bombId with no live graphics (e.g. a bug upstream) still renders the
-        // explosion at the event's own position — there's nothing to clean up for it locally.
         console.warn(`bombExploded event references a bomb with no live graphics: ${bombId}`);
       }
       bg?.container.destroy();

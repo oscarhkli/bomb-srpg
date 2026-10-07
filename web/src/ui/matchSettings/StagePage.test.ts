@@ -92,7 +92,6 @@ describe('StagePage — StagesPanel', () => {
     const p = page(cfg);
     p.renderBody(mockScene as never, bodyBounds());
 
-    // StageCard 0 = Plain (unselected: thin border), StageCard 1 = Divided (selected: thick border).
     const [plainCardGraphics, dividedCardGraphics] = allGraphics();
 
     expect(lineWidth(dividedCardGraphics!)).toBeGreaterThan(lineWidth(plainCardGraphics!));
@@ -119,8 +118,6 @@ describe('StagePage — StagesPanel', () => {
     expect(cfg.stagePreset).toBe('Divided');
     expect(cfg.maxTurns).toBe(30);
 
-    // renderBody() renders [cardG(Plain), cardG(Divided), leftArrowG, rightArrowG] (4 graphics);
-    // the click re-renders both StagesPanel + StageDetailPanel, appending 4 more.
     const [, , , , plainCardGraphics2, dividedCardGraphics2] = allGraphics();
     expect(lineWidth(dividedCardGraphics2!)).toBeGreaterThan(lineWidth(plainCardGraphics2!));
   });
@@ -130,8 +127,6 @@ describe('StagePage — StagesPanel', () => {
     const bounds = bodyBounds();
     p.renderBody(mockScene as never, bounds);
 
-    // 2 cards x 80px + 1 gap x 6px = 166px row width, centered within (bounds.width*0.6 - 12)px
-    // of content (6px padding each side of the StagesPanel's 60%-width half).
     const panelWidth = bounds.width * 0.6;
     const contentX = bounds.x + 6;
     const contentWidth = panelWidth - 12;
@@ -170,8 +165,6 @@ describe('StagePage — StageDetailPanel', () => {
     const bounds = bodyBounds();
     p.renderBody(mockScene as never, bounds);
 
-    // StageDetailPanel is the remaining 40% of the body; InnerPanel is 80% of that, centered;
-    // content-x is InnerPanel's center (padding is symmetric, so it doesn't shift the center).
     const detailPanelX = bounds.x + bounds.width * 0.6;
     const detailPanelWidth = bounds.width * 0.4;
     const innerWidth = detailPanelWidth * 0.8;
@@ -210,7 +203,6 @@ describe('StagePage — MaxTurnsSelector', () => {
     const p = page(cfg);
     p.renderBody(mockScene as never, bodyBounds());
 
-    // Plain's recommended maxTurns is 60, not gameCfg.maxTurns's 15.
     expect(mockScene.add.text).toHaveBeenCalledWith(
       expect.any(Number),
       expect.any(Number),
@@ -232,11 +224,9 @@ describe('StagePage — MaxTurnsSelector', () => {
     const p = page(cfg);
     p.renderBody(mockScene as never, bodyBounds());
 
-    // Graphics order: [cardG(Plain), cardG(Divided), leftArrowG, rightArrowG].
     const rightArrowGraphics = allGraphics()[3]!;
     clickPointerdown(rightArrowGraphics);
 
-    // Plain's maxTurns=60 cycles forward (wraps) to 💣 (0).
     expect(cfg.maxTurns).toBe(0);
     expect(mockScene.add.text).toHaveBeenCalledWith(
       expect.any(Number),
@@ -254,7 +244,6 @@ describe('StagePage — MaxTurnsSelector', () => {
     const leftArrowGraphics = allGraphics()[2]!;
     clickPointerdown(leftArrowGraphics);
 
-    // Plain's maxTurns=60 cycles backward to 45.
     expect(cfg.maxTurns).toBe(45);
   });
 
@@ -274,7 +263,7 @@ describe('StagePage — MaxTurnsSelector', () => {
     const p = page(cfg);
     p.renderBody(mockScene as never, bodyBounds());
 
-    clickPointerdown(allGraphics()[2]!); // left arrow -> 45
+    clickPointerdown(allGraphics()[2]!);
     expect(cfg.maxTurns).toBe(45);
 
     // Re-select Plain (StagesPanel wasn't re-rendered by the arrow click, so index 0 still
