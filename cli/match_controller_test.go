@@ -314,7 +314,6 @@ func TestMatchController_GameplayActions(t *testing.T) {
 	}
 }
 
-// newTestMatch generates a clean slate grid environment
 func newTestMatch(width, height int) *engine.Match {
 	grid := make([][]engine.Tile, height)
 	for y, row := range grid {

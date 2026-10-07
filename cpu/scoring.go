@@ -6,11 +6,10 @@ import (
 )
 
 const (
-	maxForecastTurn = 5 // Max number of turns to forcast the damage area for the future bomb.
+	maxForecastTurn = 5
 )
 
 // scoreContext identifies the units a candidate's forecast scores against.
-// Its fields are fixed for the duration of one evaluate call.
 type scoreContext struct {
 	actorID        engine.UnitID
 	allyIDs        []engine.UnitID
@@ -22,24 +21,23 @@ type scoreContext struct {
 
 // turnResult holds one simulated turn's outcome, rebuilt fresh each forecast iteration.
 type turnResult struct {
-	turn                  int                            // the nth next turn, not the exact turn number
-	affectedTiles         map[engine.Coordinate]struct{} // this turn's AffectedPositions overall
-	allyAffectedTiles     map[engine.Coordinate]struct{} // this turn's AffectedPositions from an ally-owned bomb
-	opponentAffectedTiles map[engine.Coordinate]struct{} // this turn's AffectedPositions from an opponent-owned bomb
-	destroyedSoftBlocks   int                            // this turn's softBlockDestroyed count
-	diedUnits             map[engine.UnitID]struct{}     // this turn's dead units
-	suicides              map[engine.UnitID]struct{}     // this turn's dead allies killed by an ally-owned bomb
-	distToKingBefore      int                            // unit's reachability to opponent King, before this turn resolved
-	distToKingAfter       int                            // unit's reachability to opponent King, after this turn resolved
-	aliveOpponentsBefore  int                            // opponent non-King units alive, before this turn resolved
-	aliveOpponentsAfter   int                            // opponent non-King units alive, after this turn resolved
-	aliveAlliesBefore     int                            // ally non-King units alive, before this turn resolved
-	aliveAlliesAfter      int                            // ally non-King units alive, after this turn resolved
+	turn                  int // the nth next turn, not the exact turn number
+	affectedTiles         map[engine.Coordinate]struct{}
+	allyAffectedTiles     map[engine.Coordinate]struct{}
+	opponentAffectedTiles map[engine.Coordinate]struct{}
+	destroyedSoftBlocks   int                        // this turn's softBlockDestroyed count
+	diedUnits             map[engine.UnitID]struct{} // this turn's dead units
+	suicides              map[engine.UnitID]struct{} // this turn's dead allies killed by an ally-owned bomb
+	distToKingBefore      int                        // unit's reachability to opponent King, before this turn resolved
+	distToKingAfter       int                        // unit's reachability to opponent King, after this turn resolved
+	aliveOpponentsBefore  int                        // opponent non-King units alive, before this turn resolved
+	aliveOpponentsAfter   int                        // opponent non-King units alive, after this turn resolved
+	aliveAlliesBefore     int                        // ally non-King units alive, before this turn resolved
+	aliveAlliesAfter      int                        // ally non-King units alive, after this turn resolved
 }
 
 type scoreFactor func(gs *engine.GameState, sc scoreContext, tr turnResult) int
 
-// aliveCount returns how many of ids are alive in gs, excluding King.
 func aliveCount(gs *engine.GameState, ids []engine.UnitID, kingID engine.UnitID) int {
 	count := 0
 	for _, id := range ids {
@@ -54,7 +52,6 @@ func aliveCount(gs *engine.GameState, ids []engine.UnitID, kingID engine.UnitID)
 }
 
 // evaluate forecasts the consequence if the Unit take certain actions.
-// Returns candidate with score and tags
 func evaluate(sc scoreContext, gs *engine.GameState, cmds []engine.TurnCommand) (candidate, error) {
 	scratch := gs.DeepCopy()
 	if err := applyCandidate(scratch, candidate{turnCommands: cmds}); err != nil {

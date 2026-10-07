@@ -31,11 +31,8 @@ func (m *Match) Surrender(teamID int) []GameEvent {
 		m.WinnerTeamID = 1
 	}
 
-	// discard all the logs in rollback mode
-	// as opponent doesn't need to know what steps were taken lead to surrender
 	m.PlaybackLog = nil
 
-	// broadcast it
 	return []GameEvent{
 		NewMatchEndedEvent(m.WinnerTeamID),
 	}
@@ -136,7 +133,6 @@ func (gs *GameState) PlaceBomb(unitID UnitID, target Coordinate) (GameEvent, err
 	bombPower := BombDefaultPower
 	var unit *Unit
 
-	// identify the unit and check the availability for real Units only
 	if unitID != SystemUnitID {
 		var err error
 		unit, err = gs.validateActiveUnit(unitID)
@@ -185,7 +181,6 @@ func (gs *GameState) PlaceBomb(unitID UnitID, target Coordinate) (GameEvent, err
 }
 
 // IsLandingLegal checks if the target is legal to be landed by a certain occupantType.
-// In Phase 1 it's used by placing Bomb only, but in future it will be used for skills like jump.
 func (gs *GameState) IsLandingLegal(target Coordinate, occupantType OccupantType) error {
 	if !gs.IsWithinBounds(target) {
 		return fmt.Errorf("%w: coordinate %v out of bounds", ErrOutOfBounds, target)
@@ -193,12 +188,10 @@ func (gs *GameState) IsLandingLegal(target Coordinate, occupantType OccupantType
 
 	tile := gs.Grid[target.Y][target.X]
 
-	// Phase 1 only on TerrainPlain. In futur phase it should support TerrainLava as well
 	if tile.Type != TerrainPlain {
 		return fmt.Errorf("%w: can only place on plain terrain, got %v", ErrInvalidLanding, tile.Type)
 	}
 
-	// Cell Occupant Collisions
 	if tile.OccupantType != OccupantNone {
 		return fmt.Errorf("%w: cell occupied by %v", ErrCellOccupied, tile.OccupantType)
 	}
@@ -211,7 +204,7 @@ func (gs *GameState) IsLandingLegal(target Coordinate, occupantType OccupantType
 func (m *Match) StartTurn() []GameEvent {
 	winner := m.evaluateVictoryConditions()
 	if winner != MatchInProgress {
-		return []GameEvent{} // Match has reached a conclusion; abort round initialization
+		return []GameEvent{}
 	}
 
 	if m.TrueState.Turn <= m.GameCfg.MaxTurns {
@@ -223,7 +216,6 @@ func (m *Match) StartTurn() []GameEvent {
 	m.injectSuddenDeathHazards()
 	m.TrueState = m.WorkingState.DeepCopy()
 
-	// Flush animation log arrays from the sandbox replay history buffer to the caller
 	gameEvents := make([]GameEvent, len(m.PlaybackLog))
 	copy(gameEvents, m.PlaybackLog)
 	m.PlaybackLog = nil
@@ -289,7 +281,6 @@ func (m *Match) ResolveTurn() (planGameEvents, resolveTurnGameEvents []GameEvent
 			m.WorkingState.Turn++
 			m.WorkingState.ActiveTeam = ((m.WorkingState.Turn - 1) & 1) + 1
 		} else {
-			// Concluded with win/draw
 			m.WinnerTeamID = winner
 			m.PlaybackLog = append(m.PlaybackLog, NewMatchEndedEvent(winner))
 		}
@@ -297,7 +288,6 @@ func (m *Match) ResolveTurn() (planGameEvents, resolveTurnGameEvents []GameEvent
 
 	m.TrueState = m.WorkingState.DeepCopy()
 
-	// Flush animation log arrays from the sandbox replay history buffer to the caller
 	resolveTurnGameEvents = make([]GameEvent, len(m.PlaybackLog))
 	copy(resolveTurnGameEvents, m.PlaybackLog)
 	m.PlaybackLog = nil
@@ -305,7 +295,6 @@ func (m *Match) ResolveTurn() (planGameEvents, resolveTurnGameEvents []GameEvent
 	return planGameEvents, resolveTurnGameEvents
 }
 
-// resolveBombExplosionAndDamage wraps WorkingState's ResolveBombExplosionAndDamage and fire related GameEvents obtained.
 func (m *Match) resolveBombExplosionAndDamage() {
 	m.PlaybackLog = append(m.PlaybackLog, m.WorkingState.ResolveBombExplosionAndDamage()...)
 }
@@ -323,7 +312,6 @@ func (gs *GameState) ResolveBombExplosionAndDamage() []GameEvent {
 
 	frozenGrid := gs.cloneGridSnapshot()
 
-	// Setup delayed batch damange handling
 	damagedUnits := make(map[UnitID]bool)
 	destroyedSoftBlocks := make(map[int]bool)
 	destroyedItems := make(map[int]bool)
@@ -343,7 +331,7 @@ func (gs *GameState) tickCountdownsAndQueueFuses() ([]BombID, map[BombID]bool, [
 	var gameEvents []GameEvent
 	for id, bomb := range gs.Bombs {
 		if bomb.Countdown < 0 {
-			continue // Skip non-countdown bombs
+			continue
 		}
 
 		bomb.Countdown--
@@ -394,7 +382,6 @@ func (gs *GameState) processChainDetonations(
 			tile := &gs.Grid[pos.Y][pos.X]
 			switch tile.OccupantType {
 			case OccupantBomb:
-				// chain reaction
 				nextBombID := BombID(tile.OccupantID)
 				if ignitedBombs[nextBombID] {
 					continue
@@ -436,12 +423,11 @@ func (gs *GameState) cloneGridSnapshot() [][]Tile {
 	return frozenGrid
 }
 
-// handleDelayedBatchDamage handles delayed batch damange after all ignited bombs detonated.
+// handleDelayedBatchDamage handles delayed batch damage after all ignited bombs detonated.
 // Returns GameEvents related to damaging.
 func (gs *GameState) handleDelayedBatchDamage(
 	damagedUnits map[UnitID]bool,
 	destroyedSoftBlocks map[int]bool,
-	// destroyedItems map[int]bool,
 ) []GameEvent {
 	var gameEvents []GameEvent
 	for unitID := range damagedUnits {
@@ -512,33 +498,26 @@ func (m *Match) evaluateVictoryConditions() int {
 		}
 	}
 
-	// Standard goals
 	p1Goal := (p1HasBoss && p1BossAlive) || (p1KingAlive && p1OrdinaryAlive)
 	p2Goal := (p2HasBoss && p2BossAlive) || (p2KingAlive && p2OrdinaryAlive)
 
-	// Opponent fully defeated conditions
 	p1Wiped := (p1HasBoss && !p1BossAlive) || (!p1HasBoss && !p1KingAlive && !p1OrdinaryAlive)
 	p2Wiped := (p2HasBoss && !p2BossAlive) || (!p2HasBoss && !p2KingAlive && !p2OrdinaryAlive)
 
-	// 1. Both teams are still strong -> The fight continues
 	if p1Goal && p2Goal {
 		return MatchInProgress
 	}
 
-	// 2. P1 wins if they meet their goal, OR if they have a King and P2 is wiped
 	if p1Goal || (p1KingAlive && p2Wiped) {
-		// Double check mutual wipe out edge case
 		if p2Goal || (p2KingAlive && p1Wiped) {
 			return MatchDrawn
 		}
 		return 1
 	}
 
-	// 3. P2 wins if they meet their goal, OR if they have a King and P1 is wiped
 	if p2Goal || (p2KingAlive && p1Wiped) {
 		return 2
 	}
 
-	// 4. Anything else is a Draw
 	return MatchDrawn
 }

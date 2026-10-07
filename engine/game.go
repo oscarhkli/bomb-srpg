@@ -171,14 +171,14 @@ func createUnits(
 	gameCfg GameCfg,
 ) error {
 	for i, ts := range teams {
-		if ts.Archetype == NoUnit { // allowing non-full team in a specific location
+		if ts.Archetype == NoUnit {
 			continue
 		}
 		archetype, exists := GetArchetype(ts.Archetype)
 		if !exists {
 			return fmt.Errorf("%w: archetype '%s' for Player %d not found", ErrUnknownArchetype, ts.Archetype, teamID)
 		}
-		id := NewUnitID(teamID, i) // Player 1 units have IDs starting from 8, Player 2 units have IDs starting from 16
+		id := NewUnitID(teamID, i)
 		units[id] = &Unit{
 			ID:           id,
 			Type:         archetype,
@@ -248,7 +248,7 @@ func (gs *GameState) DeepCopy() *GameState {
 			}
 			clone.Units[id] = &Unit{
 				ID:           unit.ID,
-				Type:         unit.Type, // Archetype is immutable, can share reference
+				Type:         unit.Type,
 				Position:     unit.Position,
 				Speed:        unit.Speed,
 				BombMaxRange: unit.BombMaxRange,

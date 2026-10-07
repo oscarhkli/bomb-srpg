@@ -93,7 +93,6 @@ type CatalogResponse struct {
 }
 
 // HandleGetCatalog returns all available unit archetypes and stages for the client to display in the lobby.
-// It encodes the archetype and stagePreset definitions as JSON and writes them to the response.
 func (h *Handler) HandleGetCatalog(w http.ResponseWriter, r *http.Request) {
 	archetypes := engine.GetAllArchetypes()
 	stagePresets := engine.GetAllStagePresets()
@@ -206,7 +205,6 @@ func (h *Handler) HandleDeleteMatch(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetMatchState gets the WorkingState of the Match in a given MatchRoom.
-// It encodes the gameState as JSON and writes them to the response.
 func (h *Handler) HandleGetMatchState(w http.ResponseWriter, r *http.Request) {
 	roomID := r.PathValue("roomID")
 
@@ -220,7 +218,6 @@ func (h *Handler) HandleGetMatchState(w http.ResponseWriter, r *http.Request) {
 }
 
 // HandleSubmitTurnCommand delivers TurnCommand to engine to move a Unit or place a bomb in a given MatchRoom.
-// It encodes the gameEvents as JSON and writes them to the response.
 func (h *Handler) HandleSubmitTurnCommand(w http.ResponseWriter, r *http.Request) {
 	roomID := r.PathValue("roomID")
 
@@ -252,7 +249,6 @@ type StartTurnResponse struct {
 }
 
 // HandleStartTurn sends StartTurn signal engine to start a new turn in a given MatchRoom.
-// It encodes the gameEvents as JSON and writes them to the response.
 func (h *Handler) HandleStartTurn(w http.ResponseWriter, r *http.Request) {
 	roomID := r.PathValue("roomID")
 
@@ -281,7 +277,6 @@ type CPUStatusResponse struct {
 }
 
 // HandleConsumeCPUStatus consumes current CPU Turn States in given MatchRoom and reset the state if CPU TurnPhase is in Ready - planning is done.
-// It encodes the cpuTurnPhase, gameEvents as JSON and writes them to the response.
 func (h *Handler) HandleConsumeCPUStatus(w http.ResponseWriter, r *http.Request) {
 	roomID := r.PathValue("roomID")
 
@@ -302,7 +297,6 @@ func (h *Handler) HandleConsumeCPUStatus(w http.ResponseWriter, r *http.Request)
 }
 
 // HandleResetTurn sends ResetTurn signal to engine to drop the current WorkingState and reset to TrueState in a given MatchRoom.
-// It writes HTTP 204 with no content to the response.
 func (h *Handler) HandleResetTurn(w http.ResponseWriter, r *http.Request) {
 	roomID := r.PathValue("roomID")
 
@@ -327,7 +321,6 @@ type ResolveTurnResponse struct {
 }
 
 // HandleResolveTurn sends ResolveTurn signal to engine to calculate the impacts of the Player's action in a given MatchRoom.
-// It encodes the ResolveTurnStatusResponse as JSON and writes them to the response.
 func (h *Handler) HandleResolveTurn(w http.ResponseWriter, r *http.Request) {
 	roomID := r.PathValue("roomID")
 
@@ -352,8 +345,7 @@ type SurrenderRequest struct {
 	TeamID int `json:"teamId"`
 }
 
-// HandleSurrender sends Surrender signal to engine to egnd the current Match in a given MatchRoom.
-// It encodes the gameEvents as JSON and writes them to the response.
+// HandleSurrender sends Surrender signal to engine to end the current Match in a given MatchRoom.
 func (h *Handler) HandleSurrender(w http.ResponseWriter, r *http.Request) {
 	roomID := r.PathValue("roomID")
 
@@ -390,7 +382,7 @@ func (h *Handler) HandleGetMatchConfig(w http.ResponseWriter, r *http.Request) {
 	h.writeJSON(w, http.StatusOK, gameCfg, "encode gameConfig failed")
 }
 
-// HandlesGetAllowedTiles gets the hints for Player to identify which tiles are available according to the TurnCmdAction
+// HandleGetAllowedTiles gets the hints for Player to identify which tiles are available according to the TurnCmdAction
 func (h *Handler) HandleGetAllowedTiles(w http.ResponseWriter, r *http.Request) {
 	roomID := r.PathValue("roomID")
 	unitIDStr := r.URL.Query().Get("unitId")

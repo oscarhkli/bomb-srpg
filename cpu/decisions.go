@@ -12,9 +12,9 @@ const (
 
 // candidate represents a possible action a Unit can take and what it scores.
 type candidate struct {
-	turnCommands []engine.TurnCommand // Multiple TurnCommands can be done in each Turn.
-	score        int                  // The higher the better.
-	tag          string               // Debug/log label.
+	turnCommands []engine.TurnCommand
+	score        int    // The higher the better.
+	tag          string // Debug/log label.
 }
 
 // priority breaks a score tie: move+bomb is worse than other action.

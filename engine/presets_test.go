@@ -169,7 +169,6 @@ func TestStagePresets(t *testing.T) {
 				t.Errorf("Height for %s should be minimum 5, got %d", s.Name, stagePreset.Height)
 			}
 
-			// Check if layout grid dimensions match width and height
 			if len(stagePreset.LayoutGrid) != stagePreset.Height {
 				t.Errorf("LayoutGrid row count for %s should match Height, got %d rows, expected %d", s.Name, len(stagePreset.LayoutGrid), stagePreset.Height)
 			} else {
@@ -180,7 +179,6 @@ func TestStagePresets(t *testing.T) {
 				}
 			}
 
-			// Check if all SoftBlocks are in terrainPlain (.) positions
 			for _, softBlock := range stagePreset.SoftBlocks {
 				if softBlock.X < 0 || softBlock.X >= stagePreset.Width || softBlock.Y < 0 || softBlock.Y >= stagePreset.Height {
 					t.Errorf("SoftBlock at (%d, %d) for %s is out of bounds", softBlock.X, softBlock.Y, s.Name)
@@ -188,7 +186,6 @@ func TestStagePresets(t *testing.T) {
 					t.Errorf("SoftBlock at (%d, %d) for %s should be on a plain terrain (.), but found '%c'", softBlock.X, softBlock.Y, s.Name, stagePreset.LayoutGrid[softBlock.Y][softBlock.X])
 				}
 			}
-			// Check if all SoftBlocks are not overlapping with each other
 			softBlockPositions := make(map[Coordinate]bool)
 			for _, softBlock := range stagePreset.SoftBlocks {
 				pos := Coordinate{softBlock.X, softBlock.Y}
@@ -198,7 +195,6 @@ func TestStagePresets(t *testing.T) {
 				softBlockPositions[pos] = true
 			}
 
-			// Check if starting positions for P1 and P2 are on plain terrain (.)
 			for i, pos := range stagePreset.P1StartingPositions {
 				if pos.X < 0 || pos.X >= stagePreset.Width || pos.Y < 0 || pos.Y >= stagePreset.Height {
 					t.Errorf("P1 Starting Position %d at (%d, %d) for %s is out of bounds", i, pos.X, pos.Y, s.Name)
@@ -217,7 +213,6 @@ func TestStagePresets(t *testing.T) {
 	}
 }
 
-// Stage sanity checks on whether all characters' starting positions can reach the opponent's starting position by walking
 func TestStagePrests_Sanity(t *testing.T) {
 	rule := MovementRule{
 		MaxSteps:        -1,
@@ -230,8 +225,8 @@ func TestStagePrests_Sanity(t *testing.T) {
 		t.Run(s.Name, func(t *testing.T) {
 			gs, err := initGameState(GameCfg{
 				StagePreset: s.Name,
-				P1Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}}, // we don't care this value in this test, as long as it can create a GameState
-				P2Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}}, // same as above
+				P1Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
+				P2Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
 			})
 
 			if err != nil {

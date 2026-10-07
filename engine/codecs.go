@@ -5,21 +5,19 @@ const (
 	// mapped explicitly to Team 0, Player 0 for sudden-death bomb drops.
 	SystemUnitID UnitID = 0
 
-	// UnitID Configuration
 	UnitLocalShift = 0
 	UnitTeamShift  = 4
 
-	UnitLocalMask uint8 = 0x0F // Isolates the 4 bits for local unit index
-	UnitTeamMask  uint8 = 0x0F // Isolates the 4 bits for team after shifting
+	UnitLocalMask uint8 = 0x0F
+	UnitTeamMask  uint8 = 0x0F
 
-	// BombID Configuration
 	BombCounterShift = 0
 	BombTurnShift    = 16
 	BombUnitIDShift  = 24
 
-	BombCounterMask uint32 = 0xFFFF // Isolates the 16 bits for counter
-	BombTurnMask    uint32 = 0xFF   // Isolates the 8 bits for turn after shifting
-	BombUnitIDMask  uint32 = 0xFF   // Isolates the 8 bits for unit ID after shifting
+	BombCounterMask uint32 = 0xFFFF
+	BombTurnMask    uint32 = 0xFF
+	BombUnitIDMask  uint32 = 0xFF
 )
 
 // NewUnitID constructs a UnitID from team and player index using (TeamID << 4) | Index.

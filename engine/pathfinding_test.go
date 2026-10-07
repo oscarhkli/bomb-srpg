@@ -168,7 +168,7 @@ func TestGameState_FindReachableTiles_OccupiedTiles(t *testing.T) {
 			},
 		},
 		{
-			name: "can pass units, stops on non-unit occupant", // like bomb blast movement
+			name: "can pass units, stops on non-unit occupant",
 			rule: MovementRule{
 				MaxSteps:              -1,
 				Pattern:               PatternCardinal,
@@ -230,13 +230,11 @@ func TestGameState_FindReachableTiles_OccupiedTiles(t *testing.T) {
 	}
 }
 
-// diffMaps compares two coordinate maps and cleanly isolates the discrepancies.
 func diffMaps(expected, got map[Coordinate]int) (extra, missing map[Coordinate]int, mismatched map[Coordinate][2]int) {
 	extra = make(map[Coordinate]int)
 	missing = make(map[Coordinate]int)
 	mismatched = make(map[Coordinate][2]int)
 
-	// Find missing tiles and mismatched values
 	for coord, expStep := range expected {
 		gotStep, exists := got[coord]
 		if !exists {
@@ -248,7 +246,6 @@ func diffMaps(expected, got map[Coordinate]int) (extra, missing map[Coordinate]i
 		}
 	}
 
-	// Find extra tiles
 	for coord, gotStep := range got {
 		if _, exists := expected[coord]; !exists {
 			extra[coord] = gotStep
@@ -335,12 +332,10 @@ func TestUnit_NewMovementRule_BasicWalking(t *testing.T) {
 		t.Error("Expected StopOnNonUnitOccupant to be false for character pedestrian walking")
 	}
 
-	// Verify that the correct permission bit flag is flipped ON
 	if mr.PassPermissions&PassItems == 0 {
 		t.Error("Security flaw: Baseline movement rule is missing the PassItems permission gate!")
 	}
 
-	// Verify that all other barriers are locked DOWN (default-fail)
 	forbiddenFlags := PassUnits | PassSoftBlocks | PassHardBlocks | PassBombs
 	if mr.PassPermissions&forbiddenFlags != 0 {
 		t.Errorf("Boundary leak: Baseline walking rule was granted unauthorized privileges (Bitmask: %b)",
@@ -363,13 +358,11 @@ func TestUnit_NewBombPlacementRule(t *testing.T) {
 
 	requiredFlags := PassUnits | PassSoftBlocks | PassHardBlocks | PassItems | PassBombs
 
-	// Verify that the placement rule permits passing through all required objects
 	if br.PassPermissions&requiredFlags != requiredFlags {
 		t.Errorf("Security flaw: Bomb placement rule is missing required pass permissions. Expected mask %b, got %b",
 			requiredFlags, br.PassPermissions)
 	}
 
-	// Verify that no undefined/unauthorized high bits are set outside our expected flags
 	if br.PassPermissions&^requiredFlags != 0 {
 		t.Errorf("Boundary leak: Bomb placement rule was granted unauthorized privileges (Bitmask: %b)",
 			br.PassPermissions)

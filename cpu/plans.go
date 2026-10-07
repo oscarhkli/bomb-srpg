@@ -8,12 +8,11 @@ import (
 )
 
 // plansFor gathers all the possible actions, currently they should cover idle/move/bomb/move+bomb/bomb+move.
-// Returns all possible plans (slice of slice of TurnCommand) a Unit can take.
 func plansFor(unit *engine.Unit, gs *engine.GameState) [][]engine.TurnCommand {
 	movePlans := movePlansFor(unit, gs)
 	placeBombPlans := placeBombPlansFor(unit, gs)
 
-	plans := [][]engine.TurnCommand{{}} // Idle is an option
+	plans := [][]engine.TurnCommand{{}}
 	plans = append(plans, movePlans...)
 	plans = append(plans, placeBombPlans...)
 	plans = append(plans, combinePlans(unit, gs, movePlans, placeBombPlansFor)...)
@@ -23,7 +22,6 @@ func plansFor(unit *engine.Unit, gs *engine.GameState) [][]engine.TurnCommand {
 }
 
 // combinePlans pairs each of firstPlans with every plan second produces once firstPlans has been applied.
-// Return all possible plans under the specific combinations.
 func combinePlans(
 	unit *engine.Unit,
 	gs *engine.GameState,

@@ -54,11 +54,11 @@ type Coordinate struct {
 type OccupantType int
 
 const (
-	OccupantNone      OccupantType = iota // Empty tile
-	OccupantUnit                          // Player unit
-	OccupantBomb                          // Active bomb
-	OccupantSoftBlock                     // Destructible block
-	OccupantItem                          // Item pickup (hidden in soft block)
+	OccupantNone OccupantType = iota
+	OccupantUnit
+	OccupantBomb
+	OccupantSoftBlock
+	OccupantItem
 )
 
 // String converts an OccupantType integer value into a human-readable text string.
@@ -88,7 +88,7 @@ func (o OccupantType) MarshalJSON() ([]byte, error) {
 type Tile struct {
 	Type         TerrainType  `json:"type"`
 	OccupantType OccupantType `json:"occupantType"`
-	OccupantID   int64        `json:"occupantId"` // Cross-reference ID for the occupant (UnitID, BombID, or SoftBlockID)
+	OccupantID   int64        `json:"occupantId"`
 }
 
 // SoftBlock represents a destructible block that may hide an item.
@@ -232,8 +232,8 @@ type Unit struct {
 	BombPower    int
 	MaxBombCount int
 	BombUsed     int
-	Team         int // 1 = P1, 2 = P2 / COM
-	HP           int // 1 = alive, 0 = dead; extensible for multi-HP units
+	Team         int
+	HP           int
 	Skills       SkillType
 	Role         UnitRole
 	HasMoved     bool
@@ -282,7 +282,7 @@ func (u Unit) MarshalJSON() ([]byte, error) {
 // Bomb represents an active explosive on the board.
 type Bomb struct {
 	ID        BombID     `json:"id"`
-	OwnerID   UnitID     `json:"ownerId"` // Unit that placed this bomb
+	OwnerID   UnitID     `json:"ownerId"`
 	Position  Coordinate `json:"position"`
 	Range     int        `json:"range"`     // Explosion radius in tiles
 	Countdown int        `json:"countdown"` // Turns remaining until detonation; <0 for non-countdown bombs
@@ -296,28 +296,28 @@ type TeamSlot struct {
 
 // GameCfg holds all configuration for a match.
 type GameCfg struct {
-	VSCpu                       bool       `json:"vsCpu"`       // True = VS CPU Mode
-	StagePreset                 string     `json:"stagePreset"` // Stage preset name (e.g., "Plain")
+	VSCpu                       bool       `json:"vsCpu"` // True = VS CPU Mode
+	StagePreset                 string     `json:"stagePreset"`
 	P1Slots                     []TeamSlot `json:"p1Slots"`
 	P2Slots                     []TeamSlot `json:"p2Slots"`
-	MaxTurns                    int        `json:"maxTurns"`       // Turn limit; 0 = instant sudden death
-	AllowResetTurn              bool       `json:"allowResetTurn"` // True = players can undo actions before committing
-	GlobalSpeedOverride         int        `json:"-"`              // Test override for all unit speeds (0 = disabled)
-	GlobalBombCountdownOverride int        `json:"-"`              // Test override for bomb countdown (0 = disabled)
-	GlobalBombMaxRangeOverride  int        `json:"-"`              // Test override for bomb max range (0 = disabled)
+	MaxTurns                    int        `json:"maxTurns"` // Turn limit; 0 = instant sudden death
+	AllowResetTurn              bool       `json:"allowResetTurn"`
+	GlobalSpeedOverride         int        `json:"-"` // Test override for all unit speeds (0 = disabled)
+	GlobalBombCountdownOverride int        `json:"-"` // Test override for bomb countdown (0 = disabled)
+	GlobalBombMaxRangeOverride  int        `json:"-"` // Test override for bomb max range (0 = disabled)
 }
 
 // GameState is the complete snapshot of a match at a point in time.
 type GameState struct {
-	Turn            int                // Current turn number (starts at 1)
-	InSuddenDeath   bool               // Indicate if the current turn is in Sudden Death
-	ActiveTeam      int                // Team whose turn it is (1 or 2)
-	TurnBombCounter int                // Bombs placed this turn (for BombID generation)
-	Grid            [][]Tile           // Board matrix [Y][X]
-	Units           map[UnitID]*Unit   // All units by ID
-	Bombs           map[BombID]*Bomb   // Active bombs by ID
-	SoftBlocks      map[int]*SoftBlock // Soft blocks by ID
-	TurnCommands    []TurnCommand      // Pending commands for current turn
+	Turn            int              // Current turn number (starts at 1)
+	InSuddenDeath   bool             // Indicate if the current turn is in Sudden Death
+	ActiveTeam      int              // Team whose turn it is (1 or 2)
+	TurnBombCounter int              // Bombs placed this turn (for BombID generation)
+	Grid            [][]Tile         // Board matrix [Y][X]
+	Units           map[UnitID]*Unit // All units by ID
+	Bombs           map[BombID]*Bomb // Active bombs by ID
+	SoftBlocks      map[int]*SoftBlock
+	TurnCommands    []TurnCommand // Pending commands for current turn
 }
 
 // MarshalJSON serializes GameState struct to JSON that client needs
@@ -362,9 +362,9 @@ func (gs GameState) MarshalJSON() ([]byte, error) {
 type CPUTurnPhase int
 
 const (
-	TurnPhaseIdle     CPUTurnPhase = iota // CPU is idling, or no CPU involved at all
-	TurnPhasePlanning                     // CPU is planning
-	TurnPhaseReady                        // CPU has made the decision
+	TurnPhaseIdle CPUTurnPhase = iota // CPU is idling, or no CPU involved at all
+	TurnPhasePlanning
+	TurnPhaseReady
 )
 
 // String converts an CPUTurnPhase integer value into a human-readable text string.
@@ -396,9 +396,9 @@ type CPUState struct {
 // Match orchestrates a full game session: state, config, and event log.
 type Match struct {
 	GameCfg      GameCfg
-	TrueState    *GameState  // Committed state
-	WorkingState *GameState  // Sandbox for mid-turn planning
-	PlaybackLog  []GameEvent // Events since last ResolveTurn
+	TrueState    *GameState // Committed state
+	WorkingState *GameState // Sandbox for mid-turn planning
+	PlaybackLog  []GameEvent
 	CPU          CPUState
 	WinnerTeamID int // 0 = in progress, 1/2 = winner, -1 = draw
 }
@@ -412,25 +412,25 @@ const (
 type StepPattern int
 
 const (
-	PatternCardinal StepPattern = iota // 4-directional (up/down/left/right)
+	PatternCardinal StepPattern = iota
 )
 
 // PassFlag is a bitmask for pathfinding passability rules.
 type PassFlag uint8
 
 const (
-	PassUnits      PassFlag = 1 << iota // Can pass through other units
-	PassSoftBlocks                      // Can pass through soft blocks
-	PassHardBlocks                      // Can pass through hard blocks (TerrainBlock)
-	PassItems                           // Can pass through items
-	PassBombs                           // Can pass through bombs
+	PassUnits PassFlag = 1 << iota
+	PassSoftBlocks
+	PassHardBlocks
+	PassItems
+	PassBombs
 )
 
 // MovementRule configures pathfinding for a specific action (move, bomb placement, skill).
 type MovementRule struct {
 	MaxSteps              int // Max steps; -1 = unlimited
 	Pattern               StepPattern
-	CanTurn               bool     // True = can change direction mid-path
-	PassPermissions       PassFlag // Bitmask of passable obstacle types
-	StopOnNonUnitOccupant bool     // True = stop on first non-unit (bomb, block, item); False = stop before it
+	CanTurn               bool // True = can change direction mid-path
+	PassPermissions       PassFlag
+	StopOnNonUnitOccupant bool // True = stop on first non-unit (bomb, block, item); False = stop before it
 }

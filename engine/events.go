@@ -60,7 +60,7 @@ func NewBombPlacedEvent(unitID UnitID, bombID BombID, pos Coordinate, rangeVal, 
 	return GameEvent{Type: GameEvtBombPlaced, UnitID: unitID, BombID: bombID, Position: &pos, Range: rangeVal, Countdown: countdown}
 }
 
-// NewBombCountdownUpdatedEvent creats a bomb countdown updated event.
+// NewBombCountdownUpdatedEvent creates a bomb countdown updated event.
 func NewBombCountdownUpdatedEvent(bombID BombID, pos Coordinate, countdown int) GameEvent {
 	return GameEvent{Type: GameEvtBombCountdownUpdated, BombID: bombID, Position: &pos, Countdown: countdown}
 }

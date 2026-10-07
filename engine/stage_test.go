@@ -110,7 +110,6 @@ func TestGameState_ClearStageTile(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Arrange: Create a sterile 1x3 grid row for this test case run
 			state := &GameState{
 				Grid: [][]Tile{{
 					{Type: TerrainPlain, OccupantType: OccupantUnit, OccupantID: 123},
@@ -119,10 +118,8 @@ func TestGameState_ClearStageTile(t *testing.T) {
 				}},
 			}
 
-			// Act: Run the target operation
 			state.ClearStageTile(tt.clearPos)
 
-			// Assert: Dynamically inspect the precise coordinate vector specified by the test case row
 			cell := state.Grid[tt.verifyPos.Y][tt.verifyPos.X]
 
 			if cell.OccupantType != tt.expectedType {
@@ -163,7 +160,6 @@ func TestGameState_UpdateStageOccupant(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Arrange: Create a sterile 1x3 grid row for this test case run
 			state := &GameState{
 				Grid: [][]Tile{{
 					{Type: TerrainPlain, OccupantType: OccupantUnit, OccupantID: 123},
@@ -172,10 +168,8 @@ func TestGameState_UpdateStageOccupant(t *testing.T) {
 				}},
 			}
 
-			// Act: Run the target operation
 			state.UpdateStageOccupant(tt.updatePos, tt.expectedType, tt.expectedID)
 
-			// Assert: Dynamically inspect the precise coordinate vector specified by the test case row
 			cell := state.Grid[tt.verifyPos.Y][tt.verifyPos.X]
 
 			if cell.OccupantType != tt.expectedType {

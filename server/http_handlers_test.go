@@ -417,7 +417,6 @@ func TestHandleCreateNewMatch(t *testing.T) {
 			t.Error("Expected success=true in response, got false")
 		}
 
-		// Verify match was actually created in the server state manager
 		room := mustRoom(t, s, roomID)
 		if room.Match == nil {
 			t.Error("Match was not created in the server state manager")
@@ -501,7 +500,7 @@ func TestHandleCreateNewMatch(t *testing.T) {
 		}
 
 		gameCfg := engine.GameCfg{
-			StagePreset: "INVALID_STAGE", // Invalid stage ID
+			StagePreset: "INVALID_STAGE",
 			MaxTurns:    10,
 		}
 		jsonBody, _ := json.Marshal(CreateMatchRequest{GameCfg: gameCfg})
@@ -530,7 +529,6 @@ func TestHandleCreateNewMatch(t *testing.T) {
 			t.Fatalf("Failed to create room: %v", err)
 		}
 
-		// Malformed JSON body
 		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match", strings.NewReader("{invalid json"))
 		if err != nil {
 			t.Fatalf("Failed to create request: %v", err)
@@ -629,7 +627,6 @@ func TestHandleRematch(t *testing.T) {
 			t.Error("Expected success=true in response, got false")
 		}
 
-		// Verify match was actually recreated in the server state manager
 		room := mustRoom(t, s, roomID)
 		if room.Match == nil {
 			t.Error("Match was not created in the server state manager")
@@ -759,7 +756,7 @@ func TestHandleDeleteMatch(t *testing.T) {
 	t.Run("Success: deletes an existing concluded Match", func(t *testing.T) {
 		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
 		room := mustRoom(t, s, roomID)
-		room.Match.WinnerTeamID = 1 // conclude the match
+		room.Match.WinnerTeamID = 1
 
 		req, err := http.NewRequest("DELETE", "/api/match-rooms/"+roomID+"/match", nil)
 		if err != nil {
@@ -1175,7 +1172,6 @@ func TestHandleSubmitTurnCommand(t *testing.T) {
 	t.Run("Failure: invalid JSON format", func(t *testing.T) {
 		roomID, playerTokens, _, h := createTestRoomWithMatch(t)
 
-		// Malformed JSON body
 		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/turn-commands", strings.NewReader("{invalid json"))
 		if err != nil {
 			t.Fatalf("Failed to create request: %v", err)
@@ -1279,7 +1275,7 @@ func TestHandleSubmitTurnCommand(t *testing.T) {
 
 		assertArrayContract(t, rr.Body.Bytes(),
 			[]string{"type", "unitId", "from", "to",
-				"countdown", "newHp"}, // unrelated to this GameEvent
+				"countdown", "newHp"},
 			func(t *testing.T, item map[string]any) {
 				t.Helper()
 				fromField := item["from"].(map[string]any)
@@ -1382,7 +1378,7 @@ func TestHandleStartTurn(t *testing.T) {
 			t.Fatalf("Failed to create request: %v", err)
 		}
 		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Authorization", "Bearer "+playerTokens[0]) // Team 1's turn
+		req.Header.Set("Authorization", "Bearer "+playerTokens[0])
 
 		rr := httptest.NewRecorder()
 		testMux("POST /api/match-rooms/{roomID}/match/start-turn", h.HandleStartTurn).ServeHTTP(rr, req)
@@ -1497,7 +1493,7 @@ func TestHandleStartTurn(t *testing.T) {
 				}
 				assertArrayContract(t, gameEventsBytes,
 					[]string{"type", "unitId", "bombId", "position", "range", "countdown",
-						"newHp"}, // unrelated to this GameEvent
+						"newHp"},
 					func(t *testing.T, item map[string]any) {
 						t.Helper()
 						positionField := item["position"].(map[string]any)
@@ -1556,7 +1552,7 @@ func TestHandleStartTurn(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to create request: %v", err)
 		}
-		req.Header.Set("Authorization", "Bearer "+playerTokens[1]) // Team 2 token for Team 1's turn
+		req.Header.Set("Authorization", "Bearer "+playerTokens[1])
 
 		rr := httptest.NewRecorder()
 		testMux("POST /api/match-rooms/{roomID}/match/start-turn", h.HandleStartTurn).ServeHTTP(rr, req)
@@ -2208,7 +2204,6 @@ func TestHandleSurrender(t *testing.T) {
 		if got, want := response[0].WinnerTeamID, 2; got != want {
 			t.Errorf("Expected gameEvent WinnerTeamID = %v, got %v", want, got)
 		}
-		// Room should not be deleted after surrender, verify it's still here
 		if _, ok := s.Rooms.Load(roomID); !ok {
 			t.Error("Expected room not to be deleted after surrender")
 		}
@@ -2331,7 +2326,7 @@ func TestHandleSurrender(t *testing.T) {
 		testMux("POST /api/match-rooms/{roomID}/match/surrender", h.HandleSurrender).ServeHTTP(rr, req)
 
 		assertArrayContract(t, rr.Body.Bytes(), []string{"type", "winnerTeamId",
-			"unitId", "countdown", "newHp"}, // unrelated to this GameEvent
+			"unitId", "countdown", "newHp"},
 			nil)
 	})
 
@@ -2387,7 +2382,7 @@ func TestHandleSurrender(t *testing.T) {
 			t.Fatalf("Failed to create request: %v", err)
 		}
 		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Authorization", "Bearer "+playerTokens[1]) // Team 2 token for Team 1 surrender
+		req.Header.Set("Authorization", "Bearer "+playerTokens[1])
 
 		rr := httptest.NewRecorder()
 		testMux("POST /api/match-rooms/{roomID}/match/surrender", h.HandleSurrender).ServeHTTP(rr, req)

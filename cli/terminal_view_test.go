@@ -96,7 +96,6 @@ func TestTerminalView_RenderBoard_Errors(t *testing.T) {
 	})
 }
 
-// newTestGameState generates a clean slate grid environment
 func newTestGameState(width, height int) *engine.GameState {
 	grid := make([][]engine.Tile, height)
 	for y, row := range grid {

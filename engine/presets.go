@@ -1,11 +1,10 @@
 package engine
 
-const BombDefaultCountDown int = 5 // default countdown for Bomb
-const BombDefaultPower int = 2     // default power of Bomb
-const SuddenDeathBombs int = 2     // Sudden Death, maximum bombs to drop during Sudden Death
+const BombDefaultCountDown int = 5
+const BombDefaultPower int = 2 // default power of Bomb
+const SuddenDeathBombs int = 2 // Sudden Death, maximum bombs to drop during Sudden Death
 
 // archetypeRegistry stores the base templates of Archetypes.
-// This initializer func protects the slice from mutation.
 func archetypesRegistry() []Archetype {
 	return []Archetype{
 		{
@@ -66,8 +65,7 @@ func archetypesRegistry() []Archetype {
 	}
 }
 
-// GetArchetype mimics a read-only database query.
-// It returns the archetype and a boolean indicating whether the archetype exists.
+// GetArchetype returns the archetype and whether it exists.
 func GetArchetype(name string) (Archetype, bool) {
 	for _, a := range archetypesRegistry() {
 		if a.Name == name {
@@ -89,7 +87,6 @@ func GetAllArchetypes() []Archetype {
 }
 
 // stagePresetsRegistry stores the base templates of stagePresets.
-// This initializer func protects the slice from mutation.
 func stagePresetsRegistry() []StagePreset {
 	return []StagePreset{
 		{
@@ -158,8 +155,7 @@ func stagePresetsRegistry() []StagePreset {
 	}
 }
 
-// GetStagePreset mimics a read-only database query.
-// It returns the stage preset and a boolean indicating whether the stage preset exists.
+// GetStagePreset returns the stage preset and whether it exists.
 func GetStagePreset(name string) (StagePreset, bool) {
 	for _, s := range stagePresetsRegistry() {
 		if s.Name == name {

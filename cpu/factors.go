@@ -31,7 +31,6 @@ type scoreFactorEntry struct {
 }
 
 // scoreFactorsRegistry stores the base of scoreFactors.
-// This initializer func protects the slice from mutation.
 func scoreFactorsRegistry() []scoreFactorEntry {
 	return []scoreFactorEntry{
 		{FactorAdvanceOpponentKingReachability, advanceOpponentKingReachability},
@@ -51,7 +50,6 @@ func scoreFactorsRegistry() []scoreFactorEntry {
 
 // defaultWeightProfile is today's fixed polarity:
 // threats count for the actor, risks count against it.
-// Future profiles (GameCfg aggressiveness, per-Archetype tuning) are additional maps of this same shape.
 func defaultWeightProfile() map[factorID]int {
 	return map[factorID]int{
 		FactorAdvanceOpponentKingReachability: 1,
@@ -234,11 +232,11 @@ func decayRatio(x, t int, k float64) float64 {
 }
 
 const (
-	riskFreeDist = 6                  // distance beyond which threat is considered negligible
-	kDistThreat  = 4.0 / riskFreeDist // decayRatio's distance-axis k for offense
-	kDistRisk    = 1.0 / riskFreeDist // decayRatio's distance-axis k for defense
-	riskFreeTurn = 5                  // turns beyond which a bomb's fuse is considered escapable
-	kTurn        = 1.0 / riskFreeTurn // decayRatio's k for the turn axis
+	riskFreeDist = 6 // distance beyond which threat is considered negligible
+	kDistThreat  = 4.0 / riskFreeDist
+	kDistRisk    = 1.0 / riskFreeDist
+	riskFreeTurn = 5 // turns beyond which a bomb's fuse is considered escapable
+	kTurn        = 1.0 / riskFreeTurn
 )
 
 // exposureIndex deduces a unit's exposure to the nearest tile in affectedTiles, as a 0..1 ratio.
