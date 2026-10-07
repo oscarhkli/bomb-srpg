@@ -1,18 +1,12 @@
 import { TILE_SIZE } from '../constants';
 
-// Depth bands local to blast/fire rendering — between DEPTH_STAGE_BACKGROUND(0) and DEPTH_OCCUPANT(10)
-// in the shared web/src/constants.ts (blast under occupants; fire above occupants, since it
-// renders "on top of the blast and unit/softblock").
 export const DEPTH_BLAST = 5;
 export const DEPTH_FIRE = 15;
 
-// Blast/fire visuals were tuned at Phase 3's 48px tile; both scale with TILE_SIZE so they stay
-// proportionate if it changes again, rather than needing a separate manual rescale each time.
 const PHASE_3_TILE_SIZE = 48;
 const PHASE_3_BLAST_BEAM_WIDTH = 32;
 const PHASE_3_FIRE_SHAPE_SIZE = 42;
 
-// Blast timing/visuals (placeholder values — tunable later without touching sequencing rules)
 export const BLAST_SPEED_MS_PER_TILE = 60;
 export const BLAST_DURATION_MS = 3000;
 export const BLAST_BEAM_WIDTH = Math.round(

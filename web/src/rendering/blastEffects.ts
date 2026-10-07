@@ -16,7 +16,6 @@ import { tileCenter } from './boardRenderer';
 
 export type CardinalDirection = 'N' | 'S' | 'E' | 'W';
 
-// A 🔥 glyph at the tile center — placeholder for a formal sprite, so kept minimal
 export function drawFireShape(scene: Phaser.Scene, position: Coordinate): Phaser.GameObjects.Text {
   const { cx, cy } = tileCenter(position);
 

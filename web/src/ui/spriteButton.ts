@@ -16,8 +16,7 @@ export interface SpriteButtonConfig {
   onClick: () => void;
 }
 
-// Neutral's trimmed frame size — shared by every SpriteButton's hit area and by callers laying
-// out a stack of them (TurnCommandPanel, ConfirmDialog).
+// Neutral's trimmed frame size, shared by every SpriteButton's hit area.
 export function buttonFrameSize(scene: Phaser.Scene): { width: number; height: number } {
   const frame = firstNonBaseFrame(scene, BUTTON_TEXTURE_NEUTRAL);
   const { width, height } = scene.textures.getFrame(BUTTON_TEXTURE_NEUTRAL, frame);

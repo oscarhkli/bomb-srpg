@@ -13,7 +13,6 @@ describe('cardinalDistance', () => {
 
 describe('reachTimeMs', () => {
   it('scales cardinal distance by BLAST_SPEED_MS_PER_TILE (60ms/tile)', () => {
-    // 4 tiles away, 60ms/tile => 240ms — a worked example independent of the implementation.
     expect(reachTimeMs({ x: 0, y: 0 }, { x: 0, y: 4 })).toBe(240);
   });
 });

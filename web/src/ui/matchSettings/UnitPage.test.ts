@@ -84,8 +84,6 @@ describe('UnitPage — FormationPanel', () => {
     const p = page(1, makeCfg({ p1Slots: serializeTeams(['King']) }));
     p.renderBody(mockScene as never, bodyBounds());
 
-    // Graphics order: [formationHeader is text, slot(0)..slot(4) as graphics in display order]
-    // SLOT_DISPLAY_ORDER_P1 = [3, 1, 0, 2, 4] -> displayPos 2 renders slotIndex 0 (King).
     const slotGraphics = allGraphics()[2]!;
     expect(pointerDownOf(slotGraphics)).toBeUndefined();
   });
@@ -95,8 +93,7 @@ describe('UnitPage — FormationPanel', () => {
     const p = page(1, cfg);
     p.renderBody(mockScene as never, bodyBounds());
 
-    // 5 slot graphics + N card graphics follow the formation header text.
-    const cardGraphics = allGraphics()[5]!; // first UnitCard (Fighter)
+    const cardGraphics = allGraphics()[5]!;
     clickPointerdown(cardGraphics);
 
     expect(cfg.p1Slots).toEqual(serializeTeams(['King', 'Fighter']));
@@ -120,7 +117,6 @@ describe('UnitPage — FormationPanel', () => {
     const p = page(1, cfg);
     p.renderBody(mockScene as never, bodyBounds());
 
-    // SLOT_DISPLAY_ORDER_P1 = [3, 1, 0, 2, 4]; displayPos 1 renders slotIndex 1 (Fighter).
     const slotIndex1Graphics = allGraphics()[1]!;
     clickPointerdown(slotIndex1Graphics);
 
@@ -134,8 +130,6 @@ describe('UnitPage — FormationPanel', () => {
     const p = page(1, cfg);
     p.renderBody(mockScene as never, bodyBounds());
 
-    // Graphics are created in display-position order (SLOT_DISPLAY_ORDER_P1 = [3, 1, 0, 2, 4]):
-    // index 1 -> slotIndex 1 (Fighter), index 3 -> slotIndex 2 (Witch).
     clickPointerdown(allGraphics()[1]!);
     p.renderBody(mockScene as never, bodyBounds());
     clickPointerdown(allGraphics()[3]!);
@@ -161,7 +155,6 @@ describe('UnitPage — UnitSlot sprites', () => {
     const p = page(1, makeCfg({ p1Slots: serializeTeams(['King']) }));
     p.renderBody(mockScene as never, bodyBounds());
 
-    // SLOT_DISPLAY_ORDER_P1 displayPos 0 -> slotIndex 3 (empty).
     const g = allGraphics()[0]!;
     expect(g.fillStyle).not.toHaveBeenCalled();
     expect(g.lineStyle).toHaveBeenCalledWith(2, TEAM_COLORS[1]);
@@ -220,7 +213,6 @@ describe('UnitPage — Panel stacking', () => {
     const bounds = bodyBounds();
     p.renderBody(mockScene as never, bounds);
 
-    // Graphics order: slot(0)..slot(4) (5 graphics), then the first UnitCard (Fighter).
     const firstCardGraphics = allGraphics()[5]!;
     const [, cardY] = firstCardGraphics.fillRoundedRect.mock.calls[0] as [number, number];
 
@@ -232,7 +224,6 @@ describe('UnitPage — Panel stacking', () => {
     const bounds = bodyBounds();
     p.renderBody(mockScene as never, bounds);
 
-    // 5 slots x 48px + 4 gaps x 6px = 264px row width, centered in a 1184px-wide panel.
     const firstSlotGraphics = allGraphics()[0]!;
     const [slotX] = firstSlotGraphics.strokeRoundedRect.mock.calls[0] as [number, number];
 
@@ -244,7 +235,6 @@ describe('UnitPage — Panel stacking', () => {
     const bounds = bodyBounds();
     p.renderBody(mockScene as never, bounds);
 
-    // 2 archetypes x 90px + 1 gap x 6px = 186px row width, centered as its own pair.
     const firstCardGraphics = allGraphics()[5]!;
     const [cardX] = firstCardGraphics.fillRoundedRect.mock.calls[0] as [number, number];
 

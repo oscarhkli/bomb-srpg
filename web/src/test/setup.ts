@@ -61,8 +61,6 @@ export function createMockText() {
   };
 }
 
-// Like Graphics/Text above: a fresh instance per add.container() call, seeded with the real
-// x/y constructor args so drop-tween tests can assert against the container's actual position.
 export function createMockContainer(x = 0, y = 0) {
   return {
     x,
@@ -86,8 +84,6 @@ export function createMockContainer(x = 0, y = 0) {
   };
 }
 
-// Fresh instance per add.image() call, seeded with real x/y constructor args so
-// centering tests can assert against actual position.
 export function createMockImage(x = 0, y = 0) {
   return {
     x,
@@ -100,9 +96,6 @@ export function createMockImage(x = 0, y = 0) {
   };
 }
 
-// Fresh instance per add.sprite() call, seeded with real x/y constructor args so
-// ground-anchoring/tween tests can assert against actual position. width/height mirror the
-// real untrimmed 64x64 sprite canvas (see docs/frontend/p4-spec001-sprites.md).
 export function createMockSprite(x = 0, y = 0) {
   return {
     x,
@@ -123,8 +116,6 @@ export function createMockSprite(x = 0, y = 0) {
   };
 }
 
-// Fresh instance per cameras.add() call, mirroring cameras.main's shape so UI components
-// that read `cameras.main.width/height` keep working unchanged after a makeMain swap.
 export function createMockCamera(x = 0, y = 0, width = 640, height = 360, name = '') {
   return {
     x,
@@ -142,7 +133,6 @@ export function createMockCamera(x = 0, y = 0, width = 640, height = 360, name =
   };
 }
 
-// Mock Phaser globals for unit tests (no real canvas/WebGL)
 const mockGameObjectFactory = {
   sprite: vi.fn((x?: number, y?: number) => createMockSprite(x, y)),
   image: vi.fn((x?: number, y?: number) => createMockImage(x, y)),

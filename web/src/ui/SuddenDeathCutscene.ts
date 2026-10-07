@@ -10,8 +10,7 @@ import {
 import { createFilledRect } from './gameObjectUtils';
 import type { GameEvent } from '../types/api';
 
-// play() resolves after the LATER of the pulse duration and the last bomb landing, so
-// MatchScene's beginTurn() can await the whole sequence before continuing.
+// play() resolves after the later of the pulse duration and the last bomb landing.
 export default class SuddenDeathCutscene {
   constructor(private readonly scene: Phaser.Scene) {}
 

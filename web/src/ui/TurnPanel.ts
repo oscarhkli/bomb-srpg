@@ -16,7 +16,6 @@ import {
 import { destroyAll, colorToCss } from './gameObjectUtils';
 
 const HEADER_HEIGHT = TURN_PANEL_HEIGHT / 2;
-// Fixed pixel reservations for the right-aligned "NN / NN" value row (max 2 digits).
 const VALUE_DIGIT_WIDTH = 20;
 const VALUE_SLASH_WIDTH = 12;
 

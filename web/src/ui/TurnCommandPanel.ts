@@ -39,10 +39,9 @@ type ActionStackEntry =
   | { kind: 'allowedTilesShown'; turnCmdType: TurnCmdType }
   | { kind: 'confirmPending'; turnCmdType: TurnCmdType; target: Coordinate };
 
-const BUTTON_COUNT = 3; // Move, Bomb, Back
+const BUTTON_COUNT = 3;
 
-// Total stacked height of the panel's 3 SpriteButtons; MatchSummaryPanel reads this to
-// position its own button in the gap above the panel.
+// Total stacked height of the panel's SpriteButtons.
 export function turnCommandPanelHeight(scene: Phaser.Scene): number {
   const { height } = buttonFrameSize(scene);
   return BUTTON_COUNT * height + (BUTTON_COUNT - 1) * SPRITE_BUTTON_ROW_SPACING;

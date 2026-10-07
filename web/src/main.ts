@@ -16,7 +16,6 @@ const game = new Phaser.Game({
     zoom: computeZoom(window.innerWidth, window.innerHeight),
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
-  // TitleScene first = auto-starts on load.
   scene: [TitleScene, MatchSettingsScene, MatchScene],
 });
 

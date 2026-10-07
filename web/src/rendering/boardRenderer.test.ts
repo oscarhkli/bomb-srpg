@@ -53,7 +53,6 @@ function state(
   };
 }
 
-// Entry-order paint: board layout, then occupants.
 function renderAll(c: BoardRenderContext, s: GameState): void {
   establishBoardLayout(s.grid);
   renderOccupants(c, s);
@@ -90,7 +89,6 @@ describe('renderStageBackground', () => {
 
   it('centers on the grid regardless of grid size, using boardOffset', () => {
     const c = ctx();
-    // 3x2 grid, centered in GameBoardRegion (offsetX=192, offsetY=148).
     establishBoardLayout([
       [plainTile(), plainTile(), plainTile()],
       [plainTile(), plainTile(), plainTile()],
@@ -174,7 +172,6 @@ describe('renderOccupants — units', () => {
       state([[plainTile(), plainTile()]], { units: [unit({ position: { x: 1, y: 0 }, team: 1 })] })
     );
 
-    // On this 1x2 grid, centered in GameBoardRegion (offsetX=208, offsetY=164).
     const sprite = occupantSprite(0);
     expect(sprite.x).toBe(1 * TILE_SIZE + TILE_SIZE / 2 + 208);
     expect(sprite.y).toBe((0 + 1) * TILE_SIZE + SPRITE_GROUND_MARGIN + 164);
@@ -222,8 +219,6 @@ describe('renderOccupants — units', () => {
     renderAll(ctx({ onUnitClicked }), state([[plainTile(), plainTile()]], { units: [u] }));
 
     const sprite = occupantSprite(0);
-    // Local-space hit rect: sprite is 64x64 (untrimmed canvas), origin (0.5, 1) — the tile
-    // footprint sits at x=[16,48), y=[16,48) regardless of the unit's grid position.
     expect(sprite.setInteractive).toHaveBeenCalledWith(
       expect.objectContaining({ x: 16, y: 16, width: TILE_SIZE, height: TILE_SIZE }),
       expect.any(Function)
@@ -243,7 +238,6 @@ describe('renderOccupants — softBlocks & bombs', () => {
       })
     );
 
-    // On this 1x2 grid, centered in GameBoardRegion (offsetX=208, offsetY=164).
     const sprite = occupantSprite(0);
     expect(mockScene.add.sprite).toHaveBeenCalledWith(
       1 * TILE_SIZE + TILE_SIZE / 2 + 208,
@@ -279,9 +273,7 @@ describe('renderOccupants — softBlocks & bombs', () => {
       'bomb',
       'bomb-frame'
     );
-    // Countdown text is added last, so it renders on top of the bomb sprite.
     expect(mockScene.add.text).toHaveBeenCalledWith(0, 0, '5', expect.objectContaining({}));
-    // tileCenter of {x:1,y:0} on this 1x2 grid, centered in GameBoardRegion: (256, 180).
     expect(mockScene.add.container).toHaveBeenCalledWith(256, 180, [
       expect.anything(),
       expect.anything(),
@@ -295,7 +287,6 @@ describe('renderBomb', () => {
     const c = ctx();
     renderBomb(c, bomb({ id: 42, position: { x: 0, y: 0 }, countdown: 2 }));
 
-    // No Graphics allocated for the bomb itself — glyph is a Sprite, countdown a Text.
     expect(mockScene.add.graphics).not.toHaveBeenCalled();
     expect(mockScene.add.sprite).toHaveBeenCalledWith(
       0,
@@ -350,7 +341,6 @@ describe('renderOccupants — teardown', () => {
     const bg = stageBackgroundImage();
     renderOccupants(c, state([[plainTile()]], { units: [unit({ id: 7 })] }));
 
-    // Swap the occupants again — the background must survive both rebuilds.
     renderOccupants(c, state([[plainTile()]]));
 
     expect(bg.destroy).not.toHaveBeenCalled();

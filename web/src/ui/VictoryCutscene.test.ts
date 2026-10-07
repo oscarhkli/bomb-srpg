@@ -55,7 +55,6 @@ describe('VictoryCutscene', () => {
       onReturnClicked: vi.fn(),
     });
 
-    // graphicsAt(0) is the full-canvas scrim, graphicsAt(1) is the banner itself.
     expect(graphicsAt(1).fillStyle).toHaveBeenCalledWith(color);
   });
 
@@ -78,7 +77,6 @@ describe('VictoryCutscene', () => {
 
     cutscene.play(2, 'Return to Match Settings', { onRematch: vi.fn(), onReturnClicked: vi.fn() });
 
-    // Camera width is 640 in the test mock, so 5% left of center (320) is 288.
     expect(mockScene.add.text).toHaveBeenCalledWith(
       288,
       expect.any(Number),
@@ -161,8 +159,6 @@ describe('VictoryCutscene', () => {
     cutscene.play(1, 'Return to Match Settings', { onRematch, onReturnClicked: vi.fn() });
     completeFadeInAndButtonDelay();
 
-    // graphicsAt(0)=scrim, (1)=banner (text lines are add.text, not add.graphics), so the
-    // Rematch button's own Graphics is the 3rd graphics call.
     const rematchButtonGraphics = graphicsAt(2);
     pointerDownOf(rematchButtonGraphics)();
 
@@ -176,7 +172,6 @@ describe('VictoryCutscene', () => {
     cutscene.play(1, 'Return to Match Settings', { onRematch: vi.fn(), onReturnClicked });
     completeFadeInAndButtonDelay();
 
-    // graphicsAt(2) is the Rematch button's Graphics; the Return button's is the next one.
     const returnButtonGraphics = graphicsAt(3);
     pointerDownOf(returnButtonGraphics)();
 

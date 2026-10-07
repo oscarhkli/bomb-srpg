@@ -76,7 +76,6 @@ export default class MatchSettingsScene extends Phaser.Scene {
         if (gen !== this.generation) {
           return;
         }
-        // Empty archetypes or stagePresets is unplayable — report and stop.
         if (catalog.archetypes.length === 0 || catalog.stagePresets.length === 0) {
           this.errorPanel.show(
             'Failed to load match catalog: no archetypes or stage presets available'
@@ -170,8 +169,6 @@ export default class MatchSettingsScene extends Phaser.Scene {
     });
   }
 
-  // Page swap = fadeTransition: fade out, destroy the outgoing Page, render the incoming one,
-  // fade in. BackButton persists across the swap untouched.
   private goToPage(index: number): void {
     if (!this.pages[index]) {
       return;

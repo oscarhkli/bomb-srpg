@@ -92,7 +92,6 @@ export interface Bomb {
   countdown: number;
 }
 
-/** Complete game state snapshot */
 export interface GameState {
   turn: number;
   inSuddenDeath: boolean;
@@ -104,7 +103,6 @@ export interface GameState {
   turnCommands: TurnCommand[];
 }
 
-/** Player action during planning phase */
 export interface TurnCommand {
   type: TurnCmdType;
   unitId: number;

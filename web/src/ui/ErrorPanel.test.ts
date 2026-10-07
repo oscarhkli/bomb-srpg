@@ -40,7 +40,6 @@ describe('ErrorPanel', () => {
 
     const firstY = textCalls().find(c => c[2] === 'first')![1];
     const secondY = textCalls().find(c => c[2] === 'second')![1];
-    // createMockText() reports height 16 — the gap is that height plus panel padding.
     expect(secondY - firstY).toBe(textResult(0).height + ERROR_PANEL_PADDING);
   });
 
@@ -57,7 +56,7 @@ describe('ErrorPanel', () => {
     expect(bg.destroy).toHaveBeenCalled();
 
     panel.show('again');
-    expect(mockScene.add.graphics).toHaveBeenCalledTimes(2); // fresh bg after clear
+    expect(mockScene.add.graphics).toHaveBeenCalledTimes(2);
   });
 
   it('resets the vertical offset after clear so the next message starts back at the top', () => {
@@ -65,7 +64,7 @@ describe('ErrorPanel', () => {
 
     panel.show('first');
     const firstY = textCalls().find(c => c[2] === 'first')![1];
-    panel.show('second'); // pushes the offset down
+    panel.show('second');
     panel.clear();
     panel.show('third');
 

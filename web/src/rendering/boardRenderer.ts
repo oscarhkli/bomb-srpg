@@ -25,7 +25,6 @@ export interface BoardRenderContext {
   onUnitClicked: (unit: Unit) => void;
 }
 
-// Archetype + team -> texture key
 const UNIT_TEXTURE_KEYS: Record<string, Record<number, string>> = {
   Fighter: { 1: 'unit_fighter_blue', 2: 'unit_fighter_red' },
   King: { 1: 'unit_king_blue', 2: 'unit_king_red' },
@@ -34,7 +33,6 @@ const UNIT_TEXTURE_KEYS: Record<string, Record<number, string>> = {
   Prologue: { 2: 'unit_prologue_red' },
 };
 
-// StagePreset.Name -> texture key
 const STAGE_TEXTURE_KEYS: Record<string, string> = {
   Plain: 'stage_plain',
   Standard: 'stage_standard',
@@ -168,7 +166,6 @@ export function renderBomb(ctx: BoardRenderContext, bomb: Bomb): void {
   // edge (+TILE_SIZE/2) before adding the ground margin, mirroring groundY()'s world-space math.
   const glyph = ctx.scene.add.sprite(0, TILE_SIZE / 2 + SPRITE_GROUND_MARGIN, 'bomb', frame);
   glyph.setOrigin(0.5, 1);
-  // Countdown text is added last, so it renders on top of the bomb sprite within the container.
   const text = ctx.scene.add.text(0, 0, String(bomb.countdown), {
     color: colorToCss(BOMB_COUNTDOWN_TEXT_COLOR),
   });
@@ -182,7 +179,6 @@ export function renderBomb(ctx: BoardRenderContext, bomb: Bomb): void {
   ctx.bombGraphicsById.set(bomb.id, { container, countdownText: text });
 }
 
-// Containers use local origin (0,0), not world space.
 function attachContainerClickLogger(
   container: Phaser.GameObjects.Container,
   label: string,

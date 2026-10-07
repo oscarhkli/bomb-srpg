@@ -120,7 +120,6 @@ describe('MatchSettingsScene — catalog loading', () => {
     await bootScene();
 
     expect(textCalls().some(c => typeof c[2] === 'string' && c[2].includes('catalog'))).toBe(true);
-    // Only the BackButton's graphics + ErrorPanel's background graphics were created — no Page.
     expect(allGraphics()).toHaveLength(2);
   });
 
@@ -153,7 +152,6 @@ describe('MatchSettingsScene — catalog loading', () => {
     resolveCatalog({ archetypes: ARCHETYPES, stagePresets: STAGE_PRESETS });
     await flush();
 
-    // Only the BackButton was ever created — the resolved catalog was discarded.
     expect(allGraphics()).toHaveLength(1);
   });
 });
@@ -204,7 +202,6 @@ describe('MatchSettingsScene — UnitPage 1 (default entry)', () => {
     await bootScene();
 
     const g = currentPageGraphics();
-    // King is array index 0, at SLOT_DISPLAY_ORDER_P1 displayPos 2.
     const kingSlot = slotGraphics(g, 2);
     expect(pointerDownOf(kingSlot)).toBeUndefined();
   });
@@ -218,7 +215,7 @@ describe('MatchSettingsScene — UnitPage 1 (default entry)', () => {
     await bootScene({ gameCfg });
 
     const g = currentPageGraphics();
-    clickPointerdown(cardGraphics(g, 0)); // Fighter
+    clickPointerdown(cardGraphics(g, 0));
 
     expect(gameCfg.p1Slots).toEqual(serializeTeams(['King', 'Fighter']));
   });
@@ -248,7 +245,6 @@ describe('MatchSettingsScene — UnitPage 1 (default entry)', () => {
     await bootScene({ gameCfg });
 
     const g = currentPageGraphics();
-    // Array index 1 (order number 2) is at SLOT_DISPLAY_ORDER_P1 displayPos 1.
     clickPointerdown(slotGraphics(g, 1));
 
     expect(gameCfg.p1Slots).toEqual(serializeTeams(['King', NO_UNIT, NO_UNIT, 'Witch', 'Witch']));
@@ -336,7 +332,6 @@ describe('MatchSettingsScene — BackButton', () => {
     });
     await bootAndAdvanceToPage2(gameCfg);
 
-    // Now on UnitPage 2 with 2 slots filled — advance to StagePage.
     const g2 = currentPageGraphics();
     clickPointerdown(nextButtonGraphics(g2));
     fireCameraFadeOutComplete();

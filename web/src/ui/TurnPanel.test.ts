@@ -14,7 +14,6 @@ describe('TurnPanel', () => {
 
     panel.update(2, 30, 1);
 
-    // Independent literal — GameControlRegion is 480..640, TurnPanel is 96 wide: 512 centers it.
     expect(headerGraphics().fillRoundedRect).toHaveBeenCalledWith(
       512,
       2,

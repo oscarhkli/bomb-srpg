@@ -96,7 +96,6 @@ export default class UnitPage implements SettingsPage {
     return TEAM_COLORS[this.playerIndex] ?? TEAM_COLOR_FALLBACK;
   }
 
-  // Renders an archetype's pixel-art sprite bottom-anchored at (cx, bottomY), scaled to fit size.
   private renderUnitIcon(
     scene: Phaser.Scene,
     archetype: string,
@@ -112,7 +111,6 @@ export default class UnitPage implements SettingsPage {
     return sprite;
   }
 
-  // Team 2 faces Team 1, so its slots render in the mirrored order (formation.ts).
   private slotDisplayOrder(): readonly number[] {
     return this.playerIndex === 1 ? SLOT_DISPLAY_ORDER_P1 : SLOT_DISPLAY_ORDER_P2;
   }
@@ -170,7 +168,6 @@ export default class UnitPage implements SettingsPage {
     this.renderNextButton();
   }
 
-  // P1: back to TitleScene. P2: back to UnitPage 1.
   handleBack(): void {
     if (this.playerIndex === 2) {
       this.nav.goBack();
@@ -185,8 +182,6 @@ export default class UnitPage implements SettingsPage {
     destroyAll(this.formationObjects);
     destroyAll(this.navObjects);
   }
-
-  // ---- FormationPanel ----
 
   private renderFormationPanel(): void {
     const scene = this.scene;
@@ -248,12 +243,9 @@ export default class UnitPage implements SettingsPage {
         color: colorToCss(0xffffff),
       }
     );
-    // The label must render above the sprite (they overlap) — the sprite is left at Phaser's
-    // default depth (0).
     label.setDepth(DEPTH_UNIT_SLOT_LABEL);
     this.formationObjects.push(label);
 
-    // King (slot 0) is fixed: no click handler, can't be removed.
     if (slotIndex === 0) {
       return;
     }
@@ -265,8 +257,6 @@ export default class UnitPage implements SettingsPage {
       this.commitAndRerender();
     });
   }
-
-  // ---- ArchetypesPanel ----
 
   private renderArchetypesPanel(): void {
     const scene = this.scene;
@@ -378,8 +368,6 @@ export default class UnitPage implements SettingsPage {
     });
   }
 
-  // ---- NavRegion ----
-
   private renderNextButton(): void {
     const scene = this.scene;
     const bounds = this.navBounds;
@@ -406,8 +394,6 @@ export default class UnitPage implements SettingsPage {
       )
     );
   }
-
-  // ---- Shared post-change flow ----
 
   // Only FormationPanel + NextButton depend on formation state, so only those are redrawn.
   private commitAndRerender(): void {
