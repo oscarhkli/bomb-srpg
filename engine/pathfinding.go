@@ -127,7 +127,7 @@ func (u Unit) NewBombPlacementRule() MovementRule {
 	}
 }
 
-// FindAllowedTiles deduces the tiles that an occupant can reach and actually land on.
+// FindAllowedTiles deduces the tiles that an occupant can reach and land on.
 // It returns coordinates with distance from the start.
 func (gs *GameState) FindAllowedTiles(start Coordinate, rule MovementRule, occupantType OccupantType) map[Coordinate]int {
 	reachable := gs.FindReachableTiles(start, rule)
