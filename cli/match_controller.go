@@ -51,7 +51,7 @@ func (c *MatchController) StartInputLoop() {
 
 		line := strings.TrimSpace(scanner.Text())
 		if line == "" {
-			continue // Skip processing if user typed whitespace
+			continue
 		}
 
 		if strings.HasPrefix(line, "/") {

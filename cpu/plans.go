@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-// plansFor gathers all the possible actions, currently they should cover idle/move/bomb/move+bomb/bomb+move.
+// plansFor returns every plan for the unit: idle, move, bomb, move+bomb and bomb+move.
 func plansFor(unit *engine.Unit, gs *engine.GameState) [][]engine.TurnCommand {
 	movePlans := movePlansFor(unit, gs)
 	placeBombPlans := placeBombPlansFor(unit, gs)
@@ -60,7 +60,6 @@ func singleCommandPlans(unit *engine.Unit, gs *engine.GameState, turnCmdType eng
 
 	allowedTiles, err := gs.FindAllowedTilesForCommand(unit.ID, turnCmdType)
 	if err != nil {
-		// Should never happen; return no plans rather than propagate.
 		return plans
 	}
 

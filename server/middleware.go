@@ -18,8 +18,7 @@ func SecurityHeaders(next http.Handler) http.Handler {
 	})
 }
 
-// RecoverPanic turns a handler panic into a structured log entry and a clean 500,
-// instead of net/http's default stderr dump and dropped connection.
+// RecoverPanic turns a handler panic into a logged 500.
 func RecoverPanic(logger *slog.Logger, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {

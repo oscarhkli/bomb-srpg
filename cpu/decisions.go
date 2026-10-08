@@ -6,9 +6,8 @@ import (
 	"slices"
 )
 
-const (
-	maxAttempts = 15 // Max attempt for candidates selection. Defensive way to prevent from infinite loop.
-)
+// maxAttempts caps candidate-selection rounds, defending against an infinite loop.
+const maxAttempts = 15
 
 // candidate represents a possible action a Unit can take and what it scores.
 type candidate struct {
@@ -17,7 +16,7 @@ type candidate struct {
 	tag          string // Debug/log label.
 }
 
-// priority breaks a score tie: move+bomb is worse than other action.
+// priority breaks a score tie; move-then-bomb ranks lowest.
 func (c candidate) priority() int {
 	if len(c.turnCommands) == 2 && c.turnCommands[0].Type == engine.TurnCmdMove {
 		return 0
@@ -25,8 +24,7 @@ func (c candidate) priority() int {
 	return 1
 }
 
-// Decide computes the CPU's plan for the given sandbox state.
-// Returns the TurnCommands to apply, in order; an empty result means no action.
+// Decide returns the TurnCommands the CPU plays this turn, in order; empty means no action.
 func Decide(gs *engine.GameState) []engine.TurnCommand {
 	sandbox := gs.DeepCopy()
 	var cmds []engine.TurnCommand
@@ -41,12 +39,12 @@ func Decide(gs *engine.GameState) []engine.TurnCommand {
 		}
 		if team, _ := u.ID.Decode(); team == 2 {
 			allies = append(allies, u)
-			if u.Role == engine.RoleKing || u.Role == engine.RoleBoss {
+			if isKingRole(u) {
 				allyKing = u
 			}
 		} else {
 			opponents = append(opponents, u)
-			if u.Role == engine.RoleKing || u.Role == engine.RoleBoss {
+			if isKingRole(u) {
 				opponentKing = u
 			}
 		}
@@ -79,7 +77,6 @@ func Decide(gs *engine.GameState) []engine.TurnCommand {
 			}
 			c, err := bestCandidateFor(sc, sandbox)
 			if err != nil {
-				// Sandbox is untouched here; skip this unit for the round.
 				continue
 			}
 			if len(c.turnCommands) == 0 {
@@ -95,7 +92,6 @@ func Decide(gs *engine.GameState) []engine.TurnCommand {
 		}
 
 		if err := applyCandidate(sandbox, *best); err != nil {
-			// Sandbox may be partially mutated by best's own earlier commands; stop here.
 			break
 		}
 
@@ -103,6 +99,10 @@ func Decide(gs *engine.GameState) []engine.TurnCommand {
 	}
 
 	return cmds
+}
+
+func isKingRole(u *engine.Unit) bool {
+	return u.Role == engine.RoleKing || u.Role == engine.RoleBoss
 }
 
 func bestCandidateFor(sc scoreContext, gs *engine.GameState) (candidate, error) {

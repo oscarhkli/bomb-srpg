@@ -12,7 +12,7 @@ const (
 	GameEvtUnitDied GameEvtType = "unitDied"
 	// GameEvtBombPlaced signals a new bomb was deployed.
 	GameEvtBombPlaced GameEvtType = "bombPlaced"
-	// GameEvtBombCountdownUpdated signals a bomb updated its countdown, for both increase or decrease
+	// GameEvtBombCountdownUpdated signals a bomb updated its countdown.
 	GameEvtBombCountdownUpdated GameEvtType = "bombCountdownUpdated"
 	// GameEvtBombExploded signals a bomb detonated and lists affected tiles.
 	GameEvtBombExploded GameEvtType = "bombExploded"

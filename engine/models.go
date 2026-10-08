@@ -3,6 +3,8 @@ package engine
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
+	"slices"
 )
 
 // TerrainType represents the base terrain of a tile.
@@ -21,7 +23,7 @@ const (
 	TerrainLava
 )
 
-// String converts a TerrainType integer value into a human-readable text string.
+// String returns the name used in logs and JSON.
 func (t TerrainType) String() string {
 	switch t {
 	case TerrainPlain:
@@ -39,7 +41,7 @@ func (t TerrainType) String() string {
 	}
 }
 
-// MarshalJSON serializes TerrainType struct to JSON that client needs
+// MarshalJSON encodes the terrain as its String name.
 func (o TerrainType) MarshalJSON() ([]byte, error) {
 	return json.Marshal(o.String())
 }
@@ -61,7 +63,7 @@ const (
 	OccupantItem
 )
 
-// String converts an OccupantType integer value into a human-readable text string.
+// String returns the name used in logs and JSON.
 func (o OccupantType) String() string {
 	switch o {
 	case OccupantNone:
@@ -79,7 +81,7 @@ func (o OccupantType) String() string {
 	}
 }
 
-// MarshalJSON serializes OccupantType struct to JSON that client needs
+// MarshalJSON encodes the occupant type as its String name.
 func (o OccupantType) MarshalJSON() ([]byte, error) {
 	return json.Marshal(o.String())
 }
@@ -88,14 +90,13 @@ func (o OccupantType) MarshalJSON() ([]byte, error) {
 type Tile struct {
 	Type         TerrainType  `json:"type"`
 	OccupantType OccupantType `json:"occupantType"`
-	OccupantID   int64        `json:"occupantId"`
+	OccupantID   int64        `json:"occupantId"` // UnitID, BombID or SoftBlockID, per OccupantType
 }
 
 // SoftBlock represents a destructible block that may hide an item.
 type SoftBlock struct {
-	ID         int        `json:"id"`
-	Position   Coordinate `json:"position"`
-	HiddenItem string     `json:"-"` // Reserved for future item system
+	ID       int        `json:"id"`
+	Position Coordinate `json:"position"`
 }
 
 // StagePreset defines a complete map layout including terrain, soft blocks, and starting positions.
@@ -107,8 +108,8 @@ type StagePreset struct {
 	MaxTurns            int           `json:"maxTurns"`
 	LayoutGrid          []string      `json:"-"` // Visual layout matrix; each string is a row (Y), each char a column (X)
 	SoftBlocks          []Coordinate  `json:"-"`
-	P1StartingPositions [5]Coordinate `json:"-"` // Default order: 3,1,0,2,4 (bottom side)
-	P2StartingPositions [5]Coordinate `json:"-"` // Default order: 4,2,0,1,3 (top side)
+	P1StartingPositions [5]Coordinate `json:"-"`
+	P2StartingPositions [5]Coordinate `json:"-"`
 }
 
 // SkillType is a bitmask for unit abilities (jump, fly, etc.).
@@ -124,7 +125,7 @@ func allSkills() []SkillType {
 	return []SkillType{SkillCanJump, SkillCanFly}
 }
 
-// String converts an SkillType integer value into a human-readable text string.
+// String returns the name used in logs and JSON.
 func (s SkillType) String() string {
 	switch s {
 	case SkillNone:
@@ -151,7 +152,7 @@ type Archetype struct {
 	Selectable   bool
 }
 
-// MarshalJSON serializes Archetype struct to JSON that client needs
+// MarshalJSON emits the client-facing shape.
 func (a Archetype) MarshalJSON() ([]byte, error) {
 	skills := []string{}
 	for _, skill := range allSkills() {
@@ -176,7 +177,7 @@ const (
 	RoleBoss
 )
 
-// String converts an UnitRole integer value into a human-readable text string.
+// String returns the name used in logs and JSON.
 func (o UnitRole) String() string {
 	switch o {
 	case RoleNormal:
@@ -190,12 +191,12 @@ func (o UnitRole) String() string {
 	}
 }
 
-// MarshalJSON serializes UnitRole struct to JSON that client needs
+// MarshalJSON encodes the role as its String name.
 func (o UnitRole) MarshalJSON() ([]byte, error) {
 	return json.Marshal(o.String())
 }
 
-// UnmarshalJSON deserializes UnitRole struct from JSON that client provides
+// UnmarshalJSON decodes a role from its String name.
 func (r *UnitRole) UnmarshalJSON(data []byte) error {
 	var s string
 	if err := json.Unmarshal(data, &s); err != nil {
@@ -214,11 +215,10 @@ func (r *UnitRole) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// UnitID encodes (TeamID << 4) | PlayerIndex. Max 15 teams, 15 units per team.
-// Value 0 is reserved for SystemUnitID (environmental actor).
+// UnitID packs a team and a player index; see NewUnitID.
 type UnitID uint8
 
-// BombID encodes (UnitID << 24) | (Turn << 16) | Counter. Unique per bomb placement.
+// BombID packs owner, turn and counter; see NewBombID.
 type BombID uint32
 
 // Unit represents a single controllable character on the board.
@@ -232,15 +232,15 @@ type Unit struct {
 	BombPower    int
 	MaxBombCount int
 	BombUsed     int
-	Team         int
-	HP           int
+	Team         int // 1 = P1, 2 = P2 / COM
+	HP           int // 1 = alive, 0 = dead
 	Skills       SkillType
 	Role         UnitRole
 	HasMoved     bool
-	HasUsedSkill bool // True after placing bomb or using skill; resets each turn
+	HasUsedSkill bool // set after placing a bomb or using a skill; reset each turn
 }
 
-// MarshalJSON serializes Unit struct to JSON that client needs
+// MarshalJSON emits the client-facing shape.
 func (u Unit) MarshalJSON() ([]byte, error) {
 	skills := []string{}
 	for _, skill := range allSkills() {
@@ -282,7 +282,7 @@ func (u Unit) MarshalJSON() ([]byte, error) {
 // Bomb represents an active explosive on the board.
 type Bomb struct {
 	ID        BombID     `json:"id"`
-	OwnerID   UnitID     `json:"ownerId"`
+	OwnerID   UnitID     `json:"ownerId"` // unit that placed the bomb
 	Position  Coordinate `json:"position"`
 	Range     int        `json:"range"`     // Explosion radius in tiles
 	Countdown int        `json:"countdown"` // Turns remaining until detonation; <0 for non-countdown bombs
@@ -296,15 +296,15 @@ type TeamSlot struct {
 
 // GameCfg holds all configuration for a match.
 type GameCfg struct {
-	VSCpu                       bool       `json:"vsCpu"` // True = VS CPU Mode
-	StagePreset                 string     `json:"stagePreset"`
+	VSCpu                       bool       `json:"vsCpu"`       // true = the second team is CPU-controlled
+	StagePreset                 string     `json:"stagePreset"` // stage preset name, e.g. "Plain"
 	P1Slots                     []TeamSlot `json:"p1Slots"`
 	P2Slots                     []TeamSlot `json:"p2Slots"`
-	MaxTurns                    int        `json:"maxTurns"` // Turn limit; 0 = instant sudden death
-	AllowResetTurn              bool       `json:"allowResetTurn"`
-	GlobalSpeedOverride         int        `json:"-"` // Test override for all unit speeds (0 = disabled)
-	GlobalBombCountdownOverride int        `json:"-"` // Test override for bomb countdown (0 = disabled)
-	GlobalBombMaxRangeOverride  int        `json:"-"` // Test override for bomb max range (0 = disabled)
+	MaxTurns                    int        `json:"maxTurns"`       // Turn limit; 0 = instant sudden death
+	AllowResetTurn              bool       `json:"allowResetTurn"` // true = players can undo planned actions before commit
+	GlobalSpeedOverride         int        `json:"-"`              // Test override for all unit speeds (0 = disabled)
+	GlobalBombCountdownOverride int        `json:"-"`              // Test override for bomb countdown (0 = disabled)
+	GlobalBombMaxRangeOverride  int        `json:"-"`              // Test override for bomb max range (0 = disabled)
 }
 
 // GameState is the complete snapshot of a match at a point in time.
@@ -320,23 +320,16 @@ type GameState struct {
 	TurnCommands    []TurnCommand // Pending commands for current turn
 }
 
-// MarshalJSON serializes GameState struct to JSON that client needs
+func nonNilValues[K comparable, V any](m map[K]V) []V {
+	return slices.AppendSeq(make([]V, 0, len(m)), maps.Values(m))
+}
+
+// MarshalJSON emits the client-facing shape; every slice is non-nil so it encodes as [].
 func (gs GameState) MarshalJSON() ([]byte, error) {
-	// Every slice is built non-nil so it marshals as [] — the client types these as non-nullable arrays.
-	units := make([]*Unit, 0, len(gs.Units))
-	for _, u := range gs.Units {
-		units = append(units, u)
-	}
-	bombs := make([]*Bomb, 0, len(gs.Bombs))
-	for _, b := range gs.Bombs {
-		bombs = append(bombs, b)
-	}
-	softBlocks := make([]*SoftBlock, 0, len(gs.SoftBlocks))
-	for _, sb := range gs.SoftBlocks {
-		softBlocks = append(softBlocks, sb)
-	}
-	turnCommands := make([]TurnCommand, 0, len(gs.TurnCommands))
-	turnCommands = append(turnCommands, gs.TurnCommands...)
+	units := nonNilValues(gs.Units)
+	bombs := nonNilValues(gs.Bombs)
+	softBlocks := nonNilValues(gs.SoftBlocks)
+	turnCommands := append(make([]TurnCommand, 0, len(gs.TurnCommands)), gs.TurnCommands...)
 	return json.Marshal(struct {
 		Turn          int           `json:"turn"`
 		InSuddenDeath bool          `json:"inSuddenDeath"`
@@ -367,7 +360,7 @@ const (
 	TurnPhaseReady
 )
 
-// String converts an CPUTurnPhase integer value into a human-readable text string.
+// String returns the name used in logs and JSON.
 func (c CPUTurnPhase) String() string {
 	switch c {
 	case TurnPhaseIdle:
@@ -381,7 +374,7 @@ func (c CPUTurnPhase) String() string {
 	}
 }
 
-// MarshalJSON serializes CPUTurnPhase struct to JSON that client needs
+// MarshalJSON encodes the phase as its String name.
 func (o CPUTurnPhase) MarshalJSON() ([]byte, error) {
 	return json.Marshal(o.String())
 }
@@ -396,9 +389,9 @@ type CPUState struct {
 // Match orchestrates a full game session: state, config, and event log.
 type Match struct {
 	GameCfg      GameCfg
-	TrueState    *GameState // Committed state
-	WorkingState *GameState // Sandbox for mid-turn planning
-	PlaybackLog  []GameEvent
+	TrueState    *GameState  // Committed state
+	WorkingState *GameState  // Sandbox for mid-turn planning
+	PlaybackLog  []GameEvent // events since the last ResolveTurn
 	CPU          CPUState
 	WinnerTeamID int // 0 = in progress, 1/2 = winner, -1 = draw
 }
@@ -419,18 +412,18 @@ const (
 type PassFlag uint8
 
 const (
-	PassUnits PassFlag = 1 << iota
-	PassSoftBlocks
-	PassHardBlocks
-	PassItems
-	PassBombs
+	PassUnits      PassFlag = 1 << iota // walk through other units
+	PassSoftBlocks                      // walk through soft blocks
+	PassHardBlocks                      // walk through hard blocks (TerrainBlock)
+	PassItems                           // walk through items
+	PassBombs                           // walk through bombs
 )
 
 // MovementRule configures pathfinding for a specific action (move, bomb placement, skill).
 type MovementRule struct {
 	MaxSteps              int // Max steps; -1 = unlimited
 	Pattern               StepPattern
-	CanTurn               bool // True = can change direction mid-path
-	PassPermissions       PassFlag
-	StopOnNonUnitOccupant bool // True = stop on first non-unit (bomb, block, item); False = stop before it
+	CanTurn               bool     // True = can change direction mid-path
+	PassPermissions       PassFlag // obstacle types the mover may walk through
+	StopOnNonUnitOccupant bool     // True = stop on first non-unit (bomb, block, item); False = stop before it
 }

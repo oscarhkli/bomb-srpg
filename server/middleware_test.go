@@ -20,7 +20,6 @@ func TestRecoverPanic_RecoversTo500(t *testing.T) {
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 
-	// A panic escaping RecoverPanic would crash this call and fail the test.
 	RecoverPanic(discardLogger(), panicking).ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusInternalServerError {
