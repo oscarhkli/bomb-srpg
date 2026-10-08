@@ -17,7 +17,6 @@ func terrainToken() map[byte]TerrainType {
 }
 
 // InitGame validates the config, builds the initial GameState, and returns a ready-to-play Match.
-// It enforces: 1-5 units per team, King as first unit, valid stage preset, and grid dimensions.
 func InitGame(gameCfg GameCfg) (*Match, error) {
 	gameState, err := initGameState(gameCfg)
 	if err != nil {
@@ -91,8 +90,7 @@ func initGameState(gameCfg GameCfg) (*GameState, error) {
 	}, nil
 }
 
-// compileGrid validates a stage preset's LayoutGrid against its declared dimensions
-// and parses it into a Tile matrix.
+// compileGrid parses a preset's LayoutGrid into a Tile matrix, checking it against the declared size.
 func compileGrid(preset StagePreset) ([][]Tile, error) {
 	if len(preset.LayoutGrid) != preset.Height {
 		return nil, fmt.Errorf("%w: stage preset layout grid row count %d does not match specified height %d", ErrInvalidStageLayout, len(preset.LayoutGrid), preset.Height)
@@ -208,9 +206,7 @@ func applyGlobalOverride(orig, newVal int) int {
 	return orig
 }
 
-// DeepCopy creates a faithful deep copy of the GameState, sharing no memory with the original.
-// It is used both to fork an independent WorkingState for the planning stage and to snapshot state
-// for callers that read it after releasing the lock that guarded the original.
+// DeepCopy returns a copy of gs that shares no memory with it.
 func (gs *GameState) DeepCopy() *GameState {
 	if gs == nil {
 		return nil

@@ -24,6 +24,7 @@ func NewTerminalView(o io.Writer) *TerminalView {
 }
 
 // RenderBoard prints a 2D ASCII grid representation of the map.
+// Not every terrain and occupant type is drawn; it is a debugging view.
 func (v *TerminalView) RenderBoard(gs *engine.GameState) error {
 	if gs == nil {
 		return errors.New("cannot render board: GameState pointer is nil")
@@ -46,7 +47,7 @@ func (v *TerminalView) RenderBoard(gs *engine.GameState) error {
 		return err
 	}
 
-	fmt.Fprint(v.output, "Y\\X  ") // Space for the left Y column padding
+	fmt.Fprint(v.output, "Y\\X  ")
 	for x := range gs.Grid {
 		fmt.Fprintf(v.output, " %-3d", x)
 	}
@@ -60,10 +61,10 @@ func (v *TerminalView) RenderBoard(gs *engine.GameState) error {
 		fmt.Fprintf(v.output, "%-2d |", y)
 
 		for _, tile := range row {
-			cellStr := "   " // Default blank for TerrainPlain / empty
+			cellStr := "   "
 
 			if tile.Type == engine.TerrainBlock {
-				cellStr = "███" // Solid block representation
+				cellStr = "███"
 			} else {
 				switch tile.OccupantType {
 				case engine.OccupantUnit:

@@ -5,16 +5,13 @@ import (
 	"math/rand"
 )
 
-// ResetTurn discards the mid-turn WorkingState and PlaybackLog
-// and rollback to the beginning of the turn with deep copy of TrueState
+// ResetTurn discards WorkingState and PlaybackLog, restoring a copy of TrueState.
 func (m *Match) ResetTurn() {
 	m.WorkingState = m.TrueState.DeepCopy()
 	m.PlaybackLog = nil
 }
 
-// SubmitAction registers a validated mid-turn planning step permanently.
-// - In Rollback Mode: It just logs the event but waits for a final commit command.
-// - In Non-Rollback Mode: The server calls this immediately, making the move irreversible.
+// SubmitAction logs gameEvent; without AllowResetTurn it also commits WorkingState to TrueState.
 func (m *Match) SubmitAction(gameEvent GameEvent) {
 	m.PlaybackLog = append(m.PlaybackLog, gameEvent)
 
@@ -50,8 +47,7 @@ func (m *Match) ApplyTurnCommand(cmd TurnCommand) ([]GameEvent, error) {
 	}
 }
 
-// CommandMoveUnit wraps WorkingState MoveUnit and submit the result for mid-turn planning step.
-// Returns GameEvents produced or an error if MoveUnit validation gate doesn't pass.
+// CommandMoveUnit applies MoveUnit to WorkingState and logs the resulting event.
 func (m *Match) CommandMoveUnit(unitID UnitID, target Coordinate) ([]GameEvent, error) {
 	gameEvent, err := m.WorkingState.MoveUnit(unitID, target)
 	if err != nil {
@@ -61,9 +57,7 @@ func (m *Match) CommandMoveUnit(unitID UnitID, target Coordinate) ([]GameEvent, 
 	return []GameEvent{gameEvent}, nil
 }
 
-// MoveUnit executes a unit relocation after verifying game rule compliance.
-// It calculates the active range, updates the board matrix, and commits a UnitMovedEvent.
-// Returns GameEvents produced or an error if the pathing rules are violated or if the target cell is blocked.
+// MoveUnit relocates a unit within its move range and returns the UnitMovedEvent.
 func (gs *GameState) MoveUnit(unitID UnitID, target Coordinate) (GameEvent, error) {
 	unit, err := gs.validateActiveUnit(unitID)
 	if err != nil {
@@ -115,8 +109,7 @@ func (gs *GameState) validateActiveUnit(unitID UnitID) (*Unit, error) {
 	return unit, nil
 }
 
-// CommandPlaceBomb wraps WorkingState PlaceBomb and submit the result for mid-turn planning step.
-// Returns GameEvents produced or an error if PlaceBomb validation gate doesn't pass.
+// CommandPlaceBomb applies PlaceBomb to WorkingState and logs the resulting event.
 func (m *Match) CommandPlaceBomb(unitID UnitID, target Coordinate) ([]GameEvent, error) {
 	gameEvent, err := m.WorkingState.PlaceBomb(unitID, target)
 	if err != nil {
@@ -126,9 +119,7 @@ func (m *Match) CommandPlaceBomb(unitID UnitID, target Coordinate) ([]GameEvent,
 	return []GameEvent{gameEvent}, nil
 }
 
-// PlaceBomb executes a bomb deployment after verifying unit's bomb availability and grid compliance.
-// It validates placement range, registers a new Bomb state tracking instance, and commits a BombPlacedEvent.
-// Returns GameEvents produced or an error if the unit is running out of bombs, the target is out of range, or the cell is blocked.
+// PlaceBomb drops a bomb for the unit within its placement range and returns the BombPlacedEvent.
 func (gs *GameState) PlaceBomb(unitID UnitID, target Coordinate) (GameEvent, error) {
 	bombPower := BombDefaultPower
 	var unit *Unit
@@ -161,23 +152,27 @@ func (gs *GameState) PlaceBomb(unitID UnitID, target Coordinate) (GameEvent, err
 		bombPower = unit.BombPower
 	}
 
-	gs.TurnBombCounter++
-	bomb := &Bomb{
-		ID:        NewBombID(gs.Turn, gs.TurnBombCounter, unitID),
-		OwnerID:   unitID,
-		Position:  target,
-		Range:     bombPower,
-		Countdown: gs.DeduceBombCountDown(target),
-	}
-	gs.Bombs[bomb.ID] = bomb
-	gs.UpdateStageOccupant(target, OccupantBomb, int64(bomb.ID))
-
 	if unit != nil {
 		unit.BombUsed++
 		unit.HasUsedSkill = true
 	}
 
-	return NewBombPlacedEvent(unitID, bomb.ID, target, bomb.Range, bomb.Countdown), nil
+	return gs.dropBomb(unitID, target, bombPower), nil
+}
+
+func (gs *GameState) dropBomb(ownerID UnitID, target Coordinate, power int) GameEvent {
+	gs.TurnBombCounter++
+	bomb := &Bomb{
+		ID:        NewBombID(gs.Turn, gs.TurnBombCounter, ownerID),
+		OwnerID:   ownerID,
+		Position:  target,
+		Range:     power,
+		Countdown: gs.DeduceBombCountDown(target),
+	}
+	gs.Bombs[bomb.ID] = bomb
+	gs.UpdateStageOccupant(target, OccupantBomb, int64(bomb.ID))
+
+	return NewBombPlacedEvent(ownerID, bomb.ID, target, bomb.Range, bomb.Countdown)
 }
 
 // IsLandingLegal checks if the target is legal to be landed by a certain occupantType.
@@ -223,7 +218,7 @@ func (m *Match) StartTurn() []GameEvent {
 	return gameEvents
 }
 
-// injectSuddenDeathHazards picks 2 random unoccupied tiles and drop bombs there.
+// injectSuddenDeathHazards drops up to SuddenDeathBombs bombs on random empty tiles.
 func (m *Match) injectSuddenDeathHazards() {
 	var emptyTilePos []Coordinate
 	for y, row := range m.WorkingState.Grid {
@@ -241,26 +236,12 @@ func (m *Match) injectSuddenDeathHazards() {
 	limit := min(len(emptyTilePos), SuddenDeathBombs)
 
 	for _, target := range emptyTilePos[:limit] {
-		gameEvent, err := m.WorkingState.PlaceBomb(SystemUnitID, target)
-		if err != nil {
-			// Pre-filtered to empty, non-block tiles. A rejection here just means one
-			// fewer sudden-death bomb this round. Skip the error, not worth failing the turn.
-			continue
-		}
-		m.SubmitAction(gameEvent)
+		m.SubmitAction(m.WorkingState.dropBomb(SystemUnitID, target, BombDefaultPower))
 	}
 }
 
-// ResolveTurn controls everything in between turns:
-// 1. Tick Bomb Countdowns
-// 2. Detonate Zero-Timer Bombs & Cascade Chain Reactions
-// 3. Calculate Occupant Destruction (Units, SoftBlocks, Items)
-// 4. Reset HasMoved and HasUsed guard
-// 5. Victory audit guard: Check who has living units left on the board
-// 6. Advance Turn Counter (Turn++)
-// 7. Overwrite TrueState with clean DeepCopy
-// Returns the events accumulated during planning and those produced by this resolution,
-// as two slices so callers can animate the two phases apart. MatchEndedEvent lands in the latter.
+// ResolveTurn detonates due bombs, then advances the turn or ends the match, and commits WorkingState to TrueState.
+// Returns the events logged during planning and those produced by resolution; MatchEndedEvent lands in the latter.
 func (m *Match) ResolveTurn() (planGameEvents, resolveTurnGameEvents []GameEvent) {
 	planGameEvents = make([]GameEvent, len(m.PlaybackLog))
 	copy(planGameEvents, m.PlaybackLog)
@@ -299,11 +280,8 @@ func (m *Match) resolveBombExplosionAndDamage() {
 	m.PlaybackLog = append(m.PlaybackLog, m.WorkingState.ResolveBombExplosionAndDamage()...)
 }
 
-// ResolveBombExplosionAndDamage resolves bomb explosion, chain reaction and the damages made, and fire related GameEvents.
-// Note: All cascading chain reactions occur at the exact same physical millisecond within a turn.
-// Soft block / Item destroyed by an early explosion must continue to exist as a solid, ray-blocking obstacle for all subsequent waves of bombs
-// until the entire chain reaction loop is completely finished.
-// Returns all GameEvents related to the Bombs
+// ResolveBombExplosionAndDamage ticks bomb countdowns, detonates due bombs with their chain reactions, and applies the damage.
+// Returns the resulting GameEvents.
 func (gs *GameState) ResolveBombExplosionAndDamage() []GameEvent {
 	var gameEvents []GameEvent
 
@@ -344,8 +322,8 @@ func (gs *GameState) tickCountdownsAndQueueFuses() ([]BombID, map[BombID]bool, [
 	return queue, ignited, gameEvents
 }
 
-// processChainDetonations handles Occupant Destruction & Chain reaction.
-// returns BombExplodedEvents caused by the chain reaction
+// processChainDetonations detonates the queued bombs and any bombs their blasts reach, recording hits into the given sets.
+// Returns the BombExplodedEvents.
 func (gs *GameState) processChainDetonations(
 	explosionQueue []BombID,
 	ignitedBombs map[BombID]bool,
@@ -412,8 +390,7 @@ func (gs *GameState) processChainDetonations(
 	return gameEvents
 }
 
-// cloneGridSnapshot captures the exact state of the board before any bomb goes off.
-// This ensures soft blocks continue to block rays for the entire duration of the turn.
+// cloneGridSnapshot returns a copy of the grid for casting blast rays against the pre-explosion board.
 func (gs *GameState) cloneGridSnapshot() [][]Tile {
 	frozenGrid := make([][]Tile, len(gs.Grid))
 	for y := range gs.Grid {
@@ -455,8 +432,6 @@ func (gs *GameState) handleDelayedBatchDamage(
 		delete(gs.SoftBlocks, softBlockID)
 		gameEvents = append(gameEvents, NewSoftBlockDestroyedEvent(softBlockID, softBlock.Position))
 	}
-
-	// TODO: Item destruction in future phase
 
 	return gameEvents
 }

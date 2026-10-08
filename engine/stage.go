@@ -1,7 +1,6 @@
 package engine
 
 // IsWithinBounds checks if the given coordinate is within the grid boundaries.
-// Return false if the grid is empty or if the coordinate is out of bounds.
 func (gs *GameState) IsWithinBounds(pos Coordinate) bool {
 	if len(gs.Grid) == 0 || len(gs.Grid[0]) == 0 {
 		return false
@@ -27,8 +26,7 @@ func (gs *GameState) UpdateStageOccupant(pos Coordinate, occupantType OccupantTy
 	gs.Grid[pos.Y][pos.X].OccupantID = id
 }
 
-// DeduceBombCountDown inspects the target position and unit's skill and deduces the count down of the bomb.
-// Since terrains and skills are in later phase, it always return 5 at the moment
+// DeduceBombCountDown returns the countdown for a bomb placed at pos.
 func (gs *GameState) DeduceBombCountDown(pos Coordinate) int {
 	return BombDefaultCountDown
 }

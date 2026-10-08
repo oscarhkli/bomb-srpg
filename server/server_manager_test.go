@@ -137,7 +137,6 @@ func TestServerStateManager_CreateMatchRoom(t *testing.T) {
 	}
 }
 
-// dropped in RoomID but will be used in RoomKey in online mtulti-player mode phase
 func isValidCrockfordCode(s string) bool {
 	const alphabet = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 	for _, c := range s {
@@ -1016,7 +1015,6 @@ func TestServerStateManager_StartTurn_CPUTurn(t *testing.T) {
 	legalCPUMove := []engine.TurnCommand{engine.NewMoveCommand(cpuUnitID, engine.Coordinate{X: 4, Y: 1})}
 	rejectedPlan := []engine.TurnCommand{engine.NewMoveCommand(humanUnitID, engine.Coordinate{X: 1, Y: 1})}
 
-	// Opens the CPU's turn: hands the board to team 2 the way a resolved human turn would.
 	cpuTurnPending := func(t *testing.T, room *MatchRoom) int {
 		t.Helper()
 		room.Match.WorkingState.Turn = 2
@@ -1318,7 +1316,6 @@ func TestServerStateManager_ReadsDuringCPUTurn(t *testing.T) {
 					t.Errorf("GetMatchState() error = %v", err)
 					return
 				}
-				// Consume it the way HandleGetMatchState does, or nothing racy is ever touched.
 				if _, err := json.Marshal(gs); err != nil {
 					t.Errorf("Marshal(gameState) error = %v", err)
 					return

@@ -815,3 +815,32 @@ func TestRiskAllies(t *testing.T) {
 		})
 	}
 }
+
+func TestAllyDeathCountedByExactlyOneFactor(t *testing.T) {
+	allyKingID := engine.NewUnitID(2, 0)
+	allyID := engine.NewUnitID(2, 1)
+	sc := scoreContext{allyKingID: allyKingID, allyIDs: []engine.UnitID{allyKingID, allyID}}
+
+	for turn := range maxForecastTurn {
+		tr := turnResult{
+			turn:              turn,
+			diedUnits:         map[engine.UnitID]struct{}{allyKingID: {}},
+			suicides:          map[engine.UnitID]struct{}{allyKingID: {}, allyID: {}},
+			aliveAlliesBefore: 1,
+			aliveAlliesAfter:  0,
+		}
+		kingFactors := []int{killAllyKing(nil, sc, tr), suicideAllyKing(nil, sc, tr)}
+		allyFactors := []int{killAllies(nil, sc, tr), suicideAllies(nil, sc, tr)}
+		for name, got := range map[string][]int{"king": kingFactors, "allies": allyFactors} {
+			nonZero := 0
+			for _, score := range got {
+				if score != 0 {
+					nonZero++
+				}
+			}
+			if nonZero != 1 {
+				t.Errorf("turn %d, %s factors scored %v, want exactly one non-zero", turn, name, got)
+			}
+		}
+	}
+}

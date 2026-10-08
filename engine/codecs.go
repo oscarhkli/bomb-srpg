@@ -1,16 +1,17 @@
 package engine
 
 const (
-	// SystemUnitID represents environmental or game-engine authoritative actions
-	// mapped explicitly to Team 0, Player 0 for sudden-death bomb drops.
+	// SystemUnitID is the environmental actor, Team 0 Player 0.
 	SystemUnitID UnitID = 0
 
+	// UnitID layout: team in the high nibble, player index in the low nibble.
 	UnitLocalShift = 0
 	UnitTeamShift  = 4
 
 	UnitLocalMask uint8 = 0x0F
 	UnitTeamMask  uint8 = 0x0F
 
+	// BombID layout: owner UnitID, turn and per-turn counter packed into 32 bits.
 	BombCounterShift = 0
 	BombTurnShift    = 16
 	BombUnitIDShift  = 24
@@ -20,7 +21,7 @@ const (
 	BombUnitIDMask  uint32 = 0xFF
 )
 
-// NewUnitID constructs a UnitID from team and player index using (TeamID << 4) | Index.
+// NewUnitID packs a team and a player index into a UnitID.
 func NewUnitID(teamID, counter int) UnitID {
 	return UnitID((uint8(teamID) << UnitTeamShift) | (uint8(counter) << UnitLocalShift))
 }
@@ -32,7 +33,7 @@ func (id UnitID) Decode() (teamID int, index int) {
 	return
 }
 
-// NewBombID constructs a BombID from turn, counter, and owner UnitID using (UnitID << 24) | (Turn << 16) | Counter.
+// NewBombID packs an owner, a turn and a counter into a BombID.
 func NewBombID(turn int, counter int, unitID UnitID) BombID {
 	return BombID(
 		(uint32(unitID) << BombUnitIDShift) |

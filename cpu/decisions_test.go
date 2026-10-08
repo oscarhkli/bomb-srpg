@@ -526,3 +526,47 @@ func TestDecide(t *testing.T) {
 		})
 	}
 }
+
+func TestCandidatePriority_MoveThenBombRanksLowest(t *testing.T) {
+	move := engine.NewMoveCommand(engine.NewUnitID(2, 1), engine.Coordinate{X: 1, Y: 0})
+	bomb := engine.NewPlaceBombCommand(engine.NewUnitID(2, 1), engine.Coordinate{X: 1, Y: 0})
+
+	tests := []struct {
+		name         string
+		turnCommands []engine.TurnCommand
+		want         int
+	}{
+		{"Idle", nil, 1},
+		{"Move only", []engine.TurnCommand{move}, 1},
+		{"Bomb only", []engine.TurnCommand{bomb}, 1},
+		{"Bomb then move", []engine.TurnCommand{bomb, move}, 1},
+		{"Move then bomb", []engine.TurnCommand{move, bomb}, 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := candidate{turnCommands: tt.turnCommands}.priority()
+			if got != tt.want {
+				t.Errorf("priority() = %d, want %d", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestIsKingRole_CoversBoss(t *testing.T) {
+	tests := []struct {
+		role engine.UnitRole
+		want bool
+	}{
+		{engine.RoleKing, true},
+		{engine.RoleBoss, true},
+		{engine.RoleNormal, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.role.String(), func(t *testing.T) {
+			got := isKingRole(&engine.Unit{Role: tt.role})
+			if got != tt.want {
+				t.Errorf("isKingRole(%v) = %v, want %v", tt.role, got, tt.want)
+			}
+		})
+	}
+}

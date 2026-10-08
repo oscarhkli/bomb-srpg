@@ -8,7 +8,7 @@ func (gs *GameState) FindReachableTiles(start Coordinate, rule MovementRule) map
 }
 
 // FindReachableTilesOnSnapshot runs pathfinding using a frozen, read-only grid snapshot matrix.
-// This is what allows overlapping explosions to evaluate line-of-sight blocks correctly.
+// The frozen snapshot lets overlapping explosions evaluate line-of-sight blocks correctly.
 func (gs *GameState) FindReachableTilesOnSnapshot(start Coordinate, snapshot [][]Tile, rule MovementRule) map[Coordinate]int {
 	return gs.findReachableTiles(start, rule, snapshot)
 }
@@ -49,12 +49,10 @@ func (gs *GameState) findReachableTiles(startPos Coordinate, rule MovementRule, 
 			}
 
 			canPass, canLand := rule.CheckPassability(grid[nextPos.Y][nextPos.X])
-			// can't pass and can't land means we skip this tile entirely
 			if !canPass && !canLand {
 				continue
 			}
 
-			// can land but can't pass: identify as reachable then stop exploration
 			if canLand {
 				if oldSteps, ok := steps[nextPos]; !ok || nextStep < oldSteps {
 					steps[nextPos] = nextStep
@@ -74,14 +72,9 @@ func (gs *GameState) findReachableTiles(startPos Coordinate, rule MovementRule, 
 	return steps
 }
 
-// CheckPassability evaluates how a movement rule interacts with a tile's terrain and occupant.
-// It returns:
-// - canPass: true if the pathfinder can step through this tile and continue moving.
-// - canLand: true if the pathfinder can step onto this tile but must stop immediately.
-// Either one can be true, both can be false, but they cannot both be true at the same time.
-// canPass = true, canLand = false - it's an open tile that can be moved through.
-// canPass = false, canLand = true - it's a tile that can be stepped on but not passed through.
-// canPass = false, canLand = false - it's a tile that cannot be stepped on or passed through.
+// CheckPassability reports how the rule treats the tile: canPass = can walk through it;
+// canLand = can step on it but must stop; both false = blocked.
+// Both true never occurs.
 func (mr MovementRule) CheckPassability(tile Tile) (canPass bool, canLand bool) {
 	if tile.Type == TerrainBlock && (mr.PassPermissions&PassHardBlocks == 0) {
 		return false, false
@@ -128,9 +121,8 @@ func (u Unit) NewMovementRule() MovementRule {
 // NewBombPlacementRule builds a snapshot configuration for a unit's bomb placement action.
 func (u Unit) NewBombPlacementRule() MovementRule {
 	return MovementRule{
-		MaxSteps: u.BombMaxRange,
-		Pattern:  PatternCardinal,
-		// All pass, but can't land on any occupant. Landing is handled in other place.
+		MaxSteps:        u.BombMaxRange,
+		Pattern:         PatternCardinal,
 		PassPermissions: PassUnits | PassSoftBlocks | PassHardBlocks | PassItems | PassBombs,
 	}
 }
@@ -149,8 +141,7 @@ func (gs *GameState) FindAllowedTiles(start Coordinate, rule MovementRule, occup
 	return allowed
 }
 
-// FindAllowedTilesForCommand returns tiles a unit can reach for a given command type.
-// Encapsulates rule selection so callers don't need to know MovementRule internals.
+// FindAllowedTilesForCommand returns the tiles a unit can use for the given command type.
 func (gs *GameState) FindAllowedTilesForCommand(unitID UnitID, turnCmdType TurnCmdType) (map[Coordinate]int, error) {
 	unit, err := gs.findUnit(unitID, true)
 	if err != nil {

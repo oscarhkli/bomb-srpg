@@ -51,7 +51,7 @@ func aliveCount(gs *engine.GameState, ids []engine.UnitID, kingID engine.UnitID)
 	return count
 }
 
-// evaluate forecasts the consequence if the Unit take certain actions.
+// evaluate scores the plan by forecasting maxForecastTurn turns of bomb resolution.
 func evaluate(sc scoreContext, gs *engine.GameState, cmds []engine.TurnCommand) (candidate, error) {
 	scratch := gs.DeepCopy()
 	if err := applyCandidate(scratch, candidate{turnCommands: cmds}); err != nil {

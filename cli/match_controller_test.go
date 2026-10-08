@@ -7,7 +7,7 @@ import (
 	"bomb-srpg/engine"
 )
 
-// SpyMatchView traps view interaction calls for behavioral assertions.
+// SpyMatchView records view calls.
 type SpyMatchView struct {
 	RenderBoardCalled      bool
 	RenderGameConfigCalled bool

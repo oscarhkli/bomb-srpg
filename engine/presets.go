@@ -1,8 +1,13 @@
 package engine
 
+// BombDefaultCountDown is the countdown in turns of a newly placed bomb.
 const BombDefaultCountDown int = 5
-const BombDefaultPower int = 2 // default power of Bomb
-const SuddenDeathBombs int = 2 // Sudden Death, maximum bombs to drop during Sudden Death
+
+// BombDefaultPower is the default explosion range in tiles.
+const BombDefaultPower int = 2
+
+// SuddenDeathBombs is the maximum number of bombs dropped per Sudden Death turn.
+const SuddenDeathBombs int = 2
 
 // archetypeRegistry stores the base templates of Archetypes.
 func archetypesRegistry() []Archetype {

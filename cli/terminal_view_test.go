@@ -86,7 +86,7 @@ func TestTerminalView_RenderBoard_Errors(t *testing.T) {
 		view := NewTerminalView(&fakeScreen)
 
 		gs := &engine.GameState{
-			Grid: [][]engine.Tile{}, // Completely empty matrix grid array
+			Grid: [][]engine.Tile{},
 		}
 
 		err := view.RenderBoard(gs)

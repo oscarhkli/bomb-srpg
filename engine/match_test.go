@@ -296,7 +296,6 @@ func TestGameState_MoveUnit(t *testing.T) {
 					Speed:    3,
 				}
 				gs.Grid[origin.Y][origin.X] = Tile{OccupantType: OccupantUnit, OccupantID: int64(validUnitID)}
-				// Mock rule where target won't be found in reachable tiles
 				return gs
 			},
 			wantErr:     true,
@@ -340,7 +339,6 @@ func TestGameState_MoveUnit(t *testing.T) {
 					Speed:    3,
 				}
 				gs.Grid[origin.Y][origin.X] = Tile{OccupantType: OccupantUnit, OccupantID: int64(validUnitID)}
-				// FindReachableTiles/IsLandingLegal pass this target
 				return gs
 			},
 			wantErr: false,
@@ -1342,8 +1340,7 @@ func TestMatch_ResolveTurn_CascadingChainReactions(t *testing.T) {
 
 		_, gameEvents := m.ResolveTurn()
 
-		// Verification: SoftBlock must be flagged for destruction, but its active shielding body
-		// must prevent the blast ray from crossing over to touch Bomb 2 in this frame pass.
+		// The soft block is destroyed but still shields Bomb 2 from the blast within this pass.
 		if _, ok := m.WorkingState.SoftBlocks[softBlockID]; ok {
 			t.Error("Soft block failed to be destroyed by direct ray hit")
 		}
@@ -1446,7 +1443,6 @@ func TestMatch_ResolveTurn_TimelineSystemTransitions(t *testing.T) {
 	})
 }
 
-// AddUnit adds a unit to the match's WorkingState and syncs the grid.
 func (m *Match) AddUnit(team, idx int, archetype Archetype, role UnitRole, pos Coordinate, hp int) *Unit {
 	id := NewUnitID(team, idx)
 	u := &Unit{
@@ -1473,7 +1469,6 @@ func (m *Match) AddUnit(team, idx int, archetype Archetype, role UnitRole, pos C
 	return u
 }
 
-// AddBomb adds a bomb to the match's WorkingState and syncs the grid.
 func (m *Match) AddBomb(turn, counter int, owner UnitID, pos Coordinate, range_, cd int) *Bomb {
 	b := &Bomb{
 		ID:        NewBombID(turn, counter, owner),
@@ -1491,7 +1486,6 @@ func (m *Match) AddBomb(turn, counter int, owner UnitID, pos Coordinate, range_,
 	return b
 }
 
-// AddSoftBlock adds a soft block to the match's WorkingState and syncs the grid.
 func (m *Match) AddSoftBlock(id int, pos Coordinate) *SoftBlock {
 	sb := &SoftBlock{ID: id, Position: pos}
 	m.WorkingState.SoftBlocks[id] = sb
@@ -1503,12 +1497,11 @@ func (m *Match) AddSoftBlock(id int, pos Coordinate) *SoftBlock {
 	return sb
 }
 
-// teamFormation describes one team's roster for victory-condition test setup.
-// King == nil selects a Boss-type team, built from BossesAlive instead.
+// teamFormation describes one team's roster; a nil King selects a Boss-type team built from BossesAlive.
 type teamFormation struct {
 	King               *bool
 	BossesAlive        []bool
-	OrdinaryUnitsAlive []bool // non-King, non-Boss Fighter units, either team type
+	OrdinaryUnitsAlive []bool
 }
 
 func boolPtr(b bool) *bool { return &b }
