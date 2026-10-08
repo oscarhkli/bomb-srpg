@@ -276,8 +276,8 @@ func riskAllyKing(gs *engine.GameState, sc scoreContext, tr turnResult) int {
 	return int(float64(riskAllyKingScore) * exposureIndex(gs, sc.allyKingID, tr.opponentAffectedTiles, tr, 1, kDistRisk))
 }
 
-// nonKingCount returns how many of ids aren't kingID, alive or not — the fixed group size
-// to average risk/threat exposure over, so a wipeout still scores instead of dividing by zero.
+// nonKingCount returns how many of ids aren't kingID, alive or not.
+// It is the fixed group size to average risk/threat exposure over, so a wipeout still scores instead of dividing by zero.
 func nonKingCount(ids []engine.UnitID, kingID engine.UnitID) int {
 	count := 0
 	for _, id := range ids {
