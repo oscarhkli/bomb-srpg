@@ -309,15 +309,15 @@ type GameCfg struct {
 
 // GameState is the complete snapshot of a match at a point in time.
 type GameState struct {
-	Turn            int              // Current turn number (starts at 1)
-	InSuddenDeath   bool             // Indicate if the current turn is in Sudden Death
-	ActiveTeam      int              // Team whose turn it is (1 or 2)
-	TurnBombCounter int              // Bombs placed this turn (for BombID generation)
-	Grid            [][]Tile         // Board matrix [Y][X]
-	Units           map[UnitID]*Unit // All units by ID
-	Bombs           map[BombID]*Bomb // Active bombs by ID
-	SoftBlocks      map[int]*SoftBlock
-	TurnCommands    []TurnCommand // Pending commands for current turn
+	Turn            int                // Current turn number (starts at 1)
+	InSuddenDeath   bool               // Indicate if the current turn is in Sudden Death
+	ActiveTeam      int                // Team whose turn it is (1 or 2)
+	TurnBombCounter int                // Bombs placed this turn (for BombID generation)
+	Grid            [][]Tile           // Board matrix [Y][X]
+	Units           map[UnitID]*Unit   // All units by ID
+	Bombs           map[BombID]*Bomb   // Active bombs by ID
+	SoftBlocks      map[int]*SoftBlock // Soft blocks by ID
+	TurnCommands    []TurnCommand      // Pending commands for current turn
 }
 
 func nonNilValues[K comparable, V any](m map[K]V) []V {
