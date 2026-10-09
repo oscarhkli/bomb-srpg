@@ -233,7 +233,7 @@ type Unit struct {
 	MaxBombCount int
 	BombUsed     int
 	Team         int // 1 = P1, 2 = P2 / COM
-	HP           int // 1 = alive, 0 = dead
+	HP           int // alive while above 0; every archetype currently has 1
 	Skills       SkillType
 	Role         UnitRole
 	HasMoved     bool
