@@ -605,20 +605,18 @@ func (s *ServerStateManager) GetAllowedTiles(roomID string, unitID engine.UnitID
 	return slices.AppendSeq(tiles, maps.Keys(allowedTiles)), nil
 }
 
-// StartCleanupLoop runs background cleanup until ctx is cancelled.
-func (s *ServerStateManager) StartCleanupLoop(ctx context.Context, interval time.Duration) {
+// RunCleanupLoop removes inactive rooms every interval and blocks until ctx is cancelled.
+func (s *ServerStateManager) RunCleanupLoop(ctx context.Context, interval time.Duration) {
 	ticker := time.NewTicker(interval)
-	go func() {
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				s.cleanupInactiveRooms()
-			}
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			s.cleanupInactiveRooms()
 		}
-	}()
+	}
 }
 
 const roomInactivityTimeout = 60 * time.Minute

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"reflect"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -1882,15 +1883,42 @@ func TestServerStateManager_cleanupInactiveRooms(t *testing.T) {
 	}
 }
 
-func TestServerStateManager_StartCleanupLoop_Cancellation(t *testing.T) {
+func TestServerStateManager_RunCleanupLoop(t *testing.T) {
 	s := NewServerStateManager()
+	roomID, _ := s.CreateMatchRoom()
+	s.CreateMatch(roomID, validGameCfg())
+	room := mustRoom(t, s, roomID)
+	room.mu.Lock()
+	room.LastActivity = time.Now().Add(-2 * roomInactivityTimeout)
+	room.mu.Unlock()
+
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan struct{})
+	go func() {
+		s.RunCleanupLoop(ctx, time.Millisecond)
+		close(done)
+	}()
 
-	s.StartCleanupLoop(ctx, 10*time.Millisecond)
-	time.Sleep(25 * time.Millisecond) // let it tick a couple times
+	deadline := time.After(2 * time.Second)
+	for {
+		if _, ok := s.Rooms.Load(roomID); !ok {
+			break
+		}
+		select {
+		case <-deadline:
+			t.Fatal("inactive room was not removed by the loop")
+		default:
+			runtime.Gosched()
+		}
+	}
+
 	cancel()
-	time.Sleep(10 * time.Millisecond) // let goroutine exit
-
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("loop did not stop after cancel")
+	}
 }
 
 func TestServerStateManager_WithLoggerOption(t *testing.T) {
