@@ -118,7 +118,9 @@ func (m *Match) CommandPlaceBomb(unitID UnitID, target Coordinate) ([]GameEvent,
 	return []GameEvent{gameEvent}, nil
 }
 
-// PlaceBomb drops a bomb for the unit within its placement range and returns the BombPlacedEvent.
+// PlaceBomb drops a bomb for the unit and returns the BombPlacedEvent. SystemUnitID skips validation.
+// Otherwise it returns an error if the unit has no bombs or skill use left, the target is out of
+// bomb range, or the cell is not landable.
 func (gs *GameState) PlaceBomb(unitID UnitID, target Coordinate) (GameEvent, error) {
 	bombPower := BombDefaultPower
 	var unit *Unit

@@ -184,7 +184,7 @@ func (h *Handler) HandleRematch(w http.ResponseWriter, r *http.Request) {
 	h.Logger.Info("rematch created", "roomID", roomID)
 }
 
-// HandleDeleteMatch removes the room's concluded Match.
+// HandleDeleteMatch removes the room's concluded Match and responds 204 with no body.
 func (h *Handler) HandleDeleteMatch(w http.ResponseWriter, r *http.Request) {
 	roomID := r.PathValue("roomID")
 
@@ -295,7 +295,7 @@ func (h *Handler) HandleConsumeCPUStatus(w http.ResponseWriter, r *http.Request)
 	h.writeJSON(w, http.StatusOK, res, "encode cpu status response failed")
 }
 
-// HandleResetTurn discards the planned actions for the current turn.
+// HandleResetTurn discards the planned actions for the current turn and responds 204 with no body.
 func (h *Handler) HandleResetTurn(w http.ResponseWriter, r *http.Request) {
 	roomID := r.PathValue("roomID")
 

@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"log/slog"
 	"reflect"
-	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -1901,6 +1900,8 @@ func TestServerStateManager_RunCleanupLoop(t *testing.T) {
 	}()
 
 	deadline := time.After(2 * time.Second)
+	poll := time.NewTicker(time.Millisecond)
+	defer poll.Stop()
 	for {
 		if _, ok := s.Rooms.Load(roomID); !ok {
 			break
@@ -1908,8 +1909,7 @@ func TestServerStateManager_RunCleanupLoop(t *testing.T) {
 		select {
 		case <-deadline:
 			t.Fatal("inactive room was not removed by the loop")
-		default:
-			runtime.Gosched()
+		case <-poll.C:
 		}
 	}
 
