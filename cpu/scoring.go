@@ -23,17 +23,17 @@ type scoreContext struct {
 type turnResult struct {
 	turn                  int // the nth next turn, not the exact turn number
 	affectedTiles         map[engine.Coordinate]struct{}
-	allyAffectedTiles     map[engine.Coordinate]struct{}
-	opponentAffectedTiles map[engine.Coordinate]struct{}
-	destroyedSoftBlocks   int                        // this turn's softBlockDestroyed count
-	diedUnits             map[engine.UnitID]struct{} // this turn's dead units
-	suicides              map[engine.UnitID]struct{} // this turn's dead allies killed by an ally-owned bomb
-	distToKingBefore      int                        // unit's reachability to opponent King, before this turn resolved
-	distToKingAfter       int                        // unit's reachability to opponent King, after this turn resolved
-	aliveOpponentsBefore  int                        // opponent non-King units alive, before this turn resolved
-	aliveOpponentsAfter   int                        // opponent non-King units alive, after this turn resolved
-	aliveAlliesBefore     int                        // ally non-King units alive, before this turn resolved
-	aliveAlliesAfter      int                        // ally non-King units alive, after this turn resolved
+	allyAffectedTiles     map[engine.Coordinate]struct{} // tiles hit by an ally-owned bomb
+	opponentAffectedTiles map[engine.Coordinate]struct{} // tiles hit by an opponent-owned bomb
+	destroyedSoftBlocks   int                            // this turn's softBlockDestroyed count
+	diedUnits             map[engine.UnitID]struct{}     // this turn's dead units
+	suicides              map[engine.UnitID]struct{}     // this turn's dead allies killed by an ally-owned bomb
+	distToKingBefore      int                            // unit's reachability to opponent King, before this turn resolved
+	distToKingAfter       int                            // unit's reachability to opponent King, after this turn resolved
+	aliveOpponentsBefore  int                            // opponent non-King units alive, before this turn resolved
+	aliveOpponentsAfter   int                            // opponent non-King units alive, after this turn resolved
+	aliveAlliesBefore     int                            // ally non-King units alive, before this turn resolved
+	aliveAlliesAfter      int                            // ally non-King units alive, after this turn resolved
 }
 
 type scoreFactor func(gs *engine.GameState, sc scoreContext, tr turnResult) int
