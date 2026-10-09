@@ -302,6 +302,28 @@ func TestGameState_MoveUnit(t *testing.T) {
 			errContains: "target out of move range",
 		},
 		{
+			name:   "Failure: Target is reachable but not landable terrain",
+			unitID: validUnitID,
+			target: validTarget,
+			setupState: func() *GameState {
+				gs := newTestMatch(3, 3).WorkingState
+				gs.Turn = 1
+				gs.ActiveTeam = 1
+				gs.Units[validUnitID] = &Unit{
+					ID:       validUnitID,
+					HP:       1,
+					Team:     1,
+					Position: origin,
+					Speed:    3,
+				}
+				gs.Grid[origin.Y][origin.X] = Tile{OccupantType: OccupantUnit, OccupantID: int64(validUnitID)}
+				gs.Grid[validTarget.Y][validTarget.X].Type = TerrainWater
+				return gs
+			},
+			wantErr:     true,
+			errContains: "invalid landing position",
+		},
+		{
 			name:   "Failure: Unit has moved in the same turn",
 			unitID: validUnitID,
 			target: validTarget,
