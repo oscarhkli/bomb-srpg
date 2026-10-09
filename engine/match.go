@@ -74,7 +74,6 @@ func (gs *GameState) MoveUnit(unitID UnitID, target Coordinate) (GameEvent, erro
 		return GameEvent{}, ErrOutOfMoveRange
 	}
 
-	// err will always be nil at the moment, not testable until the Skills implementation in Phase 4+
 	if err = gs.IsLandingLegal(target, OccupantUnit); err != nil {
 		return GameEvent{}, fmt.Errorf("%w: %w", ErrInvalidLanding, err)
 	}
@@ -436,19 +435,10 @@ func (gs *GameState) handleDelayedBatchDamage(
 	return gameEvents
 }
 
-// evaluateVictoryConditions defines each team's
-// - Goal (win condition met):
-//   - a living Boss for a Boss-type team, or a living King plus a living Ordinary unit for a King-type team
-//
-// - Wiped (loss condition met):
-//   - all Bosses dead, or King and all Ordinary units dead) status
-//
-// Then resolves the outcome:
-//   - Both teams meet Goal: match continues.
-//   - Just One team meets Goal, or holds a living King against a Wiped opponent: that team wins.
-//   - Neither team qualifies: draw.
-//
-// Returns MatchInProgress, 1, 2, or MatchDrawn.
+// evaluateVictoryConditions returns MatchInProgress, 1, 2, or MatchDrawn.
+// Goal: a living Boss, or a living King plus a living Ordinary unit. Wiped: the Boss dead, or a Boss-less team with no living unit.
+// Both teams at Goal play on. A team wins by meeting Goal or by holding a living King against a Wiped opponent;
+// if both or neither qualify, it is a draw.
 func (m *Match) evaluateVictoryConditions() int {
 	p1HasBoss, p1BossAlive := false, false
 	p2HasBoss, p2BossAlive := false, false
