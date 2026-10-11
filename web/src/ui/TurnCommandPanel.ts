@@ -129,7 +129,6 @@ export default class TurnCommandPanel {
     );
   }
 
-  // Disabled while ConfirmDialog is open — "No" is the only rollback path.
   private onBackButtonClick(): void {
     if (this.callbacks.isConfirmOpen() || this.callbacks.isLocked()) {
       return;

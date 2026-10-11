@@ -112,9 +112,6 @@ describe('playResolveTurnEvents — validation', () => {
     expect(mockScene.time.delayedCall).not.toHaveBeenCalled();
   });
 
-  // bombCountdownUpdated keeps its snapshot-existence check (unlike bombExploded's, dropped
-  // below) since its countdown display always targets an already-live bomb, never one placed
-  // earlier in the same CPU turn.
   it('flags a bombCountdownUpdated referencing a bombId absent from the snapshot', () => {
     const onError = vi.fn();
 
@@ -314,8 +311,6 @@ describe('playResolveTurnEvents — validation', () => {
     });
 
     const result = playResolveTurnEvents(
-      // (3,3) is diagonal to the bomb at (2,2) — not on the same row or column, but in-bounds.
-      // A future engine change could plausibly emit this; it must not be rejected client-side.
       [
         {
           type: 'bombExploded',
@@ -407,8 +402,6 @@ describe('playResolveTurnEvents — bombExploded (non-chain)', () => {
           type: 'bombExploded',
           bombId: 1,
           position: { x: 2, y: 2 },
-          // The engine's raycast seeds the reachable set with the bomb's own tile,
-          // so (2,2) is always present alongside the outward ray tiles.
           affectedPositions: [
             { x: 2, y: 2 },
             { x: 3, y: 2 },
@@ -573,8 +566,6 @@ describe('playResolveTurnEvents — occupant events', () => {
     const state = baseState({
       grid: grid5x5(),
       bombs: [{ id: 1, ownerId: 0x11, position: { x: 0, y: 0 }, range: 2, countdown: 0 }],
-      // Deliberately-wrong snapshot position — the unit's real position must come from
-      // the event only, since a CPU turn's snapshot predates its own planGameEvents.
       units: [
         makeUnit({
           id: 0x21,
@@ -654,8 +645,6 @@ describe('playResolveTurnEvents — occupant events', () => {
   });
 });
 
-// Plays the event stream to completion, then asserts the graphics maps hold exactly the
-// occupants the expected end-state says survived.
 describe('playResolveTurnEvents — render fidelity oracle', () => {
   interface FidelityCase {
     name: string;

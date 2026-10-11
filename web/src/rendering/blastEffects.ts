@@ -35,8 +35,6 @@ interface BandSegment {
   color: number;
 }
 
-// Splits [0, totalLength] into inner/mid/outer thirds (nearest-to-bomb = inner/hottest,
-// farthest tip = outer), clipped to how far the beam has grown (currentLen) so far.
 function bandSegments(totalLength: number, currentLen: number): BandSegment[] {
   const thirdLen = totalLength / 3;
   const boundaries = [0, thirdLen, thirdLen * 2, totalLength];
@@ -53,7 +51,6 @@ function bandSegments(totalLength: number, currentLen: number): BandSegment[] {
   return segments;
 }
 
-// Draws a pill-shaped (fully-rounded) rect; radius is clamped to half the segment length.
 function drawSegmentRect(
   g: Phaser.GameObjects.Graphics,
   cx: number,
@@ -80,8 +77,7 @@ function drawSegmentRect(
   }
 }
 
-// Renders one cardinal ray of a bomb's blast as a beam that elongates outward over time —
-// a single tween drives redraws rather than per-tile flashes.
+// Renders one cardinal blast ray as a beam that grows outward over durationMs.
 export function drawGrowingBeam(
   scene: Phaser.Scene,
   origin: Coordinate,

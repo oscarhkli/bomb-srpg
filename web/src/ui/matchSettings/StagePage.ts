@@ -46,7 +46,7 @@ const START_MATCH_BUTTON_STYLE: PillButtonStyle = {
   borderWidth: PANEL_BUTTON_BORDER_WIDTH,
 };
 
-// StagesPanel (StageCard grid, left half) + StageDetailPanel (InnerPanel, right half).
+// Stage selection (left) and the selected stage's details (right).
 export default class StagePage implements SettingsPage {
   private selectedIndex: number;
   private currentMaxTurns: number;
@@ -259,7 +259,6 @@ export default class StagePage implements SettingsPage {
     this.renderMaxTurnsSelector(inner, rowY, cx);
   }
 
-  // Inset is measured from InnerPanel's own edge, not the padded content edge.
   private renderMaxTurnsSelector(inner: PageBounds, rowY: number, cx: number): void {
     const scene = this.scene;
     if (!scene) {

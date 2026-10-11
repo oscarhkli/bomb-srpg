@@ -1,5 +1,4 @@
-// Shared domain-object builders for tests. Pure data — no Phaser/mockScene dependency, so any
-// test file (including non-rendering ones like api.test.ts) can import from here.
+// Pure-data domain builders with no Phaser or mockScene dependency.
 import type {
   Bomb,
   GameCfg,

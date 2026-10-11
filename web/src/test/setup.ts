@@ -1,22 +1,18 @@
 import { boardOffset } from '../rendering/boardOffset';
 
-// boardOffset is a shared module-level singleton (recomputed once per establishBoardLayout()
-// call in real usage) — reset it before every test so a non-default-size grid in one test can't
-// leak its offset into an unrelated test later in the same file.
+// Reset the shared boardOffset singleton so one test's grid size can't leak into the next.
 beforeEach(() => {
   boardOffset.x = 0;
   boardOffset.y = 0;
 });
 
-// Mock Path2D globally for jsdom (not implemented by jsdom)
+// jsdom does not implement Path2D.
 (globalThis as Record<string, unknown>).Path2D ??= class MockPath2D {
   addPath(): void {
     /* stub */
   }
 };
 
-// Fake Graphics/Text so chained calls don't throw. add.graphics()/add.text() return a fresh
-// instance per call — inspect via mock.results[i].value.
 export function createMockGraphics() {
   return {
     x: 0,
@@ -183,14 +179,9 @@ export const mockScene = {
     on: vi.fn(),
     once: vi.fn(),
   },
-  // Any texture key resolves to one real frame (named after the key itself) plus '__BASE',
-  // mirroring a real single-frame aseprite atlas — so firstNonBaseFrame() works out of the box
-  // for every sprite key without per-test texture setup.
   textures: {
     get: vi.fn((key: string) => ({ frames: { __BASE: {}, [`${key}-frame`]: {} } })),
     exists: vi.fn((_key: string) => false),
-    // Symmetric by default so setOrigin(0.5, 0.5) holds unless a test overrides it.
-    // width/height are the trimmed size; realWidth/realHeight are the untrimmed canvas.
     getFrame: vi.fn(() => ({
       x: 0,
       y: 0,
@@ -265,7 +256,6 @@ global.Phaser = {
   Display: { Color: { ValueToColor: vi.fn() } },
 };
 
-// Mock canvas for jsdom
 const mockContext = {
   fillRect: vi.fn(),
   clearRect: vi.fn(),
@@ -338,8 +328,7 @@ HTMLCanvasElement.prototype.getContext = vi.fn((contextId: string) => {
   return null;
 }) as unknown as HTMLCanvasElement['getContext'];
 
-// Scene subclasses `import Phaser from 'phaser'` and `extends Phaser.Scene` — redirect that
-// import to the mocked global.Phaser above so `this.add`/`this.cameras` are populated.
+// Redirects scenes' `import Phaser from 'phaser'` to the mocked global.Phaser above.
 vi.mock('phaser', () => ({
   default: (globalThis as Record<string, unknown>).Phaser,
 }));

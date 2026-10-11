@@ -23,9 +23,7 @@ export function buttonFrameSize(scene: Phaser.Scene): { width: number; height: n
   return { width, height };
 }
 
-// A composite Button+Label component swapping between Neutral/Selected/Clicked/Disabled sprite
-// states. Both GameObjects sit at local (0, 0) with origin (0.5, 0.5) so trimmed atlas frames
-// self-align regardless of each state's differing trim.
+// A button/label sprite pair that swaps between Neutral, Selected, Clicked, and Disabled states.
 export default class SpriteButton {
   readonly container: Phaser.GameObjects.Container;
   private readonly buttonImage: Phaser.GameObjects.Image;
@@ -42,7 +40,6 @@ export default class SpriteButton {
 
     this.container = scene.add.container(config.x, config.y);
     this.container.setDepth(config.depth);
-    // Enabled up front so `filters` is non-null regardless of which state setEnabled starts in.
     this.container.enableFilters();
 
     this.buttonImage = scene.add

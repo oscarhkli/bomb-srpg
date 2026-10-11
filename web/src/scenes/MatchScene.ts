@@ -191,8 +191,6 @@ export default class MatchScene extends Phaser.Scene {
     this.cameras.main.fadeIn(FADE_MS);
   }
 
-  // gameState and gameCfg are fetched via two independent promise chains (kept separate so
-  // MatchScene's initial render doesn't wait on both round-trips), so either may resolve first.
   private refreshTurnPanelIfReady(): void {
     if (this.gameStateLoaded && this.gameCfgLoaded) {
       this.turnPanel.update(this.gameState.turn, this.gameCfg.maxTurns, this.gameState.activeTeam);
@@ -364,8 +362,6 @@ export default class MatchScene extends Phaser.Scene {
     await this.beginTurn();
   }
 
-  // Distinguishes a lost animation (turn advanced server-side, re-render silently) from a CPU
-  // turn that never completed (surface an error; the match is never force-ended).
   private async recoverFromCpuPollFailure(gen: number): Promise<void> {
     const turnBeforeCpu = this.gameState.turn;
     const freshState = await getMatchState();
@@ -412,9 +408,7 @@ export default class MatchScene extends Phaser.Scene {
     }
 
     const restY = bomb.container.y;
-    // Relative to the bomb's own rest position so the drop starts fully off-screen on any tile.
-    const dropOffset = restY + BOMB_SIZE;
-    bomb.container.y -= dropOffset;
+    bomb.container.y = -BOMB_SIZE;
     bomb.container.setDepth(DEPTH_SUDDEN_DEATH_BOMB);
 
     return new Promise(resolve => {
@@ -767,7 +761,6 @@ export default class MatchScene extends Phaser.Scene {
         }
         this.showError(err instanceof Error ? err.message : String(err));
       }
-      // turnPanel is turn-advance UI, not reconciliation, so it refreshes regardless of success.
       await this.resyncFromServer(gen, succeeded, freshState => {
         this.turnPanel.update(freshState.turn, this.gameCfg.maxTurns, freshState.activeTeam);
       });
@@ -787,8 +780,6 @@ export default class MatchScene extends Phaser.Scene {
     }
   }
 
-  // A missing/out-of-range winnerTeamId is a client-side integration bug: the match is over
-  // server-side regardless, so there's nothing safe to resume — show the error and stop.
   private handleMatchEnded(event: GameEvent): void {
     const { winnerTeamId } = event;
     if (
@@ -840,7 +831,6 @@ export default class MatchScene extends Phaser.Scene {
     }
     this.victoryActionTaken = true;
     void this.fadeOutAndDeleteMatch().then(() => {
-      // Forward gameCfg so MatchSettingsScene remembers the last match's settings.
       this.scene.start('MatchSettingsScene', {
         gameCfg: this.gameCfg,
       } satisfies MatchSettingsSceneData);
@@ -882,7 +872,7 @@ export default class MatchScene extends Phaser.Scene {
     };
   }
 
-  // `clickedUnit` may be a stale snapshot, so resolve the live copy by id before use.
+  // `clickedUnit` may be a stale snapshot, so resolve the live copy by id.
   private onUnitClicked(clickedUnit: Unit): void {
     if (this.isLocked()) {
       return;

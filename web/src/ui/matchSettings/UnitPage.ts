@@ -66,8 +66,7 @@ const NEXT_BUTTON_DISABLED_STYLE: PillButtonStyle = {
   borderWidth: PANEL_BUTTON_BORDER_WIDTH,
 };
 
-// Builds one Player's formation (FormationPanel) from the archetypes offered by ArchetypesPanel.
-// Mutates the scene's shared `gameCfg` in place on every put-on/take-off.
+// Builds one Player's formation; mutates the scene's shared gameCfg in place.
 export default class UnitPage implements SettingsPage {
   private readonly slots: string[];
   private scene: Phaser.Scene | undefined;
@@ -395,7 +394,6 @@ export default class UnitPage implements SettingsPage {
     );
   }
 
-  // Only FormationPanel + NextButton depend on formation state, so only those are redrawn.
   private commitAndRerender(): void {
     if (this.playerIndex === 1) {
       this.gameCfg.p1Slots = serializeTeams(this.slots);

@@ -77,8 +77,6 @@ describe('drawGrowingBeam', () => {
 
     expect(g.clear).toHaveBeenCalledTimes(1);
     expect(g.fillStyle).toHaveBeenCalledExactlyOnceWith(BLAST_COLOR_INNER, BLAST_ALPHA);
-    // Pill-shaped (rounded rect), not a hard-edged rectangle — radius is half the beam width,
-    // clamped to half the segment's own length so a short segment doesn't over-round.
     expect(g.fillRoundedRect).toHaveBeenCalledExactlyOnceWith(
       TILE_SIZE / 2,
       TILE_SIZE / 2 - BLAST_BEAM_WIDTH / 2,

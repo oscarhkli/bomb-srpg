@@ -1,5 +1,4 @@
-// Test-only oracle: asserts the occupant graphics maps contain exactly the occupants that
-// server truth says exist, nothing missing or extra.
+// Asserts the occupant graphics maps hold exactly the occupants server truth says exist.
 import type Phaser from 'phaser';
 import type { GameState } from '../types/api';
 import type { BombGraphics } from '../rendering/resolveTurnPlayer';

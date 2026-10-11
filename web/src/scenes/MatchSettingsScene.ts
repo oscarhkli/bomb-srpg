@@ -31,8 +31,7 @@ function defaultGameCfg(): GameCfg {
   };
 }
 
-// Configures a match: 2 UnitPages (one per Player) + a StagePage, swapped via fadeTransition
-// behind persistent chrome (BackButton + HeaderRegion/NavRegion).
+// Configures a match through two UnitPages and a StagePage.
 export default class MatchSettingsScene extends Phaser.Scene {
   private gameCfg!: GameCfg;
   private pages: SettingsPage[] = [];

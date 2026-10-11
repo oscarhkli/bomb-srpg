@@ -50,8 +50,7 @@ function makePanel(overrides: Partial<Record<string, unknown>> = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  // button_neutral's real trimmed frame size (130x40) — this file's own gap-math tests need a
-  // realistic button height, not the generic 100x100 default other tests rely on.
+  // button_neutral's real trimmed size (130x40); the default 100x100 frame skews the gap math.
   mockScene.textures.getFrame.mockReturnValue({
     x: 0,
     y: 0,
@@ -210,8 +209,7 @@ describe('MatchSummaryPanel.open', () => {
 
     panel.open(makeState(), makeCfg({ allowResetTurn: false }));
 
-    // Last 4 graphics are always [Resolve, Reset, Surrender, Back], regardless of how many
-    // graphics (scrim, P1/P2 team badges) precede them.
+    // Last 4 graphics are [Resolve, Reset, Surrender, Back].
     const [, resetButtonGraphics] = allGraphics().slice(-4);
     expect(resetButtonGraphics!.fillStyle).toHaveBeenCalledWith(
       DISABLED_BUTTON_COLOR,
@@ -271,7 +269,6 @@ describe('MatchSummaryPanel.open', () => {
 
     panel.open(makeState(), makeCfg());
 
-    // First two graphics after the scrim are the P1/P2 badges (drawn before any button).
     const [, p1Badge, p2Badge] = allGraphics();
     expect(p1Badge!.fillStyle).toHaveBeenCalledWith(TEAM_COLORS[1]);
     expect(p1Badge!.fillRoundedRect).toHaveBeenCalled();
@@ -322,5 +319,16 @@ describe('MatchSummaryPanel.close', () => {
 
     objectsBeforeClose.forEach(o => expect(o.destroy).toHaveBeenCalled());
     expect(panel.isOpen).toBe(false);
+  });
+
+  it('disables clicks on every panel graphic immediately, before the fade-out completes', () => {
+    const { panel } = makePanel();
+    panel.open(makeState(), makeCfg());
+    const graphicsBeforeClose = [...allGraphics()];
+
+    panel.close();
+
+    graphicsBeforeClose.forEach(g => expect(g.disableInteractive).toHaveBeenCalled());
+    graphicsBeforeClose.forEach(g => expect(g.destroy).not.toHaveBeenCalled());
   });
 });

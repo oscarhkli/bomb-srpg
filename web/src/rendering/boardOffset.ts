@@ -1,8 +1,6 @@
 import { GAME_BOARD_REGION_WIDTH, GAME_BOARD_REGION_HEIGHT, TILE_SIZE } from '../constants';
 
-// Grid is centered within GameBoardRegion; stage presets vary in size, so this is recomputed
-// once per match (not a fixed constant). Shared by everything board-relative — grid, occupants,
-// blast/fire effects, allowed-tile overlay — so they all stay aligned to the same origin.
+// Top-left of the grid centered in GameBoardRegion; recomputed per match by setBoardOffset().
 export const boardOffset = { x: 0, y: 0 };
 
 export function setBoardOffset(cols: number, rows: number): void {

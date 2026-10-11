@@ -136,8 +136,7 @@ interface ExplodedInfo {
   offset: number;
 }
 
-// Chain-reaction/occupant causer: whichever earlier bombExplodedEvent's blast reaches
-// `position` soonest (smallest resulting offset), not necessarily the earliest in event order.
+// The soonest offset at which any earlier explosion's blast reaches `position`.
 function causerOffsetFor(position: Coordinate, exploded: ExplodedInfo[]): number {
   let best: number | undefined;
   for (const e of exploded) {

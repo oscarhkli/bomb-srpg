@@ -116,8 +116,7 @@ describe('renderStageBackground', () => {
   });
 
   it('computes origin from the trimmed content center, not the untrimmed canvas center', () => {
-    // Actual Stage-Plain.json trim data: a 320x320 visible crop offset (64, 64) within a
-    // 640x640 untrimmed canvas — not centered, so origin must not default to (0.5, 0.5).
+    // Stage-Plain.json: a 320x320 crop offset (64, 64) in a 640x640 canvas, so not centered.
     mockScene.textures.getFrame.mockReturnValueOnce({
       x: 64,
       y: 64,

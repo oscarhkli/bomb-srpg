@@ -146,13 +146,10 @@ describe('TurnCommandPanel', () => {
   it('keeps placeBombButton disabled across a turn boundary while the placed bomb has not detonated, then re-enables once it has', () => {
     const { panel } = makePanel();
 
-    // Next turn opens: hasUsedSkill resets, but bombUsed (server truth) still reflects
-    // the outstanding bomb — the button must stay disabled.
     panel.openFor(makeUnit({ hasUsedSkill: false, maxBombCount: 1, bombUsed: 1 }));
     const [, stillDisabled] = lastContainers(3);
     expect(stillDisabled!.disableInteractive).toHaveBeenCalled();
 
-    // The bomb has since detonated: bombUsed resets — button re-enables.
     panel.openFor(makeUnit({ hasUsedSkill: false, maxBombCount: 1, bombUsed: 0 }));
     const [, reenabled] = lastContainers(3);
     expect(reenabled!.disableInteractive).not.toHaveBeenCalled();
@@ -175,6 +172,16 @@ describe('TurnCommandPanel', () => {
     clickPointerdown(backButtonContainer!);
 
     allContainers().forEach(c => expect(c.destroy).toHaveBeenCalled());
+  });
+
+  it('ignores backButton while a confirm dialog is open, leaving No as the only rollback', () => {
+    const { panel } = makePanel({ isConfirmOpen: vi.fn(() => true) });
+    panel.openFor(makeUnit());
+
+    const [, , backButtonContainer] = allContainers();
+    clickPointerdown(backButtonContainer!);
+
+    allContainers().forEach(c => expect(c.destroy).not.toHaveBeenCalled());
   });
 
   it('closeImmediately destroys every panel object', () => {
@@ -347,8 +354,6 @@ describe('TurnCommandPanel', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    // "No" discards the recolored tile and re-renders the overlay — the caller-side cache
-    // (not this class) is what makes the re-fetch a no-op network-wise in the real app.
     expect(getAllowedTiles).toHaveBeenCalledTimes(2);
     expect(overlayTileGraphics!.destroy).toHaveBeenCalled();
     const newOverlayGraphics = allGraphics().at(-1);
@@ -381,7 +386,6 @@ describe('TurnCommandPanel', () => {
       isLocked.mockReturnValue(true);
       clickPointerdown(backButtonContainer!);
 
-      // Still open — a locked Back click must be a no-op, not close/pop the panel.
       allContainers().forEach(c => expect(c.destroy).not.toHaveBeenCalled());
     });
 

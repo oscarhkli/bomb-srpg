@@ -69,9 +69,7 @@ vi.mock('../ui/TurnBanner');
 vi.mock('../ui/SuddenDeathCutscene');
 vi.mock('../ui/VictoryCutscene');
 
-// Queues getMatchState() resolutions across the per-turn lifecycle (create() + beginTurn()'s
-// automatic refresh get `states[0]`; further states cover a test's own actions, with the last
-// one as the persistent fallback).
+// create() and beginTurn() both consume states[0]; the last state is the persistent fallback.
 function queueMatchStates(...states: GameState[]): void {
   const mocked = vi.mocked(getMatchState);
   const [first, ...rest] = states;
@@ -85,7 +83,6 @@ function queueMatchStates(...states: GameState[]): void {
   mocked.mockResolvedValue(rest.length > 0 ? rest[rest.length - 1]! : first);
 }
 
-// Boots the scene and drains the create() -> beginTurn() chain to settle.
 async function bootScene(overrides: Partial<MatchSceneData> = {}): Promise<MatchScene> {
   const scene = new MatchScene();
   scene.create({ roomId: 'room-abc', playerTokens: ['t1', 't2'], ...overrides });
@@ -93,13 +90,10 @@ async function bootScene(overrides: Partial<MatchSceneData> = {}): Promise<Match
   return scene;
 }
 
-// The "≡" MatchSummaryButton's Graphics. Units/softBlocks/bombs are Sprites/Containers now, not
-// Graphics, so the button is always the first Graphics after the grid.
 function matchSummaryButtonGraphics(): ReturnType<typeof mockScene.add.graphics> {
   return occupantGraphics(0);
 }
 
-// Opens MatchSummaryPanel then clicks one of its 4 lifecycle buttons.
 function clickSummaryPanelButton(button: 'resolve' | 'reset' | 'surrender' | 'back'): void {
   pointerDownOf(matchSummaryButtonGraphics())();
   const offset = { resolve: 1, reset: 2, surrender: 3, back: 4 }[button];
@@ -107,9 +101,6 @@ function clickSummaryPanelButton(button: 'resolve' | 'reset' | 'surrender' | 'ba
   pointerDownOf(buttonGraphics)();
 }
 
-// Shared by the resolve/reset/surrender "clears the TurnCommandPanel action stack" tests: opens
-// a unit's TurnCommandPanel, then clicks the given MatchSummaryPanel button and asserts the
-// panel's Move button was torn down (treating the in-progress action as nothing selected).
 async function expectActionStackClearedBy(
   button: 'resolve' | 'reset' | 'surrender'
 ): Promise<void> {
@@ -127,8 +118,7 @@ async function expectActionStackClearedBy(
   expect(moveButtonContainer!.destroy).toHaveBeenCalled();
 }
 
-// Drives the full UI path (click unit -> click Move/Bomb -> click allowed tile -> click Yes)
-// assuming getAllowedTiles is mocked to resolve with exactly one tile.
+// Drives click unit -> Move/Bomb -> allowed tile -> Yes, with getAllowedTiles mocked to one tile.
 async function submitViaUI(
   unitGraphics: ReturnType<typeof mockScene.add.sprite>,
   buttonIndex: 0 | 1 // 0 = Move, 1 = Bomb
@@ -219,8 +209,6 @@ describe('MatchScene', () => {
     const containersBefore = mockScene.add.container.mock.calls.length;
     pointerDownOf(occupantSprite(0))();
 
-    // TurnCommandPanel.openFor draws 3 new button Containers (Move/Bomb/Back), but initToken is
-    // not called again — it already fired once for this turn in beginTurn().
     expect(mockScene.add.container.mock.calls.length).toBe(containersBefore + 3);
     expect(initToken).toHaveBeenCalledOnce();
   });
@@ -386,8 +374,6 @@ describe('MatchScene', () => {
     expect(unitGraphics.destroy).not.toHaveBeenCalled();
   });
 
-  // A second click on the same (never-rebuilt) Graphics must reflect fresh hasUsedSkill, not
-  // the stale snapshot from the last occupant rebuild.
   it('disables the Bomb button on a second click after a successful bomb placement, even without an occupant rebuild', async () => {
     const unit = makeUnit({
       id: 7,
@@ -490,9 +476,6 @@ describe('MatchScene', () => {
 
   it('accepts a unitMoved event even when the client grid did not show the unit at `from` (no client-side legality re-derivation)', async () => {
     const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
-    // Deliberately inconsistent with `unit`'s own position: the grid tile at `from` shows
-    // no occupant, even though the units array (the source boardRenderer used) has unit 7
-    // there. Previously this tripped the "mover was at from" tile-based re-derivation.
     const initialGrid: Tile[][] = [[plainTile(), plainTile()]];
     const target: Coordinate = { x: 1, y: 0 };
     const movedUnit = makeUnit({ id: 7, team: 1, position: target });
@@ -610,7 +593,7 @@ describe('MatchScene', () => {
     const [yesButtonContainer] = lastContainers(2);
     const graphicsCallCountBeforeClick = mockScene.add.graphics.mock.calls.length;
 
-    pointerDownOf(unitGraphics)(); // clicking a unit while confirm is pending must be a no-op
+    pointerDownOf(unitGraphics)();
 
     expect(yesButtonContainer!.destroy).not.toHaveBeenCalled();
     expect(mockScene.add.graphics.mock.calls.length).toBe(graphicsCallCountBeforeClick);
@@ -638,10 +621,10 @@ describe('MatchScene', () => {
     pointerDownOf(overlayTileGraphics!)();
     const [firstYesButtonContainer] = lastContainers(2);
 
-    pointerDownOf(firstYesButtonContainer!)(); // submitTurnCommand now pending, never resolves in this test
-    pointerDownOf(overlayTileGraphics!)(); // re-click the still-visible tile
+    pointerDownOf(firstYesButtonContainer!)();
+    pointerDownOf(overlayTileGraphics!)();
     const [secondYesButtonContainer] = lastContainers(2);
-    pointerDownOf(secondYesButtonContainer!)(); // second Yes click while the first is still in flight
+    pointerDownOf(secondYesButtonContainer!)();
 
     expect(submitTurnCommand).toHaveBeenCalledTimes(1);
   });
@@ -702,9 +685,7 @@ describe('MatchScene', () => {
     await submitViaUI(unitGraphics, 0);
     await flush();
 
-    // The mock Sprite object never actually animates (tweens.add is a no-op spy), so simulate
-    // the first tween having completed by advancing the object's position ourselves before the
-    // second move — this is what the real Phaser tween would have left it at.
+    // The mock tween never animates, so advance the sprite to where the first move left it.
     unitGraphics.x = 48;
     unitGraphics.y = 48;
 
@@ -826,8 +807,6 @@ describe('MatchScene', () => {
     const [overlayTile] = lastGraphics(1);
     pointerDownOf(overlayTile!)();
 
-    // Clicking Resolve must still surface the resolve prompt (previously the open confirm
-    // caused an early return and nothing happened).
     clickSummaryPanelButton('resolve');
 
     expect(mockScene.add.text).toHaveBeenCalledWith(
@@ -868,15 +847,10 @@ describe('MatchScene', () => {
     expect(calledEvents).toBe(resolveTurnGameEvents);
     expect(deps.gameStateSnapshot.activeTeam).toBe(2);
 
-    // A fresh beginTurn() ran for the next turn: startTurn() called again, and initToken
-    // re-fired for the new active team (1) — but NOT from inside handleResolveTurn itself,
-    // only from beginTurn().
     expect(startTurn).toHaveBeenCalledTimes(2);
     expect(initToken).toHaveBeenCalledWith('team1-token');
   });
 
-  // planGameEvents was already animated live during submitTurnCommand — handleResolveTurn
-  // must discard it by position, not replay it through playResolveTurnEvents.
   it('discards planGameEvents from the resolve response instead of replaying them', async () => {
     await setUpEmptyBoardAndClickResolve();
     const planGameEvents: GameEvent[] = [
@@ -1033,7 +1007,6 @@ describe('MatchScene', () => {
         typeof mockScene.add.container
       >;
 
-      // Single target, single rest value — no second object that can drift out of sync.
       expect(mockScene.tweens.add).toHaveBeenCalledOnce();
       const tweenCfg = tweenConfigAt(0) as {
         targets: unknown;
@@ -1100,8 +1073,6 @@ describe('MatchScene', () => {
 
       await bootScene();
 
-      // getMatchState: initial board render, beginTurn()'s per-turn refresh, then a 3rd refresh
-      // triggered by inSuddenDeath so gameState.bombs picks up the server-injected bomb.
       expect(getMatchState).toHaveBeenCalledTimes(3);
 
       vi.mocked(resolveTurn).mockResolvedValue({
@@ -1184,8 +1155,7 @@ describe('MatchScene', () => {
 
     it('does not animate the CPU turn until its own TurnBanner has finished, even when polling resolves instantly (AC 6, 7)', async () => {
       queueMatchStates(makeState({ grid: [[plainTile()]], activeTeam: 2, turn: 1 }));
-      // Ends the match so the CPU turn terminates cleanly once it renders, instead of resyncing
-      // and recursing into another beginTurn() that would outlive this test.
+      // Ends the match so the CPU turn terminates instead of recursing into another beginTurn().
       vi.mocked(consumeCpuStatus).mockResolvedValue(
         readyStatus({ resolveTurnGameEvents: [{ type: 'matchEnded', winnerTeamId: 2 }] })
       );
@@ -1199,8 +1169,6 @@ describe('MatchScene', () => {
       await bootScene();
       await flush();
 
-      // Polling itself may have already resolved (concurrent with the banner), but the CPU's
-      // plan/resolve render must not have started yet.
       expect(playResolveTurnEvents).not.toHaveBeenCalled();
 
       resolveCpuBanner();
@@ -1441,8 +1409,6 @@ describe('MatchScene', () => {
         planGameEvents: [],
         resolveTurnGameEvents: [],
       });
-      // Budget is wall-clock (Date.now()-based): jump straight past it on the first check so
-      // the poll times out without needing to drain any backoff waits.
       const dateNowSpy = vi.spyOn(Date, 'now').mockReturnValueOnce(0).mockReturnValue(31000);
 
       await bootScene();
@@ -1538,9 +1504,6 @@ describe('MatchScene', () => {
       await flush();
       expect(consumeCpuStatus).toHaveBeenCalledTimes(1);
 
-      // Fires only delayShutdownSafe's own listener, leaving the generation-bump listener from
-      // create() untouched — without that listener, the pending backoff wait would never
-      // resolve, since its delayedCall is never fired here.
       fireLastShutdownListener();
       await flush();
 
@@ -1577,8 +1540,6 @@ describe('MatchScene', () => {
   });
 
   describe('victory cutscene and rematch', () => {
-    // winnerTeamId omitted entirely simulates the server sending a matchEnded event with no
-    // winnerTeamId field at all (missing, not just out-of-range).
     async function resolveWithMatchEnded(winnerTeamId?: number): Promise<void> {
       await setUpEmptyBoardAndClickResolve();
       const event: GameEvent =
@@ -1724,7 +1685,7 @@ describe('MatchScene', () => {
 
       fireCameraFadeOutComplete();
       await flush();
-      expect(mockScene.scene.start).not.toHaveBeenCalled(); // fade done, but deleteMatch() hasn't settled yet
+      expect(mockScene.scene.start).not.toHaveBeenCalled();
 
       resolveDelete();
       await flush();
@@ -1789,7 +1750,6 @@ describe('MatchScene', () => {
       scene.create({ roomId: 'room-abc', playerTokens: ['t1', 't2'] });
       await flush();
 
-      // Simulate scene.restart(): shutdown fires (bumping generation), then create() runs again.
       fireShutdown();
       queueMatchStates(makeState({ grid: [[plainTile()]] }));
       scene.create({ roomId: 'room-abc', playerTokens: ['t1', 't2'], isRematch: true });
@@ -1820,8 +1780,6 @@ describe('MatchScene', () => {
       );
       const imageCallsBeforeRematch = mockScene.add.image.mock.calls.length;
 
-      // Rematch with a different StagePreset, holding getMatchConfig() open so getMatchState()
-      // resolves first — the last match's gameCfg must not be read as this entry's.
       fireShutdown();
       let resolveFreshCfg: (cfg: GameCfg) => void = () => undefined;
       vi.mocked(getMatchConfig).mockReturnValueOnce(
@@ -1857,8 +1815,6 @@ describe('MatchScene', () => {
       const imageCallsBeforeRematch = mockScene.add.image.mock.calls.length;
       expect(imageCallsBeforeRematch).toBeGreaterThan(0);
 
-      // Rematch with a different StagePreset, holding getMatchState() open so getMatchConfig()
-      // resolves first — the last match's gameState must not be read as this entry's.
       fireShutdown();
       let resolveFreshState: (state: GameState) => void = () => undefined;
       vi.mocked(getMatchState).mockReturnValueOnce(
@@ -1891,8 +1847,6 @@ describe('MatchScene', () => {
       scene.create({ roomId: 'room-abc', playerTokens: ['t1', 't2'] });
       await flush();
 
-      // Rematch with a different maxTurns, holding getMatchConfig() open so getMatchState()
-      // resolves first — the last match's gameCfg must not be read as this entry's.
       fireShutdown();
       let resolveFreshCfg: (cfg: GameCfg) => void = () => undefined;
       vi.mocked(getMatchConfig).mockReturnValueOnce(
@@ -1932,8 +1886,6 @@ describe('MatchScene', () => {
       vi.mocked(resetTurn).mockResolvedValue(undefined);
 
       await bootScene({ playerTokens: ['team1-token', 'team2-token'] });
-      // create() itself fades in (fadeTransition entry) — clear it so the assertions below only
-      // observe the Reset flow's own fadeOut/fadeIn pair.
       mockScene.cameras.main.fadeIn.mockClear();
 
       const unitGraphics = occupantSprite(0);
@@ -1951,7 +1903,6 @@ describe('MatchScene', () => {
       expect(resetTurn).toHaveBeenCalledOnce();
       expect(getMatchState).toHaveBeenCalledTimes(3);
       expect(grid.destroy).not.toHaveBeenCalled();
-      // Unlike a successful Resolve (no rebuild), Reset always rebuilds the occupant layer.
       expect(unitGraphics.destroy).toHaveBeenCalled();
       expect(mockScene.cameras.main.fadeIn).toHaveBeenCalledWith(200);
     });
@@ -1968,9 +1919,6 @@ describe('MatchScene', () => {
       pointerDownOf(yesButtonContainer!)();
       await flush();
 
-      // The undim tween's onComplete was never fired — yet a unit click on the freshly rebuilt
-      // occupant sprite still opens TurnCommandPanel (drawn via Containers), proving interactions
-      // already re-enabled.
       const freshUnitSprite = mockScene.add.sprite.mock.results.at(-1)!.value as ReturnType<
         typeof mockScene.add.sprite
       >;
@@ -2021,12 +1969,10 @@ describe('MatchScene', () => {
       const [yesButtonContainer] = lastContainers(2);
       pointerDownOf(yesButtonContainer!)();
 
-      fireShutdown(); // bumps generation while resetTurn() is still pending
+      fireShutdown();
       resolveReset();
       await flush();
 
-      // Even though the generation mismatch short-circuits renderBoard()/getMatchState(), the
-      // camera must still fade back in — otherwise the screen would stay faded to black forever.
       expect(mockScene.cameras.main.fadeIn).toHaveBeenCalledWith(200);
     });
 
@@ -2103,7 +2049,7 @@ describe('MatchScene', () => {
       pointerDownOf(resetGraphics!)();
 
       const textCallsBefore = mockScene.add.text.mock.calls.length;
-      pointerDownOf(surrenderGraphics!)(); // must be a no-op: Reset's confirm hasn't resolved
+      pointerDownOf(surrenderGraphics!)();
 
       expect(mockScene.add.text.mock.calls.length).toBe(textCallsBefore);
     });
@@ -2125,8 +2071,6 @@ describe('MatchScene', () => {
       const [overlayTile] = lastGraphics(1);
       pointerDownOf(overlayTile!)();
 
-      // Reset must still surface its own prompt — a stale TurnCommandPanel confirm is superseded,
-      // not treated as an already-pending lifecycle confirm.
       clickSummaryPanelButton('reset');
 
       expect(mockScene.add.text).toHaveBeenCalledWith(

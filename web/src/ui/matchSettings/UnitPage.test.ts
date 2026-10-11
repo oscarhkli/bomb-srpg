@@ -142,8 +142,7 @@ describe('UnitPage — FormationPanel', () => {
     const p = page(2, cfg);
     p.renderBody(mockScene as never, bodyBounds());
 
-    // SLOT_DISPLAY_ORDER_P2 = [4, 2, 0, 1, 3]; displayPos 1 renders slotIndex 2 (Witch), unlike
-    // P1 where displayPos 1 renders slotIndex 1.
+    // P2 displayPos 1 renders slotIndex 2 (Witch), unlike P1.
     clickPointerdown(allGraphics()[1]!);
 
     expect(cfg.p2Slots).toEqual(serializeTeams(['King', 'Fighter']));
@@ -289,8 +288,6 @@ describe('UnitPage — NextButton', () => {
     p.renderNav(mockScene as never, navBounds());
     p.renderBody(mockScene as never, bodyBounds());
 
-    // renderBody's card graphics come after renderNav's + formation's own graphics; click the
-    // first UnitCard to cross the King-only -> King+1 threshold.
     const allG = allGraphics();
     const firstCardGraphics = allG[allG.length - ARCHETYPES.length]!;
     clickPointerdown(firstCardGraphics);

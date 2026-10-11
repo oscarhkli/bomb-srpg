@@ -3,8 +3,7 @@ export const FADE_MS = 200;
 
 export const TILE_SIZE = 32;
 
-// Fixed bottom-padding band every sprite's untrimmed 64x64 canvas reserves; sprites use
-// origin (0.5, 1) offset by this amount below the tile's bottom edge.
+// Bottom-padding band every sprite's untrimmed 64x64 canvas reserves below the tile edge.
 export const SPRITE_GROUND_MARGIN = 16;
 
 export const GAME_BOARD_REGION_WIDTH = 480;
@@ -23,8 +22,6 @@ export const TEAM_COLORS: Record<number, number> = {
   2: 0xf32d21,
 };
 
-// Depth (z-order) bands — explicit rather than relying on Phaser's creation-order default,
-// since overlays/panels/dialogs must render above the board contents.
 export const DEPTH_STAGE_BACKGROUND = 0;
 export const DEPTH_OCCUPANT = 10;
 export const DEPTH_ALLOWED_TILE_OVERLAY = 20;
@@ -158,8 +155,7 @@ export const UNIT_SLOT_SIZE = 48;
 export const UNIT_SLOT_SPACING = 6;
 export const UNIT_SLOT_ORDER_LABEL_INSET = 2;
 export const UNIT_SLOT_ORDER_LABEL_FONT_SIZE = 20;
-// The order-number label must render above the slot's unit sprite (they overlap); the sprite
-// itself is left at Phaser's default depth (0).
+// Renders above the slot's unit sprite, which stays at Phaser's default depth (0).
 export const DEPTH_UNIT_SLOT_LABEL = 1;
 
 export const UNIT_CARD_WIDTH = 90;
@@ -184,11 +180,8 @@ export const STAGE_PANEL_PADDING = 6;
 export const STAGE_CARD_SIZE = 80;
 export const STAGE_CARD_PADDING = 6;
 export const STAGE_CARD_SPACING = 6;
-// Sized to STAGE_CARD_SIZE's own halving (80px), not the flat -4px font rule — that rule
-// left "Standard"/"Divided" overflowing an 80px card.
 export const STAGE_CARD_NAME_FONT_SIZE = 16;
-// A literal halve (4->2) would collide with PANEL_BUTTON_BORDER_WIDTH (2, unhalved) and make
-// selected/unselected StageCards indistinguishable — rounded up instead.
+// Rounded up from 2 so it stays distinguishable from PANEL_BUTTON_BORDER_WIDTH.
 export const STAGE_CARD_SELECTED_BORDER_WIDTH = 3;
 
 export const STAGE_DETAIL_INNER_PANEL_SIZE_RATIO = 0.8;
@@ -215,7 +208,6 @@ export const TITLE_COPYRIGHT_FONT_SIZE = 12;
 export const TITLE_HOVER_BOMB_GAP = 12;
 
 export const DEPTH_VICTORY_CUTSCENE = 80;
-// Named by size tier, not line position: the draw case's single line uses the TITLE size.
 export const VICTORY_SUBTITLE_FONT_SIZE = 36;
 export const VICTORY_TITLE_FONT_SIZE = 48;
 export const VICTORY_SUBTITLE_OFFSET_Y = -24;
