@@ -140,7 +140,7 @@ export const SETTINGS_CORNER_RADIUS = 4;
 
 export const BACK_BUTTON_SIZE = 32;
 export const BACK_BUTTON_COLOR = 0x4c4c4c;
-// U+2B90, a symbol not an emoji — can tofu on sparse font coverage.
+// U+2B90 is a symbol, not an emoji, so it can render as tofu on fonts with sparse coverage.
 export const BACK_BUTTON_GLYPH = '⮐';
 export const BACK_BUTTON_GLYPH_FONT_SIZE = 32;
 

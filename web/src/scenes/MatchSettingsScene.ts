@@ -150,7 +150,7 @@ export default class MatchSettingsScene extends Phaser.Scene {
     this.renderActivePage();
   }
 
-  // Fades out, then runs onFadedOut — unless the scene was torn down/recreated mid-fade
+  // Fades out, then runs onFadedOut, unless the scene was torn down or recreated mid-fade
   // (generation check) or another transition is already in flight.
   private fadeOutThen(onFadedOut: () => void): void {
     if (this.isTransitioning) {

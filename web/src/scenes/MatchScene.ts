@@ -261,8 +261,8 @@ export default class MatchScene extends Phaser.Scene {
     }
   }
 
-  // Resolves after `ms`, or immediately on scene shutdown — a bare delayedCall is discarded on
-  // shutdown and would otherwise leave its awaiter suspended forever.
+  // Resolves after `ms`, or immediately on scene shutdown. A bare delayedCall is discarded on
+  // shutdown and would leave its awaiter suspended forever.
   private delayShutdownSafe(ms: number): Promise<void> {
     return new Promise<void>(resolve => {
       this.time.delayedCall(ms, resolve);
