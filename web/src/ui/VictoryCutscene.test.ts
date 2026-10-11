@@ -20,8 +20,6 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-// Drives the fade-in -> button-delay chain, mirroring TurnBanner.test.ts's
-// completeBannerSequence() helper.
 function completeFadeIn(): void {
   const fadeInCall = tweenConfigAt(0) as { onComplete?: () => void };
   fadeInCall.onComplete?.();

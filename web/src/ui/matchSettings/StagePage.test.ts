@@ -266,8 +266,7 @@ describe('StagePage — MaxTurnsSelector', () => {
     clickPointerdown(allGraphics()[2]!);
     expect(cfg.maxTurns).toBe(45);
 
-    // Re-select Plain (StagesPanel wasn't re-rendered by the arrow click, so index 0 still
-    // points at the original Plain card).
+    // Re-select Plain: index 0 is still the original Plain card.
     clickPointerdown(allGraphics()[0]!);
 
     expect(cfg.maxTurns).toBe(60);

@@ -12,9 +12,8 @@ import {
 } from '../constants';
 import type { Bomb, Coordinate, GameState, SoftBlock, Tile, Unit } from '../types/api';
 
-// Static board rendering: draws grid/units/softBlocks/bombs and tracks each one's Sprite/Graphics
-// in the shared per-occupant maps. terrainObjects and occupantObjects have separate lifetimes so
-// an occupant swap (renderOccupants) never touches the terrain layer.
+// Shared state for board rendering. terrainObjects and occupantObjects have separate lifetimes,
+// so an occupant swap never touches the terrain layer.
 export interface BoardRenderContext {
   scene: Phaser.Scene;
   terrainObjects: Phaser.GameObjects.GameObject[];
@@ -39,9 +38,8 @@ const STAGE_TEXTURE_KEYS: Record<string, string> = {
   Divided: 'stage_divided',
 };
 
-// Computes board layout (boardOffset) from grid dimensions, ahead of occupant positioning;
-// returns them for sizing dependent UI. Must run before renderStageBackground(), which centers
-// on the boardOffset this sets.
+// Sets boardOffset from the grid and returns its dimensions.
+// Must run before renderStageBackground().
 export function establishBoardLayout(grid: Tile[][]): { cols: number; rows: number } {
   const cols = grid[0]?.length ?? 0;
   const rows = grid.length;
@@ -49,17 +47,14 @@ export function establishBoardLayout(grid: Tile[][]): { cols: number; rows: numb
   return { cols, rows };
 }
 
-// Targets the trimmed content's own center (Frame.x/width), scaled against the untrimmed
-// canvas (Frame.realWidth) — a trimmed export may crop asymmetrically, so origin can't
-// assume (0.5, 0.5).
+// Origin at the trimmed content's own center; a trimmed export may crop asymmetrically.
 function trimmedContentOrigin(scene: Phaser.Scene, key: string, frame: string): [number, number] {
   const f = scene.textures.getFrame(key, frame);
   return [(f.x + f.width / 2) / f.realWidth, (f.y + f.height / 2) / f.realHeight];
 }
 
-// Paints the Stage background image matching stagePresetName, centered on the grid regardless of
-// either's size. Idempotent — destroys any prior background first so re-entry doesn't stack.
-// Assumes establishBoardLayout(grid) already ran this entry (boardOffset must be current).
+// Paints the stage background centered on the grid, replacing any previous one.
+// Requires establishBoardLayout() to have run for this grid.
 export function renderStageBackground(
   ctx: BoardRenderContext,
   grid: Tile[][],
@@ -82,8 +77,7 @@ export function renderStageBackground(
   ctx.terrainObjects.push(bg);
 }
 
-// Destroy-and-rebuild the occupant layer (units, softBlocks, bombs) from truth. This is the
-// wholesale occupant swap; it leaves the terrain layer untouched.
+// Rebuilds units, soft blocks, and bombs from state; terrain is untouched.
 export function renderOccupants(ctx: BoardRenderContext, state: GameState): void {
   destroyAll(ctx.occupantObjects);
   ctx.unitSpritesById.clear();
@@ -95,21 +89,16 @@ export function renderOccupants(ctx: BoardRenderContext, state: GameState): void
   state.bombs.forEach(bomb => renderBomb(ctx, bomb));
 }
 
-// Ground-anchored world Y for a sprite on the given tile: the tile's bottom edge, plus the
-// fixed bottom-band every untrimmed 64x64 sprite canvas reserves (SPRITE_GROUND_MARGIN).
 function groundY(position: Coordinate): number {
   return (position.y + 1) * TILE_SIZE + SPRITE_GROUND_MARGIN + boardOffset.y;
 }
 
-// occupantDepth returns a small per-row offset so occupants sort visually by row within the
-// DEPTH_OCCUPANT band. Exported for movement tweens and sudden-death bomb drops that re-anchor
-// an occupant's depth after initial render.
+// Returns the occupant depth for a tile; lower rows draw over higher ones.
 export function occupantDepth(position: Coordinate): number {
   return DEPTH_OCCUPANT + position.y * 0.01;
 }
 
-// Archetype + team -> texture key, falling back to that archetype's blue variant (or
-// unit_fighter_blue) for an unconfigured team. Shared with UnitPage's sprite rendering.
+// Maps archetype and team to a texture key, falling back to the archetype's blue variant.
 export function resolveUnitTextureKey(archetype: string, team: number, context = ''): string {
   const textureKey = UNIT_TEXTURE_KEYS[archetype]?.[team];
   if (!textureKey) {
@@ -158,12 +147,11 @@ function renderSoftBlocks(ctx: BoardRenderContext, softBlocks: SoftBlock[]): voi
   });
 }
 
-// Renders a single bomb; used both by renderOccupants and by MatchScene's optimistic bomb placement.
+// Renders one bomb into the occupant layer.
 export function renderBomb(ctx: BoardRenderContext, bomb: Bomb): void {
   const { cx, cy } = tileCenter(bomb.position);
   const frame = firstNonBaseFrame(ctx.scene, 'bomb');
-  // Container sits at tile center, so the glyph's local Y must reach down to the tile's bottom
-  // edge (+TILE_SIZE/2) before adding the ground margin, mirroring groundY()'s world-space math.
+  // The container sits at tile center, so reach down to the tile's bottom edge first.
   const glyph = ctx.scene.add.sprite(0, TILE_SIZE / 2 + SPRITE_GROUND_MARGIN, 'bomb', frame);
   glyph.setOrigin(0.5, 1);
   const text = ctx.scene.add.text(0, 0, String(bomb.countdown), {
@@ -200,9 +188,7 @@ function attachClickLogger(
   sprite.on('pointerdown', () => console.log(`${label} is clicked`, details));
 }
 
-// Makes a sprite clickable over just its tile footprint, not the full untrimmed sprite canvas.
-// Hit-area shapes are in the sprite's LOCAL space (origin-relative), not world/tile coordinates
-// — must be derived from sprite.width/height, not the occupant's grid position.
+// Clickable over just the tile footprint. Hit areas are in the sprite's local space.
 function setTileHitArea(sprite: Phaser.GameObjects.Sprite): void {
   const localX = sprite.width / 2 - TILE_SIZE / 2;
   const localY = sprite.height - SPRITE_GROUND_MARGIN - TILE_SIZE;

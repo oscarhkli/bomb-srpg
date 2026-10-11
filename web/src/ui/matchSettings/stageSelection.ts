@@ -1,14 +1,14 @@
-// Pure, Phaser-free stage/maxTurns selection logic for StagePage.
+// Pure, Phaser-free selection logic for StagePage.
 import type { StagePreset } from '../../types/api';
 
-// Cyclic maxTurns options. 0 = instant sudden death (displayed as 💣).
+// 0 = instant sudden death (displayed as 💣).
 const MAX_TURNS_OPTIONS = [0, 15, 20, 30, 45, 60] as const;
 
 export function formatMaxTurns(value: number): string {
   return value === 0 ? '💣' : String(value);
 }
 
-// Steps `current` to the next/previous MAX_TURNS_OPTIONS entry, wrapping at both ends.
+// Steps to the next or previous max-turns option, wrapping at both ends.
 export function cycleMaxTurns(current: number, delta: 1 | -1): number {
   const index = MAX_TURNS_OPTIONS.indexOf(current as (typeof MAX_TURNS_OPTIONS)[number]);
   const len = MAX_TURNS_OPTIONS.length;

@@ -43,8 +43,6 @@ describe('deserializeTeams', () => {
       [slot('King', 'King'), slot('Fighter'), slot(NO_UNIT), slot('Witch'), slot('Witch')],
       ['King', 'Fighter', NO_UNIT, 'Witch', 'Witch'],
     ],
-    // index 0 is always forced to King even if the input says otherwise (defensive; backend
-    // never sends this, but deserialize shouldn't trust it blindly).
     ['index 0 forced to King', [slot('Fighter')], ['King', NO_UNIT, NO_UNIT, NO_UNIT, NO_UNIT]],
   ])('%s', (_name, input, expected) => {
     expect(deserializeTeams(input)).toEqual(expected);
@@ -72,6 +70,11 @@ describe('serializeTeams', () => {
       'trailing NO_UNIT trimmed even after an interior gap',
       ['King', 'Fighter', NO_UNIT, 'Witch', NO_UNIT],
       [slot('King', 'King'), slot('Fighter'), slot(NO_UNIT), slot('Witch')],
+    ],
+    [
+      'slot 0 is the King role and every other slot is Normal',
+      ['Fighter', 'Witch', NO_UNIT, 'Bandit', 'Fighter'],
+      [slot('Fighter', 'King'), slot('Witch'), slot(NO_UNIT), slot('Bandit'), slot('Fighter')],
     ],
     [
       'multiple trailing NO_UNIT trimmed',

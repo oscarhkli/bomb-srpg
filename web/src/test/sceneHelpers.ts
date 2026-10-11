@@ -1,11 +1,7 @@
-// Shared mockScene accessors/drivers for tests. Centralizes the `mock.results[i].value` casts
-// (mockScene.add.graphics()/add.text() return a FRESH instance per call — see setup.ts) and the
-// "invoke a scheduled tween/timer callback manually" idiom that recurs across UI/rendering tests.
 import { mockScene, createMockText, createMockContainer } from './setup';
 import type { BombGraphics } from '../rendering/resolveTurnPlayer';
 
-// Drains the microtask queue `times` times — enough for a chain of already-resolved mock
-// promises (`.then`/`await` hops) to settle. Cheap since nothing here is a real timer.
+// Drains the microtask queue so chains of already-resolved mock promises settle.
 export async function flush(times = 15): Promise<void> {
   for (let i = 0; i < times; i++) {
     await Promise.resolve();
@@ -49,8 +45,7 @@ export function allTexts(): ReturnType<typeof mockScene.add.text>[] {
   return mockScene.add.text.mock.results.map(r => r.value as ReturnType<typeof mockScene.add.text>);
 }
 
-// mockScene.add.text's mock.calls infer a `[]` call-signature (from its no-arg factory
-// implementation), so raw index access needs a cast — this helper centralizes it.
+// Casts add.text's mock.calls, whose inferred call signature is empty.
 export function textCalls(): [number, number, string, ...unknown[]][] {
   return mockScene.add.text.mock.calls as unknown as [number, number, string, ...unknown[]][];
 }
@@ -136,9 +131,7 @@ export function fireDelayedCall(delayMs: number): void {
   delayedCallAt(delayMs)();
 }
 
-// Drains every scheduled delayedCall in insertion order, including ones appended by callbacks
-// while draining (e.g. a chain reaction's nested removals, or a poll loop's next retry). The
-// index cursor keeps each callback firing exactly once.
+// Fires every scheduled delayedCall in order, including ones scheduled while draining.
 export function drainDelayedCalls(): void {
   let i = 0;
   while (i < mockScene.time.delayedCall.mock.calls.length) {
@@ -155,17 +148,14 @@ export function fireShutdown(): void {
   (call?.[1] as (() => void) | undefined)?.();
 }
 
-// Invokes only the most recently registered 'shutdown' listener, leaving earlier ones (e.g. the
-// scene's own generation-bump listener) untouched — isolates a single pending shutdown race
-// (delayShutdownSafe's own listener) from the rest of the scene's teardown behavior.
+// Fires only the most recently registered 'shutdown' listener.
 export function fireLastShutdownListener(): void {
   const calls = mockScene.events.once.mock.calls.filter(c => c[0] === 'shutdown');
   const call = calls[calls.length - 1];
   (call?.[1] as (() => void) | undefined)?.();
 }
 
-// Simulates a fadeOut() finishing by invoking the most recently registered
-// 'camerafadeoutcomplete' listener — the mock keeps every registration, unlike a real `.once()`.
+// Fires the most recently registered 'camerafadeoutcomplete' listener.
 export function fireCameraFadeOutComplete(): void {
   const calls = mockScene.cameras.main.once.mock.calls.filter(
     c => c[0] === 'camerafadeoutcomplete'

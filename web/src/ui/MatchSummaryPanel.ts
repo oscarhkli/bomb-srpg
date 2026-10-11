@@ -155,9 +155,6 @@ export default class MatchSummaryPanel {
       return;
     }
     const objects = this.panelObjects;
-    // Disable clicks immediately rather than waiting for the fade-out tween's onComplete to
-    // destroy() these objects — otherwise a click during the 200ms fade can still fire a button
-    // callback on a panel that's already closing.
     objects.forEach(o => o.disableInteractive());
     fadeOutTargets(this.scene, objects, FADE_MS, () => destroyAll(objects));
     this.panelObjects = [];

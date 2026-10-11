@@ -44,15 +44,11 @@ async function bootScene(data: MatchSettingsSceneData = {}): Promise<MatchSettin
   return scene;
 }
 
-// renderActivePage() creates GameObjects in this fixed order:
-//   graphics: [badge, slot x5, card x N, nextButton]  (7+N total)
-//   text:     [badgeLabel, title, formationHeader, slotLabel x5, (name,speed,bomb,skill) x N, nextButtonLabel]
 function graphicsSince(since: number): ReturnType<typeof allGraphics> {
   return allGraphics().slice(since);
 }
 
-// The trailing N graphics a single renderActivePage() call produces, regardless of what
-// rendered earlier (BackButton, prior Pages).
+// renderActivePage() draws graphics in order: badge, 5 slots, N cards, nextButton.
 const PAGE_GRAPHICS_COUNT = 7 + N;
 function currentPageGraphics(): ReturnType<typeof allGraphics> {
   return lastGraphics(PAGE_GRAPHICS_COUNT);
@@ -355,16 +351,13 @@ describe('MatchSettingsScene — BackButton', () => {
       p2Slots: serializeTeams(['King']),
     });
     await bootScene({ gameCfg });
-    // Isolates the transition's own fadeIn from create()'s entry fadeIn.
     vi.mocked(mockScene.cameras.main.fadeIn).mockClear();
 
     const g = currentPageGraphics();
     clickPointerdown(nextButtonGraphics(g));
-    // Fires before camerafadeoutcomplete — the transition is still mid-fade.
     clickPointerdown(nextButtonGraphics(g));
     fireCameraFadeOutComplete();
 
-    // Only 1 fadeIn: a second concurrent transition would have queued its own fadeOut/fadeIn pair.
     expect(mockScene.cameras.main.fadeIn).toHaveBeenCalledTimes(1);
   });
 });
