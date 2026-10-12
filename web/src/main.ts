@@ -19,6 +19,10 @@ const game = new Phaser.Game({
   scene: [TitleScene, MatchSettingsScene, MatchScene],
 });
 
+if (import.meta.env.VITE_E2E) {
+  window.__game = game;
+}
+
 function handleResize() {
   const zoom = computeZoom(window.innerWidth, window.innerHeight);
   if (zoom !== game.scale.zoom) {
