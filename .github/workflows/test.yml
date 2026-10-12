@@ -13,7 +13,7 @@ permissions:
 jobs:
   unit_tests:
     name: "Run Unit Tests"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -35,7 +35,7 @@ jobs:
 
   web_tests:
     name: "Run Web Tests"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -63,7 +63,7 @@ jobs:
 
   web_lint:
     name: "Lint, Typecheck & Build Web"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -98,13 +98,16 @@ jobs:
   web_coverage:
     name: "Generate Web Coverage Report"
     if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: web_tests
     permissions:
       contents: read
       actions: read
       pull-requests: write
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Download web coverage artifact
         uses: actions/download-artifact@v4
         with:
@@ -122,7 +125,7 @@ jobs:
   code_coverage:
     name: "Generate Coverage Report"
     if: github.event_name == 'pull_request' # Only comment on Pull Requests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: unit_tests
     permissions:
       contents: read
