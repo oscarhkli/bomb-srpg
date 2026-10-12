@@ -22,6 +22,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: "^1.26.9"
+          cache: false
 
       - name: Run Tests with Coverage
         run: go test -race -cover -coverprofile=coverage.txt ./cli/... ./cmd/srpg-web/... ./cpu/... ./engine/... ./server/...
@@ -115,6 +116,7 @@ jobs:
         with:
           json-summary-path: web/coverage/coverage-summary.json
           json-final-path: web/coverage/coverage-final.json
+          vite-config-path: web/vitest.config.ts
           name: "Web (Vitest)"
 
   code_coverage:
@@ -144,7 +146,7 @@ jobs:
 
   e2e_tests:
     name: "Run Web E2E Tests"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -153,6 +155,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: "^1.26.9"
+          cache: false
 
       - name: Setup Node
         uses: actions/setup-node@v4
