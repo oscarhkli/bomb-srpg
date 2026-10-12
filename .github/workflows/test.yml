@@ -28,7 +28,7 @@ jobs:
         run: go test -race -cover -coverprofile=coverage.txt ./cli/... ./cmd/srpg-web/... ./cpu/... ./engine/... ./server/...
 
       - name: Archive code coverage results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: code-coverage
           path: coverage.txt
@@ -56,7 +56,7 @@ jobs:
         working-directory: web
 
       - name: Archive web coverage results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: web-coverage
           path: web/coverage/
@@ -180,7 +180,7 @@ jobs:
 
       - name: Archive Playwright report
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report
           path: web/e2e/playwright-report/
