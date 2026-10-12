@@ -69,3 +69,7 @@ dist-ssr
 
 # Docker build
 bomb-srpg-deploy.tar
+
+# Playwright
+web/e2e/test-results/
+web/e2e/playwright-report/

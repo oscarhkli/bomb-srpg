@@ -9,3 +9,5 @@ cover.out
 *.log
 docs
 .DS_Store
+web/e2e/test-results
+web/e2e/playwright-report
