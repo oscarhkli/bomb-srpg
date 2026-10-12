@@ -21,7 +21,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: "^1.26.5"
+          go-version: "^1.26.9"
 
       - name: Run Tests with Coverage
         run: go test -race -cover -coverprofile=coverage.txt ./cli/... ./cmd/srpg-web/... ./cpu/... ./engine/... ./server/...
@@ -141,3 +141,41 @@ jobs:
           coverage-file-name: "coverage.txt"
           root-package: "bomb-srpg"
           exclude: "models\\.go"
+
+  e2e_tests:
+    name: "Run Web E2E Tests"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "^1.26.9"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: web
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+        working-directory: web
+
+      - name: Run e2e tests
+        run: make web-e2e
+
+      - name: Archive Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: web/e2e/playwright-report/
+          retention-days: 7
