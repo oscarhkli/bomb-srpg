@@ -9,7 +9,7 @@ test('two-player local match reaches the board', async ({ page }) => {
   await clickText(page, 'Battle Mode');
   await expect.poll(() => activeSceneKey(page)).toBe('MatchSettingsScene');
 
-  for (const _player of [1, 2]) {
+  for (let player = 1; player <= 2; player++) {
     await clickText(page, 'Fighter');
     await clickText(page, 'NEXT →');
   }
