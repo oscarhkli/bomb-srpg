@@ -142,6 +142,17 @@ describe('SpriteButton', () => {
     expect(container!.setInteractive).toHaveBeenCalled();
   });
 
+  it('stays usable when the renderer has no filters (Canvas fallback)', () => {
+    const { button, onClick } = makeButton({ enabled: false });
+    const [container] = allContainers();
+    container!.filters = null as never;
+
+    expect(() => button.setEnabled(false)).not.toThrow();
+    expect(() => button.setEnabled(true)).not.toThrow();
+    clickPointerdown(container!);
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
+
   it('destroy() destroys the container', () => {
     const { button } = makeButton();
 
