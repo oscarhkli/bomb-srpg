@@ -47,7 +47,7 @@ web-build: web-format web-typecheck
 	cd web && npm run build
 
 web-e2e: build-server
-	cd web && npm run build:e2e && npm run e2e
+	cd web && npm run build:e2e && npm run e2e -- $(if $(E2E_BROWSER),--project $(E2E_BROWSER))
 
 web-coverage: web-format web-typecheck
 	cd web && npm run test:run -- --coverage
