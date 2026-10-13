@@ -40,6 +40,7 @@ export default class SpriteButton {
 
     this.container = scene.add.container(config.x, config.y);
     this.container.setDepth(config.depth);
+    // Filters exist only on the WebGL renderer; the Canvas fallback leaves container.filters null.
     this.container.enableFilters();
 
     this.buttonImage = scene.add
@@ -68,14 +69,14 @@ export default class SpriteButton {
     this.container.off('pointerup');
     this.container.off('pointerupoutside');
 
-    this.container.filters!.internal.clear();
+    this.container.filters?.internal.clear();
 
     if (!enabled) {
       this.hovered = false;
       this.setButtonTexture(BUTTON_TEXTURE_NEUTRAL);
       this.labelImage.y = 0;
       this.container.disableInteractive();
-      this.container.filters!.internal.addColorMatrix().colorMatrix.desaturate();
+      this.container.filters?.internal.addColorMatrix().colorMatrix.desaturate();
       return;
     }
 

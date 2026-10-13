@@ -148,13 +148,17 @@ jobs:
           exclude: "models\\.go"
 
   e2e_tests:
-    name: "Run Web E2E Tests (${{ matrix.browser }})"
+    name: "Run Web E2E Tests (${{ matrix.project }})"
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        browser: [chromium, firefox, webkit]
+        include:
+          - { project: chromium, browser: chromium }
+          - { project: firefox, browser: firefox }
+          - { project: firefox-canvas, browser: firefox }
+          - { project: webkit, browser: webkit }
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -181,12 +185,12 @@ jobs:
         working-directory: web
 
       - name: Run e2e tests
-        run: make web-e2e E2E_BROWSER=${{ matrix.browser }}
+        run: make web-e2e E2E_BROWSER=${{ matrix.project }}
 
       - name: Archive Playwright report
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
-          name: playwright-report-${{ matrix.browser }}
+          name: playwright-report-${{ matrix.project }}
           path: web/e2e/playwright-report/
           retention-days: 7
