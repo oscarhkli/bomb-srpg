@@ -148,8 +148,13 @@ jobs:
           exclude: "models\\.go"
 
   e2e_tests:
-    name: "Run Web E2E Tests"
+    name: "Run Web E2E Tests (${{ matrix.browser }})"
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -171,17 +176,17 @@ jobs:
         run: npm ci
         working-directory: web
 
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+      - name: Install ${{ matrix.browser }}
+        run: npx playwright install --with-deps ${{ matrix.browser }}
         working-directory: web
 
       - name: Run e2e tests
-        run: make web-e2e
+        run: make web-e2e E2E_BROWSER=${{ matrix.browser }}
 
       - name: Archive Playwright report
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.browser }}
           path: web/e2e/playwright-report/
           retention-days: 7
