@@ -2,32 +2,32 @@ import { expect, test } from '@playwright/test';
 import {
   clickAllowedTile,
   clickConfirmYes,
+  clickLifecycleOption,
   clickMoveButton,
-  clickSummaryButton,
   clickText,
-  clickUnit,
   matchState,
   matchStatus,
   pixelScale,
   roomId,
+  openSummaryPanel,
+  openUnitPanel,
+  teamUnit,
   unitCenter,
   waitForText,
-  waitForTurnBannerToPass,
 } from './canvas';
 import { startStoryMatch, startTwoPlayerMatch } from './flows';
 import { TILE_SIZE } from '../src/constants';
 
-test('a queued move is applied and the turn passes to the other player', async ({
+test('a queued move is accepted and ending the turn passes play to the other player', async ({
   page,
   request,
 }) => {
   await startTwoPlayerMatch(page);
-  await waitForTurnBannerToPass(page, 1);
   const room = await roomId(page);
-  const unit = (await matchState(request, room)).units.find(u => u.team === 1)!;
+  const unit = await teamUnit(request, room, 1);
 
   const from = await unitCenter(page, unit.id);
-  await clickUnit(page, unit.id);
+  await openUnitPanel(page, unit.id);
   await clickMoveButton(page);
   const to = await clickAllowedTile(page, 0);
   await clickConfirmYes(page);
@@ -41,8 +41,8 @@ test('a queued move is applied and the turn passes to the other player', async (
     .poll(async () => (await matchState(request, room)).units.find(u => u.id === unit.id))
     .toMatchObject({ position: target, hasMoved: true });
 
-  await clickSummaryButton(page);
-  await clickText(page, 'End this turn');
+  await openSummaryPanel(page);
+  await clickLifecycleOption(page, 'End this turn');
   await clickConfirmYes(page);
   await expect
     .poll(async () => matchState(request, room))
@@ -57,11 +57,10 @@ test('surrendering ends the match and returning to settings deletes it', async (
   request,
 }) => {
   await startTwoPlayerMatch(page);
-  await waitForTurnBannerToPass(page, 1);
   const room = await roomId(page);
 
-  await clickSummaryButton(page);
-  await clickText(page, 'Surrender');
+  await openSummaryPanel(page);
+  await clickLifecycleOption(page, 'Surrender');
   await clickConfirmYes(page);
   await waitForText(page, 'Player 2!');
 
@@ -69,16 +68,21 @@ test('surrendering ends the match and returning to settings deletes it', async (
   await expect.poll(() => matchStatus(request, room)).toBe(404);
 });
 
-test('a VS CPU match plays the CPU turn and returns to the player', async ({ page, request }) => {
+test('a VS CPU match plays the CPU turn and hands control back to the player', async ({
+  page,
+  request,
+}) => {
   test.setTimeout(90_000);
   await startStoryMatch(page);
-  await waitForTurnBannerToPass(page, 1);
   const room = await roomId(page);
 
-  await clickSummaryButton(page);
-  await clickText(page, 'End this turn');
+  await openSummaryPanel(page);
+  await clickLifecycleOption(page, 'End this turn');
   await clickConfirmYes(page);
   await expect
     .poll(async () => matchState(request, room), { timeout: 60_000 })
     .toMatchObject({ turn: 3, activeTeam: 1 });
+
+  const unit = await teamUnit(request, room, 1);
+  await openUnitPanel(page, unit.id);
 });

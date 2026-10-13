@@ -1,5 +1,4 @@
-import type { Page } from '@playwright/test';
-import { expect } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 import { activeSceneKey, clickText } from './canvas';
 
 export async function openTitle(page: Page): Promise<void> {
