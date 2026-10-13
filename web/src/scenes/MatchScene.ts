@@ -60,8 +60,7 @@ import type {
 } from '../types/api';
 
 type CpuPollResult =
-  | { ok: true; status: CpuStatusResponse }
-  | { ok: false; reason: 'timeout' | 'idle' };
+  { ok: true; status: CpuStatusResponse } | { ok: false; reason: 'timeout' | 'idle' };
 
 export interface MatchSceneData {
   roomId: string;

@@ -1,16 +1,8 @@
 export type TerrainType =
-  | 'TerrainPlain'
-  | 'TerrainBlock'
-  | 'TerrainTower'
-  | 'TerrainWater'
-  | 'TerrainLava';
+  'TerrainPlain' | 'TerrainBlock' | 'TerrainTower' | 'TerrainWater' | 'TerrainLava';
 
 export type OccupantType =
-  | 'OccupantNone'
-  | 'OccupantUnit'
-  | 'OccupantBomb'
-  | 'OccupantSoftBlock'
-  | 'OccupantItem';
+  'OccupantNone' | 'OccupantUnit' | 'OccupantBomb' | 'OccupantSoftBlock' | 'OccupantItem';
 
 export type SkillType = 'Jump' | 'Fly';
 
