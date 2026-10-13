@@ -181,30 +181,53 @@ export async function clickText(page: Page, label: string): Promise<void> {
   await clickTarget(page, { kind: 'text', label }, `visible text "${label}" in the active scene`);
 }
 
-export async function waitForTurnBannerToPass(page: Page, team: number): Promise<void> {
-  const label = `Player ${team}'s Turn`;
-  await waitForText(page, label);
-  await expect
-    .poll(async () => (await targetCenter(page, { kind: 'text', label })) === undefined, {
-      message: `turn banner "${label}" to leave the screen`,
-    })
-    .toBe(true);
-}
-
 export async function clickUnit(page: Page, unitId: number): Promise<void> {
   await clickTarget(page, { kind: 'unit', id: unitId }, `unit ${unitId} sprite`);
 }
 
+async function clickUntilVisible(
+  page: Page,
+  click: () => Promise<void>,
+  next: Target
+): Promise<void> {
+  // The game ignores input while it animates, so retry until the next control appears.
+  await expect(async () => {
+    await click();
+    expect(await targetCenter(page, next)).toBeDefined();
+  }).toPass({ timeout: 15_000 });
+}
+
 export async function clickMoveButton(page: Page): Promise<void> {
-  await clickTarget(page, { kind: 'spriteButton', labelKey: BUTTON_LABEL_MOVE }, 'Move button');
+  await clickUntilVisible(
+    page,
+    () => clickTarget(page, { kind: 'spriteButton', labelKey: BUTTON_LABEL_MOVE }, 'Move button'),
+    { kind: 'allowedTile', index: 0 }
+  );
+}
+
+export async function clickLifecycleOption(page: Page, label: string): Promise<void> {
+  await clickUntilVisible(page, () => clickText(page, label), {
+    kind: 'spriteButton',
+    labelKey: BUTTON_LABEL_YES,
+  });
 }
 
 export async function clickConfirmYes(page: Page): Promise<void> {
   await clickTarget(page, { kind: 'spriteButton', labelKey: BUTTON_LABEL_YES }, 'Yes button');
 }
 
-export async function clickSummaryButton(page: Page): Promise<void> {
-  await clickText(page, MATCH_SUMMARY_BUTTON_LABEL);
+export async function openSummaryPanel(page: Page): Promise<void> {
+  await clickUntilVisible(page, () => clickText(page, MATCH_SUMMARY_BUTTON_LABEL), {
+    kind: 'text',
+    label: 'Surrender',
+  });
+}
+
+export async function openUnitPanel(page: Page, unitId: number): Promise<void> {
+  await clickUntilVisible(page, () => clickUnit(page, unitId), {
+    kind: 'spriteButton',
+    labelKey: BUTTON_LABEL_MOVE,
+  });
 }
 
 export async function unitCenter(page: Page, unitId: number): Promise<Point> {
@@ -212,8 +235,18 @@ export async function unitCenter(page: Page, unitId: number): Promise<Point> {
 }
 
 export async function clickAllowedTile(page: Page, index: number): Promise<Point> {
-  const tile = await waitForTarget(page, { kind: 'allowedTile', index }, `allowed tile ${index}`);
-  await click(page, tile);
+  let tile: Point | undefined;
+  await clickUntilVisible(
+    page,
+    async () => {
+      tile = await waitForTarget(page, { kind: 'allowedTile', index }, `allowed tile ${index}`);
+      await click(page, tile);
+    },
+    { kind: 'spriteButton', labelKey: BUTTON_LABEL_YES }
+  );
+  if (!tile) {
+    throw new Error(`allowed tile ${index} was never clicked`);
+  }
   return tile;
 }
 
@@ -245,7 +278,10 @@ export async function roomId(page: Page): Promise<string> {
       { message: 'a match-room request from the page' }
     )
     .toBe(true);
-  return id!;
+  if (!id) {
+    throw new Error('no match-room request seen by the page');
+  }
+  return id;
 }
 
 export async function matchState(request: APIRequestContext, room: string): Promise<MatchState> {
@@ -256,4 +292,16 @@ export async function matchState(request: APIRequestContext, room: string): Prom
 
 export async function matchStatus(request: APIRequestContext, room: string): Promise<number> {
   return (await request.get(`/api/match-rooms/${room}/match/state`)).status();
+}
+
+export async function teamUnit(
+  request: APIRequestContext,
+  room: string,
+  team: number
+): Promise<Unit> {
+  const unit = (await matchState(request, room)).units.find(u => u.team === team);
+  if (!unit) {
+    throw new Error(`no unit for team ${team} in room ${room}`);
+  }
+  return unit;
 }
