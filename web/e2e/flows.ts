@@ -1,5 +1,5 @@
 import { expect, type Page } from '@playwright/test';
-import { activeSceneKey, clickText } from './canvas';
+import { activeSceneKey, clickText, waitForInput } from './canvas';
 
 export async function openTitle(page: Page): Promise<void> {
   await page.goto('/');
@@ -18,6 +18,7 @@ export async function startTwoPlayerMatch(page: Page): Promise<void> {
   }
   await clickText(page, 'Start Match');
   await expect.poll(() => activeSceneKey(page)).toBe('MatchScene');
+  await waitForInput(page);
 }
 
 export async function startStoryMatch(page: Page): Promise<void> {
@@ -25,4 +26,5 @@ export async function startStoryMatch(page: Page): Promise<void> {
   await clickText(page, 'Start Game');
   await clickText(page, 'Story Mode');
   await expect.poll(() => activeSceneKey(page)).toBe('MatchScene');
+  await waitForInput(page);
 }

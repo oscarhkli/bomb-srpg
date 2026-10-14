@@ -1,9 +1,9 @@
 import { expect, type APIRequestContext, type Page } from '@playwright/test';
+import type { GameState, Unit } from '../src/types/api';
 import {
   BUTTON_LABEL_MOVE,
   BUTTON_LABEL_YES,
   DEPTH_ALLOWED_TILE_OVERLAY,
-  MATCH_SUMMARY_BUTTON_LABEL,
   SPRITE_GROUND_MARGIN,
   TILE_SIZE,
 } from '../src/constants';
@@ -11,19 +11,6 @@ import {
 export interface Point {
   x: number;
   y: number;
-}
-
-export interface Unit {
-  id: number;
-  team: number;
-  position: Point;
-  hasMoved: boolean;
-}
-
-export interface MatchState {
-  turn: number;
-  activeTeam: number;
-  units: Unit[];
 }
 
 type Target =
@@ -185,49 +172,12 @@ export async function clickUnit(page: Page, unitId: number): Promise<void> {
   await clickTarget(page, { kind: 'unit', id: unitId }, `unit ${unitId} sprite`);
 }
 
-async function clickUntilVisible(
-  page: Page,
-  click: () => Promise<void>,
-  next: Target
-): Promise<void> {
-  // The game ignores input while it animates, so retry until the next control appears.
-  await expect(async () => {
-    await click();
-    expect(await targetCenter(page, next)).toBeDefined();
-  }).toPass({ timeout: 15_000 });
-}
-
 export async function clickMoveButton(page: Page): Promise<void> {
-  await clickUntilVisible(
-    page,
-    () => clickTarget(page, { kind: 'spriteButton', labelKey: BUTTON_LABEL_MOVE }, 'Move button'),
-    { kind: 'allowedTile', index: 0 }
-  );
-}
-
-export async function clickLifecycleOption(page: Page, label: string): Promise<void> {
-  await clickUntilVisible(page, () => clickText(page, label), {
-    kind: 'spriteButton',
-    labelKey: BUTTON_LABEL_YES,
-  });
+  await clickTarget(page, { kind: 'spriteButton', labelKey: BUTTON_LABEL_MOVE }, 'Move button');
 }
 
 export async function clickConfirmYes(page: Page): Promise<void> {
   await clickTarget(page, { kind: 'spriteButton', labelKey: BUTTON_LABEL_YES }, 'Yes button');
-}
-
-export async function openSummaryPanel(page: Page): Promise<void> {
-  await clickUntilVisible(page, () => clickText(page, MATCH_SUMMARY_BUTTON_LABEL), {
-    kind: 'text',
-    label: 'Surrender',
-  });
-}
-
-export async function openUnitPanel(page: Page, unitId: number): Promise<void> {
-  await clickUntilVisible(page, () => clickUnit(page, unitId), {
-    kind: 'spriteButton',
-    labelKey: BUTTON_LABEL_MOVE,
-  });
 }
 
 export async function unitCenter(page: Page, unitId: number): Promise<Point> {
@@ -235,19 +185,23 @@ export async function unitCenter(page: Page, unitId: number): Promise<Point> {
 }
 
 export async function clickAllowedTile(page: Page, index: number): Promise<Point> {
-  let tile: Point | undefined;
-  await clickUntilVisible(
-    page,
-    async () => {
-      tile = await waitForTarget(page, { kind: 'allowedTile', index }, `allowed tile ${index}`);
-      await click(page, tile);
-    },
-    { kind: 'spriteButton', labelKey: BUTTON_LABEL_YES }
-  );
-  if (!tile) {
-    throw new Error(`allowed tile ${index} was never clicked`);
-  }
+  const tile = await waitForTarget(page, { kind: 'allowedTile', index }, `allowed tile ${index}`);
+  await click(page, tile);
   return tile;
+}
+
+export async function waitForInput(page: Page): Promise<void> {
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => {
+          const scene = window.__game?.scene.getScenes(true)[0] as
+            { interactionsEnabled?: boolean; isSubmitting?: boolean } | undefined;
+          return scene?.interactionsEnabled === true && scene.isSubmitting === false;
+        }),
+      { message: 'the match to accept input', timeout: 30_000 }
+    )
+    .toBe(true);
 }
 
 export function pixelScale(page: Page): Promise<number> {
@@ -284,10 +238,10 @@ export async function roomId(page: Page): Promise<string> {
   return id;
 }
 
-export async function matchState(request: APIRequestContext, room: string): Promise<MatchState> {
+export async function matchState(request: APIRequestContext, room: string): Promise<GameState> {
   const res = await request.get(`/api/match-rooms/${room}/match/state`);
   expect(res.ok()).toBe(true);
-  return (await res.json()) as MatchState;
+  return (await res.json()) as GameState;
 }
 
 export async function matchStatus(request: APIRequestContext, room: string): Promise<number> {
