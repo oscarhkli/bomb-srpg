@@ -10,7 +10,6 @@ import (
 	"bomb-srpg/engine"
 )
 
-// Trailing data is accepted today because the handlers decode one value from the stream.
 func TestSurrenderRequestDecoding(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -18,12 +17,12 @@ func TestSurrenderRequestDecoding(t *testing.T) {
 		wantStatus int
 	}{
 		{"exact keys", `{"teamId":1}`, http.StatusOK},
-		{"keys match case-insensitively", `{"TeamID":1}`, http.StatusOK},
+		{"keys match case-sensitively", `{"TeamID":1}`, http.StatusBadRequest},
 		{"unknown member ignored", `{"teamId":1,"extra":[true]}`, http.StatusOK},
-		{"duplicate key last wins", `{"teamId":3,"teamId":1}`, http.StatusOK},
-		{"invalid UTF-8 in unknown member", "{\"teamId\":1,\"x\":\"\xff\"}", http.StatusOK},
-		{"trailing data after value", `{"teamId":1} garbage`, http.StatusOK},
-		{"second value after value", `{"teamId":1}{"teamId":3}`, http.StatusOK},
+		{"duplicate key", `{"teamId":3,"teamId":1}`, http.StatusBadRequest},
+		{"invalid UTF-8 in unknown member", "{\"teamId\":1,\"x\":\"\xff\"}", http.StatusBadRequest},
+		{"trailing data after value", `{"teamId":1} garbage`, http.StatusBadRequest},
+		{"second value after value", `{"teamId":1}{"teamId":3}`, http.StatusBadRequest},
 		{"truncated", `{"teamId":`, http.StatusBadRequest},
 		{"wrong member type", `{"teamId":"1"}`, http.StatusBadRequest},
 		{"fractional number", `{"teamId":1.5}`, http.StatusBadRequest},
@@ -53,5 +52,16 @@ func TestSurrenderRequestDecoding(t *testing.T) {
 				t.Errorf("gameEvents = %+v, want one event with WinnerTeamID 2", gameEvents)
 			}
 		})
+	}
+}
+
+func TestWriteJSONNilSlicesEncodeAsArrays(t *testing.T) {
+	h := NewHandler(NewServerStateManager())
+	rr := httptest.NewRecorder()
+	h.writeJSON(rr, http.StatusOK, ResolveTurnResponse{}, "encode failed")
+
+	want := `{"planGameEvents":[],"resolveTurnGameEvents":[]}`
+	if got := rr.Body.String(); got != want {
+		t.Errorf("body = %s, want %s", got, want)
 	}
 }
