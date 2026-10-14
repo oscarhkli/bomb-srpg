@@ -1,7 +1,7 @@
 package engine
 
 import (
-	"encoding/json"
+	"encoding/json/v2"
 	"strings"
 	"testing"
 )
@@ -94,7 +94,7 @@ func TestSkillUnitRoleString(t *testing.T) {
 	}
 }
 
-func TestUnitRole_UnmarshalJSON(t *testing.T) {
+func TestUnitRole_UnmarshalText(t *testing.T) {
 	tests := []struct {
 		name    string
 		input   string
@@ -115,16 +115,16 @@ func TestUnitRole_UnmarshalJSON(t *testing.T) {
 
 			if tt.wantErr {
 				if err == nil {
-					t.Fatalf("UnmarshalJSON(%s) error = nil, want error", tt.input)
+					t.Fatalf("Unmarshal(%s) error = nil, want error", tt.input)
 				}
 				return
 			}
 
 			if err != nil {
-				t.Fatalf("UnmarshalJSON(%s) unexpected error: %v", tt.input, err)
+				t.Fatalf("Unmarshal(%s) unexpected error: %v", tt.input, err)
 			}
 			if got != tt.want {
-				t.Errorf("UnmarshalJSON(%s) = %v, want %v", tt.input, got, tt.want)
+				t.Errorf("Unmarshal(%s) = %v, want %v", tt.input, got, tt.want)
 			}
 		})
 	}

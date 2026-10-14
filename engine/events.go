@@ -27,17 +27,17 @@ const (
 type GameEvent struct {
 	Type              GameEvtType  `json:"type"`
 	UnitID            UnitID       `json:"unitId"`
-	BombID            BombID       `json:"bombId,omitempty"`
-	SoftBlockID       int          `json:"softBlockId,omitempty"`
-	ItemID            int          `json:"itemId,omitempty"`
-	Position          *Coordinate  `json:"position,omitempty"`
-	From              *Coordinate  `json:"from,omitempty"`
-	To                *Coordinate  `json:"to,omitempty"`
+	BombID            BombID       `json:"bombId,omitzero"`
+	SoftBlockID       int          `json:"softBlockId,omitzero"`
+	ItemID            int          `json:"itemId,omitzero"`
+	Position          *Coordinate  `json:"position,omitzero"`
+	From              *Coordinate  `json:"from,omitzero"`
+	To                *Coordinate  `json:"to,omitzero"`
 	NewHP             int          `json:"newHp"`
-	Range             int          `json:"range,omitempty"`
+	Range             int          `json:"range,omitzero"`
 	Countdown         int          `json:"countdown"`
 	AffectedPositions []Coordinate `json:"affectedPositions,omitempty"`
-	WinnerTeamID      int          `json:"winnerTeamId,omitempty"`
+	WinnerTeamID      int          `json:"winnerTeamId,omitzero"`
 }
 
 // NewUnitMovedEvent creates a unit moved event.

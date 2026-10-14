@@ -469,12 +469,6 @@ func (s *ServerStateManager) ConsumeCPUStatus(roomID, token string) (engine.CPUT
 		room.Match.CPU.ResolveTurnGameEvents = nil
 		room.Match.CPU.Phase = engine.TurnPhaseIdle
 	}
-	if planGameEvents == nil {
-		planGameEvents = []engine.GameEvent{}
-	}
-	if resolveTurnGameEvents == nil {
-		resolveTurnGameEvents = []engine.GameEvent{}
-	}
 
 	return turnPhase, planGameEvents, resolveTurnGameEvents, nil
 }
@@ -600,9 +594,7 @@ func (s *ServerStateManager) GetAllowedTiles(roomID string, unitID engine.UnitID
 		return nil, err
 	}
 
-	// slices.Collect yields nil for an empty map; the client types this as a non-nullable array.
-	tiles := make([]engine.Coordinate, 0, len(allowedTiles))
-	return slices.AppendSeq(tiles, maps.Keys(allowedTiles)), nil
+	return slices.Collect(maps.Keys(allowedTiles)), nil
 }
 
 // RunCleanupLoop removes inactive rooms every interval and blocks until ctx is cancelled.

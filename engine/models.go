@@ -1,7 +1,7 @@
 package engine
 
 import (
-	"encoding/json"
+	"encoding/json/v2"
 	"fmt"
 	"maps"
 	"slices"
@@ -41,9 +41,9 @@ func (t TerrainType) String() string {
 	}
 }
 
-// MarshalJSON encodes the terrain as its String name.
-func (o TerrainType) MarshalJSON() ([]byte, error) {
-	return json.Marshal(o.String())
+// MarshalText encodes the terrain as its String name.
+func (o TerrainType) MarshalText() ([]byte, error) {
+	return []byte(o.String()), nil
 }
 
 // Coordinate represents a grid position using (X, Y) where (0,0) is top-left.
@@ -81,9 +81,9 @@ func (o OccupantType) String() string {
 	}
 }
 
-// MarshalJSON encodes the occupant type as its String name.
-func (o OccupantType) MarshalJSON() ([]byte, error) {
-	return json.Marshal(o.String())
+// MarshalText encodes the occupant type as its String name.
+func (o OccupantType) MarshalText() ([]byte, error) {
+	return []byte(o.String()), nil
 }
 
 // Tile represents a single cell on the game board combining terrain and occupant.
@@ -154,7 +154,7 @@ type Archetype struct {
 
 // MarshalJSON emits the client-facing shape.
 func (a Archetype) MarshalJSON() ([]byte, error) {
-	skills := []string{}
+	var skills []string
 	for _, skill := range allSkills() {
 		if (skill & a.PresetSkills) != 0 {
 			skills = append(skills, skill.String())
@@ -191,18 +191,14 @@ func (o UnitRole) String() string {
 	}
 }
 
-// MarshalJSON encodes the role as its String name.
-func (o UnitRole) MarshalJSON() ([]byte, error) {
-	return json.Marshal(o.String())
+// MarshalText encodes the role as its String name.
+func (o UnitRole) MarshalText() ([]byte, error) {
+	return []byte(o.String()), nil
 }
 
-// UnmarshalJSON decodes a role from its String name.
-func (r *UnitRole) UnmarshalJSON(data []byte) error {
-	var s string
-	if err := json.Unmarshal(data, &s); err != nil {
-		return err
-	}
-	switch s {
+// UnmarshalText decodes a role from its String name.
+func (r *UnitRole) UnmarshalText(text []byte) error {
+	switch s := string(text); s {
 	case "Normal":
 		*r = RoleNormal
 	case "King":
@@ -210,7 +206,7 @@ func (r *UnitRole) UnmarshalJSON(data []byte) error {
 	case "Boss":
 		*r = RoleBoss
 	default:
-		return fmt.Errorf("%w: %q", ErrInvalidUnitRole, s)
+		return fmt.Errorf("%w: %q", ErrInvalidUnitRole, text)
 	}
 	return nil
 }
@@ -242,7 +238,7 @@ type Unit struct {
 
 // MarshalJSON emits the client-facing shape.
 func (u Unit) MarshalJSON() ([]byte, error) {
-	skills := []string{}
+	var skills []string
 	for _, skill := range allSkills() {
 		if (skill & u.Skills) != 0 {
 			skills = append(skills, skill.String())
@@ -320,16 +316,8 @@ type GameState struct {
 	TurnCommands    []TurnCommand      // Pending commands for current turn
 }
 
-func nonNilValues[K comparable, V any](m map[K]V) []V {
-	return slices.AppendSeq(make([]V, 0, len(m)), maps.Values(m))
-}
-
-// MarshalJSON emits the client-facing shape; every slice is non-nil so it encodes as [].
+// MarshalJSON emits the client-facing shape, with the entity maps flattened to arrays.
 func (gs GameState) MarshalJSON() ([]byte, error) {
-	units := nonNilValues(gs.Units)
-	bombs := nonNilValues(gs.Bombs)
-	softBlocks := nonNilValues(gs.SoftBlocks)
-	turnCommands := append(make([]TurnCommand, 0, len(gs.TurnCommands)), gs.TurnCommands...)
 	return json.Marshal(struct {
 		Turn          int           `json:"turn"`
 		InSuddenDeath bool          `json:"inSuddenDeath"`
@@ -344,10 +332,10 @@ func (gs GameState) MarshalJSON() ([]byte, error) {
 		gs.InSuddenDeath,
 		gs.ActiveTeam,
 		gs.Grid,
-		units,
-		bombs,
-		softBlocks,
-		turnCommands,
+		slices.Collect(maps.Values(gs.Units)),
+		slices.Collect(maps.Values(gs.Bombs)),
+		slices.Collect(maps.Values(gs.SoftBlocks)),
+		gs.TurnCommands,
 	})
 }
 
@@ -374,9 +362,9 @@ func (c CPUTurnPhase) String() string {
 	}
 }
 
-// MarshalJSON encodes the phase as its String name.
-func (o CPUTurnPhase) MarshalJSON() ([]byte, error) {
-	return json.Marshal(o.String())
+// MarshalText encodes the phase as its String name.
+func (o CPUTurnPhase) MarshalText() ([]byte, error) {
+	return []byte(o.String()), nil
 }
 
 // CPUState manages the TurnPhase state and pending GameEvent for VS CPU.

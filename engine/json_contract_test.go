@@ -1,7 +1,7 @@
 package engine
 
 import (
-	"encoding/json"
+	"encoding/json/v2"
 	"errors"
 	"reflect"
 	"testing"
@@ -55,12 +55,12 @@ func TestJSONEncoding(t *testing.T) {
 				`,"turnCommands":[{"type":"move","unitId":17,"target":{"x":1,"y":2}}]}`},
 		{"game cfg", GameCfg{VSCpu: true, StagePreset: "Plain", P1Slots: []TeamSlot{{Archetype: "King", Role: RoleKing}}, P2Slots: []TeamSlot{}, MaxTurns: 0, GlobalSpeedOverride: 9},
 			`{"vsCpu":true,"stagePreset":"Plain","p1Slots":[{"archetype":"King","role":"King"}],"p2Slots":[],"maxTurns":0,"allowResetTurn":false}`},
-		{"game cfg nil slots", GameCfg{StagePreset: "Plain"},
-			`{"vsCpu":false,"stagePreset":"Plain","p1Slots":null,"p2Slots":null,"maxTurns":0,"allowResetTurn":false}`},
+		{"game cfg nil slots encode as arrays", GameCfg{StagePreset: "Plain"},
+			`{"vsCpu":false,"stagePreset":"Plain","p1Slots":[],"p2Slots":[],"maxTurns":0,"allowResetTurn":false}`},
 		{"stage preset", StagePreset{Name: "Plain", Description: "d", Width: 2, Height: 1, MaxTurns: 5, LayoutGrid: []string{"ab"}},
 			`{"name":"Plain","description":"d","width":2,"height":1,"maxTurns":5}`},
-		{"HTML characters are escaped", Archetype{Name: "<a&b>"},
-			`{"name":"\u003ca\u0026b\u003e","speed":0,"bombMaxRange":0,"skills":[]}`},
+		{"HTML characters are not escaped", Archetype{Name: "<a&b>"},
+			`{"name":"<a&b>","speed":0,"bombMaxRange":0,"skills":[]}`},
 		{"cpu phase", TurnPhaseReady, `"TurnPhaseReady"`},
 		{"unknown enums", []any{TerrainType(99), OccupantType(99), UnitRole(99), CPUTurnPhase(99)},
 			`["TerrainUnknown","OccupantUnknown","Unknown","TurnPhaseUnknown"]`},
@@ -88,14 +88,12 @@ func TestJSONDecoding(t *testing.T) {
 	}{
 		{"exact keys", `{"type":"move","unitId":17,"target":{"x":4,"y":7}}`,
 			TurnCommand{Type: TurnCmdMove, UnitID: 17, Target: Coordinate{X: 4, Y: 7}}, false},
-		{"keys match case-insensitively", `{"TYPE":"move","UnitID":17,"TARGET":{"X":4,"Y":7}}`,
-			TurnCommand{Type: TurnCmdMove, UnitID: 17, Target: Coordinate{X: 4, Y: 7}}, false},
+		{"keys match case-sensitively", `{"TYPE":"move","UnitID":17,"TARGET":{"X":4,"Y":7}}`,
+			TurnCommand{}, false},
 		{"unknown member ignored", `{"type":"move","unitId":17,"target":{"x":4,"y":7},"extra":[1]}`,
 			TurnCommand{Type: TurnCmdMove, UnitID: 17, Target: Coordinate{X: 4, Y: 7}}, false},
-		{"duplicate key last wins", `{"type":"move","type":"placeBomb","unitId":17,"target":{"x":4,"y":7}}`,
-			TurnCommand{Type: TurnCmdPlaceBomb, UnitID: 17, Target: Coordinate{X: 4, Y: 7}}, false},
-		{"invalid UTF-8 is replaced", "{\"type\":\"mo\xffve\",\"unitId\":17,\"target\":{\"x\":4,\"y\":7}}",
-			TurnCommand{Type: "mo\ufffdve", UnitID: 17, Target: Coordinate{X: 4, Y: 7}}, false},
+		{"duplicate key", `{"type":"move","type":"placeBomb","unitId":17,"target":{"x":4,"y":7}}`, TurnCommand{}, true},
+		{"invalid UTF-8", "{\"type\":\"mo\xffve\",\"unitId\":17,\"target\":{\"x\":4,\"y\":7}}", TurnCommand{}, true},
 		{"missing members stay zero", `{}`, TurnCommand{}, false},
 		{"null leaves zero", `{"type":null,"unitId":null}`, TurnCommand{}, false},
 		{"unit id overflows uint8", `{"type":"move","unitId":300,"target":{"x":4,"y":7}}`, TurnCommand{}, true},
@@ -131,6 +129,16 @@ func TestGameCfgDecoding(t *testing.T) {
 		}
 	})
 
+	t.Run("role null leaves the zero role", func(t *testing.T) {
+		var got TeamSlot
+		if err := json.Unmarshal([]byte(`{"archetype":"King","role":null}`), &got); err != nil {
+			t.Fatalf("Unmarshal() error = %v", err)
+		}
+		if got.Role != RoleNormal {
+			t.Errorf("Role = %v, want %v", got.Role, RoleNormal)
+		}
+	})
+
 	t.Run("hidden fields are not settable", func(t *testing.T) {
 		var got GameCfg
 		if err := json.Unmarshal([]byte(`{"GlobalSpeedOverride":9}`), &got); err != nil {
@@ -148,7 +156,6 @@ func TestGameCfgDecoding(t *testing.T) {
 	}{
 		{"wrong case", `"king"`, ErrInvalidUnitRole},
 		{"empty", `""`, ErrInvalidUnitRole},
-		{"null", `null`, ErrInvalidUnitRole},
 		{"number", `1`, nil},
 	}
 	for _, tt := range roleTests {

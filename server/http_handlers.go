@@ -2,7 +2,7 @@ package server
 
 import (
 	"bomb-srpg/engine"
-	"encoding/json"
+	"encoding/json/v2"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -57,7 +57,7 @@ func (h *Handler) handleError(w http.ResponseWriter, err error, logMsg string, a
 func (h *Handler) writeJSON(w http.ResponseWriter, status int, res any, logMsg string, args ...any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	if err := json.NewEncoder(w).Encode(res); err != nil {
+	if err := json.MarshalWrite(w, res); err != nil {
 		h.Logger.Error(logMsg, append(args, "error", err)...)
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 	}
@@ -140,7 +140,7 @@ func (h *Handler) HandleCreateMatch(w http.ResponseWriter, r *http.Request) {
 	roomID := r.PathValue("roomID")
 
 	var req CreateMatchRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.UnmarshalRead(r.Body, &req); err != nil {
 		h.Logger.Warn("invalid config format", "error", err)
 		http.Error(w, "Invalid configuration format", http.StatusBadRequest)
 		return
@@ -221,7 +221,7 @@ func (h *Handler) HandleSubmitTurnCommand(w http.ResponseWriter, r *http.Request
 	roomID := r.PathValue("roomID")
 
 	var req engine.TurnCommand
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.UnmarshalRead(r.Body, &req); err != nil {
 		h.Logger.Warn("invalid turnCommand format", "error", err)
 		http.Error(w, "Invalid turnCommand format", http.StatusBadRequest)
 		return
@@ -348,7 +348,7 @@ func (h *Handler) HandleSurrender(w http.ResponseWriter, r *http.Request) {
 	roomID := r.PathValue("roomID")
 
 	var req SurrenderRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.UnmarshalRead(r.Body, &req); err != nil {
 		h.Logger.Warn("invalid surrender request format", "error", err)
 		http.Error(w, "Invalid surrenderRequest format", http.StatusBadRequest)
 		return
