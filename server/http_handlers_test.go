@@ -249,7 +249,10 @@ func TestHandleGetCatalog(t *testing.T) {
 			t.Errorf("Handler returned wrong content type: got %v want %v", contentType, expectedHeader)
 		}
 
-		var response CatalogResponse
+		var response struct {
+			Archetypes   []json.RawMessage `json:"archetypes"`
+			StagePresets []json.RawMessage `json:"stagePresets"`
+		}
 		if err := json.NewDecoder(rr.Body).Decode(&response); err != nil {
 			t.Fatalf("Failed to decode response JSON payload: %v", err)
 		}
