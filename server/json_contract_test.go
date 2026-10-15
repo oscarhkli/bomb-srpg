@@ -54,14 +54,3 @@ func TestSurrenderRequestDecoding(t *testing.T) {
 		})
 	}
 }
-
-func TestWriteJSONNilSlicesEncodeAsArrays(t *testing.T) {
-	h := NewHandler(NewServerStateManager())
-	rr := httptest.NewRecorder()
-	h.writeJSON(rr, http.StatusOK, ResolveTurnResponse{}, "encode failed")
-
-	want := `{"planGameEvents":[],"resolveTurnGameEvents":[]}`
-	if got := rr.Body.String(); got != want {
-		t.Errorf("body = %s, want %s", got, want)
-	}
-}

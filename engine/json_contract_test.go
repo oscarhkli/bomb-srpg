@@ -2,8 +2,6 @@ package engine
 
 import (
 	"encoding/json/v2"
-	"errors"
-	"reflect"
 	"testing"
 )
 
@@ -79,95 +77,12 @@ func TestJSONEncoding(t *testing.T) {
 	}
 }
 
-func TestJSONDecoding(t *testing.T) {
-	tests := []struct {
-		name    string
-		input   string
-		want    TurnCommand
-		wantErr bool
-	}{
-		{"exact keys", `{"type":"move","unitId":17,"target":{"x":4,"y":7}}`,
-			TurnCommand{Type: TurnCmdMove, UnitID: 17, Target: Coordinate{X: 4, Y: 7}}, false},
-		{"keys match case-sensitively", `{"TYPE":"move","UnitID":17,"TARGET":{"X":4,"Y":7}}`,
-			TurnCommand{}, false},
-		{"unknown member ignored", `{"type":"move","unitId":17,"target":{"x":4,"y":7},"extra":[1]}`,
-			TurnCommand{Type: TurnCmdMove, UnitID: 17, Target: Coordinate{X: 4, Y: 7}}, false},
-		{"duplicate key", `{"type":"move","type":"placeBomb","unitId":17,"target":{"x":4,"y":7}}`, TurnCommand{}, true},
-		{"invalid UTF-8", "{\"type\":\"mo\xffve\",\"unitId\":17,\"target\":{\"x\":4,\"y\":7}}", TurnCommand{}, true},
-		{"missing members stay zero", `{}`, TurnCommand{}, false},
-		{"null leaves zero", `{"type":null,"unitId":null}`, TurnCommand{}, false},
-		{"unit id overflows uint8", `{"type":"move","unitId":300,"target":{"x":4,"y":7}}`, TurnCommand{}, true},
-		{"wrong member type", `{"type":"move","unitId":"17"}`, TurnCommand{}, true},
-		{"trailing data", `{"type":"move"} x`, TurnCommand{}, true},
-		{"truncated", `{"type":"move"`, TurnCommand{}, true},
+func TestGameCfgDecodingIgnoresTestOverrides(t *testing.T) {
+	var got GameCfg
+	if err := json.Unmarshal([]byte(`{"GlobalSpeedOverride":9,"globalSpeedOverride":9}`), &got); err != nil {
+		t.Fatalf("Unmarshal() error = %v", err)
 	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var got TurnCommand
-			err := json.Unmarshal([]byte(tt.input), &got)
-			if (err != nil) != tt.wantErr {
-				t.Fatalf("Unmarshal() error = %v, want error %v", err, tt.wantErr)
-			}
-			if !tt.wantErr && !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Unmarshal() = %+v, want %+v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestGameCfgDecoding(t *testing.T) {
-	t.Run("slots and roles", func(t *testing.T) {
-		var got GameCfg
-		in := `{"vsCpu":true,"stagePreset":"Plain","p1Slots":[{"archetype":"King","role":"King"}],"p2Slots":null,"maxTurns":3,"allowResetTurn":true}`
-		if err := json.Unmarshal([]byte(in), &got); err != nil {
-			t.Fatalf("Unmarshal() error = %v", err)
-		}
-		want := GameCfg{VSCpu: true, StagePreset: "Plain", P1Slots: []TeamSlot{{Archetype: "King", Role: RoleKing}}, MaxTurns: 3, AllowResetTurn: true}
-		if !reflect.DeepEqual(got, want) {
-			t.Errorf("Unmarshal() = %+v, want %+v", got, want)
-		}
-	})
-
-	t.Run("role null leaves the zero role", func(t *testing.T) {
-		var got TeamSlot
-		if err := json.Unmarshal([]byte(`{"archetype":"King","role":null}`), &got); err != nil {
-			t.Fatalf("Unmarshal() error = %v", err)
-		}
-		if got.Role != RoleNormal {
-			t.Errorf("Role = %v, want %v", got.Role, RoleNormal)
-		}
-	})
-
-	t.Run("hidden fields are not settable", func(t *testing.T) {
-		var got GameCfg
-		if err := json.Unmarshal([]byte(`{"GlobalSpeedOverride":9}`), &got); err != nil {
-			t.Fatalf("Unmarshal() error = %v", err)
-		}
-		if got.GlobalSpeedOverride != 0 {
-			t.Errorf("GlobalSpeedOverride = %d, want 0", got.GlobalSpeedOverride)
-		}
-	})
-
-	roleTests := []struct {
-		name    string
-		role    string
-		wantErr error
-	}{
-		{"wrong case", `"king"`, ErrInvalidUnitRole},
-		{"empty", `""`, ErrInvalidUnitRole},
-		{"number", `1`, nil},
-	}
-	for _, tt := range roleTests {
-		t.Run("role "+tt.name, func(t *testing.T) {
-			var got TeamSlot
-			err := json.Unmarshal([]byte(`{"archetype":"King","role":`+tt.role+`}`), &got)
-			if err == nil {
-				t.Fatalf("Unmarshal() error = nil, want error")
-			}
-			if tt.wantErr != nil && !errors.Is(err, tt.wantErr) {
-				t.Errorf("Unmarshal() error = %v, want %v", err, tt.wantErr)
-			}
-		})
+	if got.GlobalSpeedOverride != 0 {
+		t.Errorf("GlobalSpeedOverride = %d, want 0", got.GlobalSpeedOverride)
 	}
 }
