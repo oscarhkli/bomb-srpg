@@ -139,33 +139,28 @@ func (s SkillType) String() string {
 	}
 }
 
-// Archetype defines the base template for a unit class (King, Fighter, Witch, etc.).
-type Archetype struct {
-	Name         string
-	BaseSpeed    int
-	BombMaxRange int
-	BombMinRange int
-	BombPower    int
-	MaxBombCount int
-	BaseHP       int
-	PresetSkills SkillType
-	Selectable   bool
-}
-
-// MarshalJSON emits the client-facing shape.
-func (a Archetype) MarshalJSON() ([]byte, error) {
-	var skills []string
+// MarshalJSON encodes the set as the names of its skills, never null.
+func (s SkillType) MarshalJSON() ([]byte, error) {
+	var names []string
 	for _, skill := range allSkills() {
-		if (skill & a.PresetSkills) != 0 {
-			skills = append(skills, skill.String())
+		if skill&s != 0 {
+			names = append(names, skill.String())
 		}
 	}
-	return json.Marshal(struct {
-		Name         string   `json:"name"`
-		BaseSpeed    int      `json:"speed"`
-		BombMaxRange int      `json:"bombMaxRange"`
-		Skills       []string `json:"skills"`
-	}{a.Name, a.BaseSpeed, a.BombMaxRange, skills})
+	return json.Marshal(names)
+}
+
+// Archetype defines the base template for a unit class (King, Fighter, Witch, etc.).
+type Archetype struct {
+	Name         string    `json:"name"`
+	BaseSpeed    int       `json:"speed"`
+	BombMaxRange int       `json:"bombMaxRange"`
+	BombMinRange int       `json:"-"`
+	BombPower    int       `json:"-"`
+	MaxBombCount int       `json:"-"`
+	BaseHP       int       `json:"-"`
+	PresetSkills SkillType `json:"skills"`
+	Selectable   bool      `json:"-"`
 }
 
 // UnitRoles defines if the Unit is King, Boss, or just a Normal Unit
@@ -238,12 +233,6 @@ type Unit struct {
 
 // MarshalJSON emits the client-facing shape.
 func (u Unit) MarshalJSON() ([]byte, error) {
-	var skills []string
-	for _, skill := range allSkills() {
-		if (skill & u.Skills) != 0 {
-			skills = append(skills, skill.String())
-		}
-	}
 	return json.Marshal(struct {
 		ID           UnitID     `json:"id"`
 		Type         string     `json:"type"`
@@ -255,7 +244,7 @@ func (u Unit) MarshalJSON() ([]byte, error) {
 		BombUsed     int        `json:"bombUsed"`
 		Team         int        `json:"team"`
 		HP           int        `json:"hp"`
-		Skills       []string   `json:"skills"`
+		Skills       SkillType  `json:"skills"`
 		HasMoved     bool       `json:"hasMoved"`
 		HasUsedSkill bool       `json:"hasUsedSkill"`
 	}{
@@ -269,7 +258,7 @@ func (u Unit) MarshalJSON() ([]byte, error) {
 		u.BombUsed,
 		u.Team,
 		u.HP,
-		skills,
+		u.Skills,
 		u.HasMoved,
 		u.HasUsedSkill,
 	})
