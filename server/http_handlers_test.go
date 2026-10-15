@@ -546,6 +546,39 @@ func TestHandleCreateNewMatch(t *testing.T) {
 		}
 	})
 
+	roleTests := []struct {
+		name       string
+		role       string
+		wantStatus int
+	}{
+		{"valid role", `"Normal"`, http.StatusCreated},
+		{"wrong case", `"normal"`, http.StatusBadRequest},
+		{"unknown name", `"Wizard"`, http.StatusBadRequest},
+		{"number", `1`, http.StatusBadRequest},
+	}
+	for _, tt := range roleTests {
+		t.Run("role: "+tt.name, func(t *testing.T) {
+			s := NewServerStateManager()
+			h := NewHandler(s)
+			roomID, err := s.CreateMatchRoom()
+			if err != nil {
+				t.Fatalf("Failed to create room: %v", err)
+			}
+
+			body := `{"gameCfg":{"stagePreset":"Plain","maxTurns":10,` +
+				`"p1Slots":[{"archetype":"King","role":"King"},{"archetype":"Fighter","role":` + tt.role + `}],` +
+				`"p2Slots":[{"archetype":"King","role":"King"},{"archetype":"Witch","role":"Normal"}]}}`
+			req := httptest.NewRequest("POST", "/api/match-rooms/"+roomID+"/match", strings.NewReader(body))
+
+			rr := httptest.NewRecorder()
+			testMux("POST /api/match-rooms/{roomID}/match", h.HandleCreateMatch).ServeHTTP(rr, req)
+
+			if status := rr.Code; status != tt.wantStatus {
+				t.Errorf("Handler returned wrong status code: got %v want %v", status, tt.wantStatus)
+			}
+		})
+	}
+
 	t.Run("Failure: failed to Encode response", func(t *testing.T) {
 		s := NewServerStateManager()
 		h := NewHandler(s)
@@ -1177,6 +1210,24 @@ func TestHandleSubmitTurnCommand(t *testing.T) {
 			t.Fatalf("Failed to create request: %v", err)
 		}
 		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+playerTokens[0])
+
+		rr := httptest.NewRecorder()
+		testMux("POST /api/match-rooms/{roomID}/match/turn-commands", h.HandleSubmitTurnCommand).ServeHTTP(rr, req)
+
+		if status := rr.Code; status != http.StatusBadRequest {
+			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusBadRequest)
+		}
+		if !strings.Contains(rr.Body.String(), "Invalid turnCommand format") {
+			t.Errorf("Expected error message 'Invalid turnCommand format', got: %s", rr.Body.String())
+		}
+	})
+
+	t.Run("Failure: unitId overflows UnitID", func(t *testing.T) {
+		roomID, playerTokens, _, h := createTestRoomWithMatch(t)
+
+		body := `{"type":"move","unitId":300,"target":{"x":4,"y":7}}`
+		req := httptest.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/turn-commands", strings.NewReader(body))
 		req.Header.Set("Authorization", "Bearer "+playerTokens[0])
 
 		rr := httptest.NewRecorder()
