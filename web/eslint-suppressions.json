@@ -1,0 +1,34 @@
+{
+  "src/rendering/blastEffects.ts": {
+    "@typescript-eslint/no-non-null-assertion": {
+      "count": 3
+    }
+  },
+  "src/rendering/resolveTurnPlayer.ts": {
+    "@typescript-eslint/no-non-null-assertion": {
+      "count": 21
+    },
+    "@typescript-eslint/switch-exhaustiveness-check": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 2
+    }
+  },
+  "src/scenes/MatchScene.ts": {
+    "@typescript-eslint/no-non-null-assertion": {
+      "count": 3
+    },
+    "@typescript-eslint/switch-exhaustiveness-check": {
+      "count": 2
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "src/ui/matchSettings/stageSelection.ts": {
+    "@typescript-eslint/no-non-null-assertion": {
+      "count": 1
+    }
+  }
+}
