@@ -1,5 +1,5 @@
 import type Phaser from 'phaser';
-import type { Coordinate, GameEvent, GameState } from '../types/api';
+import type { Coordinate, GameEvent, GameState } from '../api/types';
 import {
   BOMB_COUNTDOWN_ZERO_COLOR,
   BOMB_COUNTDOWN_TEXT_COLOR,

@@ -7,10 +7,10 @@ import {
   fireCameraFadeOutComplete,
   flush,
 } from '../test/sceneHelpers';
-import { createMatchRoom, initRoom, createMatch } from '../engine/api';
+import { createMatchRoom, initRoom, createMatch } from '../api/client';
 import TitleScene from './TitleScene';
 
-vi.mock('../engine/api');
+vi.mock('../api/client');
 
 function bootScene(): TitleScene {
   const scene = new TitleScene();

@@ -13,7 +13,7 @@ import type {
   Catalog,
   CpuStatusResponse,
   ResolveTurnResponse,
-} from '../types/api';
+} from './types';
 
 let roomId: string | undefined;
 let token: string | undefined;

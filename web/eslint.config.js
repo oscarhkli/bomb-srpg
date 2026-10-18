@@ -37,6 +37,22 @@ export default [
       '@typescript-eslint/no-non-null-assertion': 'off'
     }
   },
+  {
+    files: ['src/api/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/rendering/*', '**/ui/*', '**/scenes/*'],
+              message: 'api sits below the rendering layers'
+            }
+          ]
+        }
+      ]
+    }
+  },
   prettier,
   {
     files: ['src/**/*.ts'],

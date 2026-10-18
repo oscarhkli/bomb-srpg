@@ -8,7 +8,7 @@ import {
   SUDDEN_DEATH_COLOR,
 } from '../constants';
 import { createFilledRect } from './gameObjectUtils';
-import type { GameEvent } from '../types/api';
+import type { GameEvent } from '../api/types';
 
 // play() resolves after the later of the pulse duration and the last bomb landing.
 export default class SuddenDeathCutscene {

@@ -8,7 +8,7 @@ import {
   makeBomb as bomb,
 } from '../test/fixtures';
 import { TILE_SIZE, SPRITE_GROUND_MARGIN, DEPTH_STAGE_BACKGROUND } from '../constants';
-import type { Bomb, GameState, SoftBlock, Tile, Unit } from '../types/api';
+import type { Bomb, GameState, SoftBlock, Tile, Unit } from '../api/types';
 import type { BombGraphics } from './resolveTurnPlayer';
 import {
   establishBoardLayout,

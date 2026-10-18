@@ -2,11 +2,11 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mockScene } from '../test/setup';
 import { flush, fireCameraFadeOutComplete } from '../test/sceneHelpers';
 import { makeCfg } from '../test/fixtures';
-import { createMatchRoom, initRoom, createMatch } from '../engine/api';
+import { createMatchRoom, initRoom, createMatch } from '../api/client';
 import ErrorPanel from '../ui/ErrorPanel';
 import { startMatch } from './startMatch';
 
-vi.mock('../engine/api');
+vi.mock('../api/client');
 
 beforeEach(() => {
   vi.clearAllMocks();

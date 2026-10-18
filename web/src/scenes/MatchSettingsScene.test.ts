@@ -11,14 +11,14 @@ import {
   fireShutdown,
 } from '../test/sceneHelpers';
 import { makeCfg } from '../test/fixtures';
-import { getCatalog, createMatchRoom, initRoom, createMatch } from '../engine/api';
+import { getCatalog, createMatchRoom, initRoom, createMatch } from '../api/client';
 import MatchSettingsScene, { type MatchSettingsSceneData } from './MatchSettingsScene';
 import { NO_UNIT, serializeTeams } from '../ui/matchSettings/formation';
 import { UNIT_SPRITE_MANIFEST } from '../rendering/spriteManifest';
 import { TEAM_COLORS, NEXT_BUTTON_LABEL, START_MATCH_BUTTON_LABEL } from '../constants';
-import type { Archetype, Catalog, GameCfg } from '../types/api';
+import type { Archetype, Catalog, GameCfg } from '../api/types';
 
-vi.mock('../engine/api');
+vi.mock('../api/client');
 
 const ARCHETYPES: Archetype[] = [
   { name: 'Fighter', speed: 2, bombMaxRange: 2, skills: [] },

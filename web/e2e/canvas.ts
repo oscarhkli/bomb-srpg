@@ -1,5 +1,5 @@
 import { expect, type APIRequestContext, type Page } from '@playwright/test';
-import type { GameState, Unit } from '../src/types/api';
+import type { GameState, Unit } from '../src/api/types';
 import {
   BUTTON_LABEL_MOVE,
   BUTTON_LABEL_YES,

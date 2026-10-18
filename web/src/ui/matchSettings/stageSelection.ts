@@ -1,5 +1,5 @@
 // Pure, Phaser-free selection logic for StagePage.
-import type { StagePreset } from '../../types/api';
+import type { StagePreset } from '../../api/types';
 
 // 0 = instant sudden death (displayed as 💣).
 const MAX_TURNS_OPTIONS = [0, 15, 20, 30, 45, 60] as const;

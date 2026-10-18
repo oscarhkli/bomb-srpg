@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { TeamSlot, UnitRole } from '../../types/api';
+import type { TeamSlot, UnitRole } from '../../api/types';
 import {
   NO_UNIT,
   SLOT_DISPLAY_ORDER_P1,
