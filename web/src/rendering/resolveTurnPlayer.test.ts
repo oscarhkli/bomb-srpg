@@ -3,7 +3,7 @@ import { mockScene, createMockGraphics, createMockText, createMockContainer } fr
 import { delayedCallAt, makeBombGraphics, drainDelayedCalls } from '../test/sceneHelpers';
 import { makeState, makeUnit, makeSoftBlock, plainGrid } from '../test/fixtures';
 import { occupantsMatch } from '../test/occupantsMatch';
-import type { GameEvent, GameState } from '../types/api';
+import type { GameEvent, GameState } from '../api/types';
 import { BLAST_SPEED_MS_PER_TILE, BLAST_DURATION_MS, FIRE_DURATION_MS } from './constants';
 import { TILE_SIZE } from '../constants';
 import { playResolveTurnEvents, type BombGraphics } from './resolveTurnPlayer';

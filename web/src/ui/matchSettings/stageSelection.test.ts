@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { formatMaxTurns, cycleMaxTurns, findStagePresetIndex } from './stageSelection';
-import type { StagePreset } from '../../types/api';
+import type { StagePreset } from '../../api/types';
 
 function makeStagePreset(overrides: Partial<StagePreset> = {}): StagePreset {
   return {

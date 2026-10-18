@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import ErrorPanel from '../ui/ErrorPanel';
 import { startMatch } from './startMatch';
-import type { GameCfg } from '../types/api';
+import type { GameCfg } from '../api/types';
 import {
   FADE_MS,
   GAME_FONT_FAMILY,

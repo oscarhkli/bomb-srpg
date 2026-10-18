@@ -1,6 +1,6 @@
 // Asserts the occupant graphics maps hold exactly the occupants server truth says exist.
 import type Phaser from 'phaser';
-import type { GameState } from '../types/api';
+import type { GameState } from '../api/types';
 import type { BombGraphics } from '../rendering/resolveTurnPlayer';
 
 export function occupantsMatch(

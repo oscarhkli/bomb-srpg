@@ -14,7 +14,7 @@ import {
   rematch,
   deleteMatch,
   consumeCpuStatus,
-} from '../engine/api';
+} from '../api/client';
 import TurnCommandPanel from '../ui/TurnCommandPanel';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import TurnPanel from '../ui/TurnPanel';
@@ -57,7 +57,7 @@ import type {
   TurnCmdType,
   TurnCommand,
   Unit,
-} from '../types/api';
+} from '../api/types';
 
 type CpuPollResult =
   { ok: true; status: CpuStatusResponse } | { ok: false; reason: 'timeout' | 'idle' };

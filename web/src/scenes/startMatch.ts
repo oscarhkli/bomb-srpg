@@ -1,7 +1,7 @@
 import type Phaser from 'phaser';
-import { createMatchRoom, initRoom, createMatch } from '../engine/api';
+import { createMatchRoom, initRoom, createMatch } from '../api/client';
 import type ErrorPanel from '../ui/ErrorPanel';
-import type { GameCfg } from '../types/api';
+import type { GameCfg } from '../api/types';
 import type { MatchSceneData } from './MatchScene';
 import { FADE_MS } from '../constants';
 

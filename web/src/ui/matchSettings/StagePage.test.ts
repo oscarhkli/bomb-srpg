@@ -9,7 +9,7 @@ import {
 } from '../../test/sceneHelpers';
 import { makeCfg } from '../../test/fixtures';
 import { START_MATCH_BUTTON_LABEL, PANEL_BUTTON_FILL_COLOR } from '../../constants';
-import type { StagePreset, GameCfg } from '../../types/api';
+import type { StagePreset, GameCfg } from '../../api/types';
 import type { PageBounds, SettingsPageNav } from './SettingsPage';
 import StagePage from './StagePage';
 

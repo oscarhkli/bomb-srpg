@@ -1,4 +1,4 @@
-import type { Coordinate } from '../types/api';
+import type { Coordinate } from '../api/types';
 import { BLAST_SPEED_MS_PER_TILE } from './constants';
 
 // Manhattan distance; blast tiles are axis-aligned with the bomb, so this is the ray length.

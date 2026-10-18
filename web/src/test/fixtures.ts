@@ -8,7 +8,7 @@ import type {
   TerrainType,
   Tile,
   Unit,
-} from '../types/api';
+} from '../api/types';
 
 export function tileOf(type: TerrainType): Tile {
   return { type, occupantType: 'OccupantNone', occupantId: 0 };

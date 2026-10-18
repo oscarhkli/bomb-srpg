@@ -49,7 +49,7 @@ import {
   type PillButtonStyle,
 } from './pillButton';
 import { turnCommandPanelHeight } from './TurnCommandPanel';
-import type { GameCfg, GameState } from '../types/api';
+import type { GameCfg, GameState } from '../api/types';
 
 export interface MatchSummaryPanelCallbacks {
   isLocked: () => boolean;

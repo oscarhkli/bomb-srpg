@@ -1,5 +1,5 @@
 import type Phaser from 'phaser';
-import type { Archetype, GameCfg, TeamSlot } from '../../types/api';
+import type { Archetype, GameCfg, TeamSlot } from '../../api/types';
 import {
   NO_UNIT,
   SLOT_DISPLAY_ORDER_P1,

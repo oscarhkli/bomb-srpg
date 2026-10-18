@@ -9,7 +9,7 @@ import {
 } from '../../test/sceneHelpers';
 import { makeCfg } from '../../test/fixtures';
 import { TEAM_COLORS, NEXT_BUTTON_LABEL, DISABLED_BUTTON_COLOR } from '../../constants';
-import type { Archetype, GameCfg } from '../../types/api';
+import type { Archetype, GameCfg } from '../../api/types';
 import type { PageBounds, SettingsPageNav } from './SettingsPage';
 import { NO_UNIT, serializeTeams } from './formation';
 import UnitPage from './UnitPage';

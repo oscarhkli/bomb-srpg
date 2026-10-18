@@ -15,7 +15,7 @@ import {
   ALLOWED_TILE_BOMB_COLOR,
 } from '../constants';
 import TurnCommandPanel from './TurnCommandPanel';
-import type { Coordinate, TurnCmdType } from '../types/api';
+import type { Coordinate, TurnCmdType } from '../api/types';
 import { makeUnit } from '../test/fixtures';
 
 function makePanel(overrides: Partial<Record<string, unknown>> = {}) {

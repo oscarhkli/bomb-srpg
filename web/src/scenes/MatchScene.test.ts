@@ -39,7 +39,7 @@ import {
   rematch,
   deleteMatch,
   consumeCpuStatus,
-} from '../engine/api';
+} from '../api/client';
 import { playResolveTurnEvents } from '../rendering/resolveTurnPlayer';
 import TurnBanner from '../ui/TurnBanner';
 import SuddenDeathCutscene from '../ui/SuddenDeathCutscene';
@@ -52,7 +52,7 @@ import type {
   GameEvent,
   GameState,
   Tile,
-} from '../types/api';
+} from '../api/types';
 import {
   DEPTH_SUDDEN_DEATH_BOMB,
   DEPTH_OCCUPANT,
@@ -63,7 +63,7 @@ import {
   CPU_PLAN_EVENT_STEP_MS,
 } from '../constants';
 
-vi.mock('../engine/api');
+vi.mock('../api/client');
 vi.mock('../rendering/resolveTurnPlayer');
 vi.mock('../ui/TurnBanner');
 vi.mock('../ui/SuddenDeathCutscene');

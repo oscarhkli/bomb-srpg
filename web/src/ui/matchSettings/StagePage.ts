@@ -1,5 +1,5 @@
 import type Phaser from 'phaser';
-import type { GameCfg, StagePreset } from '../../types/api';
+import type { GameCfg, StagePreset } from '../../api/types';
 import type { PageBounds, SettingsPage, SettingsPageNav } from './SettingsPage';
 import { cycleMaxTurns, findStagePresetIndex, formatMaxTurns } from './stageSelection';
 import { drawPillButton, attachRectClickHandler, type PillButtonStyle } from '../pillButton';

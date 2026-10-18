@@ -1,12 +1,12 @@
 import Phaser from 'phaser';
-import { getCatalog } from '../engine/api';
+import { getCatalog } from '../api/client';
 import ErrorPanel from '../ui/ErrorPanel';
 import { drawBackButton } from '../ui/backButton';
 import UnitPage from '../ui/matchSettings/UnitPage';
 import StagePage from '../ui/matchSettings/StagePage';
 import type { PageBounds, SettingsPage, SettingsPageNav } from '../ui/matchSettings/SettingsPage';
 import { startMatch } from './startMatch';
-import type { Catalog, GameCfg } from '../types/api';
+import type { Catalog, GameCfg } from '../api/types';
 import { UNIT_SPRITE_MANIFEST, SPRITE_ASSET_BASE } from '../rendering/spriteManifest';
 import {
   SETTINGS_SCENE_MARGIN,

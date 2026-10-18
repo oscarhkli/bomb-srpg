@@ -10,7 +10,7 @@ import {
   DEPTH_STAGE_BACKGROUND,
   DEPTH_OCCUPANT,
 } from '../constants';
-import type { Bomb, Coordinate, GameState, SoftBlock, Tile, Unit } from '../types/api';
+import type { Bomb, Coordinate, GameState, SoftBlock, Tile, Unit } from '../api/types';
 
 // Shared state for board rendering. terrainObjects and occupantObjects have separate lifetimes,
 // so an occupant swap never touches the terrain layer.

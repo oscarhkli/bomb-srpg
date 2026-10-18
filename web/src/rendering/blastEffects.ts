@@ -1,5 +1,5 @@
 import type Phaser from 'phaser';
-import type { Coordinate } from '../types/api';
+import type { Coordinate } from '../api/types';
 import { TILE_SIZE, GAME_FONT_FAMILY } from '../constants';
 import {
   DEPTH_BLAST,

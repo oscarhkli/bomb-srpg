@@ -17,7 +17,7 @@ import {
   getAllowedTiles,
   rematch,
   deleteMatch,
-} from './api';
+} from './client';
 import { makeState, makeCfg, makeBombPlacedEvent } from '../test/fixtures';
 import type {
   Archetype,
@@ -30,7 +30,7 @@ import type {
   Catalog,
   CpuStatusResponse,
   ResolveTurnResponse,
-} from '../types/api';
+} from './types';
 
 const mockFetch = vi.fn();
 
