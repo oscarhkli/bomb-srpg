@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := test
-.PHONY: fmt vet test test-race coverage build run web-e2e web-dev web-test web-lint web-format web-typecheck web-build web-coverage gen-spec-index
+.PHONY: fmt vet test test-race lint lint-all pre-push install-hooks coverage build build-server run run-server web-dev web-format web-typecheck web-test web-lint web-build web-e2e web-coverage gen-spec-index
 
 fmt:
 	go fmt ./...
@@ -12,6 +12,18 @@ test: vet
 
 test-race: vet
 	go test -race ./cli/... ./cmd/srpg-web/... ./cpu/... ./engine/... ./server/...
+
+lint:
+	golangci-lint run ./cli/... ./cmd/... ./cpu/... ./engine/... ./server/...
+
+lint-all:
+	golangci-lint run --new-from-rev= ./cli/... ./cmd/... ./cpu/... ./engine/... ./server/...
+
+pre-push: lint test web-lint web-test
+
+install-hooks:
+	printf '#!/bin/sh\nexec make pre-push\n' > $$(git rev-parse --git-path hooks)/pre-push
+	chmod +x $$(git rev-parse --git-path hooks)/pre-push
 
 coverage: test
 	go tool cover -html=coverage.txt

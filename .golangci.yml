@@ -1,0 +1,144 @@
+version: "2"
+
+run:
+  tests: true
+
+issues:
+  new-from-rev: origin/main
+
+linters:
+  default: none
+  enable:
+    # golangci-lint defaults
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    # correctness
+    - bodyclose
+    - errorlint
+    - exhaustive
+    - forcetypeassert
+    - nilerr
+    - noctx
+    - reassign
+    - recvcheck
+    - unparam
+    - wastedassign
+    # security
+    - gosec
+    # complexity and magic values
+    - gocognit
+    - goconst
+    - mnd
+    - nestif
+    # design and architecture
+    - depguard
+    - gochecknoglobals
+    - gochecknoinits
+    - iface
+    - interfacebloat
+    - ireturn
+    # style and comments
+    - errname
+    - gocritic
+    - godoclint
+    - godot
+    - godox
+    - misspell
+    - modernize
+    - nolintlint
+    - predeclared
+    - revive
+    - sloglint
+    # tests
+    - dupl
+    - thelper
+    - usetesting
+  settings:
+    depguard:
+      rules:
+        engine:
+          files:
+            - "**/engine/*.go"
+          deny:
+            - pkg: bomb-srpg/cpu
+              desc: engine is the domain core and imports no sibling package
+            - pkg: bomb-srpg/cli
+              desc: engine is the domain core and imports no sibling package
+            - pkg: bomb-srpg/server
+              desc: engine is the domain core and imports no sibling package
+            - pkg: bomb-srpg/cmd
+              desc: engine is the domain core and imports no sibling package
+            - pkg: net/http
+              desc: engine knows no transport
+            - pkg: os
+              desc: engine does no I/O
+        cpu:
+          files:
+            - "**/cpu/*.go"
+          deny:
+            - pkg: bomb-srpg/cli
+              desc: cpu depends on engine only
+            - pkg: bomb-srpg/server
+              desc: cpu depends on engine only
+            - pkg: bomb-srpg/cmd
+              desc: cpu depends on engine only
+            - pkg: net/http
+              desc: cpu decides, it does no I/O
+            - pkg: os
+              desc: cpu decides, it does no I/O
+        cli:
+          files:
+            - "**/cli/*.go"
+          deny:
+            - pkg: bomb-srpg/cpu
+              desc: cli and cpu are independent
+            - pkg: bomb-srpg/server
+              desc: cli and server are independent
+            - pkg: bomb-srpg/cmd
+              desc: only cmd composes packages
+        server:
+          files:
+            - "**/server/*.go"
+          deny:
+            - pkg: bomb-srpg/cli
+              desc: cli and server are independent
+            - pkg: bomb-srpg/cmd
+              desc: only cmd composes packages
+    errcheck:
+      exclude-functions:
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+    gocognit:
+      min-complexity: 15
+    interfacebloat:
+      max: 3
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+    revive:
+      rules:
+        - name: receiver-naming
+        - name: unused-parameter
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - dupl
+          - gocognit
+          - gochecknoglobals
+          - goconst
+          - mnd
+          - noctx
+          - revive
+      - path: engine/presets\.go
+        linters:
+          - goconst
+          - mnd
+      - path: engine/
+        linters:
+          - gosec
+        text: "G404"

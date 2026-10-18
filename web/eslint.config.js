@@ -2,6 +2,7 @@ import js from '@eslint/js'
 import tsParser from '@typescript-eslint/parser'
 import tsPlugin from '@typescript-eslint/eslint-plugin'
 import prettier from 'eslint-config-prettier'
+import sonarjs from 'eslint-plugin-sonarjs'
 
 export default [
   js.configs.recommended,
@@ -17,12 +18,23 @@ export default [
       }
     },
     plugins: {
-      '@typescript-eslint': tsPlugin
+      '@typescript-eslint': tsPlugin,
+      sonarjs
     },
     rules: {
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
       '@typescript-eslint/consistent-type-imports': 'error',
-      '@typescript-eslint/no-floating-promises': 'warn'
+      '@typescript-eslint/no-floating-promises': 'warn',
+      '@typescript-eslint/no-non-null-assertion': 'error',
+      '@typescript-eslint/restrict-template-expressions': ['error', { allowNumber: true }],
+      '@typescript-eslint/switch-exhaustiveness-check': 'error',
+      'sonarjs/cognitive-complexity': ['error', 15]
+    }
+  },
+  {
+    files: ['src/**/*.test.ts', 'src/test/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-non-null-assertion': 'off'
     }
   },
   prettier,
