@@ -857,3 +857,14 @@ func TestGameStateDeepCopy_NilEntries(t *testing.T) {
 		t.Errorf("SoftBlocks = %v, want only entry 2", got.SoftBlocks)
 	}
 }
+
+func TestCompileGrid_NonASCIILayoutRune(t *testing.T) {
+	// U+0142 has the low byte 0x42, the token for TerrainBlock; the row is 2 bytes wide.
+	preset := StagePreset{Name: "NonASCII", Width: 2, Height: 1, LayoutGrid: []string{"ł"}}
+
+	_, err := compileGrid(preset)
+
+	if !errors.Is(err, ErrInvalidTerrain) {
+		t.Errorf("compileGrid() error = %v, want ErrInvalidTerrain", err)
+	}
+}

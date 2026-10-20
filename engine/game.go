@@ -7,8 +7,8 @@ import (
 
 const NoUnit string = "NO_UNIT"
 
-func terrainToken() map[byte]TerrainType {
-	return map[byte]TerrainType{
+func terrainToken() map[rune]TerrainType {
+	return map[rune]TerrainType{
 		'.': TerrainPlain,
 		'B': TerrainBlock,
 		'T': TerrainTower,
@@ -61,11 +61,11 @@ func initGameState(gameCfg GameCfg) (*GameState, error) {
 
 	units := map[UnitID]*Unit{}
 
-	err = createUnits(units, grid, gameCfg.P1Slots, stagePreset.P1StartingPositions, 1, gameCfg)
+	err = createUnits(units, grid, gameCfg.P1Slots, stagePreset.P1StartingPositions, Team1, gameCfg)
 	if err != nil {
 		return nil, err
 	}
-	err = createUnits(units, grid, gameCfg.P2Slots, stagePreset.P2StartingPositions, 2, gameCfg)
+	err = createUnits(units, grid, gameCfg.P2Slots, stagePreset.P2StartingPositions, Team2, gameCfg)
 	if err != nil {
 		return nil, err
 	}
@@ -106,7 +106,7 @@ func compileGrid(preset StagePreset) ([][]Tile, error) {
 	for y, row := range preset.LayoutGrid {
 		grid[y] = make([]Tile, preset.Width)
 		for x, char := range row {
-			terrain, exists := terrainToken()[byte(char)]
+			terrain, exists := terrainToken()[char]
 			if !exists {
 				return nil, fmt.Errorf("%w: invalid terrain character '%c' at (%d, %d)", ErrInvalidTerrain, char, x, y)
 			}
