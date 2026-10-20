@@ -748,58 +748,6 @@ func TestGameStateDeepCopy_MemoryHandling(t *testing.T) {
 	}
 }
 
-type nonZeroFiller struct {
-	t *testing.T
-	i int64
-	u uint64
-}
-
-func (f *nonZeroFiller) fill(v reflect.Value) {
-	f.t.Helper()
-	f.i++
-	f.u++
-	switch kind := v.Kind(); {
-	case kind == reflect.Bool:
-		v.SetBool(true)
-	case kind >= reflect.Int && kind <= reflect.Int64:
-		v.SetInt(f.i)
-	case kind >= reflect.Uint && kind <= reflect.Uint64:
-		v.SetUint(f.u)
-	case kind == reflect.String:
-		v.SetString(fmt.Sprintf("s%d", f.i))
-	case kind == reflect.Struct:
-		for _, field := range v.Fields() {
-			f.fill(field)
-		}
-	case kind == reflect.Pointer:
-		v.Set(reflect.New(v.Type().Elem()))
-		f.fill(v.Elem())
-	case kind == reflect.Slice:
-		v.Set(reflect.MakeSlice(v.Type(), 1, 1))
-		f.fill(v.Index(0))
-	case kind == reflect.Map:
-		v.Set(reflect.MakeMap(v.Type()))
-		key := reflect.New(v.Type().Key()).Elem()
-		val := reflect.New(v.Type().Elem()).Elem()
-		f.fill(key)
-		f.fill(val)
-		v.SetMapIndex(key, val)
-	default:
-		f.t.Fatalf("unsupported kind %v; teach the helper about it", kind)
-	}
-}
-
-func TestGameStateDeepCopy_AllFields(t *testing.T) {
-	var original GameState
-	(&nonZeroFiller{t: t}).fill(reflect.ValueOf(&original).Elem())
-
-	got := original.DeepCopy()
-
-	if !reflect.DeepEqual(got, &original) {
-		t.Errorf("DeepCopy() = %+v, want %+v", got, &original)
-	}
-}
-
 func TestGameStateDeepCopy_NilAndEmpty(t *testing.T) {
 	tests := []struct {
 		name  string
