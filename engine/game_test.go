@@ -645,6 +645,7 @@ func TestGameStateDeepCopy_Isolation(t *testing.T) {
 	original.Units[1] = &Unit{ID: 1, Type: Archetype{Name: "King"}, Team: 1, Position: Coordinate{0, 0}, HP: 3}
 	original.Bombs[1] = &Bomb{ID: 1, OwnerID: 1, Position: Coordinate{1, 1}, Range: 2, Countdown: 3}
 	original.SoftBlocks[1] = &SoftBlock{ID: 1, Position: Coordinate{2, 2}}
+	original.TurnCommands = []TurnCommand{NewMoveCommand(1, Coordinate{3, 3})}
 
 	clone := original.DeepCopy()
 
@@ -656,6 +657,7 @@ func TestGameStateDeepCopy_Isolation(t *testing.T) {
 	clone.Units[1].Position = Coordinate{5, 5}
 	clone.Bombs[1].Range = 10
 	clone.SoftBlocks[1].Position = Coordinate{10, 10}
+	clone.TurnCommands[0].Target = Coordinate{9, 9}
 
 	if original.Turn == clone.Turn {
 		t.Errorf("Expected original Turn to be unaffected by changes to clone, got %d", original.Turn)
@@ -680,6 +682,9 @@ func TestGameStateDeepCopy_Isolation(t *testing.T) {
 	}
 	if original.SoftBlocks[1].Position == clone.SoftBlocks[1].Position {
 		t.Errorf("Expected original soft block Position to be unaffected by changes to clone, got (%d,%d)", original.SoftBlocks[1].Position.X, original.SoftBlocks[1].Position.Y)
+	}
+	if original.TurnCommands[0].Target == clone.TurnCommands[0].Target {
+		t.Errorf("Expected original TurnCommands to be unaffected by changes to clone, got %v", original.TurnCommands[0].Target)
 	}
 }
 
@@ -740,5 +745,115 @@ func TestGameStateDeepCopy_MemoryHandling(t *testing.T) {
 	}
 	if clone.SoftBlocks == nil {
 		t.Error("Panic guard failure: original.SoftBlocks was nil, but clone.SoftBlocks failed to initialize into an active writable map.")
+	}
+}
+
+func fillNonZero(t *testing.T, v reflect.Value, n *int64) {
+	t.Helper()
+	*n++
+	switch v.Kind() {
+	case reflect.Bool:
+		v.SetBool(true)
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		v.SetInt(*n)
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		v.SetUint(uint64(*n))
+	case reflect.String:
+		v.SetString(fmt.Sprintf("s%d", *n))
+	case reflect.Struct:
+		for i := range v.NumField() {
+			fillNonZero(t, v.Field(i), n)
+		}
+	case reflect.Ptr:
+		v.Set(reflect.New(v.Type().Elem()))
+		fillNonZero(t, v.Elem(), n)
+	case reflect.Slice:
+		v.Set(reflect.MakeSlice(v.Type(), 1, 1))
+		fillNonZero(t, v.Index(0), n)
+	case reflect.Map:
+		v.Set(reflect.MakeMap(v.Type()))
+		key := reflect.New(v.Type().Key()).Elem()
+		val := reflect.New(v.Type().Elem()).Elem()
+		fillNonZero(t, key, n)
+		fillNonZero(t, val, n)
+		v.SetMapIndex(key, val)
+	default:
+		t.Fatalf("fillNonZero: unsupported kind %v; teach the helper about it", v.Kind())
+	}
+}
+
+func TestGameStateDeepCopy_AllFields(t *testing.T) {
+	var original GameState
+	var n int64
+	fillNonZero(t, reflect.ValueOf(&original).Elem(), &n)
+
+	got := original.DeepCopy()
+
+	if !reflect.DeepEqual(got, &original) {
+		t.Errorf("DeepCopy() = %+v, want %+v", got, &original)
+	}
+}
+
+func TestGameStateDeepCopy_NilAndEmpty(t *testing.T) {
+	tests := []struct {
+		name  string
+		in    *GameState
+		check func(t *testing.T, got *GameState)
+	}{
+		{
+			name: "nil collections become non-nil empty, nil TurnCommands stays nil",
+			in:   &GameState{},
+			check: func(t *testing.T, got *GameState) {
+				if got.Grid == nil || got.Units == nil || got.Bombs == nil || got.SoftBlocks == nil {
+					t.Errorf("want non-nil Grid, Units, Bombs, SoftBlocks, got %+v", got)
+				}
+				if got.TurnCommands != nil {
+					t.Errorf("TurnCommands = %v, want nil", got.TurnCommands)
+				}
+			},
+		},
+		{
+			name: "empty TurnCommands stays empty and non-nil",
+			in:   &GameState{TurnCommands: []TurnCommand{}},
+			check: func(t *testing.T, got *GameState) {
+				if got.TurnCommands == nil || len(got.TurnCommands) != 0 {
+					t.Errorf("TurnCommands = %#v, want empty non-nil", got.TurnCommands)
+				}
+			},
+		},
+		{
+			name: "nil receiver returns nil",
+			in:   nil,
+			check: func(t *testing.T, got *GameState) {
+				if got != nil {
+					t.Errorf("DeepCopy() = %+v, want nil", got)
+				}
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.check(t, tt.in.DeepCopy())
+		})
+	}
+}
+
+func TestGameStateDeepCopy_NilEntries(t *testing.T) {
+	original := &GameState{
+		Units:      map[UnitID]*Unit{1: nil, 2: {ID: 2}},
+		Bombs:      map[BombID]*Bomb{1: nil, 2: {ID: 2}},
+		SoftBlocks: map[int]*SoftBlock{1: nil, 2: {ID: 2}},
+	}
+
+	got := original.DeepCopy()
+
+	if len(got.Units) != 1 || got.Units[2] == nil {
+		t.Errorf("Units = %v, want only entry 2", got.Units)
+	}
+	if len(got.Bombs) != 1 || got.Bombs[2] == nil {
+		t.Errorf("Bombs = %v, want only entry 2", got.Bombs)
+	}
+	if len(got.SoftBlocks) != 1 || got.SoftBlocks[2] == nil {
+		t.Errorf("SoftBlocks = %v, want only entry 2", got.SoftBlocks)
 	}
 }
