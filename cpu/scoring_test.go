@@ -312,3 +312,89 @@ func TestEvaluate_OriginalGameStateUntouched(t *testing.T) {
 		t.Errorf("gs.Units[actor.ID].BombUsed = %d, want 0", gs.Units[actor.ID].BombUsed)
 	}
 }
+
+func TestEvaluate_TurnResultSets(t *testing.T) {
+	type fixture struct {
+		bombOwner func(actor, fighter, opponent engine.UnitID) engine.UnitID
+		countdown int
+		fighterHP int
+		allyIDs   func(actor, fighter engine.UnitID) []engine.UnitID
+		bombAt    engine.Coordinate
+		kingHP    int
+	}
+	score := func(t *testing.T, f fixture) int {
+		t.Helper()
+		gs := newTestGameState(9, 9)
+		actor := addKing(gs, engine.NewUnitID(1, 1), engine.Coordinate{X: 2, Y: 2})
+		actor.HP = 5
+		if f.kingHP != 0 {
+			actor.HP = f.kingHP
+		}
+		fighter := addFighter(gs, engine.NewUnitID(1, 2), engine.Coordinate{X: 2, Y: 5})
+		fighter.HP = f.fighterHP
+		opponentKing := addKing(gs, engine.NewUnitID(2, 1), engine.Coordinate{X: 8, Y: 8})
+		owner := f.bombOwner(actor.ID, fighter.ID, opponentKing.ID)
+		bombID := engine.NewBombID(0, 0, owner)
+		gs.Bombs[bombID] = &engine.Bomb{ID: bombID, OwnerID: owner, Position: f.bombAt, Range: 1, Countdown: f.countdown}
+		gs.Grid[f.bombAt.Y][f.bombAt.X] = engine.Tile{Type: engine.TerrainPlain, OccupantType: engine.OccupantBomb, OccupantID: int64(bombID)}
+		sc := scoreContext{
+			actorID:        actor.ID,
+			allyIDs:        f.allyIDs(actor.ID, fighter.ID),
+			opponentIDs:    []engine.UnitID{opponentKing.ID},
+			allyKingID:     actor.ID,
+			opponentKingID: opponentKing.ID,
+			actorOrigin:    actor.Position,
+		}
+		got, err := evaluate(sc, gs, nil)
+		if err != nil {
+			t.Fatalf("evaluate() unexpected err = %v", err)
+		}
+		return got.score
+	}
+	both := func(a, f engine.UnitID) []engine.UnitID { return []engine.UnitID{a, f} }
+	opponent := func(_, _, o engine.UnitID) engine.UnitID { return o }
+	nearActor := engine.Coordinate{X: 3, Y: 2}
+	farAway := engine.Coordinate{X: 6, Y: 0}
+	nearFighter := engine.Coordinate{X: 3, Y: 5}
+
+	allyOwned := func(a, _, _ engine.UnitID) engine.UnitID { return a }
+	system := func(_, _, _ engine.UnitID) engine.UnitID { return engine.SystemUnitID }
+	fighterOwned := func(_, f, _ engine.UnitID) engine.UnitID { return f }
+	fighterOnly := func(_, f engine.UnitID) []engine.UnitID { return []engine.UnitID{f} }
+
+	t.Run("opponent bomb hits the actor's tile", func(t *testing.T) {
+		hit := score(t, fixture{bombOwner: opponent, countdown: 1, fighterHP: 5, allyIDs: both, bombAt: nearActor})
+		clear := score(t, fixture{bombOwner: opponent, countdown: 1, fighterHP: 5, allyIDs: both, bombAt: farAway})
+		if hit >= clear {
+			t.Errorf("score with bomb on actor = %d, want below %d without it", hit, clear)
+		}
+	})
+	t.Run("sudden-death bomb scores like an opponent bomb", func(t *testing.T) {
+		sys := score(t, fixture{bombOwner: system, countdown: 1, fighterHP: 5, allyIDs: both, bombAt: nearActor})
+		opp := score(t, fixture{bombOwner: opponent, countdown: 1, fighterHP: 5, allyIDs: both, bombAt: nearActor})
+		if sys != opp {
+			t.Errorf("system bomb score = %d, want %d (opponent bomb)", sys, opp)
+		}
+	})
+	t.Run("ally bomb scores differently from an opponent bomb", func(t *testing.T) {
+		ally := score(t, fixture{bombOwner: allyOwned, countdown: 1, fighterHP: 5, allyIDs: both, bombAt: nearActor})
+		opp := score(t, fixture{bombOwner: opponent, countdown: 1, fighterHP: 5, allyIDs: both, bombAt: nearActor})
+		if ally <= opp {
+			t.Errorf("ally bomb score = %d, want above opponent bomb score %d", ally, opp)
+		}
+	})
+	t.Run("ally dies inside ally-affected tiles", func(t *testing.T) {
+		inside := score(t, fixture{bombOwner: allyOwned, countdown: 5, fighterHP: 1, allyIDs: both, bombAt: nearFighter})
+		outside := score(t, fixture{bombOwner: opponent, countdown: 5, fighterHP: 1, allyIDs: both, bombAt: nearFighter})
+		if inside >= outside {
+			t.Errorf("self-inflicted death score = %d, want below %d for death by an opponent bomb", inside, outside)
+		}
+	})
+	t.Run("ally king dies though absent from allyIDs", func(t *testing.T) {
+		listed := score(t, fixture{bombOwner: fighterOwned, countdown: 5, fighterHP: 5, allyIDs: both, bombAt: nearActor, kingHP: 1})
+		unlisted := score(t, fixture{bombOwner: fighterOwned, countdown: 5, fighterHP: 5, allyIDs: fighterOnly, bombAt: nearActor, kingHP: 1})
+		if listed != unlisted {
+			t.Errorf("score with King outside allyIDs = %d, want %d", unlisted, listed)
+		}
+	})
+}

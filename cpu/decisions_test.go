@@ -570,3 +570,162 @@ func TestIsKingRole_CoversBoss(t *testing.T) {
 		})
 	}
 }
+
+func TestDecide_Roster(t *testing.T) {
+	ally := func(n int) engine.UnitID { return engine.NewUnitID(2, n) }
+	opp := func(n int) engine.UnitID { return engine.NewUnitID(1, n) }
+	tests := []struct {
+		name      string
+		setup     func(gs *engine.GameState)
+		wantEmpty bool
+		wantNone  []engine.UnitID
+	}{
+		{
+			name: "team 1 unit never planned",
+			setup: func(gs *engine.GameState) {
+				addKing(gs, ally(1), engine.Coordinate{X: 0, Y: 0})
+				addKing(gs, opp(1), engine.Coordinate{X: 8, Y: 8})
+				addFighter(gs, opp(2), engine.Coordinate{X: 8, Y: 0})
+			},
+			wantNone: []engine.UnitID{opp(1), opp(2)},
+		},
+		{
+			name: "no ally King",
+			setup: func(gs *engine.GameState) {
+				addFighter(gs, ally(1), engine.Coordinate{X: 0, Y: 0})
+				addKing(gs, opp(1), engine.Coordinate{X: 8, Y: 8})
+			},
+			wantEmpty: true,
+		},
+		{
+			name: "no opponent King",
+			setup: func(gs *engine.GameState) {
+				addKing(gs, ally(1), engine.Coordinate{X: 0, Y: 0})
+				addFighter(gs, opp(1), engine.Coordinate{X: 8, Y: 8})
+			},
+			wantEmpty: true,
+		},
+		{
+			name: "Boss counts as the ally king",
+			setup: func(gs *engine.GameState) {
+				addUnit(gs, ally(1), engine.Coordinate{X: 0, Y: 0}, "King", engine.RoleBoss)
+				addKing(gs, opp(1), engine.Coordinate{X: 8, Y: 8})
+			},
+			wantNone: []engine.UnitID{opp(1)},
+		},
+		{
+			name: "Boss counts as the opponent king",
+			setup: func(gs *engine.GameState) {
+				addKing(gs, ally(1), engine.Coordinate{X: 0, Y: 0})
+				addUnit(gs, opp(1), engine.Coordinate{X: 8, Y: 8}, "King", engine.RoleBoss)
+			},
+			wantNone: []engine.UnitID{opp(1)},
+		},
+		{
+			name: "dead ally King ignored",
+			setup: func(gs *engine.GameState) {
+				addKing(gs, ally(1), engine.Coordinate{X: 0, Y: 0}).HP = 0
+				addFighter(gs, ally(2), engine.Coordinate{X: 0, Y: 4})
+				addKing(gs, opp(1), engine.Coordinate{X: 8, Y: 8})
+			},
+			wantEmpty: true,
+		},
+		{
+			name: "dead opponent King ignored",
+			setup: func(gs *engine.GameState) {
+				addKing(gs, ally(1), engine.Coordinate{X: 0, Y: 0})
+				addKing(gs, opp(1), engine.Coordinate{X: 8, Y: 8}).HP = 0
+			},
+			wantEmpty: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gs := newTestGameState(9, 9)
+			tt.setup(gs)
+
+			got := Decide(gs)
+
+			if tt.wantEmpty != (len(got) == 0) {
+				t.Fatalf("Decide() = %+v, want empty = %v", got, tt.wantEmpty)
+			}
+			for _, cmd := range got {
+				if slices.Contains(tt.wantNone, cmd.UnitID) {
+					t.Errorf("Decide() = %+v, want no command from %v", got, cmd.UnitID)
+				}
+			}
+		})
+	}
+}
+
+func TestDecide_EmptyPlansEndLoop(t *testing.T) {
+	gs := newTestGameState(9, 9)
+	center := engine.Coordinate{X: 4, Y: 4}
+	king := addKing(gs, engine.NewUnitID(2, 1), center)
+	for _, off := range crossOffsets(max(king.Speed, king.BombMaxRange)) {
+		setTerrainBlock(gs, engine.Coordinate{X: center.X + off.X, Y: center.Y + off.Y})
+	}
+	addKing(gs, engine.NewUnitID(1, 1), engine.Coordinate{X: 0, Y: 0})
+
+	if got := Decide(gs); len(got) != 0 {
+		t.Errorf("Decide() = %+v, want no commands", got)
+	}
+}
+
+func TestDecide_SingleBestMove(t *testing.T) {
+	gs := newTestGameState(9, 2)
+	corridorWithBreakthrough(gs)
+	addFighter(gs, engine.NewUnitID(2, 3), engine.Coordinate{X: 0, Y: 1})
+
+	got := Decide(gs)
+
+	fighter := engine.NewUnitID(2, 1)
+	want := []engine.TurnCommand{
+		engine.NewMoveCommand(fighter, engine.Coordinate{X: 2, Y: 0}),
+		engine.NewPlaceBombCommand(fighter, engine.Coordinate{X: 4, Y: 0}),
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("Decide() = %+v, want %+v", got, want)
+	}
+}
+
+func TestDecide_DoesNotMutateInput(t *testing.T) {
+	tests := []struct {
+		name  string
+		setup func(gs *engine.GameState)
+	}{
+		{"move and bomb plan", func(gs *engine.GameState) { corridorWithBreakthrough(gs) }},
+		{"two fighters", func(gs *engine.GameState) { twinCorridorWithBreakthrough(gs, false) }},
+		{"king advance", func(gs *engine.GameState) {
+			addKing(gs, engine.NewUnitID(2, 1), engine.Coordinate{X: 0, Y: 0})
+			addKing(gs, engine.NewUnitID(1, 1), engine.Coordinate{X: 8, Y: 4})
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gs := newTestGameState(9, 5)
+			tt.setup(gs)
+			want := gs.DeepCopy()
+
+			if got := Decide(gs); len(got) == 0 {
+				t.Fatalf("Decide() = empty, want commands so the sandbox is exercised")
+			}
+
+			if !reflect.DeepEqual(gs, want) {
+				t.Errorf("Decide() mutated its input GameState")
+			}
+		})
+	}
+}
+
+func TestDecide_HighestScoringAllyActsFirst(t *testing.T) {
+	gs := newTestGameState(9, 5)
+	fighter1, fighter2 := twinCorridorWithBreakthrough(gs, false)
+
+	got := Decide(gs)
+
+	if len(got) != 4 || got[0].UnitID != fighter1.ID || got[1].UnitID != fighter1.ID ||
+		got[2].UnitID != fighter2.ID || got[3].UnitID != fighter2.ID {
+		t.Errorf("Decide() = %+v, want %v's plan first, then %v's", got, fighter1.ID, fighter2.ID)
+	}
+}
