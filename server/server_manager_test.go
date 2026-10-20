@@ -827,6 +827,7 @@ func TestServerStateManager_EngineRejectionStatus(t *testing.T) {
 		{
 			name: "config rejected by the engine",
 			run: func(t *testing.T) error {
+				t.Helper()
 				gameCfg := validGameCfg()
 				gameCfg.StagePreset = "NoSuchStage"
 				s := NewServerStateManager()
@@ -840,6 +841,7 @@ func TestServerStateManager_EngineRejectionStatus(t *testing.T) {
 		{
 			name: "turn command rejected by the engine",
 			run: func(t *testing.T) error {
+				t.Helper()
 				roomID, tokens, s := createTestRoom(t)
 				cmd := engine.NewMoveCommand(engine.NewUnitID(1, 0), engine.Coordinate{X: 4, Y: 7777})
 				_, err := s.SubmitTurnCommand(roomID, cmd, tokens[0])
