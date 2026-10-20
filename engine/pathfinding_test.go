@@ -286,7 +286,7 @@ func TestGameState_FindReachableTiles_0WidthDimensionGrid(t *testing.T) {
 	}
 }
 
-// to test if FindReachableTilesOnSnapshot uses snapshot to calculate
+// TestGameState_FindReachableTilesOnSnapshot checks that FindReachableTilesOnSnapshot reads the snapshot, not the live grid.
 func TestGameState_FindReachableTilesOnSnapshot(t *testing.T) {
 	state := &GameState{
 		Grid: [][]Tile{
