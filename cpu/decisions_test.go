@@ -729,3 +729,20 @@ func TestDecide_HighestScoringAllyActsFirst(t *testing.T) {
 		t.Errorf("Decide() = %+v, want %v's plan first, then %v's", got, fighter1.ID, fighter2.ID)
 	}
 }
+
+func TestBuildRoster_PositionsFromInput(t *testing.T) {
+	gs := newTestGameState(9, 9)
+	origin := engine.Coordinate{X: 0, Y: 0}
+	king := addKing(gs, engine.NewUnitID(2, 1), origin)
+	addKing(gs, engine.NewUnitID(1, 1), engine.Coordinate{X: 8, Y: 8})
+	sandbox := gs.DeepCopy()
+	if err := applyCandidate(sandbox, candidate{turnCommands: []engine.TurnCommand{engine.NewMoveCommand(king.ID, engine.Coordinate{X: 1, Y: 0})}}); err != nil {
+		t.Fatalf("applyCandidate() unexpected err = %v", err)
+	}
+
+	r, ok := buildRoster(gs)
+
+	if !ok || len(r.allies) != 1 || r.allies[0].Position != origin {
+		t.Errorf("buildRoster() = %+v, %v, want the ally King at %+v", r, ok, origin)
+	}
+}
