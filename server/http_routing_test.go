@@ -349,11 +349,12 @@ func TestHTTPRouting(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var body io.Reader
-			if tt.name == "POST /api/match-rooms/{roomID}/match" {
+			switch {
+			case tt.name == "POST /api/match-rooms/{roomID}/match":
 				body = bytes.NewReader(gameCfgBody)
-			} else if strings.HasPrefix(tt.name, "POST /api/match-rooms/{roomID}/match/turn-commands") {
+			case strings.HasPrefix(tt.name, "POST /api/match-rooms/{roomID}/match/turn-commands"):
 				body = bytes.NewBuffer(turnCmdBody)
-			} else if strings.HasPrefix(tt.name, "POST /api/match-rooms/{roomID}/match/surrender") {
+			case strings.HasPrefix(tt.name, "POST /api/match-rooms/{roomID}/match/surrender"):
 				body = bytes.NewBuffer(surrenderReqBody)
 			}
 

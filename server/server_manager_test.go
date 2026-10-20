@@ -873,10 +873,8 @@ func TestServerStateManager_SubmitTurnCommand(t *testing.T) {
 			}
 			if tt.validate != nil {
 				tt.validate(t, gameEvents, s, roomID, cmd)
-			} else {
-				if len(gameEvents) > 0 {
-					t.Errorf("Expected gameEvents to be empty, got %p", gameEvents)
-				}
+			} else if len(gameEvents) > 0 {
+				t.Errorf("Expected gameEvents to be empty, got %p", gameEvents)
 			}
 		})
 	}
@@ -1643,10 +1641,8 @@ func TestServerStateManager_ConsumeCPUStatus(t *testing.T) {
 			}
 			if tt.validate != nil {
 				tt.validate(t, turnPhase, planGameEvents, resolveTurnGameEvents, s, roomID)
-			} else {
-				if len(planGameEvents) != 0 || len(resolveTurnGameEvents) != 0 {
-					t.Errorf("Expected gameEvents to be empty, got %#v and %#v", planGameEvents, resolveTurnGameEvents)
-				}
+			} else if len(planGameEvents) != 0 || len(resolveTurnGameEvents) != 0 {
+				t.Errorf("Expected gameEvents to be empty, got %#v and %#v", planGameEvents, resolveTurnGameEvents)
 			}
 		})
 	}
@@ -1787,10 +1783,8 @@ func TestServerStateManager_ResolveTurn(t *testing.T) {
 			}
 			if tt.validate != nil {
 				tt.validate(t, planGameEvents, resolveTurnGameEvents, s, roomID)
-			} else {
-				if len(planGameEvents) != 0 || len(resolveTurnGameEvents) != 0 {
-					t.Errorf("Expected gameEvents to be empty, got %#v and %#v", planGameEvents, resolveTurnGameEvents)
-				}
+			} else if len(planGameEvents) != 0 || len(resolveTurnGameEvents) != 0 {
+				t.Errorf("Expected gameEvents to be empty, got %#v and %#v", planGameEvents, resolveTurnGameEvents)
 			}
 		})
 	}
@@ -1885,10 +1879,8 @@ func TestServerStateManager_Surrender(t *testing.T) {
 			}
 			if tt.validate != nil {
 				tt.validate(t, gameEvents, s, roomID)
-			} else {
-				if len(gameEvents) != 0 {
-					t.Errorf("Expected gameEvents to be empty, got %#v", gameEvents)
-				}
+			} else if len(gameEvents) != 0 {
+				t.Errorf("Expected gameEvents to be empty, got %#v", gameEvents)
 			}
 		})
 	}
