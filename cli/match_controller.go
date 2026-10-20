@@ -33,12 +33,7 @@ func (c *MatchController) StartInputLoop() {
 		}
 
 		if c.Match.WinnerTeamID != 0 {
-			var message string
-			if c.Match.WinnerTeamID == -1 {
-				message = "Draw Game!"
-			} else {
-				message = fmt.Sprintf("Winner... PLAYER %d!", c.Match.WinnerTeamID)
-			}
+			message := winnerMessage(c.Match.WinnerTeamID)
 			c.View.RenderFeedback(true, message)
 
 			return
@@ -65,6 +60,13 @@ func (c *MatchController) StartInputLoop() {
 	if err := scanner.Err(); err != nil {
 		log.Fatalf("Critical Input Failure: %v", err)
 	}
+}
+
+func winnerMessage(winnerTeamID int) string {
+	if winnerTeamID == -1 {
+		return "Draw Game!"
+	}
+	return fmt.Sprintf("Winner... PLAYER %d!", winnerTeamID)
 }
 
 func (c *MatchController) handleSystemCommand(cmd string) {
