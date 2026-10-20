@@ -1,7 +1,10 @@
 package engine
 
 import (
+	"errors"
+	"maps"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -1588,10 +1591,16 @@ func newTestMatchWithTeams(t *testing.T, p1, p2 teamFormation) *Match {
 }
 
 func TestMatch_Resolve_VictoryCondition_Suite(t *testing.T) {
+	addRoleUnit := func(m *Match, team, idx int, role UnitRole, hp int) {
+		id := NewUnitID(team, idx)
+		m.WorkingState.Units[id] = &Unit{ID: id, Team: team, Role: role, HP: hp}
+	}
+
 	tests := []struct {
 		name                string
 		p1                  teamFormation
 		p2                  teamFormation
+		setup               func(m *Match)
 		expectedWinningTeam int
 	}{
 		{
@@ -1780,11 +1789,61 @@ func TestMatch_Resolve_VictoryCondition_Suite(t *testing.T) {
 			p2:                  teamFormation{King: boolPtr(true), OrdinaryUnitsAlive: []bool{true}},
 			expectedWinningTeam: MatchInProgress,
 		},
+		{
+			name: "King and Boss on one team, Boss alive",
+			p1:   teamFormation{},
+			p2:   teamFormation{King: boolPtr(true)},
+			setup: func(m *Match) {
+				addRoleUnit(m, 1, 0, RoleKing, 1)
+				addRoleUnit(m, 1, 1, RoleBoss, 1)
+			},
+			expectedWinningTeam: 1,
+		},
+		{
+			name: "King and Boss on one team, Boss dead, King alive",
+			p1:   teamFormation{},
+			p2:   teamFormation{King: boolPtr(true)},
+			setup: func(m *Match) {
+				addRoleUnit(m, 1, 0, RoleKing, 1)
+				addRoleUnit(m, 1, 1, RoleBoss, 0)
+			},
+			expectedWinningTeam: 2,
+		},
+		{
+			name: "Team 3 ordinary unit plus team 2 King",
+			p1:   teamFormation{King: boolPtr(true)},
+			p2:   teamFormation{King: boolPtr(true)},
+			setup: func(m *Match) {
+				addRoleUnit(m, 3, 0, RoleNormal, 1)
+			},
+			expectedWinningTeam: 2,
+		},
+		{
+			name: "Team 3 Boss alone",
+			p1:   teamFormation{King: boolPtr(true)},
+			p2:   teamFormation{},
+			setup: func(m *Match) {
+				addRoleUnit(m, 3, 0, RoleBoss, 1)
+			},
+			expectedWinningTeam: 1,
+		},
+		{
+			name: "King at HP -1 counts as dead",
+			p1:   teamFormation{King: boolPtr(true)},
+			p2:   teamFormation{},
+			setup: func(m *Match) {
+				addRoleUnit(m, 2, 0, RoleKing, -1)
+			},
+			expectedWinningTeam: 1,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			m := newTestMatchWithTeams(t, tt.p1, tt.p2)
+			if tt.setup != nil {
+				tt.setup(m)
+			}
 
 			_, gameEvents := m.ResolveTurn()
 
@@ -1810,6 +1869,316 @@ func TestMatch_Resolve_VictoryCondition_Suite(t *testing.T) {
 			}
 			if !foundEndedEvent {
 				t.Error("Missing critical MatchEndedEvent token inside returned telemetry array stream")
+			}
+		})
+	}
+}
+
+func TestGameState_ProcessChain_Edges(t *testing.T) {
+	owner := NewUnitID(1, 0)
+	victim := NewUnitID(2, 0)
+	bombA := NewBombID(1, 1, owner)
+	bombB := NewBombID(1, 2, owner)
+	ghost := NewBombID(1, 9, owner)
+
+	addOwner := func(m *Match, bombUsed int) {
+		m.WorkingState.Units[owner] = &Unit{ID: owner, Team: 1, HP: 1, BombUsed: bombUsed}
+	}
+	type queued struct {
+		queue   []BombID
+		ignited map[BombID]bool
+	}
+	fresh := func(ids ...BombID) queued {
+		q := queued{queue: ids, ignited: map[BombID]bool{}}
+		for _, id := range ids {
+			q.ignited[id] = true
+		}
+		return q
+	}
+
+	tests := []struct {
+		name          string
+		setup         func(m *Match) queued
+		wantExploded  []BombID
+		wantIgnited   map[BombID]bool
+		wantDamaged   map[UnitID]bool
+		wantBlocks    map[int]bool
+		wantItems     map[int]bool
+		wantBombsLeft []BombID
+		wantBombUsed  int
+	}{
+		{
+			name: "tile holds an already-ignited bomb",
+			setup: func(m *Match) queued {
+				addOwner(m, 2)
+				m.AddBomb(1, 1, owner, Coordinate{0, 1}, 2, 0)
+				m.AddBomb(1, 2, owner, Coordinate{1, 1}, 2, 3)
+				q := fresh(bombA)
+				q.ignited[bombB] = true
+				return q
+			},
+			wantExploded:  []BombID{bombA},
+			wantIgnited:   map[BombID]bool{bombA: true, bombB: true},
+			wantBombsLeft: []BombID{bombB},
+			wantBombUsed:  1,
+		},
+		{
+			name: "tile holds a bomb ID missing from Bombs",
+			setup: func(m *Match) queued {
+				addOwner(m, 2)
+				m.AddBomb(1, 1, owner, Coordinate{0, 1}, 2, 0)
+				m.WorkingState.Grid[1][1] = Tile{Type: TerrainPlain, OccupantType: OccupantBomb, OccupantID: int64(ghost)}
+				return fresh(bombA)
+			},
+			wantExploded: []BombID{bombA},
+			wantIgnited:  map[BombID]bool{bombA: true},
+			wantBombUsed: 1,
+		},
+		{
+			name: "queued bomb ID missing from Bombs",
+			setup: func(m *Match) queued {
+				addOwner(m, 2)
+				return fresh(ghost)
+			},
+			wantIgnited:  map[BombID]bool{ghost: true},
+			wantBombUsed: 2,
+		},
+		{
+			name: "bomb owner missing from Units",
+			setup: func(m *Match) queued {
+				m.AddBomb(1, 1, owner, Coordinate{0, 1}, 2, 0)
+				return fresh(bombA)
+			},
+			wantExploded: []BombID{bombA},
+			wantIgnited:  map[BombID]bool{bombA: true},
+		},
+		{
+			name: "BombUsed already 0",
+			setup: func(m *Match) queued {
+				addOwner(m, 0)
+				m.AddBomb(1, 1, owner, Coordinate{0, 1}, 2, 0)
+				return fresh(bombA)
+			},
+			wantExploded: []BombID{bombA},
+			wantIgnited:  map[BombID]bool{bombA: true},
+			wantBombUsed: 0,
+		},
+		{
+			name: "BombUsed decrements by one",
+			setup: func(m *Match) queued {
+				addOwner(m, 2)
+				m.AddBomb(1, 1, owner, Coordinate{0, 1}, 2, 0)
+				return fresh(bombA)
+			},
+			wantExploded: []BombID{bombA},
+			wantIgnited:  map[BombID]bool{bombA: true},
+			wantBombUsed: 1,
+		},
+		{
+			name: "blast hits a unit",
+			setup: func(m *Match) queued {
+				addOwner(m, 1)
+				m.AddBomb(1, 1, owner, Coordinate{0, 1}, 2, 0)
+				m.AddUnit(2, 0, Archetype{}, RoleNormal, Coordinate{1, 1}, 1)
+				return fresh(bombA)
+			},
+			wantExploded: []BombID{bombA},
+			wantIgnited:  map[BombID]bool{bombA: true},
+			wantDamaged:  map[UnitID]bool{victim: true},
+		},
+		{
+			name: "blast hits a soft block",
+			setup: func(m *Match) queued {
+				addOwner(m, 1)
+				m.AddBomb(1, 1, owner, Coordinate{0, 1}, 2, 0)
+				m.AddSoftBlock(7, Coordinate{1, 1})
+				return fresh(bombA)
+			},
+			wantExploded: []BombID{bombA},
+			wantIgnited:  map[BombID]bool{bombA: true},
+			wantBlocks:   map[int]bool{7: true},
+		},
+		{
+			name: "blast hits an item",
+			setup: func(m *Match) queued {
+				addOwner(m, 1)
+				m.AddBomb(1, 1, owner, Coordinate{0, 1}, 2, 0)
+				m.WorkingState.Grid[1][1] = Tile{Type: TerrainPlain, OccupantType: OccupantItem, OccupantID: 5}
+				return fresh(bombA)
+			},
+			wantExploded: []BombID{bombA},
+			wantIgnited:  map[BombID]bool{bombA: true},
+			wantItems:    map[int]bool{5: true},
+		},
+		{
+			name: "blast reaches a second bomb",
+			setup: func(m *Match) queued {
+				addOwner(m, 2)
+				m.AddBomb(1, 1, owner, Coordinate{0, 1}, 2, 0)
+				m.AddBomb(1, 2, owner, Coordinate{1, 1}, 1, 3)
+				return fresh(bombA)
+			},
+			wantExploded: []BombID{bombA, bombB},
+			wantIgnited:  map[BombID]bool{bombA: true, bombB: true},
+			wantBombUsed: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := newTestMatch(8, 3)
+			q := tt.setup(m)
+			gs := m.WorkingState
+			damaged, blocks, items := map[UnitID]bool{}, map[int]bool{}, map[int]bool{}
+
+			gameEvents := gs.processChainDetonations(q.queue, q.ignited, gs.cloneGridSnapshot(), damaged, blocks, items)
+
+			var gotExploded []BombID
+			for _, evt := range gameEvents {
+				if evt.Type == GameEvtBombExploded {
+					gotExploded = append(gotExploded, evt.BombID)
+				}
+			}
+			if !slices.Equal(gotExploded, tt.wantExploded) {
+				t.Errorf("exploded bombs = %v, want %v", gotExploded, tt.wantExploded)
+			}
+			if !maps.Equal(q.ignited, tt.wantIgnited) {
+				t.Errorf("ignited = %v, want %v", q.ignited, tt.wantIgnited)
+			}
+			if !maps.Equal(damaged, tt.wantDamaged) {
+				t.Errorf("damaged units = %v, want %v", damaged, tt.wantDamaged)
+			}
+			if !maps.Equal(blocks, tt.wantBlocks) {
+				t.Errorf("destroyed soft blocks = %v, want %v", blocks, tt.wantBlocks)
+			}
+			if !maps.Equal(items, tt.wantItems) {
+				t.Errorf("destroyed items = %v, want %v", items, tt.wantItems)
+			}
+			gotLeft := slices.Sorted(maps.Keys(gs.Bombs))
+			if !slices.Equal(gotLeft, tt.wantBombsLeft) {
+				t.Errorf("remaining bombs = %v, want %v", gotLeft, tt.wantBombsLeft)
+			}
+			if u, ok := gs.Units[owner]; ok && u.BombUsed != tt.wantBombUsed {
+				t.Errorf("owner BombUsed = %d, want %d", u.BombUsed, tt.wantBombUsed)
+			}
+		})
+	}
+}
+
+func TestGameState_PlaceBomb_ErrorOrder(t *testing.T) {
+	unitID := NewUnitID(1, 0)
+	origin := Coordinate{1, 1}
+	target := Coordinate{1, 2}
+
+	tests := []struct {
+		name   string
+		mutate func(gs *GameState, u *Unit)
+		target Coordinate
+		want   error
+	}{
+		{
+			name:   "skill used and out of bombs reports the skill",
+			mutate: func(_ *GameState, u *Unit) { u.HasUsedSkill, u.BombUsed = true, u.MaxBombCount },
+			target: target,
+			want:   ErrAlreadyUsedSkill,
+		},
+		{
+			name:   "out of bombs and out of range reports the bombs",
+			mutate: func(_ *GameState, u *Unit) { u.BombUsed = u.MaxBombCount },
+			target: Coordinate{1, 6},
+			want:   ErrOutOfBombs,
+		},
+		{
+			name:   "out of range and illegal landing reports the range",
+			mutate: func(gs *GameState, _ *Unit) { gs.Grid[6][1].Type = TerrainBlock },
+			target: Coordinate{1, 6},
+			want:   ErrOutOfBombRange,
+		},
+		{
+			name:   "dead unit that used its skill reports the death",
+			mutate: func(_ *GameState, u *Unit) { u.HP, u.HasUsedSkill = 0, true },
+			target: target,
+			want:   ErrUnitDead,
+		},
+		{
+			name:   "wrong-team unit that used its skill reports the team",
+			mutate: func(_ *GameState, u *Unit) { u.Team, u.HasUsedSkill = 2, true },
+			target: target,
+			want:   ErrNotActiveTeam,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gs := newTestMatch(8, 8).WorkingState
+			gs.Turn, gs.ActiveTeam = 1, 1
+			unit := &Unit{ID: unitID, HP: 1, Team: 1, Position: origin, BombPower: 3, BombMaxRange: 3, MaxBombCount: 2}
+			gs.Units[unitID] = unit
+			gs.Grid[origin.Y][origin.X] = Tile{Type: TerrainPlain, OccupantType: OccupantUnit, OccupantID: int64(unitID)}
+			tt.mutate(gs, unit)
+			wantUsed, wantSkill := unit.BombUsed, unit.HasUsedSkill
+
+			_, err := gs.PlaceBomb(unitID, tt.target)
+
+			if !errors.Is(err, tt.want) {
+				t.Fatalf("PlaceBomb() error = %v, want %v", err, tt.want)
+			}
+			if unit.BombUsed != wantUsed || unit.HasUsedSkill != wantSkill {
+				t.Errorf("counters changed on failure: BombUsed %d, HasUsedSkill %v", unit.BombUsed, unit.HasUsedSkill)
+			}
+			if len(gs.Bombs) != 0 || gs.TurnBombCounter != 0 {
+				t.Errorf("failed placement left bombs %v, counter %d", gs.Bombs, gs.TurnBombCounter)
+			}
+		})
+	}
+}
+
+func TestGameState_PlaceBomb_SystemUnit(t *testing.T) {
+	bystander := NewUnitID(1, 0)
+	tests := []struct {
+		name   string
+		target Coordinate
+		setup  func(gs *GameState)
+	}{
+		{
+			name:   "occupied target",
+			target: Coordinate{1, 1},
+			setup: func(gs *GameState) {
+				gs.Grid[1][1] = Tile{Type: TerrainPlain, OccupantType: OccupantUnit, OccupantID: int64(bystander)}
+			},
+		},
+		{
+			name:   "out-of-range target",
+			target: Coordinate{7, 7},
+			setup:  func(*GameState) {},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gs := newTestMatch(8, 8).WorkingState
+			gs.Turn = 2
+			gs.Units[bystander] = &Unit{ID: bystander, HP: 1, Team: 1, Position: Coordinate{0, 0}}
+			tt.setup(gs)
+
+			evt, err := gs.PlaceBomb(SystemUnitID, tt.target)
+
+			if err != nil {
+				t.Fatalf("PlaceBomb(SystemUnitID) error = %v, want nil", err)
+			}
+			wantID := NewBombID(2, 1, SystemUnitID)
+			bomb, ok := gs.Bombs[wantID]
+			if !ok || bomb.Position != tt.target || bomb.Range != BombDefaultPower {
+				t.Fatalf("bomb %#X = %+v, want at %v with range %d", wantID, bomb, tt.target, BombDefaultPower)
+			}
+			if evt.Type != GameEvtBombPlaced || evt.BombID != wantID {
+				t.Errorf("event = %+v, want BombPlaced for %#X", evt, wantID)
+			}
+			if tile := gs.Grid[tt.target.Y][tt.target.X]; tile.OccupantType != OccupantBomb || tile.OccupantID != int64(wantID) {
+				t.Errorf("target tile = %+v, want bomb %#X", tile, wantID)
+			}
+			if u := gs.Units[bystander]; u.BombUsed != 0 || u.HasUsedSkill {
+				t.Errorf("bystander counters changed: %+v", u)
 			}
 		})
 	}
