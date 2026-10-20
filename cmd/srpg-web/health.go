@@ -9,8 +9,8 @@ func checkHealth(args []string) bool {
 	return len(args) > 0 && args[0] == "healthcheck"
 }
 
-func runHealthCheck(url string) int {
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, http.NoBody)
+func runHealthCheck(ctx context.Context, url string) int {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return 1
 	}
