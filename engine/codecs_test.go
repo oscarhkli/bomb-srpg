@@ -81,7 +81,7 @@ func TestBombIDCodecs(t *testing.T) {
 	}
 }
 
-// TestCombinatorialExhaustive loops through every valid game asset combination
+// TestCombinatorialExhaustive loops through every valid game asset combination.
 func TestCombinatorialExhaustive(t *testing.T) {
 	maxTeams := 2
 	maxPlayersPerTeam := 5
@@ -90,7 +90,7 @@ func TestCombinatorialExhaustive(t *testing.T) {
 
 	for _, turn := range sampleTurns {
 		for team := 1; team <= maxTeams; team++ {
-			for playerIdx := 0; playerIdx < maxPlayersPerTeam; playerIdx++ {
+			for playerIdx := range maxPlayersPerTeam {
 				for bombNum := 1; bombNum <= maxBombsPerPlayer; bombNum++ {
 					unitID := NewUnitID(team, playerIdx)
 					bombID := NewBombID(turn, bombNum, unitID)

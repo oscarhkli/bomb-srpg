@@ -149,3 +149,39 @@ func TestCPUTurnPhaseString(t *testing.T) {
 		})
 	}
 }
+
+func TestTile_UnitID(t *testing.T) {
+	tests := []struct {
+		name       string
+		occupantID int64
+		want       UnitID
+	}{
+		{"in range", 0x12, 0x12},
+		{"wider than the type wraps", 0x1FF, 0xFF},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := (Tile{OccupantID: tt.occupantID}).UnitID(); got != tt.want {
+				t.Errorf("UnitID() = %#x, want %#x", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestTile_BombID(t *testing.T) {
+	tests := []struct {
+		name       string
+		occupantID int64
+		want       BombID
+	}{
+		{"in range", 0x01020304, 0x01020304},
+		{"wider than the type wraps", 0x1_0000_0001, 1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := (Tile{OccupantID: tt.occupantID}).BombID(); got != tt.want {
+				t.Errorf("BombID() = %#x, want %#x", got, tt.want)
+			}
+		})
+	}
+}

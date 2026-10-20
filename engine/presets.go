@@ -170,7 +170,7 @@ func GetStagePreset(name string) (StagePreset, bool) {
 	return StagePreset{}, false
 }
 
-// GetStagePresets gets all stagePresets for game setup.
+// GetAllStagePresets returns all stagePresets for game setup.
 func GetAllStagePresets() []StagePreset {
 	return stagePresetsRegistry()
 }
