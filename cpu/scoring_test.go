@@ -322,6 +322,7 @@ func TestEvaluate_TurnResultSets(t *testing.T) {
 		kingHP    int
 		allyIDs   func(actor, fighter engine.UnitID) []engine.UnitID
 		bombAt    engine.Coordinate
+		setup     func(gs *engine.GameState)
 	}
 	score := func(t *testing.T, f fixture) int {
 		t.Helper()
@@ -334,6 +335,9 @@ func TestEvaluate_TurnResultSets(t *testing.T) {
 		fighter := addFighter(gs, engine.NewUnitID(1, 2), engine.Coordinate{X: 2, Y: 5})
 		fighter.HP = f.fighterHP
 		opponentKing := addKing(gs, engine.NewUnitID(2, 1), engine.Coordinate{X: 8, Y: 8})
+		if f.setup != nil {
+			f.setup(gs)
+		}
 		owner := f.bombOwner(actor.ID, fighter.ID, opponentKing.ID)
 		bombID := engine.NewBombID(0, 0, owner)
 		gs.Bombs[bombID] = &engine.Bomb{ID: bombID, OwnerID: owner, Position: f.bombAt, Range: 1, Countdown: f.countdown}
@@ -362,6 +366,21 @@ func TestEvaluate_TurnResultSets(t *testing.T) {
 	nearActor := engine.Coordinate{X: 3, Y: 2}
 	nearFighter := engine.Coordinate{X: 3, Y: 5}
 	farAway := engine.Coordinate{X: 6, Y: 0}
+
+	gate := engine.Coordinate{X: 4, Y: 0}
+	wallWithGate := func(soft bool) func(gs *engine.GameState) {
+		return func(gs *engine.GameState) {
+			for y := 1; y < 9; y++ {
+				setTerrainBlock(gs, engine.Coordinate{X: 4, Y: y})
+			}
+			if soft {
+				addSoftBlock(gs, 1, gate)
+			} else {
+				setTerrainBlock(gs, gate)
+			}
+		}
+	}
+	nextToGate := engine.Coordinate{X: 3, Y: 0}
 
 	tests := []struct {
 		name string
@@ -397,6 +416,12 @@ func TestEvaluate_TurnResultSets(t *testing.T) {
 			a:    fixture{bombOwner: fighterOwned, countdown: 5, fighterHP: 5, kingHP: 1, allyIDs: fighterOnly, bombAt: nearActor},
 			b:    fixture{bombOwner: fighterOwned, countdown: 5, fighterHP: 5, kingHP: 1, allyIDs: both, bombAt: nearActor},
 			want: 0,
+		},
+		{
+			name: "destroyed soft block that opens the way to the opponent King scores above an intact wall",
+			a:    fixture{bombOwner: system, countdown: 1, fighterHP: 5, allyIDs: both, bombAt: nextToGate, setup: wallWithGate(true)},
+			b:    fixture{bombOwner: system, countdown: 1, fighterHP: 5, allyIDs: both, bombAt: nextToGate, setup: wallWithGate(false)},
+			want: 1,
 		},
 	}
 	for _, tt := range tests {
