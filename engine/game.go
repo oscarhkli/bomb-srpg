@@ -7,6 +7,8 @@ import (
 
 const NoUnit string = "NO_UNIT"
 
+const maxTurnsLimit = 100
+
 func terrainToken() map[rune]TerrainType {
 	return map[rune]TerrainType{
 		'.': TerrainPlain,
