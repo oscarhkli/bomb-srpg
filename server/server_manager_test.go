@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"reflect"
 	"slices"
 	"strings"
@@ -811,6 +812,76 @@ func TestServerStateManager_SubmitTurnCommand(t *testing.T) {
 				if len(gameEvents) > 0 {
 					t.Errorf("Expected gameEvents to be empty, got %p", gameEvents)
 				}
+			}
+		})
+	}
+}
+
+func TestServerStateManager_EngineRejectionStatus(t *testing.T) {
+	tests := []struct {
+		name     string
+		run      func(t *testing.T) error
+		wantCode int
+		wantMsg  string
+	}{
+		{
+			name: "config rejected by the engine",
+			run: func(t *testing.T) error {
+				t.Helper()
+				gameCfg := validGameCfg()
+				gameCfg.StagePreset = "NoSuchStage"
+				s := NewServerStateManager()
+				roomID, _ := s.CreateMatchRoom()
+				_, err := s.CreateMatch(roomID, gameCfg)
+				return err
+			},
+			wantCode: http.StatusBadRequest,
+			wantMsg:  "invalid game config: invalid stage preset: stage preset 'NoSuchStage' not found",
+		},
+		{
+			name: "turn command rejected by the engine",
+			run: func(t *testing.T) error {
+				t.Helper()
+				roomID, tokens, s := createTestRoom(t)
+				cmd := engine.NewMoveCommand(engine.NewUnitID(1, 0), engine.Coordinate{X: 4, Y: 7777})
+				_, err := s.SubmitTurnCommand(roomID, cmd, tokens[0])
+				return err
+			},
+			wantCode: http.StatusConflict,
+			wantMsg:  "invalid turn command: target out of move range",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			code, msg := mapError(tt.run(t))
+			if code != tt.wantCode || msg != tt.wantMsg {
+				t.Errorf("got (%d, %q) want (%d, %q)", code, msg, tt.wantCode, tt.wantMsg)
+			}
+		})
+	}
+}
+
+func TestServerStateManager_SubmitTurnCommand_TeamFromUnitID(t *testing.T) {
+	tests := []struct {
+		name      string
+		team      int
+		tokenTeam int
+		wantErr   error
+	}{
+		{"team-1 unit with team 1's token", 1, 1, nil},
+		{"team-2 unit with team 2's token", 2, 2, ErrInvalidTurnCmd},
+		{"team-2 unit with team 1's token", 2, 1, ErrInvalidToken},
+		{"team-1 unit with team 2's token", 1, 2, ErrInvalidToken},
+		{"team nibble 0", 0, 1, ErrInvalidConfig},
+		{"team nibble 3", 3, 1, ErrInvalidConfig},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			roomID, tokens, s := createTestRoom(t)
+			cmd := engine.NewMoveCommand(engine.NewUnitID(tt.team, 0), engine.Coordinate{X: 4, Y: 7})
+			_, err := s.SubmitTurnCommand(roomID, cmd, tokens[tt.tokenTeam-1])
+			if !errors.Is(err, tt.wantErr) {
+				t.Errorf("SubmitTurnCommand() error = %v, want %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -1879,6 +1950,24 @@ func TestServerStateManager_cleanupInactiveRooms(t *testing.T) {
 	}
 	if !ok3 {
 		t.Error("ended but still active match room should not be cleaned")
+	}
+}
+
+func TestServerStateManager_loadRoom_WrongType(t *testing.T) {
+	s := NewServerStateManager()
+	s.Rooms.Store("bad", "not a room")
+	room, err := s.loadRoom("bad")
+	if err == nil || room != nil {
+		t.Errorf("loadRoom() = (%v, %v), want nil room and an error", room, err)
+	}
+}
+
+func TestServerStateManager_cleanupInactiveRooms_WrongType(t *testing.T) {
+	s := NewServerStateManager()
+	s.Rooms.Store("bad", "not a room")
+	s.cleanupInactiveRooms()
+	if _, ok := s.Rooms.Load("bad"); ok {
+		t.Error("wrong-typed entry should be removed")
 	}
 }
 
