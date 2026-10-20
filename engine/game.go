@@ -2,6 +2,7 @@ package engine
 
 import (
 	"fmt"
+	"slices"
 )
 
 const NoUnit string = "NO_UNIT"
@@ -217,83 +218,26 @@ func (gs *GameState) DeepCopy() *GameState {
 		InSuddenDeath:   gs.InSuddenDeath,
 		ActiveTeam:      gs.ActiveTeam,
 		TurnBombCounter: gs.TurnBombCounter,
+		Grid:            gs.cloneGridSnapshot(),
+		Units:           cloneEntities(gs.Units),
+		Bombs:           cloneEntities(gs.Bombs),
+		SoftBlocks:      cloneEntities(gs.SoftBlocks),
 	}
-
 	if gs.TurnCommands != nil {
-		clone.TurnCommands = make([]TurnCommand, len(gs.TurnCommands))
-		copy(clone.TurnCommands, gs.TurnCommands)
+		clone.TurnCommands = slices.Clone(gs.TurnCommands)
 	}
-
-	if gs.Grid == nil {
-		clone.Grid = make([][]Tile, 0)
-	} else {
-		clone.Grid = make([][]Tile, len(gs.Grid))
-		for y := range gs.Grid {
-			clone.Grid[y] = make([]Tile, len(gs.Grid[y]))
-			copy(clone.Grid[y], gs.Grid[y])
-		}
-	}
-
-	if gs.Units == nil {
-		clone.Units = make(map[UnitID]*Unit)
-	} else {
-		clone.Units = make(map[UnitID]*Unit, len(gs.Units))
-		for id, unit := range gs.Units {
-			if unit == nil {
-				continue
-			}
-			clone.Units[id] = &Unit{
-				ID:           unit.ID,
-				Type:         unit.Type,
-				Position:     unit.Position,
-				Speed:        unit.Speed,
-				BombMaxRange: unit.BombMaxRange,
-				BombMinRange: unit.BombMinRange,
-				BombPower:    unit.BombPower,
-				MaxBombCount: unit.MaxBombCount,
-				BombUsed:     unit.BombUsed,
-				Team:         unit.Team,
-				HP:           unit.HP,
-				Skills:       unit.Skills,
-				Role:         unit.Role,
-				HasMoved:     unit.HasMoved,
-				HasUsedSkill: unit.HasUsedSkill,
-			}
-		}
-	}
-
-	if gs.Bombs == nil {
-		clone.Bombs = make(map[BombID]*Bomb)
-	} else {
-		clone.Bombs = make(map[BombID]*Bomb, len(gs.Bombs))
-		for id, bomb := range gs.Bombs {
-			if bomb == nil {
-				continue
-			}
-			clone.Bombs[id] = &Bomb{
-				ID:        bomb.ID,
-				OwnerID:   bomb.OwnerID,
-				Position:  bomb.Position,
-				Range:     bomb.Range,
-				Countdown: bomb.Countdown,
-			}
-		}
-	}
-
-	if gs.SoftBlocks == nil {
-		clone.SoftBlocks = make(map[int]*SoftBlock)
-	} else {
-		clone.SoftBlocks = make(map[int]*SoftBlock, len(gs.SoftBlocks))
-		for id, sb := range gs.SoftBlocks {
-			if sb == nil {
-				continue
-			}
-			clone.SoftBlocks[id] = &SoftBlock{
-				ID:       sb.ID,
-				Position: sb.Position,
-			}
-		}
-	}
-
 	return clone
+}
+
+// cloneEntities copies each non-nil entity by value. V must hold no reference fields.
+func cloneEntities[K comparable, V any](src map[K]*V) map[K]*V {
+	dst := make(map[K]*V, len(src))
+	for id, entity := range src {
+		if entity == nil {
+			continue
+		}
+		c := *entity
+		dst[id] = &c
+	}
+	return dst
 }
