@@ -29,8 +29,6 @@ func (gs *GameState) stepTarget(node pathNode, dir Coordinate, rule MovementRule
 	return next, gs.IsWithinBounds(next)
 }
 
-var cardinalDirs = []Coordinate{{0, -1}, {0, 1}, {-1, 0}, {1, 0}}
-
 func (gs *GameState) findReachableTiles(startPos Coordinate, rule MovementRule, grid [][]Tile) map[Coordinate]int {
 	if len(grid) == 0 || len(grid[0]) == 0 {
 		return make(map[Coordinate]int)
@@ -56,9 +54,10 @@ func (gs *GameState) findReachableTiles(startPos Coordinate, rule MovementRule, 
 // The queue visits tiles by ascending step, so the first count recorded for a tile is its shortest.
 func (gs *GameState) expandNode(node pathNode, rule MovementRule, grid [][]Tile, steps map[Coordinate]int) []pathNode {
 	var next []pathNode
+	dirs := []Coordinate{{0, -1}, {0, 1}, {-1, 0}, {1, 0}}
 	nextStep := node.Step + 1
 
-	for _, dir := range cardinalDirs {
+	for _, dir := range dirs {
 		nextPos, ok := gs.stepTarget(node, dir, rule)
 		if !ok {
 			continue
