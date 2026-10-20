@@ -43,9 +43,7 @@ func (v *TerminalView) RenderBoard(gs *engine.GameState) error {
 	fmt.Fprintf(v.output, "Example   : %smove 16 4 7%s\n", Yellow, Reset)
 	fmt.Fprintln(v.output, "=================================================")
 
-	if err := v.RenderTurnHeader(gs.Turn, gs.ActiveTeam); err != nil {
-		return err
-	}
+	v.RenderTurnHeader(gs.Turn, gs.ActiveTeam)
 
 	fmt.Fprint(v.output, "Y\\X  ")
 	for x := range gs.Grid {
@@ -112,28 +110,24 @@ func (v *TerminalView) RenderGameConfig(cfg *engine.GameCfg) error {
 	return nil
 }
 
-func (v *TerminalView) RenderMessage(message string) error {
+func (v *TerminalView) RenderMessage(message string) {
 	fmt.Fprintf(v.output, "%s", message)
-	return nil
 }
 
-func (v *TerminalView) RenderFeedback(success bool, message string) error {
+func (v *TerminalView) RenderFeedback(success bool, message string) {
 	if success {
 		fmt.Fprintf(v.output, "%s%s%s\n", Green, message, Reset)
 	} else {
 		fmt.Fprintf(v.output, "%s%s%s\n", Red, message, Reset)
 	}
-	return nil
 }
 
-func (v *TerminalView) RenderTurnHeader(turn, activeTeamID int) error {
+func (v *TerminalView) RenderTurnHeader(turn, activeTeamID int) {
 	fmt.Fprintf(v.output, "\n--- TURN %d PLAYER %d ---\n\n", turn, activeTeamID)
-	return nil
 }
 
-func (v *TerminalView) RenderGameEvents(gameEvents []engine.GameEvent) error {
+func (v *TerminalView) RenderGameEvents(gameEvents []engine.GameEvent) {
 	for _, evt := range gameEvents {
 		v.RenderMessage(fmt.Sprintf("%#v\n", evt))
 	}
-	return nil
 }

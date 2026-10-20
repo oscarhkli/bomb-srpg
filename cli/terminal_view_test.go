@@ -206,11 +206,7 @@ func TestTerminalView_RenderTurnHeader(t *testing.T) {
 		var fakeScreen bytes.Buffer
 		view := NewTerminalView(&fakeScreen)
 
-		err := view.RenderTurnHeader(101, 2)
-
-		if err != nil {
-			t.Fatalf("Expected no error, got: %v", err)
-		}
+		view.RenderTurnHeader(101, 2)
 
 		result := fakeScreen.String()
 
@@ -233,11 +229,7 @@ func TestTerminalView_RenderGameEvents(t *testing.T) {
 			engine.NewMatchEndedEvent(1),
 		}
 
-		err := view.RenderGameEvents(gameEvents)
-
-		if err != nil {
-			t.Fatalf("Expected no error, got: %v", err)
-		}
+		view.RenderGameEvents(gameEvents)
 
 		result := fakeScreen.String()
 

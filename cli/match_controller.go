@@ -26,7 +26,7 @@ func (c *MatchController) StartInputLoop() {
 
 	for {
 		gameEvents := c.Match.StartTurn()
-		_ = c.View.RenderGameEvents(gameEvents)
+		c.View.RenderGameEvents(gameEvents)
 
 		if err := c.View.RenderBoard(c.Match.WorkingState); err != nil {
 			log.Fatalf("Critical Interface Failure: %v", err)
@@ -74,21 +74,21 @@ func (c *MatchController) handleSystemCommand(cmd string) {
 
 	case "/reset":
 		c.Match.ResetTurn()
-		_ = c.View.RenderFeedback(true, "Turn reset successfully!")
+		c.View.RenderFeedback(true, "Turn reset successfully!")
 
 	case "/commit":
 		planGameEvents, resolveTurnGameEvents := c.Match.ResolveTurn()
 		gameEvents := append(planGameEvents, resolveTurnGameEvents...)
-		_ = c.View.RenderFeedback(true, "Turn committed and resolved!")
-		_ = c.View.RenderGameEvents(gameEvents)
+		c.View.RenderFeedback(true, "Turn committed and resolved!")
+		c.View.RenderGameEvents(gameEvents)
 
 	case "/surrender":
 		gameEvents := c.Match.Surrender(c.Match.WorkingState.ActiveTeam)
-		_ = c.View.RenderFeedback(true, fmt.Sprintf("PLAYER %d surrendered!", c.Match.WorkingState.ActiveTeam))
-		_ = c.View.RenderGameEvents(gameEvents)
+		c.View.RenderFeedback(true, fmt.Sprintf("PLAYER %d surrendered!", c.Match.WorkingState.ActiveTeam))
+		c.View.RenderGameEvents(gameEvents)
 
 	default:
-		_ = c.View.RenderFeedback(false, fmt.Sprintf("Unknown meta command: %s. Use /config, /reset, /commit, or /surrender\n", cmd))
+		c.View.RenderFeedback(false, fmt.Sprintf("Unknown meta command: %s. Use /config, /reset, /commit, or /surrender\n", cmd))
 	}
 }
 
@@ -97,7 +97,7 @@ func (c *MatchController) routeGameAction(cmd string) {
 	token := strings.Fields(strings.ToLower(cmd))
 
 	if len(token) == 0 {
-		_ = c.View.RenderFeedback(false, "Input is empty")
+		c.View.RenderFeedback(false, "Input is empty")
 		return
 	}
 
@@ -106,44 +106,44 @@ func (c *MatchController) routeGameAction(cmd string) {
 	switch action {
 	case "move":
 		if len(token) < 4 {
-			_ = c.View.RenderFeedback(false, fmt.Sprintf("Syntax error in move command: %s. Syntax Error! Expected: move <unit_idx> <x> <y>", cmd))
+			c.View.RenderFeedback(false, fmt.Sprintf("Syntax error in move command: %s. Syntax Error! Expected: move <unit_idx> <x> <y>", cmd))
 			return
 		}
 
 		unitID, target, err := c.parseActionCommand(token[1], token[2], token[3])
 		if err != nil {
-			_ = c.View.RenderFeedback(false, "Argument Error: Unit index, X, and Y must be integers!")
+			c.View.RenderFeedback(false, "Argument Error: Unit index, X, and Y must be integers!")
 			return
 		}
 
 		gameEvents, err := c.Match.ApplyTurnCommand(engine.NewMoveCommand(unitID, target))
 		if err != nil {
-			_ = c.View.RenderFeedback(false, fmt.Sprintf("Invalid move: %v", err))
+			c.View.RenderFeedback(false, fmt.Sprintf("Invalid move: %v", err))
 			return
 		}
-		_ = c.View.RenderFeedback(true, fmt.Sprintf("GameEvents: %#v", gameEvents))
+		c.View.RenderFeedback(true, fmt.Sprintf("GameEvents: %#v", gameEvents))
 
 	case "bomb":
 		if len(token) < 4 {
-			_ = c.View.RenderFeedback(false, fmt.Sprintf("Syntax error in bomb command: %s. Syntax Error! Expected: bomb <unit_idx> <x> <y>", cmd))
+			c.View.RenderFeedback(false, fmt.Sprintf("Syntax error in bomb command: %s. Syntax Error! Expected: bomb <unit_idx> <x> <y>", cmd))
 			return
 		}
 
 		unitID, target, err := c.parseActionCommand(token[1], token[2], token[3])
 		if err != nil {
-			_ = c.View.RenderFeedback(false, "Argument Error: Unit index, X, and Y must be integers!")
+			c.View.RenderFeedback(false, "Argument Error: Unit index, X, and Y must be integers!")
 			return
 		}
 
 		gameEvents, err := c.Match.ApplyTurnCommand(engine.NewPlaceBombCommand(unitID, target))
 		if err != nil {
-			_ = c.View.RenderFeedback(false, fmt.Sprintf("Invalid bomb placement: %v", err))
+			c.View.RenderFeedback(false, fmt.Sprintf("Invalid bomb placement: %v", err))
 			return
 		}
-		_ = c.View.RenderFeedback(true, fmt.Sprintf("GameEvents: %#v", gameEvents))
+		c.View.RenderFeedback(true, fmt.Sprintf("GameEvents: %#v", gameEvents))
 
 	default:
-		_ = c.View.RenderFeedback(false, fmt.Sprintf("Unknown meta command: %s\n", cmd))
+		c.View.RenderFeedback(false, fmt.Sprintf("Unknown meta command: %s\n", cmd))
 		return
 	}
 }
