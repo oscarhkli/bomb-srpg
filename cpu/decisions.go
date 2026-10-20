@@ -24,7 +24,6 @@ func (c candidate) priority() int {
 	return 1
 }
 
-// roster splits the living units into the CPU's allies (team 2) and everyone else.
 type roster struct {
 	allies       []*engine.Unit
 	allyIDs      []engine.UnitID
@@ -56,7 +55,6 @@ func buildRoster(gs *engine.GameState) (roster, bool) {
 	return r, r.allyKing != nil && r.opponentKing != nil
 }
 
-// bestRoundCandidate returns the highest-scoring non-empty plan across allies, or nil when none has one.
 func bestRoundCandidate(r roster, sandbox *engine.GameState) *candidate {
 	var best *candidate
 	for _, unit := range r.allies {

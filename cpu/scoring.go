@@ -51,7 +51,6 @@ func aliveCount(gs *engine.GameState, ids []engine.UnitID, kingID engine.UnitID)
 	return count
 }
 
-// unitSnapshot is the actor-relative state evaluate samples before and after a turn resolves.
 type unitSnapshot struct {
 	distToKing     int
 	aliveOpponents int
@@ -66,7 +65,6 @@ func snapshotUnits(gs *engine.GameState, sc scoreContext, actor, opponentKing *e
 	}
 }
 
-// buildTurnResult folds one turn's events and its before/after snapshots into a turnResult.
 func buildTurnResult(sc scoreContext, turn int, gameEvents []engine.GameEvent, before, after unitSnapshot) turnResult {
 	tr := turnResult{
 		turn:                  turn,
