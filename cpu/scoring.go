@@ -51,6 +51,70 @@ func aliveCount(gs *engine.GameState, ids []engine.UnitID, kingID engine.UnitID)
 	return count
 }
 
+// unitSnapshot is the actor-relative state evaluate samples before and after a turn resolves.
+type unitSnapshot struct {
+	distToKing     int
+	aliveOpponents int
+	aliveAllies    int
+}
+
+func snapshotUnits(gs *engine.GameState, sc scoreContext, actor, opponentKing *engine.Unit) unitSnapshot {
+	return unitSnapshot{
+		distToKing:     reachDistToUnit(gs, actor, actor.Position, opponentKing),
+		aliveOpponents: aliveCount(gs, sc.opponentIDs, sc.opponentKingID),
+		aliveAllies:    aliveCount(gs, sc.allyIDs, sc.allyKingID),
+	}
+}
+
+// buildTurnResult folds one turn's events and its before/after snapshots into a turnResult.
+func buildTurnResult(sc scoreContext, turn int, gameEvents []engine.GameEvent, before, after unitSnapshot) turnResult {
+	tr := turnResult{
+		turn:                  turn,
+		affectedTiles:         make(map[engine.Coordinate]struct{}),
+		allyAffectedTiles:     make(map[engine.Coordinate]struct{}),
+		opponentAffectedTiles: make(map[engine.Coordinate]struct{}),
+		diedUnits:             make(map[engine.UnitID]struct{}),
+		suicides:              make(map[engine.UnitID]struct{}),
+		distToKingBefore:      before.distToKing,
+		distToKingAfter:       after.distToKing,
+		aliveOpponentsBefore:  before.aliveOpponents,
+		aliveOpponentsAfter:   after.aliveOpponents,
+		aliveAlliesBefore:     before.aliveAllies,
+		aliveAlliesAfter:      after.aliveAllies,
+	}
+	for _, evt := range gameEvents {
+		tr.fold(sc, evt)
+	}
+	return tr
+}
+
+func (tr *turnResult) fold(sc scoreContext, evt engine.GameEvent) {
+	switch evt.Type {
+	case engine.GameEvtBombExploded:
+		_, _, ownerID := evt.BombID.Decode()
+		dest := tr.opponentAffectedTiles
+		if slices.Contains(sc.allyIDs, ownerID) {
+			dest = tr.allyAffectedTiles
+		}
+		for _, pos := range evt.AffectedPositions {
+			tr.affectedTiles[pos] = struct{}{}
+			dest[pos] = struct{}{}
+		}
+	case engine.GameEvtSoftBlockDestroyed:
+		tr.destroyedSoftBlocks++
+	case engine.GameEvtUnitDied:
+		tr.diedUnits[evt.UnitID] = struct{}{}
+		isAlly := evt.UnitID == sc.allyKingID || slices.Contains(sc.allyIDs, evt.UnitID)
+		if isAlly && evt.Position != nil {
+			if _, ok := tr.allyAffectedTiles[*evt.Position]; ok {
+				tr.suicides[evt.UnitID] = struct{}{}
+			}
+		}
+	case engine.GameEvtUnitMoved, engine.GameEvtUnitDamaged, engine.GameEvtBombPlaced,
+		engine.GameEvtBombCountdownUpdated, engine.GameEvtMatchEnded:
+	}
+}
+
 // evaluate scores the plan by forecasting maxForecastTurn turns of bomb resolution.
 func evaluate(sc scoreContext, gs *engine.GameState, cmds []engine.TurnCommand) (candidate, error) {
 	scratch := gs.DeepCopy()
@@ -65,60 +129,11 @@ func evaluate(sc scoreContext, gs *engine.GameState, cmds []engine.TurnCommand) 
 		actor := scratch.Units[sc.actorID]
 		opponentKing := scratch.Units[sc.opponentKingID]
 
-		distToKingBefore := reachDistToUnit(scratch, actor, actor.Position, opponentKing)
-		aliveOpponentsBefore := aliveCount(scratch, sc.opponentIDs, sc.opponentKingID)
-		aliveAlliesBefore := aliveCount(scratch, sc.allyIDs, sc.allyKingID)
+		before := snapshotUnits(scratch, sc, actor, opponentKing)
 		gameEvents := scratch.ResolveBombExplosionAndDamage()
-		distToKingAfter := reachDistToUnit(scratch, actor, actor.Position, opponentKing)
-		aliveOpponentsAfter := aliveCount(scratch, sc.opponentIDs, sc.opponentKingID)
-		aliveAlliesAfter := aliveCount(scratch, sc.allyIDs, sc.allyKingID)
+		after := snapshotUnits(scratch, sc, actor, opponentKing)
 
-		affectedTiles := make(map[engine.Coordinate]struct{})
-		allyAffectedTiles := make(map[engine.Coordinate]struct{})
-		opponentAffectedTiles := make(map[engine.Coordinate]struct{})
-		destroyedSoftBlocks := 0
-		diedUnits := make(map[engine.UnitID]struct{})
-		suicides := make(map[engine.UnitID]struct{})
-		for _, evt := range gameEvents {
-			switch evt.Type {
-			case engine.GameEvtBombExploded:
-				_, _, ownerID := evt.BombID.Decode()
-				dest := opponentAffectedTiles
-				if slices.Contains(sc.allyIDs, ownerID) {
-					dest = allyAffectedTiles
-				}
-				for _, pos := range evt.AffectedPositions {
-					affectedTiles[pos] = struct{}{}
-					dest[pos] = struct{}{}
-				}
-			case engine.GameEvtSoftBlockDestroyed:
-				destroyedSoftBlocks++
-			case engine.GameEvtUnitDied:
-				diedUnits[evt.UnitID] = struct{}{}
-				isAlly := evt.UnitID == sc.allyKingID || slices.Contains(sc.allyIDs, evt.UnitID)
-				if isAlly && evt.Position != nil {
-					if _, ok := allyAffectedTiles[*evt.Position]; ok {
-						suicides[evt.UnitID] = struct{}{}
-					}
-				}
-			}
-		}
-
-		tr := turnResult{
-			turn:                  t,
-			affectedTiles:         affectedTiles,
-			allyAffectedTiles:     allyAffectedTiles,
-			opponentAffectedTiles: opponentAffectedTiles,
-			destroyedSoftBlocks:   destroyedSoftBlocks,
-			diedUnits:             diedUnits,
-			suicides:              suicides,
-			distToKingBefore:      distToKingBefore,
-			distToKingAfter:       distToKingAfter,
-			aliveOpponentsBefore:  aliveOpponentsBefore,
-			aliveOpponentsAfter:   aliveOpponentsAfter,
-			aliveAlliesBefore:     aliveAlliesBefore,
-			aliveAlliesAfter:      aliveAlliesAfter,
-		}
+		tr := buildTurnResult(sc, t, gameEvents, before, after)
 		for _, entry := range factors {
 			total += profile[entry.id] * entry.factor(scratch, sc, tr)
 		}

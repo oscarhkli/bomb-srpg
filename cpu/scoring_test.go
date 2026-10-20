@@ -364,9 +364,9 @@ func TestEvaluate_TurnResultSets(t *testing.T) {
 
 	t.Run("opponent bomb hits the actor's tile", func(t *testing.T) {
 		hit := score(t, fixture{bombOwner: opponent, countdown: 1, fighterHP: 5, allyIDs: both, bombAt: nearActor})
-		clear := score(t, fixture{bombOwner: opponent, countdown: 1, fighterHP: 5, allyIDs: both, bombAt: farAway})
-		if hit >= clear {
-			t.Errorf("score with bomb on actor = %d, want below %d without it", hit, clear)
+		safe := score(t, fixture{bombOwner: opponent, countdown: 1, fighterHP: 5, allyIDs: both, bombAt: farAway})
+		if hit >= safe {
+			t.Errorf("score with bomb on actor = %d, want below %d without it", hit, safe)
 		}
 	})
 	t.Run("sudden-death bomb scores like an opponent bomb", func(t *testing.T) {
