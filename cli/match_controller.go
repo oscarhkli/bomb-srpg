@@ -12,9 +12,6 @@ import (
 	"strings"
 )
 
-// actionArgCount is the token count of "<verb> <unit> <x> <y>".
-const actionArgCount = 4
-
 type MatchController struct {
 	Match *engine.Match
 	View  *TerminalView
@@ -23,6 +20,13 @@ type MatchController struct {
 
 func NewMatchController(m *engine.Match, v *TerminalView, in io.Reader) *MatchController {
 	return &MatchController{Match: m, View: v, input: in}
+}
+
+func winnerMessage(winnerTeamID int) string {
+	if winnerTeamID == -1 {
+		return "Draw Game!"
+	}
+	return fmt.Sprintf("Winner... PLAYER %d!", winnerTeamID)
 }
 
 func (c *MatchController) StartInputLoop() {
@@ -66,13 +70,6 @@ func (c *MatchController) StartInputLoop() {
 	}
 }
 
-func winnerMessage(winnerTeamID int) string {
-	if winnerTeamID == -1 {
-		return "Draw Game!"
-	}
-	return fmt.Sprintf("Winner... PLAYER %d!", winnerTeamID)
-}
-
 func (c *MatchController) handleSystemCommand(cmd string) {
 	switch strings.ToLower(cmd) {
 	case "/config":
@@ -97,6 +94,9 @@ func (c *MatchController) handleSystemCommand(cmd string) {
 		c.View.RenderFeedback(false, fmt.Sprintf("Unknown meta command: %s. Use /config, /reset, /commit, or /surrender\n", cmd))
 	}
 }
+
+// actionArgCount is the token count of "<verb> <unit> <x> <y>".
+const actionArgCount = 4
 
 func (c *MatchController) routeGameAction(cmd string) {
 	token := strings.Fields(strings.ToLower(cmd))

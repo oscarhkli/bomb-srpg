@@ -7,60 +7,40 @@ import (
 	"os"
 )
 
-const (
-	defaultMaxTurns  = 30
-	archetypeFighter = "Fighter"
-)
+const defaultMaxTurns = 30
+
+func defaultSlots() []engine.TeamSlot {
+	return []engine.TeamSlot{
+		{
+			Archetype: "King",
+			Role:      engine.RoleKing,
+		},
+		{
+			Archetype: "Witch",
+			Role:      engine.RoleNormal,
+		},
+		{
+			Archetype: "Bandit",
+			Role:      engine.RoleNormal,
+		},
+		{
+			Archetype: "Fighter",
+			Role:      engine.RoleNormal,
+		},
+		{
+			Archetype: "Fighter",
+			Role:      engine.RoleNormal,
+		},
+	}
+}
 
 func main() {
 	gameCfg := engine.GameCfg{
 		StagePreset:    "Plain",
 		MaxTurns:       defaultMaxTurns,
 		AllowResetTurn: true,
-		P1Slots: []engine.TeamSlot{
-			{
-				Archetype: "King",
-				Role:      engine.RoleKing,
-			},
-			{
-				Archetype: "Witch",
-				Role:      engine.RoleNormal,
-			},
-			{
-				Archetype: "Bandit",
-				Role:      engine.RoleNormal,
-			},
-			{
-				Archetype: archetypeFighter,
-				Role:      engine.RoleNormal,
-			},
-			{
-				Archetype: archetypeFighter,
-				Role:      engine.RoleNormal,
-			},
-		},
-		P2Slots: []engine.TeamSlot{
-			{
-				Archetype: "King",
-				Role:      engine.RoleKing,
-			},
-			{
-				Archetype: "Witch",
-				Role:      engine.RoleNormal,
-			},
-			{
-				Archetype: "Bandit",
-				Role:      engine.RoleNormal,
-			},
-			{
-				Archetype: archetypeFighter,
-				Role:      engine.RoleNormal,
-			},
-			{
-				Archetype: archetypeFighter,
-				Role:      engine.RoleNormal,
-			},
-		},
+		P1Slots:        defaultSlots(),
+		P2Slots:        defaultSlots(),
 	}
 
 	match, err := engine.InitGame(gameCfg)
