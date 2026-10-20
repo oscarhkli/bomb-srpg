@@ -1336,9 +1336,9 @@ func TestHandleSubmitTurnCommand(t *testing.T) {
 				if !ok {
 					t.Fatalf("from is not an object: %#v", item["from"])
 				}
-				toField, ok := item["from"].(map[string]any)
+				toField, ok := item["to"].(map[string]any)
 				if !ok {
-					t.Fatalf("from is not an object: %#v", item["from"])
+					t.Fatalf("to is not an object: %#v", item["to"])
 				}
 				for _, field := range []string{"x", "y"} {
 					if _, exists := fromField[field]; !exists {
