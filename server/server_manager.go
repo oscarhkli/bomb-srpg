@@ -233,7 +233,7 @@ func (s *ServerStateManager) createMatchLocked(room *MatchRoom, gameCfg engine.G
 	match, err := engine.InitGame(gameCfg)
 	if err != nil {
 		room.Logger.Error("invalid game config", "gameCfg", gameCfg, "error", err)
-		return nil, fmt.Errorf("%w: %v", ErrInvalidConfig, err)
+		return nil, fmt.Errorf("%w: %w", ErrInvalidConfig, err)
 	}
 
 	return match, nil
@@ -341,7 +341,7 @@ func (s *ServerStateManager) SubmitTurnCommand(roomID string, cmd engine.TurnCom
 	gameEvents, err := room.Match.ApplyTurnCommand(cmd)
 	if err != nil {
 		room.Logger.Error("invalid turn command", "turnCommand", cmd, "error", err)
-		return nil, fmt.Errorf("%w: %v", ErrInvalidTurnCmd, err)
+		return nil, fmt.Errorf("%w: %w", ErrInvalidTurnCmd, err)
 	}
 
 	room.LastActivity = time.Now()
