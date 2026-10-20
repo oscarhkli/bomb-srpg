@@ -234,15 +234,14 @@ func TestDecide_DeadAllyExcludedFromPlanning(t *testing.T) {
 	}
 }
 
-func corridorWithBreakthrough(gs *engine.GameState) (allyFighter *engine.Unit) {
+func corridorWithBreakthrough(gs *engine.GameState) {
 	for x := range 9 {
 		setTerrainBlock(gs, engine.Coordinate{X: x, Y: 1})
 	}
-	allyFighter = addFighter(gs, engine.NewUnitID(2, 1), engine.Coordinate{X: 0, Y: 0})
+	addFighter(gs, engine.NewUnitID(2, 1), engine.Coordinate{X: 0, Y: 0})
 	addSoftBlock(gs, 1, engine.Coordinate{X: 3, Y: 0})
 	addKing(gs, engine.NewUnitID(1, 1), engine.Coordinate{X: 8, Y: 0})
 	addKing(gs, engine.NewUnitID(2, 2), engine.Coordinate{X: 8, Y: 1})
-	return allyFighter
 }
 
 func isolatedKingsNeutral(gs *engine.GameState) (actor, allyKing, opponentKing *engine.Unit) {

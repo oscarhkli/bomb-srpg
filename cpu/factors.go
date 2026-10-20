@@ -67,7 +67,7 @@ func defaultWeightProfile() map[factorID]int {
 	}
 }
 
-// Score magnitudes, tiered so a certain outcome always outranks a predicted one
+// Score magnitudes, tiered so a certain outcome always outranks a predicted one.
 const (
 	killKingScore         = 100000 // Very high score to make a result guaranteed.
 	killUnitScore         = 10000  // Lower than killKingScore: a predicted, not guaranteed, outcome.
@@ -132,7 +132,7 @@ func advanceOpponentKingDistance(gs *engine.GameState, sc scoreContext, tr turnR
 
 // killOpponentKing deduces score based on whether the opponent King died this Turn.
 // Only cares T+0.
-func killOpponentKing(gs *engine.GameState, sc scoreContext, tr turnResult) int {
+func killOpponentKing(_ *engine.GameState, sc scoreContext, tr turnResult) int {
 	if tr.turn > 0 {
 		return 0
 	}
@@ -144,7 +144,7 @@ func killOpponentKing(gs *engine.GameState, sc scoreContext, tr turnResult) int 
 
 // killAllyKing deduces score based on whether the ally King died this Turn.
 // Cares T+0 & T+1 as Ally Team can't act at T+1.
-func killAllyKing(gs *engine.GameState, sc scoreContext, tr turnResult) int {
+func killAllyKing(_ *engine.GameState, sc scoreContext, tr turnResult) int {
 	if tr.turn > 1 {
 		return 0
 	}
@@ -156,7 +156,7 @@ func killAllyKing(gs *engine.GameState, sc scoreContext, tr turnResult) int {
 
 // killOpponents deduces score based on the opponent non-King survive rate this Turn.
 // Only cares T+0.
-func killOpponents(gs *engine.GameState, sc scoreContext, tr turnResult) int {
+func killOpponents(_ *engine.GameState, _ scoreContext, tr turnResult) int {
 	if tr.turn > 0 || tr.aliveOpponentsBefore == 0 {
 		return 0
 	}
@@ -166,7 +166,7 @@ func killOpponents(gs *engine.GameState, sc scoreContext, tr turnResult) int {
 
 // killAllies deduces score based on the ally non-King survive rate this Turn.
 // Cares T+0 & T+1 as Ally Team can't act at T+1.
-func killAllies(gs *engine.GameState, sc scoreContext, tr turnResult) int {
+func killAllies(_ *engine.GameState, _ scoreContext, tr turnResult) int {
 	if tr.turn > 1 || tr.aliveAlliesBefore == 0 {
 		return 0
 	}
@@ -177,7 +177,7 @@ func killAllies(gs *engine.GameState, sc scoreContext, tr turnResult) int {
 // suicideAllyKing deduces score based on whether the ally King died from an ally-owned bomb.
 // Only fires at tr.turn>1: killAllyKing already covers tr.turn<=1 for any cause of death,
 // self-inflicted included, and this must not double-count that same death.
-func suicideAllyKing(gs *engine.GameState, sc scoreContext, tr turnResult) int {
+func suicideAllyKing(_ *engine.GameState, sc scoreContext, tr turnResult) int {
 	if tr.turn <= 1 {
 		return 0
 	}
@@ -189,7 +189,7 @@ func suicideAllyKing(gs *engine.GameState, sc scoreContext, tr turnResult) int {
 
 // suicideAllies deduces score based on the ally non-King survive rate lost to an ally-owned bomb.
 // Only fires at tr.turn>1, for the same reason as suicideAllyKing.
-func suicideAllies(gs *engine.GameState, sc scoreContext, tr turnResult) int {
+func suicideAllies(_ *engine.GameState, sc scoreContext, tr turnResult) int {
 	total := nonKingCount(sc.allyIDs, sc.allyKingID)
 	if tr.turn <= 1 || total == 0 {
 		return 0
