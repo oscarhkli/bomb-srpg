@@ -180,8 +180,6 @@ type Archetype struct {
 	Selectable   bool      `json:"-"`
 }
 
-const roleKingName = "King"
-
 // UnitRole defines if the Unit is King, Boss, or just a Normal Unit.
 type UnitRole int
 
@@ -191,18 +189,18 @@ const (
 	RoleBoss
 )
 
+var roleNames = [...]string{
+	RoleNormal: "Normal",
+	RoleKing:   "King",
+	RoleBoss:   "Boss",
+}
+
 // String returns the name used in logs and JSON.
 func (r UnitRole) String() string {
-	switch r {
-	case RoleNormal:
-		return "Normal"
-	case RoleKing:
-		return roleKingName
-	case RoleBoss:
-		return "Boss"
-	default:
+	if r < 0 || int(r) >= len(roleNames) {
 		return "Unknown"
 	}
+	return roleNames[r]
 }
 
 // MarshalText encodes the role as its String name.
@@ -212,17 +210,13 @@ func (r UnitRole) MarshalText() ([]byte, error) {
 
 // UnmarshalText decodes a role from its String name.
 func (r *UnitRole) UnmarshalText(text []byte) error {
-	switch s := string(text); s {
-	case "Normal":
-		*r = RoleNormal
-	case roleKingName:
-		*r = RoleKing
-	case "Boss":
-		*r = RoleBoss
-	default:
-		return fmt.Errorf("%w: %q", ErrInvalidUnitRole, text)
+	for role, name := range roleNames {
+		if string(text) == name {
+			*r = UnitRole(role)
+			return nil
+		}
 	}
-	return nil
+	return fmt.Errorf("%w: %q", ErrInvalidUnitRole, text)
 }
 
 // UnitID packs a team and a player index; see NewUnitID.
