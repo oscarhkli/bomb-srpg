@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"reflect"
 	"slices"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -140,16 +139,6 @@ func TestServerStateManager_CreateMatchRoom(t *testing.T) {
 			tt.validate(t, s, id, err)
 		})
 	}
-}
-
-func isValidCrockfordCode(s string) bool {
-	const alphabet = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
-	for _, c := range s {
-		if !strings.ContainsRune(alphabet, c) {
-			return false
-		}
-	}
-	return true
 }
 
 func TestServerStateManager_LastActivityUpdated(t *testing.T) {
@@ -2147,11 +2136,6 @@ func TestHandler_WithLoggerOption(t *testing.T) {
 	if h.Logger != customLogger {
 		t.Errorf("WithHandlerLogger option not applied")
 	}
-}
-
-// testLogger returns a logger that writes to t.Log (only visible on failure or -v).
-func testLogger(t *testing.T) *slog.Logger {
-	return slog.New(slog.NewTextHandler(&testLogWriter{t: t}, nil))
 }
 
 type testLogWriter struct {
