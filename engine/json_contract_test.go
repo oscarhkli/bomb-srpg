@@ -198,6 +198,51 @@ func TestGameStateEncoding(t *testing.T) {
 	grid := [][]Tile{{{Type: TerrainWater, OccupantType: OccupantBomb, OccupantID: 9}}}
 	const gridJSON = `[[{"type": "TerrainWater", "occupantType": "OccupantBomb", "occupantId": 9}]]`
 
+	full := GameState{
+		Turn: 2, InSuddenDeath: true, ActiveTeam: 2, Grid: grid,
+		Units:        map[UnitID]*Unit{17: {ID: 17, Type: Archetype{Name: "King"}, Position: pos, Team: 1, HP: 1}},
+		Bombs:        map[BombID]*Bomb{70000: {ID: 70000, OwnerID: 17, Position: pos, Range: 2, Countdown: 3}},
+		SoftBlocks:   map[int]*SoftBlock{4: {ID: 4, Position: pos}},
+		TurnCommands: []TurnCommand{NewMoveCommand(17, pos)},
+	}
+	const wantFull = `{
+			"turn": 2,
+			"inSuddenDeath": true,
+			"activeTeam": 2,
+			"grid": ` + gridJSON + `,
+			"units": [{
+				"id": 17,
+				"type": "King",
+				"position": {"x": 1, "y": 2},
+				"speed": 0,
+				"bombMaxRange": 0,
+				"bombPower": 0,
+				"maxBombCount": 0,
+				"bombUsed": 0,
+				"team": 1,
+				"hp": 1,
+				"skills": [],
+				"hasMoved": false,
+				"hasUsedSkill": false
+			}],
+			"bombs": [{
+				"id": 70000,
+				"ownerId": 17,
+				"position": {"x": 1, "y": 2},
+				"range": 2,
+				"countdown": 3
+			}],
+			"softBlocks": [{
+				"id": 4,
+				"position": {"x": 1, "y": 2}
+			}],
+			"turnCommands": [{
+				"type": "move",
+				"unitId": 17,
+				"target": {"x": 1, "y": 2}
+			}]
+		}`
+
 	checkEncoding(t, []encodingCase{
 		{
 			"without collections",
@@ -213,53 +258,11 @@ func TestGameStateEncoding(t *testing.T) {
 				"turnCommands": []
 			}`,
 		},
-		{
-			"with collections",
-			GameState{
-				Turn: 2, InSuddenDeath: true, ActiveTeam: 2, Grid: grid,
-				Units:        map[UnitID]*Unit{17: {ID: 17, Type: Archetype{Name: "King"}, Position: pos, Team: 1, HP: 1}},
-				Bombs:        map[BombID]*Bomb{70000: {ID: 70000, OwnerID: 17, Position: pos, Range: 2, Countdown: 3}},
-				SoftBlocks:   map[int]*SoftBlock{4: {ID: 4, Position: pos}},
-				TurnCommands: []TurnCommand{NewMoveCommand(17, pos)},
-			},
-			`{
-				"turn": 2,
-				"inSuddenDeath": true,
-				"activeTeam": 2,
-				"grid": ` + gridJSON + `,
-				"units": [{
-					"id": 17,
-					"type": "King",
-					"position": {"x": 1, "y": 2},
-					"speed": 0,
-					"bombMaxRange": 0,
-					"bombPower": 0,
-					"maxBombCount": 0,
-					"bombUsed": 0,
-					"team": 1,
-					"hp": 1,
-					"skills": [],
-					"hasMoved": false,
-					"hasUsedSkill": false
-				}],
-				"bombs": [{
-					"id": 70000,
-					"ownerId": 17,
-					"position": {"x": 1, "y": 2},
-					"range": 2,
-					"countdown": 3
-				}],
-				"softBlocks": [{
-					"id": 4,
-					"position": {"x": 1, "y": 2}
-				}],
-				"turnCommands": [{
-					"type": "move",
-					"unitId": 17,
-					"target": {"x": 1, "y": 2}
-				}]
-			}`,
-		},
+		{"with collections", full, wantFull},
+		{"with collections, pointer", &full, wantFull},
+		{"with collections, struct field", struct {
+			State GameState `json:"state"`
+		}{full}, `{"state": ` + wantFull + `}`},
 	})
 }
 
