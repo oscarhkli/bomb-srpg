@@ -29,11 +29,15 @@ const (
 	readTimeout     = 5 * time.Second
 	writeTimeout    = 5 * time.Second
 	shutdownTimeout = 5 * time.Second
+	healthTimeout   = 2 * time.Second
 )
 
 func main() {
 	if checkHealth(os.Args[1:]) {
-		os.Exit(runHealthCheck("http://localhost:8080/api/health"))
+		ctx, cancel := context.WithTimeout(context.Background(), healthTimeout)
+		code := runHealthCheck(ctx, "http://localhost:8080/api/health")
+		cancel()
+		os.Exit(code)
 	}
 
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: logLevelFromEnv(os.Getenv("LOG_LEVEL"))}))
