@@ -95,3 +95,33 @@ func TestRunHealthCheck_DeadlineExceeded(t *testing.T) {
 		t.Errorf("runHealthCheck() = %d, want 1", got)
 	}
 }
+
+func TestListenAddr(t *testing.T) {
+	tests := []struct {
+		name    string
+		port    string
+		want    string
+		wantErr bool
+	}{
+		{name: "unset defaults to 8080", port: "", want: ":8080"},
+		{name: "valid port", port: "54321", want: ":54321"},
+		{name: "lowest port", port: "1", want: ":1"},
+		{name: "highest port", port: "65535", want: ":65535"},
+		{name: "zero", port: "0", wantErr: true},
+		{name: "above range", port: "65536", wantErr: true},
+		{name: "negative", port: "-1", wantErr: true},
+		{name: "service name", port: "http", wantErr: true},
+		{name: "host and port", port: "127.0.0.1:80", wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := listenAddr(func(string) string { return tt.port })
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("listenAddr(%q) error = %v, wantErr %v", tt.port, err, tt.wantErr)
+			}
+			if got != tt.want {
+				t.Errorf("listenAddr(%q) = %q, want %q", tt.port, got, tt.want)
+			}
+		})
+	}
+}
