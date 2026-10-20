@@ -748,44 +748,50 @@ func TestGameStateDeepCopy_MemoryHandling(t *testing.T) {
 	}
 }
 
-func fillNonZero(t *testing.T, v reflect.Value, n *int64) {
-	t.Helper()
-	*n++
-	switch v.Kind() {
-	case reflect.Bool:
+type nonZeroFiller struct {
+	t *testing.T
+	i int64
+	u uint64
+}
+
+func (f *nonZeroFiller) fill(v reflect.Value) {
+	f.t.Helper()
+	f.i++
+	f.u++
+	switch kind := v.Kind(); {
+	case kind == reflect.Bool:
 		v.SetBool(true)
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		v.SetInt(*n)
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		v.SetUint(uint64(*n))
-	case reflect.String:
-		v.SetString(fmt.Sprintf("s%d", *n))
-	case reflect.Struct:
-		for i := range v.NumField() {
-			fillNonZero(t, v.Field(i), n)
+	case kind >= reflect.Int && kind <= reflect.Int64:
+		v.SetInt(f.i)
+	case kind >= reflect.Uint && kind <= reflect.Uint64:
+		v.SetUint(f.u)
+	case kind == reflect.String:
+		v.SetString(fmt.Sprintf("s%d", f.i))
+	case kind == reflect.Struct:
+		for _, field := range v.Fields() {
+			f.fill(field)
 		}
-	case reflect.Ptr:
+	case kind == reflect.Pointer:
 		v.Set(reflect.New(v.Type().Elem()))
-		fillNonZero(t, v.Elem(), n)
-	case reflect.Slice:
+		f.fill(v.Elem())
+	case kind == reflect.Slice:
 		v.Set(reflect.MakeSlice(v.Type(), 1, 1))
-		fillNonZero(t, v.Index(0), n)
-	case reflect.Map:
+		f.fill(v.Index(0))
+	case kind == reflect.Map:
 		v.Set(reflect.MakeMap(v.Type()))
 		key := reflect.New(v.Type().Key()).Elem()
 		val := reflect.New(v.Type().Elem()).Elem()
-		fillNonZero(t, key, n)
-		fillNonZero(t, val, n)
+		f.fill(key)
+		f.fill(val)
 		v.SetMapIndex(key, val)
 	default:
-		t.Fatalf("fillNonZero: unsupported kind %v; teach the helper about it", v.Kind())
+		f.t.Fatalf("unsupported kind %v; teach the helper about it", kind)
 	}
 }
 
 func TestGameStateDeepCopy_AllFields(t *testing.T) {
 	var original GameState
-	var n int64
-	fillNonZero(t, reflect.ValueOf(&original).Elem(), &n)
+	(&nonZeroFiller{t: t}).fill(reflect.ValueOf(&original).Elem())
 
 	got := original.DeepCopy()
 
@@ -804,6 +810,7 @@ func TestGameStateDeepCopy_NilAndEmpty(t *testing.T) {
 			name: "nil collections become non-nil empty, nil TurnCommands stays nil",
 			in:   &GameState{},
 			check: func(t *testing.T, got *GameState) {
+				t.Helper()
 				if got.Grid == nil || got.Units == nil || got.Bombs == nil || got.SoftBlocks == nil {
 					t.Errorf("want non-nil Grid, Units, Bombs, SoftBlocks, got %+v", got)
 				}
@@ -816,6 +823,7 @@ func TestGameStateDeepCopy_NilAndEmpty(t *testing.T) {
 			name: "empty TurnCommands stays empty and non-nil",
 			in:   &GameState{TurnCommands: []TurnCommand{}},
 			check: func(t *testing.T, got *GameState) {
+				t.Helper()
 				if got.TurnCommands == nil || len(got.TurnCommands) != 0 {
 					t.Errorf("TurnCommands = %#v, want empty non-nil", got.TurnCommands)
 				}
@@ -825,6 +833,7 @@ func TestGameStateDeepCopy_NilAndEmpty(t *testing.T) {
 			name: "nil receiver returns nil",
 			in:   nil,
 			check: func(t *testing.T, got *GameState) {
+				t.Helper()
 				if got != nil {
 					t.Errorf("DeepCopy() = %+v, want nil", got)
 				}
