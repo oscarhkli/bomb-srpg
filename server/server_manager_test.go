@@ -2183,7 +2183,11 @@ func mustRoom(t *testing.T, s *ServerStateManager, roomID string) *MatchRoom {
 	if !ok {
 		t.Fatalf("Room %s not found", roomID)
 	}
-	return roomVal.(*MatchRoom)
+	room, ok := roomVal.(*MatchRoom)
+	if !ok {
+		t.Fatalf("Room %s has type %T, want *MatchRoom", roomID, roomVal)
+	}
+	return room
 }
 
 func hasGameEvent(gameEvents []engine.GameEvent, evtType engine.GameEvtType, unitID engine.UnitID) bool {

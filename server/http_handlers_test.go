@@ -1332,8 +1332,14 @@ func TestHandleSubmitTurnCommand(t *testing.T) {
 				"countdown", "newHp"},
 			func(t *testing.T, item map[string]any) {
 				t.Helper()
-				fromField := item["from"].(map[string]any)
-				toField := item["from"].(map[string]any)
+				fromField, ok := item["from"].(map[string]any)
+				if !ok {
+					t.Fatalf("from is not an object: %#v", item["from"])
+				}
+				toField, ok := item["from"].(map[string]any)
+				if !ok {
+					t.Fatalf("from is not an object: %#v", item["from"])
+				}
 				for _, field := range []string{"x", "y"} {
 					if _, exists := fromField[field]; !exists {
 						t.Errorf("Contract Broken: from missing key '%s'", field)
@@ -1550,7 +1556,10 @@ func TestHandleStartTurn(t *testing.T) {
 						"newHp"},
 					func(t *testing.T, item map[string]any) {
 						t.Helper()
-						positionField := item["position"].(map[string]any)
+						positionField, ok := item["position"].(map[string]any)
+						if !ok {
+							t.Fatalf("position is not an object: %#v", item["position"])
+						}
 						for _, field := range []string{"x", "y"} {
 							if _, exists := positionField[field]; !exists {
 								t.Errorf("Contract Broken: from missing key '%s'", field)
@@ -1839,7 +1848,10 @@ func TestHandleConsumeCPUStatus(t *testing.T) {
 				if !ok || len(events) == 0 {
 					t.Fatalf("Expected non-empty planGameEvents, got %#v", raw["planGameEvents"])
 				}
-				evt := events[0].(map[string]any)
+				evt, ok := events[0].(map[string]any)
+				if !ok {
+					t.Fatalf("planGameEvents[0] is not an object: %#v", events[0])
+				}
 				for _, field := range []string{"type", "unitId", "from", "to"} {
 					if _, exists := evt[field]; !exists {
 						t.Errorf("Contract Broken: planGameEvents[0] missing key '%s'", field)
@@ -2154,7 +2166,10 @@ func TestHandleResolveTurn(t *testing.T) {
 				if !ok || len(events) == 0 {
 					t.Fatalf("Expected non-empty planGameEvents, got %#v", raw["planGameEvents"])
 				}
-				evt := events[0].(map[string]any)
+				evt, ok := events[0].(map[string]any)
+				if !ok {
+					t.Fatalf("planGameEvents[0] is not an object: %#v", events[0])
+				}
 				for _, field := range []string{"type", "unitId", "bombId", "position", "range", "countdown"} {
 					if _, exists := evt[field]; !exists {
 						t.Errorf("Contract Broken: planGameEvents[0] missing key '%s'", field)
