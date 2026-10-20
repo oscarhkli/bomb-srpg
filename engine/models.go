@@ -4,6 +4,7 @@ import (
 	"encoding/json/v2"
 	"fmt"
 	"maps"
+	"math"
 	"slices"
 )
 
@@ -42,8 +43,8 @@ func (t TerrainType) String() string {
 }
 
 // MarshalText encodes the terrain as its String name.
-func (o TerrainType) MarshalText() ([]byte, error) {
-	return []byte(o.String()), nil
+func (t TerrainType) MarshalText() ([]byte, error) {
+	return []byte(t.String()), nil
 }
 
 // Coordinate represents a grid position using (X, Y) where (0,0) is top-left.
@@ -86,11 +87,27 @@ func (o OccupantType) MarshalText() ([]byte, error) {
 	return []byte(o.String()), nil
 }
 
+// Team1 and Team2 are the two team numbers; Team2 is also the CPU side in VS CPU.
+const (
+	Team1 = 1
+	Team2 = 2
+)
+
 // Tile represents a single cell on the game board combining terrain and occupant.
 type Tile struct {
 	Type         TerrainType  `json:"type"`
 	OccupantType OccupantType `json:"occupantType"`
 	OccupantID   int64        `json:"occupantId"` // UnitID, BombID or SoftBlockID, per OccupantType
+}
+
+// UnitID returns OccupantID as a UnitID, wrapping values wider than the type.
+func (t Tile) UnitID() UnitID {
+	return UnitID(t.OccupantID & int64(math.MaxUint8))
+}
+
+// BombID returns OccupantID as a BombID, wrapping values wider than the type.
+func (t Tile) BombID() BombID {
+	return BombID(t.OccupantID & int64(math.MaxUint32))
 }
 
 // SoftBlock represents a destructible block that may hide an item.
@@ -163,7 +180,9 @@ type Archetype struct {
 	Selectable   bool      `json:"-"`
 }
 
-// UnitRoles defines if the Unit is King, Boss, or just a Normal Unit
+const roleKingName = "King"
+
+// UnitRole defines if the Unit is King, Boss, or just a Normal Unit.
 type UnitRole int
 
 const (
@@ -173,12 +192,12 @@ const (
 )
 
 // String returns the name used in logs and JSON.
-func (o UnitRole) String() string {
-	switch o {
+func (r UnitRole) String() string {
+	switch r {
 	case RoleNormal:
 		return "Normal"
 	case RoleKing:
-		return "King"
+		return roleKingName
 	case RoleBoss:
 		return "Boss"
 	default:
@@ -187,8 +206,8 @@ func (o UnitRole) String() string {
 }
 
 // MarshalText encodes the role as its String name.
-func (o UnitRole) MarshalText() ([]byte, error) {
-	return []byte(o.String()), nil
+func (r UnitRole) MarshalText() ([]byte, error) {
+	return []byte(r.String()), nil
 }
 
 // UnmarshalText decodes a role from its String name.
@@ -196,7 +215,7 @@ func (r *UnitRole) UnmarshalText(text []byte) error {
 	switch s := string(text); s {
 	case "Normal":
 		*r = RoleNormal
-	case "King":
+	case roleKingName:
 		*r = RoleKing
 	case "Boss":
 		*r = RoleBoss
@@ -306,7 +325,7 @@ type GameState struct {
 }
 
 // MarshalJSON emits the client-facing shape, with the entity maps flattened to arrays.
-func (gs GameState) MarshalJSON() ([]byte, error) {
+func (gs *GameState) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		Turn          int           `json:"turn"`
 		InSuddenDeath bool          `json:"inSuddenDeath"`
@@ -352,8 +371,8 @@ func (c CPUTurnPhase) String() string {
 }
 
 // MarshalText encodes the phase as its String name.
-func (o CPUTurnPhase) MarshalText() ([]byte, error) {
-	return []byte(o.String()), nil
+func (c CPUTurnPhase) MarshalText() ([]byte, error) {
+	return []byte(c.String()), nil
 }
 
 // CPUState manages the TurnPhase state and pending GameEvent for VS CPU.
