@@ -98,7 +98,6 @@ func (c *MatchController) handleSystemCommand(cmd string) {
 	}
 }
 
-// routeGameAction handles movement and bomb placement commands.
 func (c *MatchController) routeGameAction(cmd string) {
 	token := strings.Fields(strings.ToLower(cmd))
 
