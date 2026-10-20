@@ -1472,10 +1472,12 @@ func TestServerStateManager_ReadsDuringCPUTurn(t *testing.T) {
 					return
 				}
 				if _, err := s.GetAllowedTiles(roomID, cpuUnitID, engine.TurnCmdMove); err != nil {
-					t.Fatalf("GetAllowedTiles() error = %v", err)
+					t.Errorf("GetAllowedTiles() error = %v", err)
+					return
 				}
 				if _, err := s.GetMatchConfig(roomID); err != nil {
-					t.Fatalf("GetMatchConfig() error = %v", err)
+					t.Errorf("GetMatchConfig() error = %v", err)
+					return
 				}
 			}
 		})
