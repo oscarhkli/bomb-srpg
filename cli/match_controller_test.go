@@ -333,9 +333,10 @@ func TestMatchController_StartInputLoop(t *testing.T) {
 			notWant: []string{"Enter Command", "reset successfully"},
 		},
 		{
-			name:  "EOF returns after the first prompt",
-			input: "",
-			want:  []string{"Enter Command: "},
+			name:    "EOF returns after the first prompt",
+			input:   "",
+			want:    []string{"Enter Command: "},
+			prompts: 1,
 		},
 		{
 			name:    "empty line prompts again",
@@ -390,8 +391,8 @@ func TestMatchController_StartInputLoop(t *testing.T) {
 					t.Errorf("output missing %q, got:\n%s", w, got)
 				}
 			}
-			if got, want := strings.Count(got, "Enter Command: "), tt.prompts; want > 0 && got != want {
-				t.Errorf("prompt count = %d, want %d", got, want)
+			if n := strings.Count(got, "Enter Command: "); tt.prompts > 0 && n != tt.prompts {
+				t.Errorf("prompt count = %d, want %d", n, tt.prompts)
 			}
 			for _, nw := range tt.notWant {
 				if strings.Contains(got, nw) {
