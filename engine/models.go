@@ -87,7 +87,7 @@ func (o OccupantType) MarshalText() ([]byte, error) {
 	return []byte(o.String()), nil
 }
 
-// Team1 and Team2 are the two team numbers; Team2 is also the CPU side in VS CPU.
+// Team1 and Team2 are the two team numbers.
 const (
 	Team1 = 1
 	Team2 = 2
