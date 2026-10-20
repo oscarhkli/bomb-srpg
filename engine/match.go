@@ -122,43 +122,46 @@ func (m *Match) CommandPlaceBomb(unitID UnitID, target Coordinate) ([]GameEvent,
 // Otherwise it returns an error if the unit has no bombs or skill use left, the target is out of
 // bomb range, or the cell is not landable.
 func (gs *GameState) PlaceBomb(unitID UnitID, target Coordinate) (GameEvent, error) {
-	bombPower := BombDefaultPower
-	var unit *Unit
-
-	if unitID != SystemUnitID {
-		var err error
-		unit, err = gs.validateActiveUnit(unitID)
-		if err != nil {
-			return GameEvent{}, err
-		}
-
-		if unit.HasUsedSkill {
-			return GameEvent{}, fmt.Errorf("%w: unit %#x already used skill this turn", ErrAlreadyUsedSkill, unitID)
-		}
-
-		if unit.BombUsed >= unit.MaxBombCount {
-			return GameEvent{}, fmt.Errorf("%w: unit %#x out of bombs", ErrOutOfBombs, unitID)
-		}
-
-		tiles := gs.FindReachableTiles(unit.Position, unit.NewBombPlacementRule())
-
-		if _, ok := tiles[target]; !ok {
-			return GameEvent{}, ErrOutOfBombRange
-		}
-
-		if err = gs.IsLandingLegal(target, OccupantBomb); err != nil {
-			return GameEvent{}, fmt.Errorf("%w: %w", ErrInvalidLanding, err)
-		}
-
-		bombPower = unit.BombPower
+	if unitID == SystemUnitID {
+		return gs.dropBomb(unitID, target, BombDefaultPower), nil
 	}
 
-	if unit != nil {
-		unit.BombUsed++
-		unit.HasUsedSkill = true
+	unit, err := gs.validateBombPlacement(unitID, target)
+	if err != nil {
+		return GameEvent{}, err
 	}
 
-	return gs.dropBomb(unitID, target, bombPower), nil
+	unit.BombUsed++
+	unit.HasUsedSkill = true
+
+	return gs.dropBomb(unitID, target, unit.BombPower), nil
+}
+
+func (gs *GameState) validateBombPlacement(unitID UnitID, target Coordinate) (*Unit, error) {
+	unit, err := gs.validateActiveUnit(unitID)
+	if err != nil {
+		return nil, err
+	}
+
+	if unit.HasUsedSkill {
+		return nil, fmt.Errorf("%w: unit %#x already used skill this turn", ErrAlreadyUsedSkill, unitID)
+	}
+
+	if unit.BombUsed >= unit.MaxBombCount {
+		return nil, fmt.Errorf("%w: unit %#x out of bombs", ErrOutOfBombs, unitID)
+	}
+
+	tiles := gs.FindReachableTiles(unit.Position, unit.NewBombPlacementRule())
+
+	if _, ok := tiles[target]; !ok {
+		return nil, ErrOutOfBombRange
+	}
+
+	if err = gs.IsLandingLegal(target, OccupantBomb); err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrInvalidLanding, err)
+	}
+
+	return unit, nil
 }
 
 func (gs *GameState) dropBomb(ownerID UnitID, target Coordinate, power int) GameEvent {
