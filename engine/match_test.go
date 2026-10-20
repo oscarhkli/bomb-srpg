@@ -1828,6 +1828,15 @@ func TestMatch_Resolve_VictoryCondition_Suite(t *testing.T) {
 			expectedWinningTeam: 1,
 		},
 		{
+			name: "Goal and Wiped on one team against a lone King",
+			p1:   teamFormation{King: boolPtr(true), OrdinaryUnitsAlive: []bool{true}},
+			p2:   teamFormation{King: boolPtr(true)},
+			setup: func(m *Match) {
+				addRoleUnit(m, 1, 5, RoleBoss, 0)
+			},
+			expectedWinningTeam: MatchDrawn,
+		},
+		{
 			name: "King at HP -1 counts as dead",
 			p1:   teamFormation{King: boolPtr(true)},
 			p2:   teamFormation{},
