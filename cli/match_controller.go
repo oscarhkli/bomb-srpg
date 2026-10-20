@@ -13,11 +13,11 @@ import (
 
 type MatchController struct {
 	Match *engine.Match
-	View  MatchView
+	View  *TerminalView
 	input io.Reader
 }
 
-func NewMatchController(m *engine.Match, v MatchView, in io.Reader) *MatchController {
+func NewMatchController(m *engine.Match, v *TerminalView, in io.Reader) *MatchController {
 	return &MatchController{Match: m, View: v, input: in}
 }
 

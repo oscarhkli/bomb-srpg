@@ -8,95 +8,56 @@ import (
 	"bomb-srpg/engine"
 )
 
-// SpyMatchView records view calls.
-type SpyMatchView struct {
-	RenderBoardCalled      bool
-	RenderGameConfigCalled bool
-	FeedbackMessage        string
-	FeedbackSuccess        bool
-	RenderTurnHeaderCalled bool
-	RenderGameEventsCalled bool
-}
-
-func (s *SpyMatchView) RenderBoard(gs *engine.GameState) error {
-	s.RenderBoardCalled = true
-	return nil
-}
-
-func (s *SpyMatchView) RenderGameConfig(cfg *engine.GameCfg) error {
-	s.RenderGameConfigCalled = true
-	return nil
-}
-
-func (s *SpyMatchView) RenderFeedback(success bool, msg string) error {
-	s.FeedbackSuccess = success
-	s.FeedbackMessage = msg
-	return nil
-}
-func (s *SpyMatchView) RenderMessage(msg string) error {
-	return nil
-}
-
-func (s *SpyMatchView) RenderTurnHeader(turn, activeTeamID int) error {
-	s.RenderTurnHeaderCalled = true
-	return nil
-}
-
-func (s *SpyMatchView) RenderGameEvents(gameEvents []engine.GameEvent) error {
-	s.RenderGameEventsCalled = true
-	return nil
-}
-
 func TestMatchController_SystemCommands(t *testing.T) {
 	type testCase struct {
 		name          string
 		inputCommands string
-		verify        func(t *testing.T, view *SpyMatchView, match *engine.Match)
+		verify        func(t *testing.T, out string, match *engine.Match)
 	}
 
 	table := []testCase{
 		{
 			name:          "Blank input whitespace elements are skipped",
 			inputCommands: "\n\n   \n",
-			verify: func(t *testing.T, view *SpyMatchView, match *engine.Match) {
-				if view.FeedbackMessage != "" {
-					t.Errorf("Expected loop to ignore spaces, but feedback registered: %q", view.FeedbackMessage)
+			verify: func(t *testing.T, out string, match *engine.Match) {
+				if strings.Contains(out, Green) || strings.Contains(out, Red) {
+					t.Errorf("Expected loop to ignore spaces, but feedback registered: %q", out)
 				}
 			},
 		},
 		{
 			name:          "/config triggers GameCfg view",
 			inputCommands: "/config\n",
-			verify: func(t *testing.T, view *SpyMatchView, match *engine.Match) {
-				if !view.RenderGameConfigCalled {
-					t.Error("Expected /config route to call RenderGameConfig")
+			verify: func(t *testing.T, out string, match *engine.Match) {
+				if !strings.Contains(out, "=== MATCH CONFIGURATION ===") {
+					t.Errorf("Expected /config route to render the game config, got: %q", out)
 				}
 			},
 		},
 		{
 			name:          "/reset executes ResetTurn",
 			inputCommands: "/reset\n",
-			verify: func(t *testing.T, view *SpyMatchView, match *engine.Match) {
-				if !view.FeedbackSuccess || !strings.Contains(view.FeedbackMessage, "reset successfully") {
-					t.Errorf("Expected successful reset confirmation, got: %v - %q", view.FeedbackSuccess, view.FeedbackMessage)
+			verify: func(t *testing.T, out string, match *engine.Match) {
+				if !strings.Contains(out, Green+"Turn reset successfully!") {
+					t.Errorf("Expected successful reset confirmation, got: %q", out)
 				}
 			},
 		},
 		{
 			name:          "/commit execute ResolveTurn and prints log event entries",
 			inputCommands: "/commit\n",
-			verify: func(t *testing.T, view *SpyMatchView, match *engine.Match) {
-				if !view.RenderGameEventsCalled || !view.FeedbackSuccess {
-					t.Error("Expected /commit route to pass events to View and trigger a green status code notice")
+			verify: func(t *testing.T, out string, match *engine.Match) {
+				if !strings.Contains(out, Green+"Turn committed and resolved!") {
+					t.Errorf("Expected /commit route to trigger a green status code notice, got: %q", out)
 				}
 			},
 		},
 		{
 			name:          "/surrender execute Surrender and prints log event entries",
 			inputCommands: "/surrender\n",
-			verify: func(t *testing.T, view *SpyMatchView, match *engine.Match) {
-				if !view.FeedbackSuccess || !strings.Contains(view.FeedbackMessage, "Winner... PLAYER 2!") {
-					t.Errorf("Expected final victory status layout sheet, got: %q", view.FeedbackMessage)
+			verify: func(t *testing.T, out string, match *engine.Match) {
+				if !strings.Contains(out, Green+"PLAYER 1 surrendered!") || !strings.Contains(out, Green+"Winner... PLAYER 2!") {
+					t.Errorf("Expected final victory status layout sheet, got: %q", out)
 				}
 				if match.WinnerTeamID != 2 {
 					t.Errorf("Expected real engine WinnerTeamID to match opponent (2) after Player 1 surrenders, got: %d", match.WinnerTeamID)
@@ -106,9 +67,9 @@ func TestMatchController_SystemCommands(t *testing.T) {
 		{
 			name:          "Invalid system shortcut",
 			inputCommands: "/unknown_action_command\n",
-			verify: func(t *testing.T, view *SpyMatchView, match *engine.Match) {
-				if view.FeedbackSuccess || !strings.Contains(view.FeedbackMessage, "Unknown meta command") {
-					t.Errorf("Expected unknown command failure warning, got: %v - %q", view.FeedbackSuccess, view.FeedbackMessage)
+			verify: func(t *testing.T, out string, match *engine.Match) {
+				if !strings.Contains(out, Red+"Unknown meta command") {
+					t.Errorf("Expected unknown command failure warning, got: %q", out)
 				}
 			},
 		},
@@ -116,8 +77,6 @@ func TestMatchController_SystemCommands(t *testing.T) {
 
 	for _, tt := range table {
 		t.Run(tt.name, func(t *testing.T) {
-			view := &SpyMatchView{}
-
 			match := &engine.Match{
 				WorkingState: &engine.GameState{
 					Turn:       1,
@@ -128,11 +87,12 @@ func TestMatchController_SystemCommands(t *testing.T) {
 			}
 			match.TrueState = match.WorkingState.DeepCopy()
 
-			controller := NewMatchController(match, view, strings.NewReader(tt.inputCommands))
+			var screen bytes.Buffer
+			controller := NewMatchController(match, NewTerminalView(&screen), strings.NewReader(tt.inputCommands))
 
 			controller.StartInputLoop()
 
-			tt.verify(t, view, match)
+			tt.verify(t, screen.String(), match)
 		})
 	}
 }
@@ -143,7 +103,7 @@ func TestMatchController_GameplayActions(t *testing.T) {
 		inputCommands string
 		setupState    func(gs *engine.GameState)
 		setupMatch    func() *engine.Match
-		verify        func(t *testing.T, view *SpyMatchView, match *engine.Match)
+		verify        func(t *testing.T, out string, match *engine.Match)
 	}
 
 	table := []testCase{
@@ -166,9 +126,9 @@ func TestMatchController_GameplayActions(t *testing.T) {
 
 				return m
 			},
-			verify: func(t *testing.T, view *SpyMatchView, match *engine.Match) {
-				if !view.FeedbackSuccess {
-					t.Errorf("Expected gameplay router to parse verb, but got error: %q", view.FeedbackMessage)
+			verify: func(t *testing.T, out string, match *engine.Match) {
+				if !strings.Contains(out, Green+"GameEvents:") {
+					t.Errorf("Expected gameplay router to parse verb, but got: %q", out)
 				}
 			},
 		},
@@ -191,12 +151,12 @@ func TestMatchController_GameplayActions(t *testing.T) {
 
 				return m
 			},
-			verify: func(t *testing.T, view *SpyMatchView, match *engine.Match) {
-				if view.FeedbackSuccess {
+			verify: func(t *testing.T, out string, match *engine.Match) {
+				if strings.Contains(out, Green+"GameEvents:") {
 					t.Error("Expected illegal move coordinates to return a failure status, but reported success")
 				}
-				if !strings.Contains(view.FeedbackMessage, "Invalid move") {
-					t.Errorf("Expected feedback warning parameters to mention 'Invalid move', got: %q", view.FeedbackMessage)
+				if !strings.Contains(out, Red+"Invalid move") {
+					t.Errorf("Expected feedback warning parameters to mention 'Invalid move', got: %q", out)
 				}
 			},
 		},
@@ -206,9 +166,9 @@ func TestMatchController_GameplayActions(t *testing.T) {
 			setupMatch: func() *engine.Match {
 				return newTestMatch(2, 2)
 			},
-			verify: func(t *testing.T, view *SpyMatchView, match *engine.Match) {
-				if view.FeedbackSuccess || !strings.Contains(view.FeedbackMessage, "Expected: move") {
-					t.Errorf("Expected short arguments length to trigger syntax warning, got: %q", view.FeedbackMessage)
+			verify: func(t *testing.T, out string, match *engine.Match) {
+				if !strings.Contains(out, Red+"Syntax error in move command") || !strings.Contains(out, "Expected: move") {
+					t.Errorf("Expected short arguments length to trigger syntax warning, got: %q", out)
 				}
 			},
 		},
@@ -218,9 +178,9 @@ func TestMatchController_GameplayActions(t *testing.T) {
 			setupMatch: func() *engine.Match {
 				return newTestMatch(2, 2)
 			},
-			verify: func(t *testing.T, view *SpyMatchView, match *engine.Match) {
-				if view.FeedbackSuccess || !strings.Contains(view.FeedbackMessage, "Argument Error") {
-					t.Errorf("Expected string parsing validation to capture character errors, got: %q", view.FeedbackMessage)
+			verify: func(t *testing.T, out string, match *engine.Match) {
+				if !strings.Contains(out, Red+"Argument Error") {
+					t.Errorf("Expected string parsing validation to capture character errors, got: %q", out)
 				}
 			},
 		},
@@ -243,9 +203,9 @@ func TestMatchController_GameplayActions(t *testing.T) {
 
 				return m
 			},
-			verify: func(t *testing.T, view *SpyMatchView, match *engine.Match) {
-				if !view.FeedbackSuccess {
-					t.Errorf("Expected gameplay router to parse verb, but got error: %q", view.FeedbackMessage)
+			verify: func(t *testing.T, out string, match *engine.Match) {
+				if !strings.Contains(out, Green+"GameEvents:") {
+					t.Errorf("Expected gameplay router to parse verb, but got: %q", out)
 				}
 			},
 		},
@@ -267,12 +227,12 @@ func TestMatchController_GameplayActions(t *testing.T) {
 
 				return m
 			},
-			verify: func(t *testing.T, view *SpyMatchView, match *engine.Match) {
-				if view.FeedbackSuccess {
+			verify: func(t *testing.T, out string, match *engine.Match) {
+				if strings.Contains(out, Green+"GameEvents:") {
 					t.Error("Expected illegal bomb coordinates to return a failure status, but reported success")
 				}
-				if !strings.Contains(view.FeedbackMessage, "unit 0x10 out of bombs") {
-					t.Errorf("Expected feedback warning parameters to mention 'unit 0x10 out of bombs', got: %q", view.FeedbackMessage)
+				if !strings.Contains(out, Red+"Invalid bomb placement") || !strings.Contains(out, "unit 0x10 out of bombs") {
+					t.Errorf("Expected feedback warning parameters to mention 'unit 0x10 out of bombs', got: %q", out)
 				}
 			},
 		},
@@ -282,9 +242,9 @@ func TestMatchController_GameplayActions(t *testing.T) {
 			setupMatch: func() *engine.Match {
 				return newTestMatch(2, 2)
 			},
-			verify: func(t *testing.T, view *SpyMatchView, match *engine.Match) {
-				if view.FeedbackSuccess || !strings.Contains(view.FeedbackMessage, "Expected: bomb") {
-					t.Errorf("Expected short arguments length to trigger syntax warning, got: %q", view.FeedbackMessage)
+			verify: func(t *testing.T, out string, match *engine.Match) {
+				if !strings.Contains(out, Red+"Syntax error in bomb command") || !strings.Contains(out, "Expected: bomb") {
+					t.Errorf("Expected short arguments length to trigger syntax warning, got: %q", out)
 				}
 			},
 		},
@@ -294,9 +254,9 @@ func TestMatchController_GameplayActions(t *testing.T) {
 			setupMatch: func() *engine.Match {
 				return newTestMatch(2, 2)
 			},
-			verify: func(t *testing.T, view *SpyMatchView, match *engine.Match) {
-				if view.FeedbackSuccess || !strings.Contains(view.FeedbackMessage, "Argument Error") {
-					t.Errorf("Expected string parsing validation to capture character errors, got: %q", view.FeedbackMessage)
+			verify: func(t *testing.T, out string, match *engine.Match) {
+				if !strings.Contains(out, Red+"Argument Error") {
+					t.Errorf("Expected string parsing validation to capture character errors, got: %q", out)
 				}
 			},
 		},
@@ -304,13 +264,13 @@ func TestMatchController_GameplayActions(t *testing.T) {
 
 	for _, tt := range table {
 		t.Run(tt.name, func(t *testing.T) {
-			view := &SpyMatchView{}
 			match := tt.setupMatch()
-			controller := NewMatchController(match, view, strings.NewReader(tt.inputCommands))
+			var screen bytes.Buffer
+			controller := NewMatchController(match, NewTerminalView(&screen), strings.NewReader(tt.inputCommands))
 
 			controller.StartInputLoop()
 
-			tt.verify(t, view, match)
+			tt.verify(t, screen.String(), match)
 		})
 	}
 }
