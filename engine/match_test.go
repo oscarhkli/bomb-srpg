@@ -1838,6 +1838,15 @@ func TestMatch_Resolve_VictoryCondition_Suite(t *testing.T) {
 			expectedWinningTeam: MatchDrawn,
 		},
 		{
+			name: "Unknown role counts as an ordinary unit",
+			p1:   teamFormation{King: new(true)},
+			p2:   teamFormation{King: new(true)},
+			setup: func(m *Match) {
+				addRoleUnit(m, 1, 5, UnitRole(9), 1)
+			},
+			expectedWinningTeam: 1,
+		},
+		{
 			name: "King at HP -1 counts as dead",
 			p1:   teamFormation{King: new(true)},
 			p2:   teamFormation{},
