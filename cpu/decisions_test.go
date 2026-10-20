@@ -745,3 +745,35 @@ func TestBuildRoster_PositionsFromInput(t *testing.T) {
 		t.Errorf("buildRoster() = %+v, %v, want the ally King at %+v", r, ok, origin)
 	}
 }
+
+func TestDecide_IdleAllyDoesNotEndRound(t *testing.T) {
+	gs := newTestGameState(7, 5)
+	setTerrainBlock(gs, engine.Coordinate{X: 1, Y: 3})
+	addSoftBlock(gs, 1, engine.Coordinate{X: 3, Y: 0})
+	addSoftBlock(gs, 2, engine.Coordinate{X: 3, Y: 2})
+	addSoftBlock(gs, 3, engine.Coordinate{X: 0, Y: 4})
+	allyKing := addKing(gs, engine.NewUnitID(2, 1), engine.Coordinate{X: 2, Y: 0})
+	allyKing.BombUsed = allyKing.MaxBombCount
+	fighter := addFighter(gs, engine.NewUnitID(2, 2), engine.Coordinate{X: 5, Y: 1})
+	fighter.BombUsed = fighter.MaxBombCount
+	addKing(gs, engine.NewUnitID(1, 1), engine.Coordinate{X: 6, Y: 3})
+	addFighter(gs, engine.NewUnitID(1, 2), engine.Coordinate{X: 6, Y: 1})
+	for i, b := range []struct {
+		pos       engine.Coordinate
+		countdown int
+	}{{engine.Coordinate{X: 4, Y: 2}, 3}, {engine.Coordinate{X: 0, Y: 3}, 1}} {
+		id := engine.NewBombID(0, 0, engine.SystemUnitID) + engine.BombID(i)
+		gs.Bombs[id] = &engine.Bomb{ID: id, OwnerID: engine.SystemUnitID, Position: b.pos, Range: 2, Countdown: b.countdown}
+		gs.Grid[b.pos.Y][b.pos.X] = engine.Tile{Type: engine.TerrainPlain, OccupantType: engine.OccupantBomb, OccupantID: int64(id)}
+	}
+
+	got := Decide(gs)
+
+	want := []engine.TurnCommand{
+		engine.NewMoveCommand(fighter.ID, engine.Coordinate{X: 5, Y: 3}),
+		engine.NewMoveCommand(allyKing.ID, engine.Coordinate{X: 1, Y: 0}),
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("Decide() = %+v, want %+v (an ally whose best plan is empty must not end the round)", got, want)
+	}
+}

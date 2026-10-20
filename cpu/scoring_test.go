@@ -2,6 +2,7 @@ package cpu
 
 import (
 	"bomb-srpg/engine"
+	"cmp"
 	"errors"
 	"testing"
 )
@@ -318,9 +319,9 @@ func TestEvaluate_TurnResultSets(t *testing.T) {
 		bombOwner func(actor, fighter, opponent engine.UnitID) engine.UnitID
 		countdown int
 		fighterHP int
+		kingHP    int
 		allyIDs   func(actor, fighter engine.UnitID) []engine.UnitID
 		bombAt    engine.Coordinate
-		kingHP    int
 	}
 	score := func(t *testing.T, f fixture) int {
 		t.Helper()
@@ -351,50 +352,60 @@ func TestEvaluate_TurnResultSets(t *testing.T) {
 		}
 		return got.score
 	}
-	both := func(a, f engine.UnitID) []engine.UnitID { return []engine.UnitID{a, f} }
+
 	opponent := func(_, _, o engine.UnitID) engine.UnitID { return o }
-	nearActor := engine.Coordinate{X: 3, Y: 2}
-	farAway := engine.Coordinate{X: 6, Y: 0}
-	nearFighter := engine.Coordinate{X: 3, Y: 5}
-
-	allyOwned := func(a, _, _ engine.UnitID) engine.UnitID { return a }
 	system := func(_, _, _ engine.UnitID) engine.UnitID { return engine.SystemUnitID }
+	allyOwned := func(a, _, _ engine.UnitID) engine.UnitID { return a }
 	fighterOwned := func(_, f, _ engine.UnitID) engine.UnitID { return f }
+	both := func(a, f engine.UnitID) []engine.UnitID { return []engine.UnitID{a, f} }
 	fighterOnly := func(_, f engine.UnitID) []engine.UnitID { return []engine.UnitID{f} }
+	nearActor := engine.Coordinate{X: 3, Y: 2}
+	nearFighter := engine.Coordinate{X: 3, Y: 5}
+	farAway := engine.Coordinate{X: 6, Y: 0}
 
-	t.Run("opponent bomb hits the actor's tile", func(t *testing.T) {
-		hit := score(t, fixture{bombOwner: opponent, countdown: 1, fighterHP: 5, allyIDs: both, bombAt: nearActor})
-		safe := score(t, fixture{bombOwner: opponent, countdown: 1, fighterHP: 5, allyIDs: both, bombAt: farAway})
-		if hit >= safe {
-			t.Errorf("score with bomb on actor = %d, want below %d without it", hit, safe)
-		}
-	})
-	t.Run("sudden-death bomb scores like an opponent bomb", func(t *testing.T) {
-		sys := score(t, fixture{bombOwner: system, countdown: 1, fighterHP: 5, allyIDs: both, bombAt: nearActor})
-		opp := score(t, fixture{bombOwner: opponent, countdown: 1, fighterHP: 5, allyIDs: both, bombAt: nearActor})
-		if sys != opp {
-			t.Errorf("system bomb score = %d, want %d (opponent bomb)", sys, opp)
-		}
-	})
-	t.Run("ally bomb scores differently from an opponent bomb", func(t *testing.T) {
-		ally := score(t, fixture{bombOwner: allyOwned, countdown: 1, fighterHP: 5, allyIDs: both, bombAt: nearActor})
-		opp := score(t, fixture{bombOwner: opponent, countdown: 1, fighterHP: 5, allyIDs: both, bombAt: nearActor})
-		if ally <= opp {
-			t.Errorf("ally bomb score = %d, want above opponent bomb score %d", ally, opp)
-		}
-	})
-	t.Run("ally dies inside ally-affected tiles", func(t *testing.T) {
-		inside := score(t, fixture{bombOwner: allyOwned, countdown: 5, fighterHP: 1, allyIDs: both, bombAt: nearFighter})
-		outside := score(t, fixture{bombOwner: opponent, countdown: 5, fighterHP: 1, allyIDs: both, bombAt: nearFighter})
-		if inside >= outside {
-			t.Errorf("self-inflicted death score = %d, want below %d for death by an opponent bomb", inside, outside)
-		}
-	})
-	t.Run("ally king dies though absent from allyIDs", func(t *testing.T) {
-		listed := score(t, fixture{bombOwner: fighterOwned, countdown: 5, fighterHP: 5, allyIDs: both, bombAt: nearActor, kingHP: 1})
-		unlisted := score(t, fixture{bombOwner: fighterOwned, countdown: 5, fighterHP: 5, allyIDs: fighterOnly, bombAt: nearActor, kingHP: 1})
-		if listed != unlisted {
-			t.Errorf("score with King outside allyIDs = %d, want %d", unlisted, listed)
-		}
-	})
+	tests := []struct {
+		name string
+		a, b fixture
+		want int
+	}{
+		{
+			name: "opponent bomb on the actor scores below no bomb",
+			a:    fixture{bombOwner: opponent, countdown: 1, fighterHP: 5, allyIDs: both, bombAt: nearActor},
+			b:    fixture{bombOwner: opponent, countdown: 1, fighterHP: 5, allyIDs: both, bombAt: farAway},
+			want: -1,
+		},
+		{
+			name: "sudden-death bomb scores like an opponent bomb",
+			a:    fixture{bombOwner: system, countdown: 1, fighterHP: 5, allyIDs: both, bombAt: nearActor},
+			b:    fixture{bombOwner: opponent, countdown: 1, fighterHP: 5, allyIDs: both, bombAt: nearActor},
+			want: 0,
+		},
+		{
+			name: "ally bomb scores above an opponent bomb",
+			a:    fixture{bombOwner: allyOwned, countdown: 1, fighterHP: 5, allyIDs: both, bombAt: nearActor},
+			b:    fixture{bombOwner: opponent, countdown: 1, fighterHP: 5, allyIDs: both, bombAt: nearActor},
+			want: 1,
+		},
+		{
+			name: "ally dying in its own bomb scores below dying in an opponent bomb",
+			a:    fixture{bombOwner: allyOwned, countdown: 5, fighterHP: 1, allyIDs: both, bombAt: nearFighter},
+			b:    fixture{bombOwner: opponent, countdown: 5, fighterHP: 1, allyIDs: both, bombAt: nearFighter},
+			want: -1,
+		},
+		{
+			name: "ally King outside allyIDs dies like one inside",
+			a:    fixture{bombOwner: fighterOwned, countdown: 5, fighterHP: 5, kingHP: 1, allyIDs: fighterOnly, bombAt: nearActor},
+			b:    fixture{bombOwner: fighterOwned, countdown: 5, fighterHP: 5, kingHP: 1, allyIDs: both, bombAt: nearActor},
+			want: 0,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := cmp.Compare(score(t, tt.a), score(t, tt.b))
+
+			if got != tt.want {
+				t.Errorf("cmp(score(a), score(b)) = %d, want %d", got, tt.want)
+			}
+		})
+	}
 }
