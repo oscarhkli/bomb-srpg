@@ -25,6 +25,12 @@ func logLevelFromEnv(env string) slog.Level {
 	}
 }
 
+const (
+	readTimeout     = 5 * time.Second
+	writeTimeout    = 5 * time.Second
+	shutdownTimeout = 5 * time.Second
+)
+
 func main() {
 	if checkHealth(os.Args[1:]) {
 		os.Exit(runHealthCheck("http://localhost:8080/api/health"))
@@ -49,8 +55,8 @@ func main() {
 	s := &http.Server{
 		Addr:         ":8080",
 		Handler:      server.SecurityHeaders(server.RecoverPanic(logger, r)),
-		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 5 * time.Second,
+		ReadTimeout:  readTimeout,
+		WriteTimeout: writeTimeout,
 	}
 
 	go func() {
@@ -64,7 +70,7 @@ func main() {
 	<-ctx.Done()
 	logger.Info("Shutdown signal received")
 
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 	if err := s.Shutdown(shutdownCtx); err != nil {
 		logger.Error("Server forced to shutdown", "error", err)
