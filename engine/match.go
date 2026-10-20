@@ -458,11 +458,11 @@ func (t *teamStatus) countLiving(unit *Unit) {
 	}
 }
 
-func (t teamStatus) goal() bool {
+func (t *teamStatus) goal() bool {
 	return (t.hasBoss && t.bossAlive) || (t.kingAlive && t.ordinaryAlive)
 }
 
-func (t teamStatus) wiped() bool {
+func (t *teamStatus) wiped() bool {
 	return (t.hasBoss && !t.bossAlive) || (!t.hasBoss && !t.kingAlive && !t.ordinaryAlive)
 }
 
