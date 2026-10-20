@@ -3,6 +3,7 @@ package main
 import (
 	"bomb-srpg/server"
 	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 	"os"
@@ -66,7 +67,7 @@ func main() {
 	go func() {
 		logger.Info("Bomb Tactics Server running on http://localhost:8080")
 		logger.Info("Open http://localhost:8080 in your browser to view the Title Screen!")
-		if err := s.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := s.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Error("Server error", "error", err)
 		}
 	}()
