@@ -155,6 +155,8 @@ func (s *ServerStateManager) loadRoom(roomID string) (*MatchRoom, error) {
 	return room, nil
 }
 
+const tokenBytes = 16
+
 func randomHex(byteLength int) (string, error) {
 	b := make([]byte, byteLength)
 	if _, err := cryptorand.Read(b); err != nil {
@@ -166,7 +168,7 @@ func randomHex(byteLength int) (string, error) {
 func generatePlayerTokens() ([2]string, error) {
 	var tokens [2]string
 	for i := range 2 {
-		token, err := randomHex(16)
+		token, err := randomHex(tokenBytes)
 		if err != nil {
 			return [2]string{}, fmt.Errorf("failed to generate playerToken for Player %d: %w", i, err)
 		}
@@ -337,7 +339,7 @@ func (s *ServerStateManager) SubmitTurnCommand(roomID string, cmd engine.TurnCom
 		return nil, fmt.Errorf("%w: roomID=%s", ErrMatchNotFound, roomID)
 	}
 
-	teamID := int(cmd.UnitID >> 4)
+	teamID, _ := cmd.UnitID.Decode()
 	if err := room.validatePlayerToken(teamID, token); err != nil {
 		return nil, err
 	}
