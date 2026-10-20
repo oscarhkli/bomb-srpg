@@ -20,6 +20,7 @@ func TestMatchController_SystemCommands(t *testing.T) {
 			name:          "Blank input whitespace elements are skipped",
 			inputCommands: "\n\n   \n",
 			verify: func(t *testing.T, out string, match *engine.Match) {
+				t.Helper()
 				if strings.Contains(out, Green) || strings.Contains(out, Red) {
 					t.Errorf("Expected loop to ignore spaces, but feedback registered: %q", out)
 				}
@@ -29,6 +30,7 @@ func TestMatchController_SystemCommands(t *testing.T) {
 			name:          "/config triggers GameCfg view",
 			inputCommands: "/config\n",
 			verify: func(t *testing.T, out string, match *engine.Match) {
+				t.Helper()
 				if !strings.Contains(out, "=== MATCH CONFIGURATION ===") {
 					t.Errorf("Expected /config route to render the game config, got: %q", out)
 				}
@@ -38,6 +40,7 @@ func TestMatchController_SystemCommands(t *testing.T) {
 			name:          "/reset executes ResetTurn",
 			inputCommands: "/reset\n",
 			verify: func(t *testing.T, out string, match *engine.Match) {
+				t.Helper()
 				if !strings.Contains(out, Green+"Turn reset successfully!") {
 					t.Errorf("Expected successful reset confirmation, got: %q", out)
 				}
@@ -47,6 +50,7 @@ func TestMatchController_SystemCommands(t *testing.T) {
 			name:          "/commit execute ResolveTurn and prints log event entries",
 			inputCommands: "/commit\n",
 			verify: func(t *testing.T, out string, match *engine.Match) {
+				t.Helper()
 				if !strings.Contains(out, Green+"Turn committed and resolved!") {
 					t.Errorf("Expected /commit route to trigger a green status code notice, got: %q", out)
 				}
@@ -56,6 +60,7 @@ func TestMatchController_SystemCommands(t *testing.T) {
 			name:          "/surrender execute Surrender and prints log event entries",
 			inputCommands: "/surrender\n",
 			verify: func(t *testing.T, out string, match *engine.Match) {
+				t.Helper()
 				if !strings.Contains(out, Green+"PLAYER 1 surrendered!") || !strings.Contains(out, Green+"Winner... PLAYER 2!") {
 					t.Errorf("Expected final victory status layout sheet, got: %q", out)
 				}
@@ -68,6 +73,7 @@ func TestMatchController_SystemCommands(t *testing.T) {
 			name:          "Invalid system shortcut",
 			inputCommands: "/unknown_action_command\n",
 			verify: func(t *testing.T, out string, match *engine.Match) {
+				t.Helper()
 				if !strings.Contains(out, Red+"Unknown meta command") {
 					t.Errorf("Expected unknown command failure warning, got: %q", out)
 				}
@@ -101,7 +107,6 @@ func TestMatchController_GameplayActions(t *testing.T) {
 	type testCase struct {
 		name          string
 		inputCommands string
-		setupState    func(gs *engine.GameState)
 		setupMatch    func() *engine.Match
 		verify        func(t *testing.T, out string, match *engine.Match)
 	}
@@ -111,7 +116,7 @@ func TestMatchController_GameplayActions(t *testing.T) {
 			name:          "move command parses valid parameters",
 			inputCommands: "move 16 1 0\n",
 			setupMatch: func() *engine.Match {
-				m := newTestMatch(2, 2)
+				m := newTestMatch()
 				unitID := engine.NewUnitID(1, 0)
 				m.WorkingState.Units[unitID] = &engine.Unit{
 					ID:           unitID,
@@ -127,6 +132,7 @@ func TestMatchController_GameplayActions(t *testing.T) {
 				return m
 			},
 			verify: func(t *testing.T, out string, match *engine.Match) {
+				t.Helper()
 				if !strings.Contains(out, Green+"GameEvents:") {
 					t.Errorf("Expected gameplay router to parse verb, but got: %q", out)
 				}
@@ -136,7 +142,7 @@ func TestMatchController_GameplayActions(t *testing.T) {
 			name:          "move command parses valid parameters but invalid movement",
 			inputCommands: "move 16 120 0\n",
 			setupMatch: func() *engine.Match {
-				m := newTestMatch(2, 2)
+				m := newTestMatch()
 				unitID := engine.NewUnitID(1, 0)
 				m.WorkingState.Units[unitID] = &engine.Unit{
 					ID:           unitID,
@@ -152,6 +158,7 @@ func TestMatchController_GameplayActions(t *testing.T) {
 				return m
 			},
 			verify: func(t *testing.T, out string, match *engine.Match) {
+				t.Helper()
 				if strings.Contains(out, Green+"GameEvents:") {
 					t.Error("Expected illegal move coordinates to return a failure status, but reported success")
 				}
@@ -163,10 +170,9 @@ func TestMatchController_GameplayActions(t *testing.T) {
 		{
 			name:          "move command syntax error",
 			inputCommands: "move 16 1\n",
-			setupMatch: func() *engine.Match {
-				return newTestMatch(2, 2)
-			},
+			setupMatch:    newTestMatch,
 			verify: func(t *testing.T, out string, match *engine.Match) {
+				t.Helper()
 				if !strings.Contains(out, Red+"Syntax error in move command") || !strings.Contains(out, "Expected: move") {
 					t.Errorf("Expected short arguments length to trigger syntax warning, got: %q", out)
 				}
@@ -175,10 +181,9 @@ func TestMatchController_GameplayActions(t *testing.T) {
 		{
 			name:          "move command parameter syntax error",
 			inputCommands: "move 16 apple 0\n",
-			setupMatch: func() *engine.Match {
-				return newTestMatch(2, 2)
-			},
+			setupMatch:    newTestMatch,
 			verify: func(t *testing.T, out string, match *engine.Match) {
+				t.Helper()
 				if !strings.Contains(out, Red+"Argument Error") {
 					t.Errorf("Expected string parsing validation to capture character errors, got: %q", out)
 				}
@@ -188,7 +193,7 @@ func TestMatchController_GameplayActions(t *testing.T) {
 			name:          "bomb command parses valid parameters",
 			inputCommands: "bomb 16 1 0\n",
 			setupMatch: func() *engine.Match {
-				m := newTestMatch(2, 2)
+				m := newTestMatch()
 				unitID := engine.NewUnitID(1, 0)
 				m.WorkingState.Units[unitID] = &engine.Unit{
 					ID:           unitID,
@@ -204,6 +209,7 @@ func TestMatchController_GameplayActions(t *testing.T) {
 				return m
 			},
 			verify: func(t *testing.T, out string, match *engine.Match) {
+				t.Helper()
 				if !strings.Contains(out, Green+"GameEvents:") {
 					t.Errorf("Expected gameplay router to parse verb, but got: %q", out)
 				}
@@ -213,7 +219,7 @@ func TestMatchController_GameplayActions(t *testing.T) {
 			name:          "bomb command parses valid parameters but invalid bomb placement",
 			inputCommands: "bomb 16 1 0\n",
 			setupMatch: func() *engine.Match {
-				m := newTestMatch(2, 2)
+				m := newTestMatch()
 				unitID := engine.NewUnitID(1, 0)
 				m.WorkingState.Units[unitID] = &engine.Unit{
 					ID:           unitID,
@@ -228,6 +234,7 @@ func TestMatchController_GameplayActions(t *testing.T) {
 				return m
 			},
 			verify: func(t *testing.T, out string, match *engine.Match) {
+				t.Helper()
 				if strings.Contains(out, Green+"GameEvents:") {
 					t.Error("Expected illegal bomb coordinates to return a failure status, but reported success")
 				}
@@ -239,10 +246,9 @@ func TestMatchController_GameplayActions(t *testing.T) {
 		{
 			name:          "bomb command syntax error",
 			inputCommands: "bomb 16 1\n",
-			setupMatch: func() *engine.Match {
-				return newTestMatch(2, 2)
-			},
+			setupMatch:    newTestMatch,
 			verify: func(t *testing.T, out string, match *engine.Match) {
+				t.Helper()
 				if !strings.Contains(out, Red+"Syntax error in bomb command") || !strings.Contains(out, "Expected: bomb") {
 					t.Errorf("Expected short arguments length to trigger syntax warning, got: %q", out)
 				}
@@ -251,10 +257,9 @@ func TestMatchController_GameplayActions(t *testing.T) {
 		{
 			name:          "bomb command parameter syntax error",
 			inputCommands: "bomb 16 apple 0\n",
-			setupMatch: func() *engine.Match {
-				return newTestMatch(2, 2)
-			},
+			setupMatch:    newTestMatch,
 			verify: func(t *testing.T, out string, match *engine.Match) {
+				t.Helper()
 				if !strings.Contains(out, Red+"Argument Error") {
 					t.Errorf("Expected string parsing validation to capture character errors, got: %q", out)
 				}
@@ -275,7 +280,9 @@ func TestMatchController_GameplayActions(t *testing.T) {
 	}
 }
 
-func newTestMatch(width, height int) *engine.Match {
+func newTestMatch() *engine.Match {
+	const width, height = 2, 2
+
 	grid := make([][]engine.Tile, height)
 	for y, row := range grid {
 		grid[y] = make([]engine.Tile, width)
@@ -369,7 +376,7 @@ func TestMatchController_StartInputLoop(t *testing.T) {
 
 	for _, tt := range table {
 		t.Run(tt.name, func(t *testing.T) {
-			match := newTestMatch(2, 2)
+			match := newTestMatch()
 			match.WinnerTeamID = tt.winner
 
 			var screen bytes.Buffer

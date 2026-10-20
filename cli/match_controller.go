@@ -7,9 +7,13 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"slices"
 	"strconv"
 	"strings"
 )
+
+// actionArgCount is the token count of "<verb> <unit> <x> <y>".
+const actionArgCount = 4
 
 type MatchController struct {
 	Match *engine.Match
@@ -80,7 +84,7 @@ func (c *MatchController) handleSystemCommand(cmd string) {
 
 	case "/commit":
 		planGameEvents, resolveTurnGameEvents := c.Match.ResolveTurn()
-		gameEvents := append(planGameEvents, resolveTurnGameEvents...)
+		gameEvents := slices.Concat(planGameEvents, resolveTurnGameEvents)
 		c.View.RenderFeedback(true, "Turn committed and resolved!")
 		c.View.RenderGameEvents(gameEvents)
 
@@ -94,7 +98,7 @@ func (c *MatchController) handleSystemCommand(cmd string) {
 	}
 }
 
-// routeGameAction handles movement and bomb placement command
+// routeGameAction handles movement and bomb placement commands.
 func (c *MatchController) routeGameAction(cmd string) {
 	token := strings.Fields(strings.ToLower(cmd))
 
@@ -107,7 +111,7 @@ func (c *MatchController) routeGameAction(cmd string) {
 
 	switch action {
 	case "move":
-		if len(token) < 4 {
+		if len(token) < actionArgCount {
 			c.View.RenderFeedback(false, fmt.Sprintf("Syntax error in move command: %s. Syntax Error! Expected: move <unit_idx> <x> <y>", cmd))
 			return
 		}
@@ -126,7 +130,7 @@ func (c *MatchController) routeGameAction(cmd string) {
 		c.View.RenderFeedback(true, fmt.Sprintf("GameEvents: %#v", gameEvents))
 
 	case "bomb":
-		if len(token) < 4 {
+		if len(token) < actionArgCount {
 			c.View.RenderFeedback(false, fmt.Sprintf("Syntax error in bomb command: %s. Syntax Error! Expected: bomb <unit_idx> <x> <y>", cmd))
 			return
 		}

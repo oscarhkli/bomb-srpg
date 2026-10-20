@@ -7,10 +7,15 @@ import (
 	"os"
 )
 
+const (
+	defaultMaxTurns  = 30
+	archetypeFighter = "Fighter"
+)
+
 func main() {
 	gameCfg := engine.GameCfg{
 		StagePreset:    "Plain",
-		MaxTurns:       30,
+		MaxTurns:       defaultMaxTurns,
 		AllowResetTurn: true,
 		P1Slots: []engine.TeamSlot{
 			{
@@ -26,11 +31,11 @@ func main() {
 				Role:      engine.RoleNormal,
 			},
 			{
-				Archetype: "Fighter",
+				Archetype: archetypeFighter,
 				Role:      engine.RoleNormal,
 			},
 			{
-				Archetype: "Fighter",
+				Archetype: archetypeFighter,
 				Role:      engine.RoleNormal,
 			},
 		},
@@ -48,11 +53,11 @@ func main() {
 				Role:      engine.RoleNormal,
 			},
 			{
-				Archetype: "Fighter",
+				Archetype: archetypeFighter,
 				Role:      engine.RoleNormal,
 			},
 			{
-				Archetype: "Fighter",
+				Archetype: archetypeFighter,
 				Role:      engine.RoleNormal,
 			},
 		},
