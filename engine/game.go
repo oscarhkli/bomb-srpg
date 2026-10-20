@@ -49,6 +49,10 @@ func initGameState(gameCfg GameCfg) (*GameState, error) {
 		return nil, fmt.Errorf("%w: stage preset '%s' not found", ErrInvalidStagePreset, gameCfg.StagePreset)
 	}
 
+	if gameCfg.MaxTurns < 0 || gameCfg.MaxTurns > maxTurnsLimit {
+		return nil, fmt.Errorf("%w: %d not in 0..%d", ErrInvalidMaxTurns, gameCfg.MaxTurns, maxTurnsLimit)
+	}
+
 	if err := validateTeamComposition(gameCfg.P1Slots, "Player 1"); err != nil {
 		return nil, err
 	}
