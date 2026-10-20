@@ -199,7 +199,7 @@ func TestGameState_DeduceBombCountDown(t *testing.T) {
 	}
 
 	want := 5
-	if got := gs.DeduceBombCountDown(Coordinate{0, 0}); got != want {
+	if got := gs.DeduceBombCountDown(); got != want {
 		t.Errorf("DeduceBombCountDown() = %v, want %v", got, want)
 	}
 }

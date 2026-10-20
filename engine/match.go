@@ -171,7 +171,7 @@ func (gs *GameState) dropBomb(ownerID UnitID, target Coordinate, power int) Game
 		OwnerID:   ownerID,
 		Position:  target,
 		Range:     power,
-		Countdown: gs.DeduceBombCountDown(target),
+		Countdown: gs.DeduceBombCountDown(),
 	}
 	gs.Bombs[bomb.ID] = bomb
 	gs.UpdateStageOccupant(target, OccupantBomb, int64(bomb.ID))
@@ -180,7 +180,7 @@ func (gs *GameState) dropBomb(ownerID UnitID, target Coordinate, power int) Game
 }
 
 // IsLandingLegal checks if the target is legal to be landed by a certain occupantType.
-func (gs *GameState) IsLandingLegal(target Coordinate, occupantType OccupantType) error {
+func (gs *GameState) IsLandingLegal(target Coordinate, _ OccupantType) error {
 	if !gs.IsWithinBounds(target) {
 		return fmt.Errorf("%w: coordinate %v out of bounds", ErrOutOfBounds, target)
 	}
@@ -199,7 +199,7 @@ func (gs *GameState) IsLandingLegal(target Coordinate, occupantType OccupantType
 }
 
 // StartTurn sets up the environmental boundaries for the upcoming round.
-// Returns GameEvents when the match enters SuddenDeath
+// Returns GameEvents when the match enters SuddenDeath.
 func (m *Match) StartTurn() []GameEvent {
 	winner := m.evaluateVictoryConditions()
 	if winner != MatchInProgress {
@@ -364,12 +364,12 @@ func (gs *GameState) processChainDetonations(
 			tile := &gs.Grid[pos.Y][pos.X]
 			switch tile.OccupantType {
 			case OccupantBomb:
-				nextBombID := BombID(tile.OccupantID)
+				nextBombID := tile.BombID()
 				if gs.igniteBomb(nextBombID, ignitedBombs) {
 					explosionQueue = append(explosionQueue, nextBombID)
 				}
 			case OccupantUnit:
-				damagedUnits[UnitID(tile.OccupantID)] = true
+				damagedUnits[tile.UnitID()] = true
 			case OccupantSoftBlock:
 				destroyedSoftBlocks[int(tile.OccupantID)] = true
 			case OccupantItem:
