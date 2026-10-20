@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 )
 
 func TestLogLevelFromEnv(t *testing.T) {
@@ -71,9 +73,25 @@ func TestRunHealthCheck(t *testing.T) {
 				defer srv.Close()
 			}
 
-			if got := runHealthCheck(url); got != tt.want {
+			if got := runHealthCheck(context.Background(), url); got != tt.want {
 				t.Errorf("runHealthCheck() = %d, want %d", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestRunHealthCheck_DeadlineExceeded(t *testing.T) {
+	release := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		<-release
+	}))
+	defer srv.Close()
+	defer close(release)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+
+	if got := runHealthCheck(ctx, srv.URL); got != 1 {
+		t.Errorf("runHealthCheck() = %d, want 1", got)
 	}
 }
