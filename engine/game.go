@@ -229,7 +229,7 @@ func (gs *GameState) DeepCopy() *GameState {
 	return clone
 }
 
-// cloneEntities copies each non-nil entity by value. V must hold no reference fields.
+// V must hold no reference fields.
 func cloneEntities[K comparable, V any](src map[K]*V) map[K]*V {
 	dst := make(map[K]*V, len(src))
 	for id, entity := range src {
