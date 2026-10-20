@@ -4,17 +4,20 @@ const (
 	// SystemUnitID is the environmental actor, Team 0 Player 0.
 	SystemUnitID UnitID = 0
 
-	// UnitID layout: team in the high nibble, player index in the low nibble.
+	// UnitLocalShift places the player index in the low nibble of a UnitID.
 	UnitLocalShift = 0
-	UnitTeamShift  = 4
+	// UnitTeamShift places the team in the high nibble of a UnitID.
+	UnitTeamShift = 4
 
 	UnitLocalMask uint8 = 0x0F
 	UnitTeamMask  uint8 = 0x0F
 
-	// BombID layout: owner UnitID, turn and per-turn counter packed into 32 bits.
+	// BombCounterShift places the per-turn counter in the low 16 bits of a BombID.
 	BombCounterShift = 0
-	BombTurnShift    = 16
-	BombUnitIDShift  = 24
+	// BombTurnShift places the turn above the counter.
+	BombTurnShift = 16
+	// BombUnitIDShift places the owner UnitID in the top byte.
+	BombUnitIDShift = 24
 
 	BombCounterMask uint32 = 0xFFFF
 	BombTurnMask    uint32 = 0xFF
@@ -23,7 +26,9 @@ const (
 
 // NewUnitID packs a team and a player index into a UnitID.
 func NewUnitID(teamID, counter int) UnitID {
-	return UnitID((uint8(teamID) << UnitTeamShift) | (uint8(counter) << UnitLocalShift))
+	team := uint8(teamID & int(UnitTeamMask))
+	local := uint8(counter & int(UnitLocalMask))
+	return UnitID((team << UnitTeamShift) | (local << UnitLocalShift))
 }
 
 // Decode extracts TeamID and PlayerIndex from a UnitID.
@@ -37,8 +42,8 @@ func (id UnitID) Decode() (teamID int, index int) {
 func NewBombID(turn int, counter int, unitID UnitID) BombID {
 	return BombID(
 		(uint32(unitID) << BombUnitIDShift) |
-			(uint32(turn) << BombTurnShift) |
-			(uint32(counter) << BombCounterShift),
+			(uint32(turn&int(BombTurnMask)) << BombTurnShift) |
+			(uint32(counter&int(BombCounterMask)) << BombCounterShift),
 	)
 }
 
