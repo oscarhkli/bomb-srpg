@@ -91,23 +91,34 @@ func assertKeys(t *testing.T, obj map[string]any, fields []string, format string
 
 func assertMatchStateNested(t *testing.T, raw map[string]any) {
 	t.Helper()
-	if row, ok := firstElement(raw["grid"]); ok {
-		if tile, ok := firstObject(row); ok {
-			assertKeys(t, tile, []string{"type", "occupantType", "occupantId"}, "grid[0][0] missing key '%s'")
-		}
+	row, ok := firstElement(raw["grid"])
+	if !ok {
+		t.Errorf("grid is empty or not an array: %#v", raw["grid"])
+	} else if tile, ok := firstObject(row); !ok {
+		t.Errorf("grid[0] is empty or not an array of objects: %#v", row)
+	} else {
+		assertKeys(t, tile, []string{"type", "occupantType", "occupantId"}, "grid[0][0] missing key '%s'")
 	}
 
-	if sb, ok := firstObject(raw["softBlocks"]); ok {
+	if sb, ok := firstObject(raw["softBlocks"]); !ok {
+		t.Errorf("softBlocks is empty or not an array of objects: %#v", raw["softBlocks"])
+	} else {
 		assertKeys(t, sb, []string{"id", "position"}, "softBlock missing key '%s'")
-		if coord, ok := sb["position"].(map[string]any); ok {
+		if coord, ok := sb["position"].(map[string]any); !ok {
+			t.Errorf("softBlock.position is not an object: %#v", sb["position"])
+		} else {
 			assertKeys(t, coord, []string{"x", "y"}, "softBlock.position missing key '%s'")
 		}
 	}
 
-	if unit, ok := firstObject(raw["units"]); ok {
+	if unit, ok := firstObject(raw["units"]); !ok {
+		t.Errorf("units is empty or not an array of objects: %#v", raw["units"])
+	} else {
 		unitFields := []string{"id", "type", "position", "speed", "bombMaxRange", "bombPower", "maxBombCount", "bombUsed", "team", "hp", "skills", "hasMoved", "hasUsedSkill"}
 		assertKeys(t, unit, unitFields, "Contract Broken: unit missing key '%s'")
-		if pos, ok := unit["position"].(map[string]any); ok {
+		if pos, ok := unit["position"].(map[string]any); !ok {
+			t.Errorf("unit.position is not an object: %#v", unit["position"])
+		} else {
 			assertKeys(t, pos, []string{"x", "y"}, "unit.position missing key '%s'")
 		}
 	}
