@@ -376,7 +376,7 @@ func TestHTTPRouting(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Request failed: %v", err)
 			}
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			if resp.StatusCode != tt.wantStatus {
 				t.Errorf("Status code: got %d want %d", resp.StatusCode, tt.wantStatus)
