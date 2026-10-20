@@ -1951,6 +1951,24 @@ func TestServerStateManager_cleanupInactiveRooms(t *testing.T) {
 	}
 }
 
+func TestServerStateManager_loadRoom_WrongType(t *testing.T) {
+	s := NewServerStateManager()
+	s.Rooms.Store("bad", "not a room")
+	room, err := s.loadRoom("bad")
+	if err == nil || room != nil {
+		t.Errorf("loadRoom() = (%v, %v), want nil room and an error", room, err)
+	}
+}
+
+func TestServerStateManager_cleanupInactiveRooms_WrongType(t *testing.T) {
+	s := NewServerStateManager()
+	s.Rooms.Store("bad", "not a room")
+	s.cleanupInactiveRooms()
+	if _, ok := s.Rooms.Load("bad"); !ok {
+		t.Error("wrong-typed entry should be left in place")
+	}
+}
+
 func TestServerStateManager_RunCleanupLoop(t *testing.T) {
 	s := NewServerStateManager()
 	roomID, _ := s.CreateMatchRoom()

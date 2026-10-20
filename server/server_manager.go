@@ -148,7 +148,11 @@ func (s *ServerStateManager) loadRoom(roomID string) (*MatchRoom, error) {
 		s.Logger.Warn("match room not found", "roomID", roomID)
 		return nil, fmt.Errorf("%w: roomID=%s", ErrRoomNotFound, roomID)
 	}
-	return roomVal.(*MatchRoom), nil
+	room, ok := roomVal.(*MatchRoom)
+	if !ok {
+		return nil, fmt.Errorf("room %s holds unexpected type %T", roomID, roomVal)
+	}
+	return room, nil
 }
 
 func randomHex(byteLength int) (string, error) {
@@ -617,7 +621,10 @@ const roomInactivityTimeout = 60 * time.Minute
 func (s *ServerStateManager) cleanupInactiveRooms() {
 	now := time.Now()
 	s.Rooms.Range(func(key, value any) bool {
-		room := value.(*MatchRoom)
+		room, ok := value.(*MatchRoom)
+		if !ok {
+			return true
+		}
 		room.mu.Lock()
 		inactive := now.Sub(room.LastActivity) > roomInactivityTimeout
 		room.mu.Unlock()
