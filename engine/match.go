@@ -451,14 +451,9 @@ func (t *teamStatus) countLiving(unit *Unit) {
 	if unit.HP <= 0 {
 		return
 	}
-	switch {
-	case unit.Role == RoleKing:
-		t.kingAlive = true
-	case unit.Role == RoleBoss:
-		t.bossAlive = true
-	default:
-		t.ordinaryAlive = true
-	}
+	t.kingAlive = t.kingAlive || unit.Role == RoleKing
+	t.bossAlive = t.bossAlive || unit.Role == RoleBoss
+	t.ordinaryAlive = t.ordinaryAlive || (unit.Role != RoleKing && unit.Role != RoleBoss)
 }
 
 func (t *teamStatus) goal() bool {
