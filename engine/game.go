@@ -208,25 +208,21 @@ func applyGlobalOverride(orig, newVal int) int {
 }
 
 // DeepCopy returns a copy of gs that shares no memory with it.
+// Reference fields must be re-cloned here.
 func (gs *GameState) DeepCopy() *GameState {
 	if gs == nil {
 		return nil
 	}
 
-	clone := &GameState{
-		Turn:            gs.Turn,
-		InSuddenDeath:   gs.InSuddenDeath,
-		ActiveTeam:      gs.ActiveTeam,
-		TurnBombCounter: gs.TurnBombCounter,
-		Grid:            gs.cloneGridSnapshot(),
-		Units:           cloneEntities(gs.Units),
-		Bombs:           cloneEntities(gs.Bombs),
-		SoftBlocks:      cloneEntities(gs.SoftBlocks),
-	}
+	clone := *gs
+	clone.Grid = gs.cloneGridSnapshot()
+	clone.Units = cloneEntities(gs.Units)
+	clone.Bombs = cloneEntities(gs.Bombs)
+	clone.SoftBlocks = cloneEntities(gs.SoftBlocks)
 	if gs.TurnCommands != nil {
 		clone.TurnCommands = slices.Clone(gs.TurnCommands)
 	}
-	return clone
+	return &clone
 }
 
 // V must hold no reference fields.
