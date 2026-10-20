@@ -39,7 +39,7 @@ func listenAddr(getenv func(string) string) (string, error) {
 	if err != nil || n < 1 || n > 65535 {
 		return "", fmt.Errorf("invalid PORT %q: want a number from 1 to 65535", port)
 	}
-	return ":" + port, nil
+	return ":" + strconv.Itoa(n), nil
 }
 
 const (

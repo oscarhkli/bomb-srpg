@@ -107,6 +107,8 @@ func TestListenAddr(t *testing.T) {
 		{name: "valid port", port: "54321", want: ":54321"},
 		{name: "lowest port", port: "1", want: ":1"},
 		{name: "highest port", port: "65535", want: ":65535"},
+		{name: "leading zeros are canonicalized", port: "080", want: ":80"},
+		{name: "explicit plus sign", port: "+80", want: ":80"},
 		{name: "zero", port: "0", wantErr: true},
 		{name: "above range", port: "65536", wantErr: true},
 		{name: "negative", port: "-1", wantErr: true},
