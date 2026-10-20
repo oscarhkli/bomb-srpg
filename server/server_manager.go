@@ -626,6 +626,8 @@ func (s *ServerStateManager) cleanupInactiveRooms() {
 	s.Rooms.Range(func(key, value any) bool {
 		room, ok := value.(*MatchRoom)
 		if !ok {
+			s.Rooms.Delete(key)
+			s.Logger.Error("removed room of unexpected type", "roomID", key, "type", fmt.Sprintf("%T", value))
 			return true
 		}
 		room.mu.Lock()

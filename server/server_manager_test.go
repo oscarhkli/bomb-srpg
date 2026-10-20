@@ -1966,8 +1966,8 @@ func TestServerStateManager_cleanupInactiveRooms_WrongType(t *testing.T) {
 	s := NewServerStateManager()
 	s.Rooms.Store("bad", "not a room")
 	s.cleanupInactiveRooms()
-	if _, ok := s.Rooms.Load("bad"); !ok {
-		t.Error("wrong-typed entry should be left in place")
+	if _, ok := s.Rooms.Load("bad"); ok {
+		t.Error("wrong-typed entry should be removed")
 	}
 }
 
