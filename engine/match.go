@@ -362,25 +362,16 @@ func (gs *GameState) processChainDetonations(
 			switch tile.OccupantType {
 			case OccupantBomb:
 				nextBombID := BombID(tile.OccupantID)
-				if ignitedBombs[nextBombID] {
-					continue
+				if gs.igniteBomb(nextBombID, ignitedBombs) {
+					explosionQueue = append(explosionQueue, nextBombID)
 				}
-
-				nextBomb, ok := gs.Bombs[nextBombID]
-				if !ok {
-					continue
-				}
-
-				nextBomb.Countdown = 0
-				explosionQueue = append(explosionQueue, nextBombID)
-				ignitedBombs[nextBombID] = true
-
 			case OccupantUnit:
 				damagedUnits[UnitID(tile.OccupantID)] = true
 			case OccupantSoftBlock:
 				destroyedSoftBlocks[int(tile.OccupantID)] = true
 			case OccupantItem:
 				destroyedItems[int(tile.OccupantID)] = true
+			case OccupantNone:
 			}
 		}
 
@@ -389,6 +380,17 @@ func (gs *GameState) processChainDetonations(
 		gameEvents = append(gameEvents, NewBombExplodedEvent(currBombID, currBomb.Position, affectedPos))
 	}
 	return gameEvents
+}
+
+// igniteBomb sets a known, not yet ignited bomb to explode now and reports whether it did.
+func (gs *GameState) igniteBomb(id BombID, ignitedBombs map[BombID]bool) bool {
+	bomb, ok := gs.Bombs[id]
+	if !ok || ignitedBombs[id] {
+		return false
+	}
+	bomb.Countdown = 0
+	ignitedBombs[id] = true
+	return true
 }
 
 // cloneGridSnapshot returns a copy of the grid for casting blast rays against the pre-explosion board.
