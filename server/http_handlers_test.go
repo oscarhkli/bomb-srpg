@@ -63,52 +63,52 @@ func assertArrayContract(t *testing.T, body []byte, expectedFields []string, ite
 	}
 }
 
+func firstElement(v any) (any, bool) {
+	arr, ok := v.([]any)
+	if !ok || len(arr) == 0 {
+		return nil, false
+	}
+	return arr[0], true
+}
+
+func firstObject(v any) (map[string]any, bool) {
+	first, ok := firstElement(v)
+	if !ok {
+		return nil, false
+	}
+	obj, ok := first.(map[string]any)
+	return obj, ok
+}
+
+func assertKeys(t *testing.T, obj map[string]any, fields []string, format string) {
+	t.Helper()
+	for _, field := range fields {
+		if _, exists := obj[field]; !exists {
+			t.Errorf(format, field)
+		}
+	}
+}
+
 func assertMatchStateNested(t *testing.T, raw map[string]any) {
 	t.Helper()
-	if gridRaw, ok := raw["grid"].([]any); ok && len(gridRaw) > 0 {
-		if row, ok := gridRaw[0].([]any); ok && len(row) > 0 {
-			if tile, ok := row[0].(map[string]any); ok {
-				for _, field := range []string{"type", "occupantType", "occupantId"} {
-					if _, exists := tile[field]; !exists {
-						t.Errorf("grid[0][0] missing key '%s'", field)
-					}
-				}
-			}
+	if row, ok := firstElement(raw["grid"]); ok {
+		if tile, ok := firstObject(row); ok {
+			assertKeys(t, tile, []string{"type", "occupantType", "occupantId"}, "grid[0][0] missing key '%s'")
 		}
 	}
 
-	if sbRaw, ok := raw["softBlocks"].([]any); ok && len(sbRaw) > 0 {
-		if sb, ok := sbRaw[0].(map[string]any); ok {
-			for _, field := range []string{"id", "position"} {
-				if _, exists := sb[field]; !exists {
-					t.Errorf("softBlock missing key '%s'", field)
-				}
-			}
-			if coord, ok := sb["position"].(map[string]any); ok {
-				for _, field := range []string{"x", "y"} {
-					if _, exists := coord[field]; !exists {
-						t.Errorf("softBlock.position missing key '%s'", field)
-					}
-				}
-			}
+	if sb, ok := firstObject(raw["softBlocks"]); ok {
+		assertKeys(t, sb, []string{"id", "position"}, "softBlock missing key '%s'")
+		if coord, ok := sb["position"].(map[string]any); ok {
+			assertKeys(t, coord, []string{"x", "y"}, "softBlock.position missing key '%s'")
 		}
 	}
 
-	if unitsRaw, ok := raw["units"].([]any); ok && len(unitsRaw) > 0 {
-		if unit, ok := unitsRaw[0].(map[string]any); ok {
-			unitFields := []string{"id", "type", "position", "speed", "bombMaxRange", "bombPower", "maxBombCount", "bombUsed", "team", "hp", "skills", "hasMoved", "hasUsedSkill"}
-			for _, field := range unitFields {
-				if _, exists := unit[field]; !exists {
-					t.Errorf("Contract Broken: unit missing key '%s'", field)
-				}
-			}
-			if pos, ok := unit["position"].(map[string]any); ok {
-				for _, field := range []string{"x", "y"} {
-					if _, exists := pos[field]; !exists {
-						t.Errorf("unit.position missing key '%s'", field)
-					}
-				}
-			}
+	if unit, ok := firstObject(raw["units"]); ok {
+		unitFields := []string{"id", "type", "position", "speed", "bombMaxRange", "bombPower", "maxBombCount", "bombUsed", "team", "hp", "skills", "hasMoved", "hasUsedSkill"}
+		assertKeys(t, unit, unitFields, "Contract Broken: unit missing key '%s'")
+		if pos, ok := unit["position"].(map[string]any); ok {
+			assertKeys(t, pos, []string{"x", "y"}, "unit.position missing key '%s'")
 		}
 	}
 
