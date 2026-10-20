@@ -51,7 +51,7 @@ func TestMatchController_SystemCommands(t *testing.T) {
 			inputCommands: "/commit\n",
 			verify: func(t *testing.T, out string, match *engine.Match) {
 				t.Helper()
-				if !strings.Contains(out, Green+"Turn committed and resolved!") {
+				if !strings.Contains(out, Green+"Turn committed and resolved!"+Reset+"\nengine.GameEvent{Type:\"matchEnded\"") {
 					t.Errorf("Expected /commit route to trigger a green status code notice, got: %q", out)
 				}
 			},
@@ -61,7 +61,7 @@ func TestMatchController_SystemCommands(t *testing.T) {
 			inputCommands: "/surrender\n",
 			verify: func(t *testing.T, out string, match *engine.Match) {
 				t.Helper()
-				if !strings.Contains(out, Green+"PLAYER 1 surrendered!") || !strings.Contains(out, Green+"Winner... PLAYER 2!") {
+				if !strings.Contains(out, Green+"PLAYER 1 surrendered!"+Reset+"\nengine.GameEvent{Type:\"matchEnded\"") || !strings.Contains(out, Green+"Winner... PLAYER 2!") {
 					t.Errorf("Expected final victory status layout sheet, got: %q", out)
 				}
 				if match.WinnerTeamID != 2 {
@@ -316,6 +316,7 @@ func TestMatchController_StartInputLoop(t *testing.T) {
 		winner  int
 		want    []string
 		notWant []string
+		prompts int
 	}{
 		{
 			name:    "draw announces and returns",
@@ -338,8 +339,9 @@ func TestMatchController_StartInputLoop(t *testing.T) {
 		},
 		{
 			name:    "empty line prompts again",
-			input:   "\n   \n",
+			input:   "\n",
 			want:    []string{"Enter Command: "},
+			prompts: 2,
 			notWant: []string{"Unknown", "Input is empty"},
 		},
 		{
@@ -387,6 +389,9 @@ func TestMatchController_StartInputLoop(t *testing.T) {
 				if !strings.Contains(got, w) {
 					t.Errorf("output missing %q, got:\n%s", w, got)
 				}
+			}
+			if got, want := strings.Count(got, "Enter Command: "), tt.prompts; want > 0 && got != want {
+				t.Errorf("prompt count = %d, want %d", got, want)
 			}
 			for _, nw := range tt.notWant {
 				if strings.Contains(got, nw) {

@@ -342,3 +342,28 @@ func TestTerminalView_RenderBoard_BombNotFound(t *testing.T) {
 		t.Errorf("RenderBoard() error = %v, want bomb 0x1234 not found", err)
 	}
 }
+
+func TestTerminalView_RenderBoard_LegendAndHeader(t *testing.T) {
+	var screen bytes.Buffer
+	gs := newTestGameState(1, 1)
+	gs.Turn = 7
+	gs.ActiveTeam = 2
+
+	if err := NewTerminalView(&screen).RenderBoard(gs); err != nil {
+		t.Fatalf("RenderBoard() error = %v", err)
+	}
+
+	want := "============== Command Instruction ==============\n" +
+		"End Turn          : " + Yellow + "/commit" + Reset + "\n" +
+		"Reset Current Turn: " + Yellow + "/reset" + Reset + "\n" +
+		"Surrender         : " + Yellow + "/surrender" + Reset + "\n" +
+		"          ------- How to move -------\n" +
+		"Move      : " + Yellow + "move <unit-ID> <target-X> <target-Y>" + Reset + "\n" +
+		"Place Bomb: " + Yellow + "bomb <unit-ID> <target-X> <target-Y>" + Reset + "\n" +
+		"Example   : " + Yellow + "move 16 4 7" + Reset + "\n" +
+		"=================================================\n" +
+		"\n--- TURN 7 PLAYER 2 ---\n\n"
+	if got := screen.String(); !strings.HasPrefix(got, want) {
+		t.Errorf("RenderBoard() output does not start with:\n%q\ngot:\n%q", want, got)
+	}
+}
