@@ -19,8 +19,6 @@ type pathNode struct {
 	Dir  Coordinate
 }
 
-// stepTarget returns the tile one step from node along dir, or false when the rule forbids the
-// move: a turn when CanTurn is false, or a target outside the grid.
 func (gs *GameState) stepTarget(node pathNode, dir Coordinate, rule MovementRule) (Coordinate, bool) {
 	if !rule.CanTurn && node.Step > 0 && dir != node.Dir {
 		return Coordinate{}, false
@@ -50,7 +48,6 @@ func (gs *GameState) findReachableTiles(startPos Coordinate, rule MovementRule, 
 	return steps
 }
 
-// expandNode records the tiles one step from node in steps and appends those the search continues from to queue.
 // The queue visits tiles by ascending step, so the first count recorded for a tile is its shortest.
 func (gs *GameState) expandNode(queue []pathNode, node pathNode, rule MovementRule, grid [][]Tile, steps map[Coordinate]int) []pathNode {
 	dirs := [4]Coordinate{{0, -1}, {0, 1}, {-1, 0}, {1, 0}}
