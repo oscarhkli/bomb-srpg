@@ -189,14 +189,13 @@ const (
 	RoleBoss
 )
 
-var roleNames = [...]string{
-	RoleNormal: "Normal",
-	RoleKing:   "King",
-	RoleBoss:   "Boss",
-}
-
 // String returns the name used in logs and JSON.
 func (r UnitRole) String() string {
+	roleNames := [...]string{
+		RoleNormal: "Normal",
+		RoleKing:   "King",
+		RoleBoss:   "Boss",
+	}
 	if r < 0 || int(r) >= len(roleNames) {
 		return "Unknown"
 	}
@@ -210,9 +209,9 @@ func (r UnitRole) MarshalText() ([]byte, error) {
 
 // UnmarshalText decodes a role from its String name.
 func (r *UnitRole) UnmarshalText(text []byte) error {
-	for role, name := range roleNames {
-		if string(text) == name {
-			*r = UnitRole(role)
+	for role := RoleNormal; role <= RoleBoss; role++ {
+		if string(text) == role.String() {
+			*r = role
 			return nil
 		}
 	}
