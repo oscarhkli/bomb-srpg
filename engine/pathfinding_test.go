@@ -286,7 +286,7 @@ func TestGameState_FindReachableTiles_0WidthDimensionGrid(t *testing.T) {
 	}
 }
 
-// to test if FindReachableTilesOnSnapshot uses snapshot to calculate
+// The snapshot, not the live grid, drives the search.
 func TestGameState_FindReachableTilesOnSnapshot(t *testing.T) {
 	state := &GameState{
 		Grid: [][]Tile{
@@ -541,6 +541,98 @@ func TestMovementRule_CheckPassability(t *testing.T) {
 			gotPass, gotLand := tt.rule.CheckPassability(tt.tile)
 			if gotPass != tt.wantCanPass || gotLand != tt.wantCanLand {
 				t.Errorf("CheckPassability() = (%v, %v), want (%v, %v)", gotPass, gotLand, tt.wantCanPass, tt.wantCanLand)
+			}
+		})
+	}
+}
+
+func TestGameState_FindReachableTiles_Rules(t *testing.T) {
+	parse := func(rows ...string) [][]Tile {
+		grid := make([][]Tile, len(rows))
+		for y, row := range rows {
+			grid[y] = make([]Tile, len(row))
+			for x, ch := range row {
+				switch ch {
+				case 'B':
+					grid[y][x] = Tile{Type: TerrainBlock}
+				case 'S':
+					grid[y][x] = Tile{Type: TerrainPlain, OccupantType: OccupantSoftBlock}
+				default:
+					grid[y][x] = Tile{Type: TerrainPlain}
+				}
+			}
+		}
+		return grid
+	}
+
+	tests := []struct {
+		name  string
+		grid  [][]Tile
+		rule  MovementRule
+		start Coordinate
+		want  map[Coordinate]int
+	}{
+		{
+			name:  "CanTurn false, straight lines only",
+			grid:  parse("...", "...", "..."),
+			rule:  MovementRule{MaxSteps: -1},
+			start: Coordinate{1, 1},
+			want:  map[Coordinate]int{{1, 1}: 0, {1, 0}: 1, {1, 2}: 1, {0, 1}: 1, {2, 1}: 1},
+		},
+		{
+			name:  "MaxSteps -1 reaches every connected tile",
+			grid:  parse("....."),
+			rule:  MovementRule{MaxSteps: -1},
+			start: Coordinate{0, 0},
+			want:  map[Coordinate]int{{0, 0}: 0, {1, 0}: 1, {2, 0}: 2, {3, 0}: 3, {4, 0}: 4},
+		},
+		{
+			name:  "MaxSteps 0 returns only the start",
+			grid:  parse("..."),
+			rule:  MovementRule{MaxSteps: 0},
+			start: Coordinate{1, 0},
+			want:  map[Coordinate]int{{1, 0}: 0},
+		},
+		{
+			name:  "landing tile reachable by two paths gets the shorter count",
+			grid:  parse(".S", ".."),
+			rule:  MovementRule{MaxSteps: -1, CanTurn: true, StopOnNonUnitOccupant: true},
+			start: Coordinate{0, 0},
+			want:  map[Coordinate]int{{0, 0}: 0, {1, 0}: 1, {0, 1}: 1, {1, 1}: 2},
+		},
+		{
+			name:  "pass-through tile reachable by a short and a long path keeps the short count",
+			grid:  parse("...", ".B.", "..."),
+			rule:  MovementRule{MaxSteps: -1, CanTurn: true},
+			start: Coordinate{0, 0},
+			want: map[Coordinate]int{
+				{0, 0}: 0, {1, 0}: 1, {2, 0}: 2,
+				{0, 1}: 1, {2, 1}: 3,
+				{0, 2}: 2, {1, 2}: 3, {2, 2}: 4,
+			},
+		},
+		{
+			name:  "path does not continue past a landing tile",
+			grid:  parse(".S.."),
+			rule:  MovementRule{MaxSteps: -1, CanTurn: true, StopOnNonUnitOccupant: true},
+			start: Coordinate{0, 0},
+			want:  map[Coordinate]int{{0, 0}: 0, {1, 0}: 1},
+		},
+		{
+			name:  "tile outside the grid or impassable is skipped",
+			grid:  parse(".B."),
+			rule:  MovementRule{MaxSteps: -1, CanTurn: true},
+			start: Coordinate{0, 0},
+			want:  map[Coordinate]int{{0, 0}: 0},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gs := &GameState{Grid: tt.grid}
+			got := gs.FindReachableTiles(tt.start, tt.rule)
+			if !maps.Equal(got, tt.want) {
+				t.Errorf("FindReachableTiles() = %v, want %v", got, tt.want)
 			}
 		})
 	}
