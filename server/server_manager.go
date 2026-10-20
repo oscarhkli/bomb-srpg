@@ -150,12 +150,11 @@ func (s *ServerStateManager) loadRoom(roomID string) (*MatchRoom, error) {
 	}
 	room, ok := roomVal.(*MatchRoom)
 	if !ok {
+		s.Logger.Error("room has unexpected type", "roomID", roomID, "type", fmt.Sprintf("%T", roomVal))
 		return nil, fmt.Errorf("room %s holds unexpected type %T", roomID, roomVal)
 	}
 	return room, nil
 }
-
-const tokenBytes = 16
 
 func randomHex(byteLength int) (string, error) {
 	b := make([]byte, byteLength)
@@ -164,6 +163,8 @@ func randomHex(byteLength int) (string, error) {
 	}
 	return hex.EncodeToString(b), nil
 }
+
+const tokenBytes = 16
 
 func generatePlayerTokens() ([2]string, error) {
 	var tokens [2]string
