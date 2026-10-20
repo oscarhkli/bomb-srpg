@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bytes"
 	"strings"
 	"testing"
 
@@ -339,4 +340,92 @@ func newTestMatch(width, height int) *engine.Match {
 	m.TrueState = m.WorkingState.DeepCopy()
 
 	return m
+}
+
+func TestMatchController_StartInputLoop(t *testing.T) {
+	table := []struct {
+		name    string
+		input   string
+		winner  int
+		want    []string
+		notWant []string
+	}{
+		{
+			name:    "draw announces and returns",
+			input:   "/reset\n",
+			winner:  -1,
+			want:    []string{"Draw Game!"},
+			notWant: []string{"Enter Command", "reset successfully"},
+		},
+		{
+			name:    "winner announces and returns",
+			input:   "/reset\n",
+			winner:  2,
+			want:    []string{"Winner... PLAYER 2!"},
+			notWant: []string{"Enter Command", "reset successfully"},
+		},
+		{
+			name:  "EOF returns after the first prompt",
+			input: "",
+			want:  []string{"Enter Command: "},
+		},
+		{
+			name:    "empty line prompts again",
+			input:   "\n   \n",
+			want:    []string{"Enter Command: "},
+			notWant: []string{"Unknown", "Input is empty"},
+		},
+		{
+			name:  "slash command reaches the system handler",
+			input: "/reset\n",
+			want:  []string{"Turn reset successfully!"},
+		},
+		{
+			name:  "unknown meta command prints feedback",
+			input: "/nope\n",
+			want:  []string{"Unknown meta command: /nope. Use /config, /reset, /commit, or /surrender"},
+		},
+		{
+			name:  "move with too few tokens",
+			input: "move 16 1\n",
+			want:  []string{"Expected: move <unit_idx> <x> <y>"},
+		},
+		{
+			name:  "bomb with too few tokens",
+			input: "bomb 16 1\n",
+			want:  []string{"Expected: bomb <unit_idx> <x> <y>"},
+		},
+		{
+			name:  "non-integer argument",
+			input: "move 16 apple 0\n",
+			want:  []string{"Argument Error: Unit index, X, and Y must be integers!"},
+		},
+		{
+			name:  "unknown game verb",
+			input: "dance\n",
+			want:  []string{"Unknown meta command: dance"},
+		},
+	}
+
+	for _, tt := range table {
+		t.Run(tt.name, func(t *testing.T) {
+			match := newTestMatch(2, 2)
+			match.WinnerTeamID = tt.winner
+
+			var screen bytes.Buffer
+			NewMatchController(match, NewTerminalView(&screen), strings.NewReader(tt.input)).StartInputLoop()
+
+			got := screen.String()
+			for _, w := range tt.want {
+				if !strings.Contains(got, w) {
+					t.Errorf("output missing %q, got:\n%s", w, got)
+				}
+			}
+			for _, nw := range tt.notWant {
+				if strings.Contains(got, nw) {
+					t.Errorf("output contains %q, got:\n%s", nw, got)
+				}
+			}
+		})
+	}
 }
