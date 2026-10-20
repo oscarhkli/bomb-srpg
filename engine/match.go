@@ -437,54 +437,67 @@ func (gs *GameState) handleDelayedBatchDamage(
 	return gameEvents
 }
 
+// teamStatus tallies one team's roster for victory evaluation.
+type teamStatus struct {
+	hasBoss, bossAlive, kingAlive, ordinaryAlive bool
+}
+
+func (t *teamStatus) countLiving(unit *Unit) {
+	if unit.HP <= 0 {
+		return
+	}
+	switch unit.Role {
+	case RoleKing:
+		t.kingAlive = true
+	case RoleBoss:
+		t.bossAlive = true
+	case RoleNormal:
+		t.ordinaryAlive = true
+	}
+}
+
+func (t teamStatus) goal() bool {
+	return (t.hasBoss && t.bossAlive) || (t.kingAlive && t.ordinaryAlive)
+}
+
+func (t teamStatus) wiped() bool {
+	return (t.hasBoss && !t.bossAlive) || (!t.hasBoss && !t.kingAlive && !t.ordinaryAlive)
+}
+
 // evaluateVictoryConditions returns MatchInProgress, 1, 2, or MatchDrawn.
 // Goal: a living Boss, or a living King plus a living Ordinary unit. Wiped: the Boss dead, or a Boss-less team with no living unit.
 // Both teams at Goal play on. A team wins by meeting Goal or by holding a living King against a Wiped opponent;
-// if both or neither qualify, it is a draw.
+// if both or neither qualify, it is a draw. Any team other than Team1 counts as Team2.
 func (m *Match) evaluateVictoryConditions() int {
-	p1HasBoss, p1BossAlive := false, false
-	p2HasBoss, p2BossAlive := false, false
-	p1KingAlive, p1OrdinaryAlive := false, false
-	p2KingAlive, p2OrdinaryAlive := false, false
+	var p1, p2 teamStatus
 
 	for _, unit := range m.WorkingState.Units {
-		p1HasBoss = p1HasBoss || (unit.Team == 1 && unit.Role == RoleBoss)
-		p2HasBoss = p2HasBoss || (unit.Team == 2 && unit.Role == RoleBoss)
+		team := &p2
+		if unit.Team == Team1 {
+			team = &p1
+		}
+		if unit.Role == RoleBoss && (unit.Team == Team1 || unit.Team == Team2) {
+			team.hasBoss = true
+		}
 
-		if unit.HP <= 0 {
-			continue
-		}
-		if unit.Team == 1 {
-			p1KingAlive = p1KingAlive || (unit.Role == RoleKing)
-			p1BossAlive = p1BossAlive || (unit.Role == RoleBoss)
-			p1OrdinaryAlive = p1OrdinaryAlive || (unit.Role != RoleKing && unit.Role != RoleBoss)
-		} else {
-			p2KingAlive = p2KingAlive || (unit.Role == RoleKing)
-			p2BossAlive = p2BossAlive || (unit.Role == RoleBoss)
-			p2OrdinaryAlive = p2OrdinaryAlive || (unit.Role != RoleKing && unit.Role != RoleBoss)
-		}
+		team.countLiving(unit)
 	}
 
-	p1Goal := (p1HasBoss && p1BossAlive) || (p1KingAlive && p1OrdinaryAlive)
-	p2Goal := (p2HasBoss && p2BossAlive) || (p2KingAlive && p2OrdinaryAlive)
-
-	p1Wiped := (p1HasBoss && !p1BossAlive) || (!p1HasBoss && !p1KingAlive && !p1OrdinaryAlive)
-	p2Wiped := (p2HasBoss && !p2BossAlive) || (!p2HasBoss && !p2KingAlive && !p2OrdinaryAlive)
-
-	if p1Goal && p2Goal {
+	if p1.goal() && p2.goal() {
 		return MatchInProgress
 	}
 
-	if p1Goal || (p1KingAlive && p2Wiped) {
-		if p2Goal || (p2KingAlive && p1Wiped) {
-			return MatchDrawn
-		}
-		return 1
-	}
+	p1Wins := p1.goal() || (p1.kingAlive && p2.wiped())
+	p2Wins := p2.goal() || (p2.kingAlive && p1.wiped())
 
-	if p2Goal || (p2KingAlive && p1Wiped) {
-		return 2
+	switch {
+	case p1Wins && p2Wins:
+		return MatchDrawn
+	case p1Wins:
+		return Team1
+	case p2Wins:
+		return Team2
+	default:
+		return MatchDrawn
 	}
-
-	return MatchDrawn
 }
