@@ -148,7 +148,12 @@ func (s *ServerStateManager) loadRoom(roomID string) (*MatchRoom, error) {
 		s.Logger.Warn("match room not found", "roomID", roomID)
 		return nil, fmt.Errorf("%w: roomID=%s", ErrRoomNotFound, roomID)
 	}
-	return roomVal.(*MatchRoom), nil
+	room, ok := roomVal.(*MatchRoom)
+	if !ok {
+		s.Logger.Error("room has unexpected type", "roomID", roomID, "type", fmt.Sprintf("%T", roomVal))
+		return nil, fmt.Errorf("room %s holds unexpected type %T", roomID, roomVal)
+	}
+	return room, nil
 }
 
 func randomHex(byteLength int) (string, error) {
@@ -159,10 +164,12 @@ func randomHex(byteLength int) (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
+const tokenBytes = 16
+
 func generatePlayerTokens() ([2]string, error) {
 	var tokens [2]string
 	for i := range 2 {
-		token, err := randomHex(16)
+		token, err := randomHex(tokenBytes)
 		if err != nil {
 			return [2]string{}, fmt.Errorf("failed to generate playerToken for Player %d: %w", i, err)
 		}
@@ -233,7 +240,7 @@ func (s *ServerStateManager) createMatchLocked(room *MatchRoom, gameCfg engine.G
 	match, err := engine.InitGame(gameCfg)
 	if err != nil {
 		room.Logger.Error("invalid game config", "gameCfg", gameCfg, "error", err)
-		return nil, fmt.Errorf("%w: %v", ErrInvalidConfig, err)
+		return nil, fmt.Errorf("%w: %w", ErrInvalidConfig, err)
 	}
 
 	return match, nil
@@ -333,7 +340,7 @@ func (s *ServerStateManager) SubmitTurnCommand(roomID string, cmd engine.TurnCom
 		return nil, fmt.Errorf("%w: roomID=%s", ErrMatchNotFound, roomID)
 	}
 
-	teamID := int(cmd.UnitID >> 4)
+	teamID, _ := cmd.UnitID.Decode()
 	if err := room.validatePlayerToken(teamID, token); err != nil {
 		return nil, err
 	}
@@ -341,7 +348,7 @@ func (s *ServerStateManager) SubmitTurnCommand(roomID string, cmd engine.TurnCom
 	gameEvents, err := room.Match.ApplyTurnCommand(cmd)
 	if err != nil {
 		room.Logger.Error("invalid turn command", "turnCommand", cmd, "error", err)
-		return nil, fmt.Errorf("%w: %v", ErrInvalidTurnCmd, err)
+		return nil, fmt.Errorf("%w: %w", ErrInvalidTurnCmd, err)
 	}
 
 	room.LastActivity = time.Now()
@@ -617,7 +624,12 @@ const roomInactivityTimeout = 60 * time.Minute
 func (s *ServerStateManager) cleanupInactiveRooms() {
 	now := time.Now()
 	s.Rooms.Range(func(key, value any) bool {
-		room := value.(*MatchRoom)
+		room, ok := value.(*MatchRoom)
+		if !ok {
+			s.Rooms.Delete(key)
+			s.Logger.Error("removed room of unexpected type", "roomID", key, "type", fmt.Sprintf("%T", value))
+			return true
+		}
 		room.mu.Lock()
 		inactive := now.Sub(room.LastActivity) > roomInactivityTimeout
 		room.mu.Unlock()

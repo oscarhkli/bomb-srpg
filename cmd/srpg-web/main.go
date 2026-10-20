@@ -3,6 +3,7 @@ package main
 import (
 	"bomb-srpg/server"
 	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 	"os"
@@ -25,9 +26,19 @@ func logLevelFromEnv(env string) slog.Level {
 	}
 }
 
+const (
+	readTimeout     = 5 * time.Second
+	writeTimeout    = 5 * time.Second
+	shutdownTimeout = 5 * time.Second
+	healthTimeout   = 2 * time.Second
+)
+
 func main() {
 	if checkHealth(os.Args[1:]) {
-		os.Exit(runHealthCheck("http://localhost:8080/api/health"))
+		ctx, cancel := context.WithTimeout(context.Background(), healthTimeout)
+		code := runHealthCheck(ctx, "http://localhost:8080/api/health")
+		cancel()
+		os.Exit(code)
 	}
 
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: logLevelFromEnv(os.Getenv("LOG_LEVEL"))}))
@@ -49,14 +60,14 @@ func main() {
 	s := &http.Server{
 		Addr:         ":8080",
 		Handler:      server.SecurityHeaders(server.RecoverPanic(logger, r)),
-		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 5 * time.Second,
+		ReadTimeout:  readTimeout,
+		WriteTimeout: writeTimeout,
 	}
 
 	go func() {
 		logger.Info("Bomb Tactics Server running on http://localhost:8080")
 		logger.Info("Open http://localhost:8080 in your browser to view the Title Screen!")
-		if err := s.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := s.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Error("Server error", "error", err)
 		}
 	}()
@@ -64,7 +75,7 @@ func main() {
 	<-ctx.Done()
 	logger.Info("Shutdown signal received")
 
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 	if err := s.Shutdown(shutdownCtx); err != nil {
 		logger.Error("Server forced to shutdown", "error", err)
