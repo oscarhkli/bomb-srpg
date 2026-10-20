@@ -1,17 +1,24 @@
 package main
 
-import "net/http"
+import (
+	"context"
+	"net/http"
+)
 
 func checkHealth(args []string) bool {
 	return len(args) > 0 && args[0] == "healthcheck"
 }
 
 func runHealthCheck(url string) int {
-	resp, err := http.Get(url)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return 1
 	}
-	defer resp.Body.Close()
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return 1
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return 1
 	}
