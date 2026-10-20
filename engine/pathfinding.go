@@ -13,20 +13,31 @@ func (gs *GameState) FindReachableTilesOnSnapshot(start Coordinate, snapshot [][
 	return gs.findReachableTiles(start, rule, snapshot)
 }
 
+type pathNode struct {
+	Pos  Coordinate
+	Step int
+	Dir  Coordinate
+}
+
+// stepTarget returns the tile one step from node along dir, or false when the rule forbids the
+// move: a turn when CanTurn is false, or a target outside the grid.
+func (gs *GameState) stepTarget(node pathNode, dir Coordinate, rule MovementRule) (Coordinate, bool) {
+	if !rule.CanTurn && node.Step > 0 && dir != node.Dir {
+		return Coordinate{}, false
+	}
+	next := Coordinate{node.Pos.X + dir.X, node.Pos.Y + dir.Y}
+	return next, gs.IsWithinBounds(next)
+}
+
+var cardinalDirs = []Coordinate{{0, -1}, {0, 1}, {-1, 0}, {1, 0}}
+
 func (gs *GameState) findReachableTiles(startPos Coordinate, rule MovementRule, grid [][]Tile) map[Coordinate]int {
 	if len(grid) == 0 || len(grid[0]) == 0 {
 		return make(map[Coordinate]int)
 	}
 
-	type QueueItem struct {
-		Pos  Coordinate
-		Step int
-		Dir  Coordinate
-	}
-
 	steps := map[Coordinate]int{startPos: 0}
-	queue := []QueueItem{{Pos: startPos, Step: 0}}
-	dirs := []Coordinate{{0, -1}, {0, 1}, {-1, 0}, {1, 0}}
+	queue := []pathNode{{Pos: startPos}}
 
 	for len(queue) > 0 {
 		current := queue[0]
@@ -35,41 +46,41 @@ func (gs *GameState) findReachableTiles(startPos Coordinate, rule MovementRule, 
 		if rule.MaxSteps != -1 && current.Step >= rule.MaxSteps {
 			continue
 		}
-
-		for _, dir := range dirs {
-			if !rule.CanTurn && current.Step > 0 && dir != current.Dir {
-				continue
-			}
-
-			nextPos := Coordinate{current.Pos.X + dir.X, current.Pos.Y + dir.Y}
-			nextStep := current.Step + 1
-
-			if !gs.IsWithinBounds(nextPos) {
-				continue
-			}
-
-			canPass, canLand := rule.CheckPassability(grid[nextPos.Y][nextPos.X])
-			if !canPass && !canLand {
-				continue
-			}
-
-			if canLand {
-				if oldSteps, ok := steps[nextPos]; !ok || nextStep < oldSteps {
-					steps[nextPos] = nextStep
-				}
-				continue
-			}
-
-			if oldSteps, ok := steps[nextPos]; ok && oldSteps <= nextStep {
-				continue
-			}
-
-			steps[nextPos] = nextStep
-			queue = append(queue, QueueItem{Pos: nextPos, Step: nextStep, Dir: dir})
-		}
+		queue = append(queue, gs.expandNode(current, rule, grid, steps)...)
 	}
 
 	return steps
+}
+
+// expandNode records the tiles one step from node in steps and returns those the search continues from.
+// The queue visits tiles by ascending step, so the first count recorded for a tile is its shortest.
+func (gs *GameState) expandNode(node pathNode, rule MovementRule, grid [][]Tile, steps map[Coordinate]int) []pathNode {
+	var next []pathNode
+	nextStep := node.Step + 1
+
+	for _, dir := range cardinalDirs {
+		nextPos, ok := gs.stepTarget(node, dir, rule)
+		if !ok {
+			continue
+		}
+
+		canPass, canLand := rule.CheckPassability(grid[nextPos.Y][nextPos.X])
+		if !canPass && !canLand {
+			continue
+		}
+
+		oldSteps, seen := steps[nextPos]
+		if seen && (canLand || oldSteps <= nextStep) {
+			continue
+		}
+
+		steps[nextPos] = nextStep
+		if canPass {
+			next = append(next, pathNode{Pos: nextPos, Step: nextStep, Dir: dir})
+		}
+	}
+
+	return next
 }
 
 // CheckPassability reports how the rule treats the tile: canPass = can walk through it;
