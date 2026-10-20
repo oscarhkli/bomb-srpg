@@ -209,13 +209,12 @@ func (r UnitRole) MarshalText() ([]byte, error) {
 
 // UnmarshalText decodes a role from its String name.
 func (r *UnitRole) UnmarshalText(text []byte) error {
-	for role, name := range roleNames() {
-		if string(text) == name {
-			*r = UnitRole(role)
-			return nil
-		}
+	i := slices.Index(roleNames(), string(text))
+	if i < 0 {
+		return fmt.Errorf("%w: %q", ErrInvalidUnitRole, text)
 	}
-	return fmt.Errorf("%w: %q", ErrInvalidUnitRole, text)
+	*r = UnitRole(i)
+	return nil
 }
 
 // UnitID packs a team and a player index; see NewUnitID.
