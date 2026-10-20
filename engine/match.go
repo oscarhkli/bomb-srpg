@@ -385,7 +385,6 @@ func (gs *GameState) processChainDetonations(
 	return gameEvents
 }
 
-// igniteBomb sets a known, not yet ignited bomb to explode now and reports whether it did.
 func (gs *GameState) igniteBomb(id BombID, ignitedBombs map[BombID]bool) bool {
 	bomb, ok := gs.Bombs[id]
 	if !ok || ignitedBombs[id] {
@@ -442,7 +441,6 @@ func (gs *GameState) handleDelayedBatchDamage(
 	return gameEvents
 }
 
-// teamStatus tallies one team's roster for victory evaluation.
 type teamStatus struct {
 	hasBoss, bossAlive, kingAlive, ordinaryAlive bool
 }
