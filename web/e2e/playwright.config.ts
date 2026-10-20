@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const port = process.env.E2E_PORT ?? '8080';
+
 export default defineConfig({
   testDir: '.',
   outputDir: './test-results',
@@ -10,7 +12,7 @@ export default defineConfig({
     ? [['github'], ['html', { open: 'never', outputFolder: 'playwright-report' }]]
     : 'list',
   use: {
-    baseURL: 'http://localhost:8080',
+    baseURL: `http://localhost:${port}`,
     trace: 'retain-on-failure',
   },
   projects: [
@@ -28,7 +30,8 @@ export default defineConfig({
   webServer: {
     command: './bin/srpg-web',
     cwd: '../..',
-    url: 'http://localhost:8080/api/health',
-    reuseExistingServer: !process.env.CI,
+    url: `http://localhost:${port}/api/health`,
+    env: { ...process.env, PORT: port },
+    reuseExistingServer: false,
   },
 });
