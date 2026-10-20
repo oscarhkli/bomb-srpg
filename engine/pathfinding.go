@@ -44,17 +44,16 @@ func (gs *GameState) findReachableTiles(startPos Coordinate, rule MovementRule, 
 		if rule.MaxSteps != -1 && current.Step >= rule.MaxSteps {
 			continue
 		}
-		queue = append(queue, gs.expandNode(current, rule, grid, steps)...)
+		queue = gs.expandNode(queue, current, rule, grid, steps)
 	}
 
 	return steps
 }
 
-// expandNode records the tiles one step from node in steps and returns those the search continues from.
+// expandNode records the tiles one step from node in steps and appends those the search continues from to queue.
 // The queue visits tiles by ascending step, so the first count recorded for a tile is its shortest.
-func (gs *GameState) expandNode(node pathNode, rule MovementRule, grid [][]Tile, steps map[Coordinate]int) []pathNode {
-	var next []pathNode
-	dirs := []Coordinate{{0, -1}, {0, 1}, {-1, 0}, {1, 0}}
+func (gs *GameState) expandNode(queue []pathNode, node pathNode, rule MovementRule, grid [][]Tile, steps map[Coordinate]int) []pathNode {
+	dirs := [4]Coordinate{{0, -1}, {0, 1}, {-1, 0}, {1, 0}}
 	nextStep := node.Step + 1
 
 	for _, dir := range dirs {
@@ -75,11 +74,11 @@ func (gs *GameState) expandNode(node pathNode, rule MovementRule, grid [][]Tile,
 
 		steps[nextPos] = nextStep
 		if canPass {
-			next = append(next, pathNode{Pos: nextPos, Step: nextStep, Dir: dir})
+			queue = append(queue, pathNode{Pos: nextPos, Step: nextStep, Dir: dir})
 		}
 	}
 
-	return next
+	return queue
 }
 
 // CheckPassability reports how the rule treats the tile: canPass = can walk through it;
