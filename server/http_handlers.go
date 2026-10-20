@@ -81,7 +81,7 @@ type HealthCheckResponse struct {
 }
 
 // HandleHealthCheck returns OK as a server health check.
-func (h *Handler) HandleHealthCheck(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) HandleHealthCheck(w http.ResponseWriter, _ *http.Request) {
 	res := HealthCheckResponse{Status: "ok"}
 	h.writeJSON(w, http.StatusOK, res, "encode health check failed")
 }
@@ -93,7 +93,7 @@ type CatalogResponse struct {
 }
 
 // HandleGetCatalog returns the selectable archetypes and the stage presets for the lobby.
-func (h *Handler) HandleGetCatalog(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) HandleGetCatalog(w http.ResponseWriter, _ *http.Request) {
 	archetypes := engine.GetAllArchetypes()
 	stagePresets := engine.GetAllStagePresets()
 
@@ -107,7 +107,7 @@ type CreateMatchRoomResponse struct {
 }
 
 // HandleCreateMatchRoom creates an empty room and returns its ID.
-func (h *Handler) HandleCreateMatchRoom(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) HandleCreateMatchRoom(w http.ResponseWriter, _ *http.Request) {
 	id, err := h.Manager.CreateMatchRoom()
 	if err != nil {
 		h.Logger.Error("create match room failed", "error", err)
@@ -241,7 +241,7 @@ func (h *Handler) HandleSubmitTurnCommand(w http.ResponseWriter, r *http.Request
 	h.writeJSON(w, http.StatusOK, gameEvents, "encode gameEvents failed")
 }
 
-// StartTurnResponse is returned to provide the result of Sudden Death
+// StartTurnResponse is returned to provide the result of Sudden Death.
 type StartTurnResponse struct {
 	InSuddenDeath bool               `json:"inSuddenDeath"`
 	GameEvents    []engine.GameEvent `json:"gameEvents"`
