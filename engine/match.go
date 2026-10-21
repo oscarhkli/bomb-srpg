@@ -122,43 +122,46 @@ func (m *Match) CommandPlaceBomb(unitID UnitID, target Coordinate) ([]GameEvent,
 // Otherwise it returns an error if the unit has no bombs or skill use left, the target is out of
 // bomb range, or the cell is not landable.
 func (gs *GameState) PlaceBomb(unitID UnitID, target Coordinate) (GameEvent, error) {
-	bombPower := BombDefaultPower
-	var unit *Unit
-
-	if unitID != SystemUnitID {
-		var err error
-		unit, err = gs.validateActiveUnit(unitID)
-		if err != nil {
-			return GameEvent{}, err
-		}
-
-		if unit.HasUsedSkill {
-			return GameEvent{}, fmt.Errorf("%w: unit %#x already used skill this turn", ErrAlreadyUsedSkill, unitID)
-		}
-
-		if unit.BombUsed >= unit.MaxBombCount {
-			return GameEvent{}, fmt.Errorf("%w: unit %#x out of bombs", ErrOutOfBombs, unitID)
-		}
-
-		tiles := gs.FindReachableTiles(unit.Position, unit.NewBombPlacementRule())
-
-		if _, ok := tiles[target]; !ok {
-			return GameEvent{}, ErrOutOfBombRange
-		}
-
-		if err = gs.IsLandingLegal(target, OccupantBomb); err != nil {
-			return GameEvent{}, fmt.Errorf("%w: %w", ErrInvalidLanding, err)
-		}
-
-		bombPower = unit.BombPower
+	if unitID == SystemUnitID {
+		return gs.dropBomb(unitID, target, BombDefaultPower), nil
 	}
 
-	if unit != nil {
-		unit.BombUsed++
-		unit.HasUsedSkill = true
+	unit, err := gs.validateBombPlacement(unitID, target)
+	if err != nil {
+		return GameEvent{}, err
 	}
 
-	return gs.dropBomb(unitID, target, bombPower), nil
+	unit.BombUsed++
+	unit.HasUsedSkill = true
+
+	return gs.dropBomb(unitID, target, unit.BombPower), nil
+}
+
+func (gs *GameState) validateBombPlacement(unitID UnitID, target Coordinate) (*Unit, error) {
+	unit, err := gs.validateActiveUnit(unitID)
+	if err != nil {
+		return nil, err
+	}
+
+	if unit.HasUsedSkill {
+		return nil, fmt.Errorf("%w: unit %#x already used skill this turn", ErrAlreadyUsedSkill, unitID)
+	}
+
+	if unit.BombUsed >= unit.MaxBombCount {
+		return nil, fmt.Errorf("%w: unit %#x out of bombs", ErrOutOfBombs, unitID)
+	}
+
+	tiles := gs.FindReachableTiles(unit.Position, unit.NewBombPlacementRule())
+
+	if _, ok := tiles[target]; !ok {
+		return nil, ErrOutOfBombRange
+	}
+
+	if err = gs.IsLandingLegal(target, OccupantBomb); err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrInvalidLanding, err)
+	}
+
+	return unit, nil
 }
 
 func (gs *GameState) dropBomb(ownerID UnitID, target Coordinate, power int) GameEvent {
@@ -168,7 +171,7 @@ func (gs *GameState) dropBomb(ownerID UnitID, target Coordinate, power int) Game
 		OwnerID:   ownerID,
 		Position:  target,
 		Range:     power,
-		Countdown: gs.DeduceBombCountDown(target),
+		Countdown: gs.DeduceBombCountDown(),
 	}
 	gs.Bombs[bomb.ID] = bomb
 	gs.UpdateStageOccupant(target, OccupantBomb, int64(bomb.ID))
@@ -177,7 +180,7 @@ func (gs *GameState) dropBomb(ownerID UnitID, target Coordinate, power int) Game
 }
 
 // IsLandingLegal checks if the target is legal to be landed by a certain occupantType.
-func (gs *GameState) IsLandingLegal(target Coordinate, occupantType OccupantType) error {
+func (gs *GameState) IsLandingLegal(target Coordinate, _ OccupantType) error {
 	if !gs.IsWithinBounds(target) {
 		return fmt.Errorf("%w: coordinate %v out of bounds", ErrOutOfBounds, target)
 	}
@@ -196,7 +199,7 @@ func (gs *GameState) IsLandingLegal(target Coordinate, occupantType OccupantType
 }
 
 // StartTurn sets up the environmental boundaries for the upcoming round.
-// Returns GameEvents when the match enters SuddenDeath
+// Returns GameEvents when the match enters SuddenDeath.
 func (m *Match) StartTurn() []GameEvent {
 	winner := m.evaluateVictoryConditions()
 	if winner != MatchInProgress {
@@ -361,26 +364,17 @@ func (gs *GameState) processChainDetonations(
 			tile := &gs.Grid[pos.Y][pos.X]
 			switch tile.OccupantType {
 			case OccupantBomb:
-				nextBombID := BombID(tile.OccupantID)
-				if ignitedBombs[nextBombID] {
-					continue
+				nextBombID := tile.BombID()
+				if gs.igniteBomb(nextBombID, ignitedBombs) {
+					explosionQueue = append(explosionQueue, nextBombID)
 				}
-
-				nextBomb, ok := gs.Bombs[nextBombID]
-				if !ok {
-					continue
-				}
-
-				nextBomb.Countdown = 0
-				explosionQueue = append(explosionQueue, nextBombID)
-				ignitedBombs[nextBombID] = true
-
 			case OccupantUnit:
-				damagedUnits[UnitID(tile.OccupantID)] = true
+				damagedUnits[tile.UnitID()] = true
 			case OccupantSoftBlock:
 				destroyedSoftBlocks[int(tile.OccupantID)] = true
 			case OccupantItem:
 				destroyedItems[int(tile.OccupantID)] = true
+			case OccupantNone:
 			}
 		}
 
@@ -389,6 +383,16 @@ func (gs *GameState) processChainDetonations(
 		gameEvents = append(gameEvents, NewBombExplodedEvent(currBombID, currBomb.Position, affectedPos))
 	}
 	return gameEvents
+}
+
+func (gs *GameState) igniteBomb(id BombID, ignitedBombs map[BombID]bool) bool {
+	bomb, ok := gs.Bombs[id]
+	if !ok || ignitedBombs[id] {
+		return false
+	}
+	bomb.Countdown = 0
+	ignitedBombs[id] = true
+	return true
 }
 
 // cloneGridSnapshot returns a copy of the grid for casting blast rays against the pre-explosion board.
@@ -437,54 +441,60 @@ func (gs *GameState) handleDelayedBatchDamage(
 	return gameEvents
 }
 
-// evaluateVictoryConditions returns MatchInProgress, 1, 2, or MatchDrawn.
+type teamStatus struct {
+	hasBoss, bossAlive, kingAlive, ordinaryAlive bool
+}
+
+func (t *teamStatus) countLiving(unit *Unit) {
+	if unit.HP <= 0 {
+		return
+	}
+	t.kingAlive = t.kingAlive || unit.Role == RoleKing
+	t.bossAlive = t.bossAlive || unit.Role == RoleBoss
+	t.ordinaryAlive = t.ordinaryAlive || (unit.Role != RoleKing && unit.Role != RoleBoss)
+}
+
+func (t *teamStatus) goal() bool {
+	return (t.hasBoss && t.bossAlive) || (t.kingAlive && t.ordinaryAlive)
+}
+
+func (t *teamStatus) wiped() bool {
+	return (t.hasBoss && !t.bossAlive) || (!t.hasBoss && !t.kingAlive && !t.ordinaryAlive)
+}
+
+// evaluateVictoryConditions returns MatchInProgress, 1, 2, or MatchDrawn; any team other than Team1 counts as Team2.
 // Goal: a living Boss, or a living King plus a living Ordinary unit. Wiped: the Boss dead, or a Boss-less team with no living unit.
-// Both teams at Goal play on. A team wins by meeting Goal or by holding a living King against a Wiped opponent;
-// if both or neither qualify, it is a draw.
+// Both at Goal play on; a team wins on Goal or a living King against a Wiped opponent; both or neither is a draw.
 func (m *Match) evaluateVictoryConditions() int {
-	p1HasBoss, p1BossAlive := false, false
-	p2HasBoss, p2BossAlive := false, false
-	p1KingAlive, p1OrdinaryAlive := false, false
-	p2KingAlive, p2OrdinaryAlive := false, false
+	var p1, p2 teamStatus
 
 	for _, unit := range m.WorkingState.Units {
-		p1HasBoss = p1HasBoss || (unit.Team == 1 && unit.Role == RoleBoss)
-		p2HasBoss = p2HasBoss || (unit.Team == 2 && unit.Role == RoleBoss)
+		team := &p2
+		if unit.Team == Team1 {
+			team = &p1
+		}
+		if unit.Role == RoleBoss && (unit.Team == Team1 || unit.Team == Team2) {
+			team.hasBoss = true
+		}
 
-		if unit.HP <= 0 {
-			continue
-		}
-		if unit.Team == 1 {
-			p1KingAlive = p1KingAlive || (unit.Role == RoleKing)
-			p1BossAlive = p1BossAlive || (unit.Role == RoleBoss)
-			p1OrdinaryAlive = p1OrdinaryAlive || (unit.Role != RoleKing && unit.Role != RoleBoss)
-		} else {
-			p2KingAlive = p2KingAlive || (unit.Role == RoleKing)
-			p2BossAlive = p2BossAlive || (unit.Role == RoleBoss)
-			p2OrdinaryAlive = p2OrdinaryAlive || (unit.Role != RoleKing && unit.Role != RoleBoss)
-		}
+		team.countLiving(unit)
 	}
 
-	p1Goal := (p1HasBoss && p1BossAlive) || (p1KingAlive && p1OrdinaryAlive)
-	p2Goal := (p2HasBoss && p2BossAlive) || (p2KingAlive && p2OrdinaryAlive)
-
-	p1Wiped := (p1HasBoss && !p1BossAlive) || (!p1HasBoss && !p1KingAlive && !p1OrdinaryAlive)
-	p2Wiped := (p2HasBoss && !p2BossAlive) || (!p2HasBoss && !p2KingAlive && !p2OrdinaryAlive)
-
-	if p1Goal && p2Goal {
+	if p1.goal() && p2.goal() {
 		return MatchInProgress
 	}
 
-	if p1Goal || (p1KingAlive && p2Wiped) {
-		if p2Goal || (p2KingAlive && p1Wiped) {
-			return MatchDrawn
-		}
-		return 1
-	}
+	p1Wins := p1.goal() || (p1.kingAlive && p2.wiped())
+	p2Wins := p2.goal() || (p2.kingAlive && p1.wiped())
 
-	if p2Goal || (p2KingAlive && p1Wiped) {
-		return 2
+	switch {
+	case p1Wins && p2Wins:
+		return MatchDrawn
+	case p1Wins:
+		return Team1
+	case p2Wins:
+		return Team2
+	default:
+		return MatchDrawn
 	}
-
-	return MatchDrawn
 }
