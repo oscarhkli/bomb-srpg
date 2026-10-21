@@ -2,7 +2,8 @@ package server
 
 import (
 	"bomb-srpg/engine"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -201,7 +202,7 @@ func TestHandleHealthCheck(t *testing.T) {
 		}
 
 		var response HealthCheckResponse
-		if err := json.NewDecoder(rr.Body).Decode(&response); err != nil {
+		if err := json.UnmarshalRead(rr.Body, &response); err != nil {
 			t.Fatalf("Failed to decode response JSON payload: %v", err)
 		}
 
@@ -251,10 +252,10 @@ func TestHandleGetCatalog(t *testing.T) {
 		}
 
 		var response struct {
-			Archetypes   []json.RawMessage `json:"archetypes"`
-			StagePresets []json.RawMessage `json:"stagePresets"`
+			Archetypes   []jsontext.Value `json:"archetypes"`
+			StagePresets []jsontext.Value `json:"stagePresets"`
 		}
-		if err := json.NewDecoder(rr.Body).Decode(&response); err != nil {
+		if err := json.UnmarshalRead(rr.Body, &response); err != nil {
 			t.Fatalf("Failed to decode response JSON payload: %v", err)
 		}
 
@@ -321,7 +322,7 @@ func TestHandleCreateMatchRoom(t *testing.T) {
 		}
 
 		var response CreateMatchRoomResponse
-		if err := json.NewDecoder(rr.Body).Decode(&response); err != nil {
+		if err := json.UnmarshalRead(rr.Body, &response); err != nil {
 			t.Fatalf("Failed to decode response JSON payload: %v", err)
 		}
 
@@ -414,7 +415,7 @@ func TestHandleCreateNewMatch(t *testing.T) {
 		}
 
 		var response CreateMatchResponse
-		if err := json.NewDecoder(rr.Body).Decode(&response); err != nil {
+		if err := json.UnmarshalRead(rr.Body, &response); err != nil {
 			t.Fatalf("Failed to decode response JSON payload: %v", err)
 		}
 		if !response.Success {
@@ -657,7 +658,7 @@ func TestHandleRematch(t *testing.T) {
 		}
 
 		var response CreateMatchResponse
-		if err := json.NewDecoder(rr.Body).Decode(&response); err != nil {
+		if err := json.UnmarshalRead(rr.Body, &response); err != nil {
 			t.Fatalf("Failed to decode response JSON payload: %v", err)
 		}
 		if !response.Success {
@@ -985,7 +986,7 @@ func TestHandleGetMatchState(t *testing.T) {
 		}
 
 		var response ClientMatchStateResponse
-		if err := json.NewDecoder(rr.Body).Decode(&response); err != nil {
+		if err := json.UnmarshalRead(rr.Body, &response); err != nil {
 			t.Fatalf("Failed to decode response JSON payload: %v", err)
 		}
 
@@ -1173,7 +1174,7 @@ func TestHandleSubmitTurnCommand(t *testing.T) {
 		}
 
 		var response []engine.GameEvent
-		if err := json.NewDecoder(rr.Body).Decode(&response); err != nil {
+		if err := json.UnmarshalRead(rr.Body, &response); err != nil {
 			t.Fatalf("Failed to decode response JSON payload: %v", err)
 		}
 		if len(response) != 1 {
@@ -1466,7 +1467,7 @@ func TestHandleStartTurn(t *testing.T) {
 		}
 
 		var response StartTurnResponse
-		if err := json.NewDecoder(rr.Body).Decode(&response); err != nil {
+		if err := json.UnmarshalRead(rr.Body, &response); err != nil {
 			t.Fatalf("Failed to decode response JSON payload: %v", err)
 		}
 
@@ -1680,7 +1681,7 @@ func TestHandleConsumeCPUStatus(t *testing.T) {
 			PlanGameEvents        []engine.GameEvent `json:"planGameEvents"`
 			ResolveTurnGameEvents []engine.GameEvent `json:"resolveTurnGameEvents"`
 		}
-		if err := json.NewDecoder(rr.Body).Decode(&response); err != nil {
+		if err := json.UnmarshalRead(rr.Body, &response); err != nil {
 			t.Fatalf("Failed to decode response JSON payload: %v", err)
 		}
 
@@ -2083,7 +2084,7 @@ func TestHandleResolveTurn(t *testing.T) {
 		}
 
 		var response ResolveTurnResponse
-		if err := json.NewDecoder(rr.Body).Decode(&response); err != nil {
+		if err := json.UnmarshalRead(rr.Body, &response); err != nil {
 			t.Fatalf("Failed to decode response JSON payload: %v", err)
 		}
 
@@ -2280,7 +2281,7 @@ func TestHandleSurrender(t *testing.T) {
 		}
 
 		var response []engine.GameEvent
-		if err := json.NewDecoder(rr.Body).Decode(&response); err != nil {
+		if err := json.UnmarshalRead(rr.Body, &response); err != nil {
 			t.Fatalf("Failed to decode response JSON payload: %v", err)
 		}
 
@@ -2522,7 +2523,7 @@ func TestHandleGetMatchConfig(t *testing.T) {
 		}
 
 		var response engine.GameCfg
-		if err := json.NewDecoder(rr.Body).Decode(&response); err != nil {
+		if err := json.UnmarshalRead(rr.Body, &response); err != nil {
 			t.Fatalf("Failed to decode response JSON payload: %v", err)
 		}
 
@@ -2666,7 +2667,7 @@ func TestHandleGetAllowedTiles(t *testing.T) {
 		}
 
 		var response []engine.Coordinate
-		if err := json.NewDecoder(rr.Body).Decode(&response); err != nil {
+		if err := json.UnmarshalRead(rr.Body, &response); err != nil {
 			t.Fatalf("Failed to decode response JSON payload: %v", err)
 		}
 
