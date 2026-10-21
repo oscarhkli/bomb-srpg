@@ -54,3 +54,25 @@ func TestSurrenderRequestDecoding(t *testing.T) {
 		})
 	}
 }
+
+func TestMatchStateWireShape(t *testing.T) {
+	roomID, _, _, h := createTestRoomWithMatch(t)
+	req := httptest.NewRequest("GET", "/api/match-rooms/"+roomID+"/match/state", nil)
+	rr := httptest.NewRecorder()
+	testMux("GET /api/match-rooms/{roomID}/match/state", h.HandleGetMatchState).ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rr.Code, http.StatusOK)
+	}
+	var state map[string]any
+	if err := json.Unmarshal(rr.Body.Bytes(), &state); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	for _, key := range []string{"bombs", "softBlocks", "turnCommands"} {
+		t.Run(key, func(t *testing.T) {
+			if _, ok := state[key].([]any); !ok {
+				t.Errorf("%s = %#v, want a JSON array (the client cannot read null)", key, state[key])
+			}
+		})
+	}
+}
