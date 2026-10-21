@@ -3,7 +3,7 @@ package server
 import (
 	"bomb-srpg/engine"
 	"bytes"
-	"encoding/json"
+	"encoding/json/v2"
 	"io"
 	"net/http"
 	"net/http/httptest"

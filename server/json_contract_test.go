@@ -1,7 +1,7 @@
 package server
 
 import (
-	"encoding/json"
+	"encoding/json/v2"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -45,7 +45,7 @@ func TestSurrenderRequestDecoding(t *testing.T) {
 				return
 			}
 			var gameEvents []engine.GameEvent
-			if err := json.NewDecoder(rr.Body).Decode(&gameEvents); err != nil {
+			if err := json.UnmarshalRead(rr.Body, &gameEvents); err != nil {
 				t.Fatalf("decode response: %v", err)
 			}
 			if len(gameEvents) != 1 || gameEvents[0].WinnerTeamID != 2 {
