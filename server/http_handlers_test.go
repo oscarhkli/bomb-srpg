@@ -1575,7 +1575,7 @@ func TestHandleStartTurn(t *testing.T) {
 						}
 						for _, field := range []string{"x", "y"} {
 							if _, exists := positionField[field]; !exists {
-								t.Errorf("Contract Broken: from missing key '%s'", field)
+								t.Errorf("Contract Broken: position missing key '%s'", field)
 							}
 						}
 					})
