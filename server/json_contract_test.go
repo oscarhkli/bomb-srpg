@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json/v2"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -68,10 +69,37 @@ func TestMatchStateWireShape(t *testing.T) {
 		t.Fatalf("decode response: %v", err)
 	}
 
-	for _, key := range []string{"bombs", "softBlocks", "turnCommands"} {
-		t.Run(key, func(t *testing.T) {
-			if _, ok := state[key].([]any); !ok {
-				t.Errorf("%s = %#v, want a JSON array (the client cannot read null)", key, state[key])
+	tests := []struct {
+		key  string
+		want string
+	}{
+		{"turn", "number"},
+		{"activeTeam", "number"},
+		{"inSuddenDeath", "bool"},
+		{"grid", "array"},
+		{"units", "array"},
+		{"bombs", "array"},
+		{"softBlocks", "array"},
+		{"turnCommands", "array"},
+	}
+	if len(state) != len(tests) {
+		t.Errorf("state has %d keys, want %d", len(state), len(tests))
+	}
+	for _, tt := range tests {
+		t.Run(tt.key, func(t *testing.T) {
+			var got string
+			switch state[tt.key].(type) {
+			case []any:
+				got = "array"
+			case float64:
+				got = "number"
+			case bool:
+				got = "bool"
+			default:
+				got = fmt.Sprintf("%T", state[tt.key])
+			}
+			if got != tt.want {
+				t.Errorf("%s is %s, want %s", tt.key, got, tt.want)
 			}
 		})
 	}
