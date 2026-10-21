@@ -27,6 +27,6 @@ func (gs *GameState) UpdateStageOccupant(pos Coordinate, occupantType OccupantTy
 }
 
 // DeduceBombCountDown returns the countdown for a newly placed bomb.
-func (gs *GameState) DeduceBombCountDown(_ Coordinate) int {
+func (gs *GameState) DeduceBombCountDown() int {
 	return BombDefaultCountDown
 }
