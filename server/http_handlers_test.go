@@ -123,26 +123,16 @@ func assertMatchStateNested(t *testing.T, raw map[string]any) {
 		}
 	}
 
-	if bombsRaw, ok := raw["bombs"].([]any); ok && len(bombsRaw) > 0 {
-		if bomb, ok := bombsRaw[0].(map[string]any); ok {
-			bombFields := []string{"id", "ownerUnitID", "position", "range", "placedTurn", "countdown"}
-			for _, field := range bombFields {
-				if _, exists := bomb[field]; !exists {
-					t.Errorf("Contract Broken: bomb missing key '%s'", field)
-				}
-			}
-		}
+	if bomb, ok := firstObject(raw["bombs"]); !ok {
+		t.Errorf("bombs is empty or not an array of objects: %#v", raw["bombs"])
+	} else {
+		assertKeys(t, bomb, []string{"id", "ownerId", "position", "range", "countdown"}, "Contract Broken: bomb missing key '%s'")
 	}
 
-	if tcRaw, ok := raw["turnCommands"].([]any); ok && len(tcRaw) > 0 {
-		if tc, ok := tcRaw[0].(map[string]any); ok {
-			tcFields := []string{"type", "unitID"}
-			for _, field := range tcFields {
-				if _, exists := tc[field]; !exists {
-					t.Errorf("Contract Broken: turnCommand missing key '%s'", field)
-				}
-			}
-		}
+	if tc, ok := firstObject(raw["turnCommands"]); !ok {
+		t.Errorf("turnCommands is empty or not an array of objects: %#v", raw["turnCommands"])
+	} else {
+		assertKeys(t, tc, []string{"type", "unitId", "target"}, "Contract Broken: turnCommand missing key '%s'")
 	}
 }
 
@@ -1104,10 +1094,22 @@ func TestHandleGetMatchState(t *testing.T) {
 			P2Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Witch", Role: engine.RoleNormal}},
 			MaxTurns:    10,
 		}
-		_, err = s.CreateMatch(roomID, gameCfg)
-		if err != nil {
-			t.Fatalf("Failed to create match: %v", err)
+		tokens := mustCreateMatch(t, s, roomID, gameCfg)
+		unitID := engine.NewUnitID(1, 0)
+		pos := engine.Coordinate{X: 4, Y: 7}
+		if _, _, err := s.StartTurn(roomID, tokens[0]); err != nil {
+			t.Fatalf("StartTurn() error = %v", err)
 		}
+		if _, err := s.SubmitTurnCommand(roomID, engine.NewPlaceBombCommand(unitID, pos), tokens[0]); err != nil {
+			t.Fatalf("SubmitTurnCommand(place bomb) error = %v", err)
+		}
+		if _, _, err := s.ResolveTurn(roomID, tokens[0]); err != nil {
+			t.Fatalf("ResolveTurn() error = %v", err)
+		}
+		room := mustRoom(t, s, roomID)
+		room.mu.Lock()
+		room.Match.WorkingState.TurnCommands = []engine.TurnCommand{engine.NewMoveCommand(unitID, pos)}
+		room.mu.Unlock()
 
 		req, _ := http.NewRequest("GET", "/api/match-rooms/"+roomID+"/match/state", nil)
 		rr := httptest.NewRecorder()
