@@ -63,75 +63,76 @@ func assertArrayContract(t *testing.T, body []byte, expectedFields []string, ite
 	}
 }
 
+func firstElement(v any) (any, bool) {
+	arr, ok := v.([]any)
+	if !ok || len(arr) == 0 {
+		return nil, false
+	}
+	return arr[0], true
+}
+
+func firstObject(v any) (map[string]any, bool) {
+	first, ok := firstElement(v)
+	if !ok {
+		return nil, false
+	}
+	obj, ok := first.(map[string]any)
+	return obj, ok
+}
+
+func assertKeys(t *testing.T, obj map[string]any, fields []string, format string) {
+	t.Helper()
+	for _, field := range fields {
+		if _, exists := obj[field]; !exists {
+			t.Errorf(format, field)
+		}
+	}
+}
+
 func assertMatchStateNested(t *testing.T, raw map[string]any) {
 	t.Helper()
-	if gridRaw, ok := raw["grid"].([]any); ok && len(gridRaw) > 0 {
-		if row, ok := gridRaw[0].([]any); ok && len(row) > 0 {
-			if tile, ok := row[0].(map[string]any); ok {
-				for _, field := range []string{"type", "occupantType", "occupantId"} {
-					if _, exists := tile[field]; !exists {
-						t.Errorf("grid[0][0] missing key '%s'", field)
-					}
-				}
-			}
+	row, ok := firstElement(raw["grid"])
+	if !ok {
+		t.Errorf("grid is empty or not an array: %#v", raw["grid"])
+	} else if tile, ok := firstObject(row); !ok {
+		t.Errorf("grid[0] is empty or not an array of objects: %#v", row)
+	} else {
+		assertKeys(t, tile, []string{"type", "occupantType", "occupantId"}, "grid[0][0] missing key '%s'")
+	}
+
+	if sb, ok := firstObject(raw["softBlocks"]); !ok {
+		t.Errorf("softBlocks is empty or not an array of objects: %#v", raw["softBlocks"])
+	} else {
+		assertKeys(t, sb, []string{"id", "position"}, "softBlock missing key '%s'")
+		if coord, ok := sb["position"].(map[string]any); !ok {
+			t.Errorf("softBlock.position is not an object: %#v", sb["position"])
+		} else {
+			assertKeys(t, coord, []string{"x", "y"}, "softBlock.position missing key '%s'")
 		}
 	}
 
-	if sbRaw, ok := raw["softBlocks"].([]any); ok && len(sbRaw) > 0 {
-		if sb, ok := sbRaw[0].(map[string]any); ok {
-			for _, field := range []string{"id", "position"} {
-				if _, exists := sb[field]; !exists {
-					t.Errorf("softBlock missing key '%s'", field)
-				}
-			}
-			if coord, ok := sb["position"].(map[string]any); ok {
-				for _, field := range []string{"x", "y"} {
-					if _, exists := coord[field]; !exists {
-						t.Errorf("softBlock.position missing key '%s'", field)
-					}
-				}
-			}
+	if unit, ok := firstObject(raw["units"]); !ok {
+		t.Errorf("units is empty or not an array of objects: %#v", raw["units"])
+	} else {
+		unitFields := []string{"id", "type", "position", "speed", "bombMaxRange", "bombPower", "maxBombCount", "bombUsed", "team", "hp", "skills", "hasMoved", "hasUsedSkill"}
+		assertKeys(t, unit, unitFields, "Contract Broken: unit missing key '%s'")
+		if pos, ok := unit["position"].(map[string]any); !ok {
+			t.Errorf("unit.position is not an object: %#v", unit["position"])
+		} else {
+			assertKeys(t, pos, []string{"x", "y"}, "unit.position missing key '%s'")
 		}
 	}
 
-	if unitsRaw, ok := raw["units"].([]any); ok && len(unitsRaw) > 0 {
-		if unit, ok := unitsRaw[0].(map[string]any); ok {
-			unitFields := []string{"id", "type", "position", "speed", "bombMaxRange", "bombPower", "maxBombCount", "bombUsed", "team", "hp", "skills", "hasMoved", "hasUsedSkill"}
-			for _, field := range unitFields {
-				if _, exists := unit[field]; !exists {
-					t.Errorf("Contract Broken: unit missing key '%s'", field)
-				}
-			}
-			if pos, ok := unit["position"].(map[string]any); ok {
-				for _, field := range []string{"x", "y"} {
-					if _, exists := pos[field]; !exists {
-						t.Errorf("unit.position missing key '%s'", field)
-					}
-				}
-			}
-		}
+	if bomb, ok := firstObject(raw["bombs"]); !ok {
+		t.Errorf("bombs is empty or not an array of objects: %#v", raw["bombs"])
+	} else {
+		assertKeys(t, bomb, []string{"id", "ownerId", "position", "range", "countdown"}, "Contract Broken: bomb missing key '%s'")
 	}
 
-	if bombsRaw, ok := raw["bombs"].([]any); ok && len(bombsRaw) > 0 {
-		if bomb, ok := bombsRaw[0].(map[string]any); ok {
-			bombFields := []string{"id", "ownerUnitID", "position", "range", "placedTurn", "countdown"}
-			for _, field := range bombFields {
-				if _, exists := bomb[field]; !exists {
-					t.Errorf("Contract Broken: bomb missing key '%s'", field)
-				}
-			}
-		}
-	}
-
-	if tcRaw, ok := raw["turnCommands"].([]any); ok && len(tcRaw) > 0 {
-		if tc, ok := tcRaw[0].(map[string]any); ok {
-			tcFields := []string{"type", "unitID"}
-			for _, field := range tcFields {
-				if _, exists := tc[field]; !exists {
-					t.Errorf("Contract Broken: turnCommand missing key '%s'", field)
-				}
-			}
-		}
+	if tc, ok := firstObject(raw["turnCommands"]); !ok {
+		t.Errorf("turnCommands is empty or not an array of objects: %#v", raw["turnCommands"])
+	} else {
+		assertKeys(t, tc, []string{"type", "unitId", "target"}, "Contract Broken: turnCommand missing key '%s'")
 	}
 }
 
@@ -911,7 +912,7 @@ func TestHandleDeleteMatch(t *testing.T) {
 	})
 }
 
-// ClientUnit mimics the client's view of Unit in GetMatchState response
+// ClientUnit mimics the client's view of Unit in GetMatchState response.
 type ClientUnit struct {
 	ID           engine.UnitID     `json:"id"`
 	Type         string            `json:"type"`
@@ -928,14 +929,14 @@ type ClientUnit struct {
 	HasUsedSkill bool              `json:"hasUsedSkill"`
 }
 
-// ClientTile mimics the client's view of Tile in GetMatchState response
+// ClientTile mimics the client's view of Tile in GetMatchState response.
 type ClientTile struct {
 	Type         string `json:"type"`
 	OccupantType string `json:"occupantType"`
 	OccupantID   int64  `json:"occupantId"`
 }
 
-// ClientMatchStateResponse mimics the client's view of GetMatchState response
+// ClientMatchStateResponse mimics the client's view of GetMatchState response.
 type ClientMatchStateResponse struct {
 	Turn         int                  `json:"turn"`
 	ActiveTeam   int                  `json:"activeTeam"`
@@ -1093,10 +1094,22 @@ func TestHandleGetMatchState(t *testing.T) {
 			P2Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Witch", Role: engine.RoleNormal}},
 			MaxTurns:    10,
 		}
-		_, err = s.CreateMatch(roomID, gameCfg)
-		if err != nil {
-			t.Fatalf("Failed to create match: %v", err)
+		tokens := mustCreateMatch(t, s, roomID, gameCfg)
+		unitID := engine.NewUnitID(1, 0)
+		pos := engine.Coordinate{X: 4, Y: 7}
+		if _, _, err := s.StartTurn(roomID, tokens[0]); err != nil {
+			t.Fatalf("StartTurn() error = %v", err)
 		}
+		if _, err := s.SubmitTurnCommand(roomID, engine.NewPlaceBombCommand(unitID, pos), tokens[0]); err != nil {
+			t.Fatalf("SubmitTurnCommand(place bomb) error = %v", err)
+		}
+		if _, _, err := s.ResolveTurn(roomID, tokens[0]); err != nil {
+			t.Fatalf("ResolveTurn() error = %v", err)
+		}
+		room := mustRoom(t, s, roomID)
+		room.mu.Lock()
+		room.Match.WorkingState.TurnCommands = []engine.TurnCommand{engine.NewMoveCommand(unitID, pos)}
+		room.mu.Unlock()
 
 		req, _ := http.NewRequest("GET", "/api/match-rooms/"+roomID+"/match/state", nil)
 		rr := httptest.NewRecorder()
@@ -1332,8 +1345,14 @@ func TestHandleSubmitTurnCommand(t *testing.T) {
 				"countdown", "newHp"},
 			func(t *testing.T, item map[string]any) {
 				t.Helper()
-				fromField := item["from"].(map[string]any)
-				toField := item["from"].(map[string]any)
+				fromField, ok := item["from"].(map[string]any)
+				if !ok {
+					t.Fatalf("from is not an object: %#v", item["from"])
+				}
+				toField, ok := item["to"].(map[string]any)
+				if !ok {
+					t.Fatalf("to is not an object: %#v", item["to"])
+				}
 				for _, field := range []string{"x", "y"} {
 					if _, exists := fromField[field]; !exists {
 						t.Errorf("Contract Broken: from missing key '%s'", field)
@@ -1550,10 +1569,13 @@ func TestHandleStartTurn(t *testing.T) {
 						"newHp"},
 					func(t *testing.T, item map[string]any) {
 						t.Helper()
-						positionField := item["position"].(map[string]any)
+						positionField, ok := item["position"].(map[string]any)
+						if !ok {
+							t.Fatalf("position is not an object: %#v", item["position"])
+						}
 						for _, field := range []string{"x", "y"} {
 							if _, exists := positionField[field]; !exists {
-								t.Errorf("Contract Broken: from missing key '%s'", field)
+								t.Errorf("Contract Broken: position missing key '%s'", field)
 							}
 						}
 					})
@@ -1839,7 +1861,10 @@ func TestHandleConsumeCPUStatus(t *testing.T) {
 				if !ok || len(events) == 0 {
 					t.Fatalf("Expected non-empty planGameEvents, got %#v", raw["planGameEvents"])
 				}
-				evt := events[0].(map[string]any)
+				evt, ok := events[0].(map[string]any)
+				if !ok {
+					t.Fatalf("planGameEvents[0] is not an object: %#v", events[0])
+				}
 				for _, field := range []string{"type", "unitId", "from", "to"} {
 					if _, exists := evt[field]; !exists {
 						t.Errorf("Contract Broken: planGameEvents[0] missing key '%s'", field)
@@ -2032,7 +2057,9 @@ func TestHandleResolveTurn(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
 		unitID := engine.NewUnitID(1, 0)
-		s.SubmitTurnCommand(roomID, engine.NewPlaceBombCommand(unitID, engine.Coordinate{X: 4, Y: 7}), playerTokens[0])
+		if _, err := s.SubmitTurnCommand(roomID, engine.NewPlaceBombCommand(unitID, engine.Coordinate{X: 4, Y: 7}), playerTokens[0]); err != nil {
+			t.Fatalf("SubmitTurnCommand() error = %v", err)
+		}
 		room := mustRoom(t, s, roomID)
 		room.Match.WorkingState.Bombs[engine.NewBombID(1, 1, unitID)].Countdown = 1
 
@@ -2132,7 +2159,9 @@ func TestHandleResolveTurn(t *testing.T) {
 	t.Run("Test Contract", func(t *testing.T) {
 		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
 		unitID := engine.NewUnitID(1, 0)
-		s.SubmitTurnCommand(roomID, engine.NewPlaceBombCommand(unitID, engine.Coordinate{X: 4, Y: 7}), playerTokens[0])
+		if _, err := s.SubmitTurnCommand(roomID, engine.NewPlaceBombCommand(unitID, engine.Coordinate{X: 4, Y: 7}), playerTokens[0]); err != nil {
+			t.Fatalf("SubmitTurnCommand() error = %v", err)
+		}
 
 		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/resolve", nil)
 		if err != nil {
@@ -2150,7 +2179,10 @@ func TestHandleResolveTurn(t *testing.T) {
 				if !ok || len(events) == 0 {
 					t.Fatalf("Expected non-empty planGameEvents, got %#v", raw["planGameEvents"])
 				}
-				evt := events[0].(map[string]any)
+				evt, ok := events[0].(map[string]any)
+				if !ok {
+					t.Fatalf("planGameEvents[0] is not an object: %#v", events[0])
+				}
 				for _, field := range []string{"type", "unitId", "bombId", "position", "range", "countdown"} {
 					if _, exists := evt[field]; !exists {
 						t.Errorf("Contract Broken: planGameEvents[0] missing key '%s'", field)
@@ -2367,7 +2399,9 @@ func TestHandleSurrender(t *testing.T) {
 	t.Run("Test Contract", func(t *testing.T) {
 		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
 		unitID := engine.NewUnitID(1, 0)
-		s.SubmitTurnCommand(roomID, engine.NewPlaceBombCommand(unitID, engine.Coordinate{X: 4, Y: 7}), playerTokens[0])
+		if _, err := s.SubmitTurnCommand(roomID, engine.NewPlaceBombCommand(unitID, engine.Coordinate{X: 4, Y: 7}), playerTokens[0]); err != nil {
+			t.Fatalf("SubmitTurnCommand() error = %v", err)
+		}
 
 		jsonBody, _ := json.Marshal(SurrenderRequest{TeamID: 1})
 		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/surrender", strings.NewReader(string(jsonBody)))
