@@ -10,6 +10,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   unit_tests:
     name: "Run Unit Tests"
@@ -170,7 +174,7 @@ jobs:
   e2e_tests:
     name: "Run Web E2E Tests (${{ matrix.project }})"
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
@@ -201,7 +205,10 @@ jobs:
         working-directory: web
 
       - name: Install ${{ matrix.browser }}
-        run: npx playwright install --with-deps ${{ matrix.browser }}
+        # The Ubuntu mirror sometimes crawls; a fresh attempt usually finds a fast one.
+        run: |
+          timeout -k 10 180 npx playwright install --with-deps ${{ matrix.browser }} ||
+            timeout -k 10 180 npx playwright install --with-deps ${{ matrix.browser }}
         working-directory: web
 
       - name: Run e2e tests
