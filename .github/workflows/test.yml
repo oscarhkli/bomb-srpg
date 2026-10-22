@@ -205,10 +205,10 @@ jobs:
         working-directory: web
 
       - name: Install ${{ matrix.browser }}
-        # The Ubuntu mirror sometimes crawls; a fresh attempt usually finds a fast one.
+        # A stalled Ubuntu mirror download is dropped after 20 s and retried by apt itself.
         run: |
-          timeout -k 10 180 npx playwright install --with-deps ${{ matrix.browser }} ||
-            timeout -k 10 180 npx playwright install --with-deps ${{ matrix.browser }}
+          echo 'Acquire::http::Timeout "20"; Acquire::Retries "3";' | sudo tee /etc/apt/apt.conf.d/99ci-retries
+          npx playwright install --with-deps ${{ matrix.browser }}
         working-directory: web
 
       - name: Run e2e tests
