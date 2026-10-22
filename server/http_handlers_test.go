@@ -96,6 +96,104 @@ func doRequest(t *testing.T, handler http.HandlerFunc, pattern, method, path, bo
 	return rr
 }
 
+type failureSet uint
+
+const (
+	failRoom failureSet = 1 << iota
+	failMatch
+	failMissingAuth
+	failInvalidToken
+	failWrongTeam
+)
+
+type failureRoute struct {
+	handler   func(*Handler, http.ResponseWriter, *http.Request)
+	pattern   string
+	query     string
+	body      any
+	cases     failureSet
+	matchGone func(room *MatchRoom)
+	bareRoom  bool
+}
+
+func testRouteFailures(t *testing.T, route failureRoute) {
+	t.Helper()
+	method, routePath, _ := strings.Cut(route.pattern, " ")
+	body := ""
+	if route.body != nil {
+		jsonBody, err := json.Marshal(route.body)
+		if err != nil {
+			t.Fatalf("Failed to marshal request body: %v", err)
+		}
+		body = string(jsonBody)
+	}
+	authed := route.cases&(failMissingAuth|failInvalidToken|failWrongTeam) != 0
+
+	call := func(t *testing.T, h *Handler, roomID, token string) *httptest.ResponseRecorder {
+		t.Helper()
+		handler := func(w http.ResponseWriter, r *http.Request) { route.handler(h, w, r) }
+		path := strings.Replace(routePath, "{roomID}", roomID, 1) + route.query
+		return doRequest(t, handler, route.pattern, method, path, body, token)
+	}
+	assertFailure := func(t *testing.T, rr *httptest.ResponseRecorder, wantStatus int, wantMsg string) {
+		t.Helper()
+		if status := rr.Code; status != wantStatus {
+			t.Errorf("Handler returned wrong status code: got %v want %v", status, wantStatus)
+		}
+		if !strings.Contains(rr.Body.String(), wantMsg) {
+			t.Errorf("Expected error message '%s', got: %s", wantMsg, rr.Body.String())
+		}
+	}
+	assertInvalidToken := func(t *testing.T, token func(tokens [2]string) string) {
+		t.Helper()
+		roomID, tokens, _, h := createTestRoomWithMatch(t)
+		assertFailure(t, call(t, h, roomID, token(tokens)), http.StatusUnauthorized, "invalid player token")
+	}
+
+	if route.cases&failRoom != 0 {
+		t.Run("Failure: room not found", func(t *testing.T) {
+			token := ""
+			if authed {
+				token = "dummy-token"
+			}
+			h := NewHandler(NewServerStateManager())
+			assertFailure(t, call(t, h, "NONEXISTENT", token), http.StatusNotFound, "room not found")
+		})
+	}
+	if route.cases&failMatch != 0 {
+		t.Run("Failure: match not found", func(t *testing.T) {
+			if route.bareRoom {
+				roomID, _, h := newTestRoom(t)
+				assertFailure(t, call(t, h, roomID, ""), http.StatusNotFound, "match not found")
+				return
+			}
+			roomID, tokens, s, h := createTestRoomWithMatch(t)
+			room := mustRoom(t, s, roomID)
+			if route.matchGone != nil {
+				route.matchGone(room)
+			} else {
+				room.Match = nil
+			}
+			assertFailure(t, call(t, h, roomID, tokens[0]), http.StatusNotFound, "match not found")
+		})
+	}
+	if route.cases&failMissingAuth != 0 {
+		t.Run("Failure: missing Authorization header", func(t *testing.T) {
+			assertInvalidToken(t, func([2]string) string { return "" })
+		})
+	}
+	if route.cases&failInvalidToken != 0 {
+		t.Run("Failure: invalid token", func(t *testing.T) {
+			assertInvalidToken(t, func([2]string) string { return "invalid-token" })
+		})
+	}
+	if route.cases&failWrongTeam != 0 {
+		t.Run("Failure: wrong team token", func(t *testing.T) {
+			assertInvalidToken(t, func(tokens [2]string) string { return tokens[1] })
+		})
+	}
+}
+
 func assertKeys(t *testing.T, obj map[string]any, fields []string, format string) {
 	t.Helper()
 	for _, field := range fields {
@@ -433,19 +531,11 @@ func TestHandleCreateNewMatch(t *testing.T) {
 		}
 	})
 
-	t.Run("Failure: room not found", func(t *testing.T) {
-		s := NewServerStateManager()
-		h := NewHandler(s)
-		gameCfg := validGameCfg()
-		jsonBody, _ := json.Marshal(gameCfg)
-		rr := doRequest(t, h.HandleCreateMatch, "POST /api/match-rooms/{roomID}/match", "POST", "/api/match-rooms/NONEXISTENT/match", string(jsonBody), "")
-
-		if status := rr.Code; status != http.StatusNotFound {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusNotFound)
-		}
-		if !strings.Contains(rr.Body.String(), "room not found") {
-			t.Errorf("Expected error message 'room not found', got: %s", rr.Body.String())
-		}
+	testRouteFailures(t, failureRoute{
+		handler: (*Handler).HandleCreateMatch,
+		pattern: "POST /api/match-rooms/{roomID}/match",
+		body:    CreateMatchRequest{GameCfg: validGameCfg()},
+		cases:   failRoom,
 	})
 
 	t.Run("Failure: match already exists", func(t *testing.T) {
@@ -590,59 +680,11 @@ func TestHandleRematch(t *testing.T) {
 		}
 	})
 
-	t.Run("Failure: room not found", func(t *testing.T) {
-		s := NewServerStateManager()
-		h := NewHandler(s)
-
-		rr := doRequest(t, h.HandleRematch, "POST /api/match-rooms/{roomID}/rematch", "POST", "/api/match-rooms/NONEXISTENT/rematch", "", "dummy-token")
-
-		if status := rr.Code; status != http.StatusNotFound {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusNotFound)
-		}
-		if !strings.Contains(rr.Body.String(), "room not found") {
-			t.Errorf("Expected error message 'room not found', got: %s", rr.Body.String())
-		}
-	})
-
-	t.Run("Failure: match not found", func(t *testing.T) {
-		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
-		room := mustRoom(t, s, roomID)
-		room.GameCfg = nil
-
-		rr := doRequest(t, h.HandleRematch, "POST /api/match-rooms/{roomID}/rematch", "POST", "/api/match-rooms/"+roomID+"/rematch", "", playerTokens[0])
-
-		if status := rr.Code; status != http.StatusNotFound {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusNotFound)
-		}
-		if !strings.Contains(rr.Body.String(), "match not found") {
-			t.Errorf("Expected error message 'match not found', got: %s", rr.Body.String())
-		}
-	})
-
-	t.Run("Failure: missing Authorization header", func(t *testing.T) {
-		roomID, _, _, h := createTestRoomWithMatch(t)
-
-		rr := doRequest(t, h.HandleRematch, "POST /api/match-rooms/{roomID}/rematch", "POST", "/api/match-rooms/"+roomID+"/rematch", "", "")
-
-		if status := rr.Code; status != http.StatusUnauthorized {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusUnauthorized)
-		}
-		if !strings.Contains(rr.Body.String(), "invalid player token") {
-			t.Errorf("Expected error message 'invalid player token', got: %s", rr.Body.String())
-		}
-	})
-
-	t.Run("Failure: invalid token", func(t *testing.T) {
-		roomID, _, _, h := createTestRoomWithMatch(t)
-
-		rr := doRequest(t, h.HandleRematch, "POST /api/match-rooms/{roomID}/rematch", "POST", "/api/match-rooms/"+roomID+"/rematch", "", "invalid-token")
-
-		if status := rr.Code; status != http.StatusUnauthorized {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusUnauthorized)
-		}
-		if !strings.Contains(rr.Body.String(), "invalid player token") {
-			t.Errorf("Expected error message 'invalid player token', got: %s", rr.Body.String())
-		}
+	testRouteFailures(t, failureRoute{
+		handler:   (*Handler).HandleRematch,
+		pattern:   "POST /api/match-rooms/{roomID}/rematch",
+		cases:     failRoom | failMatch | failMissingAuth | failInvalidToken,
+		matchGone: func(room *MatchRoom) { room.GameCfg = nil },
 	})
 
 	t.Run("Failure: failed to Encode response", func(t *testing.T) {
@@ -706,44 +748,10 @@ func TestHandleDeleteMatch(t *testing.T) {
 		}
 	})
 
-	t.Run("Failure: room not found", func(t *testing.T) {
-		s := NewServerStateManager()
-		h := NewHandler(s)
-
-		rr := doRequest(t, h.HandleDeleteMatch, "DELETE /api/match-rooms/{roomID}/match", "DELETE", "/api/match-rooms/NONEXISTENT/match", "", "dummy-token")
-
-		if status := rr.Code; status != http.StatusNotFound {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusNotFound)
-		}
-		if !strings.Contains(rr.Body.String(), "room not found") {
-			t.Errorf("Expected error message 'room not found', got: %s", rr.Body.String())
-		}
-	})
-
-	t.Run("Failure: invalid token", func(t *testing.T) {
-		roomID, _, _, h := createTestRoomWithMatch(t)
-
-		rr := doRequest(t, h.HandleDeleteMatch, "DELETE /api/match-rooms/{roomID}/match", "DELETE", "/api/match-rooms/"+roomID+"/match", "", "invalid-token")
-
-		if status := rr.Code; status != http.StatusUnauthorized {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusUnauthorized)
-		}
-		if !strings.Contains(rr.Body.String(), "invalid player token") {
-			t.Errorf("Expected error message 'invalid player token', got: %s", rr.Body.String())
-		}
-	})
-
-	t.Run("Failure: missing Authorization header", func(t *testing.T) {
-		roomID, _, _, h := createTestRoomWithMatch(t)
-
-		rr := doRequest(t, h.HandleDeleteMatch, "DELETE /api/match-rooms/{roomID}/match", "DELETE", "/api/match-rooms/"+roomID+"/match", "", "")
-
-		if status := rr.Code; status != http.StatusUnauthorized {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusUnauthorized)
-		}
-		if !strings.Contains(rr.Body.String(), "invalid player token") {
-			t.Errorf("Expected error message 'invalid player token', got: %s", rr.Body.String())
-		}
+	testRouteFailures(t, failureRoute{
+		handler: (*Handler).HandleDeleteMatch,
+		pattern: "DELETE /api/match-rooms/{roomID}/match",
+		cases:   failRoom | failMissingAuth | failInvalidToken,
 	})
 }
 
@@ -832,30 +840,11 @@ func TestHandleGetMatchState(t *testing.T) {
 		}
 	})
 
-	t.Run("Failure: room not found", func(t *testing.T) {
-		s := NewServerStateManager()
-		h := NewHandler(s)
-		rr := doRequest(t, h.HandleGetMatchState, "GET /api/match-rooms/{roomID}/match/state", "GET", "/api/match-rooms/NONEXISTENT/match/state", "", "")
-
-		if status := rr.Code; status != http.StatusNotFound {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusNotFound)
-		}
-		if !strings.Contains(rr.Body.String(), "room not found") {
-			t.Errorf("Expected error message 'room not found', got: %s", rr.Body.String())
-		}
-	})
-
-	t.Run("Failure: match not found", func(t *testing.T) {
-		roomID, _, h := newTestRoom(t)
-
-		rr := doRequest(t, h.HandleGetMatchState, "GET /api/match-rooms/{roomID}/match/state", "GET", "/api/match-rooms/"+roomID+"/match/state", "", "")
-
-		if status := rr.Code; status != http.StatusNotFound {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusNotFound)
-		}
-		if !strings.Contains(rr.Body.String(), "match not found") {
-			t.Errorf("Expected error message 'match not found', got: %s", rr.Body.String())
-		}
+	testRouteFailures(t, failureRoute{
+		handler:  (*Handler).HandleGetMatchState,
+		pattern:  "GET /api/match-rooms/{roomID}/match/state",
+		cases:    failRoom | failMatch,
+		bareRoom: true,
 	})
 
 	t.Run("Failure: failed to Encode", func(t *testing.T) {
@@ -1014,41 +1003,11 @@ func TestHandleSubmitTurnCommand(t *testing.T) {
 		}
 	})
 
-	t.Run("Failure: room not found", func(t *testing.T) {
-		s := NewServerStateManager()
-		h := NewHandler(s)
-
-		unitID := engine.NewUnitID(1, 0)
-		newPos := engine.Coordinate{X: 4, Y: 7}
-		jsonBody, _ := json.Marshal(engine.NewMoveCommand(unitID, newPos))
-
-		rr := doRequest(t, h.HandleSubmitTurnCommand, "POST /api/match-rooms/{roomID}/match/turn-commands", "POST", "/api/match-rooms/NONEXISTENT/match/turn-commands", string(jsonBody), "dummy-token")
-
-		if status := rr.Code; status != http.StatusNotFound {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusNotFound)
-		}
-		if !strings.Contains(rr.Body.String(), "room not found") {
-			t.Errorf("Expected error message 'room not found', got: %s", rr.Body.String())
-		}
-	})
-
-	t.Run("Failure: match not found", func(t *testing.T) {
-		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
-		room := mustRoom(t, s, roomID)
-		room.Match = nil
-
-		unitID := engine.NewUnitID(1, 0)
-		newPos := engine.Coordinate{X: 4, Y: 7}
-		jsonBody, _ := json.Marshal(engine.NewMoveCommand(unitID, newPos))
-
-		rr := doRequest(t, h.HandleSubmitTurnCommand, "POST /api/match-rooms/{roomID}/match/turn-commands", "POST", "/api/match-rooms/"+roomID+"/match/turn-commands", string(jsonBody), playerTokens[0])
-
-		if status := rr.Code; status != http.StatusNotFound {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusNotFound)
-		}
-		if !strings.Contains(rr.Body.String(), "match not found") {
-			t.Errorf("Expected error message 'match not found', got: %s", rr.Body.String())
-		}
+	testRouteFailures(t, failureRoute{
+		handler: (*Handler).HandleSubmitTurnCommand,
+		pattern: "POST /api/match-rooms/{roomID}/match/turn-commands",
+		body:    engine.NewMoveCommand(engine.NewUnitID(1, 0), engine.Coordinate{X: 4, Y: 7}),
+		cases:   failRoom | failMatch | failMissingAuth | failInvalidToken | failWrongTeam,
 	})
 
 	t.Run("Failure: failed to Encode", func(t *testing.T) {
@@ -1096,57 +1055,6 @@ func TestHandleSubmitTurnCommand(t *testing.T) {
 				}
 			})
 	})
-
-	t.Run("Failure: missing Authorization header", func(t *testing.T) {
-		roomID, _, _, h := createTestRoomWithMatch(t)
-
-		unitID := engine.NewUnitID(1, 0)
-		newPos := engine.Coordinate{X: 4, Y: 7}
-		jsonBody, _ := json.Marshal(engine.NewMoveCommand(unitID, newPos))
-
-		rr := doRequest(t, h.HandleSubmitTurnCommand, "POST /api/match-rooms/{roomID}/match/turn-commands", "POST", "/api/match-rooms/"+roomID+"/match/turn-commands", string(jsonBody), "")
-
-		if status := rr.Code; status != http.StatusUnauthorized {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusUnauthorized)
-		}
-		if !strings.Contains(rr.Body.String(), "invalid player token") {
-			t.Errorf("Expected error message 'invalid player token', got: %s", rr.Body.String())
-		}
-	})
-
-	t.Run("Failure: invalid token", func(t *testing.T) {
-		roomID, _, _, h := createTestRoomWithMatch(t)
-
-		unitID := engine.NewUnitID(1, 0)
-		newPos := engine.Coordinate{X: 4, Y: 7}
-		jsonBody, _ := json.Marshal(engine.NewMoveCommand(unitID, newPos))
-
-		rr := doRequest(t, h.HandleSubmitTurnCommand, "POST /api/match-rooms/{roomID}/match/turn-commands", "POST", "/api/match-rooms/"+roomID+"/match/turn-commands", string(jsonBody), "invalid-token")
-
-		if status := rr.Code; status != http.StatusUnauthorized {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusUnauthorized)
-		}
-		if !strings.Contains(rr.Body.String(), "invalid player token") {
-			t.Errorf("Expected error message 'invalid player token', got: %s", rr.Body.String())
-		}
-	})
-
-	t.Run("Failure: wrong team token", func(t *testing.T) {
-		roomID, playerTokens, _, h := createTestRoomWithMatch(t)
-
-		unitID := engine.NewUnitID(1, 0)
-		newPos := engine.Coordinate{X: 4, Y: 7}
-		jsonBody, _ := json.Marshal(engine.NewMoveCommand(unitID, newPos))
-
-		rr := doRequest(t, h.HandleSubmitTurnCommand, "POST /api/match-rooms/{roomID}/match/turn-commands", "POST", "/api/match-rooms/"+roomID+"/match/turn-commands", string(jsonBody), playerTokens[1])
-
-		if status := rr.Code; status != http.StatusUnauthorized {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusUnauthorized)
-		}
-		if !strings.Contains(rr.Body.String(), "invalid player token") {
-			t.Errorf("Expected error message 'invalid player token', got: %s", rr.Body.String())
-		}
-	})
 }
 
 func TestHandleStartTurn(t *testing.T) {
@@ -1188,33 +1096,10 @@ func TestHandleStartTurn(t *testing.T) {
 		}
 	})
 
-	t.Run("Failure: room not found", func(t *testing.T) {
-		s := NewServerStateManager()
-		h := NewHandler(s)
-
-		rr := doRequest(t, h.HandleStartTurn, "POST /api/match-rooms/{roomID}/match/start-turn", "POST", "/api/match-rooms/NONEXISTENT/match/start-turn", "", "dummy-token")
-
-		if status := rr.Code; status != http.StatusNotFound {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusNotFound)
-		}
-		if !strings.Contains(rr.Body.String(), "room not found") {
-			t.Errorf("Expected error message 'room not found', got: %s", rr.Body.String())
-		}
-	})
-
-	t.Run("Failure: match not found", func(t *testing.T) {
-		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
-		room := mustRoom(t, s, roomID)
-		room.Match = nil
-
-		rr := doRequest(t, h.HandleStartTurn, "POST /api/match-rooms/{roomID}/match/start-turn", "POST", "/api/match-rooms/"+roomID+"/match/start-turn", "", playerTokens[0])
-
-		if status := rr.Code; status != http.StatusNotFound {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusNotFound)
-		}
-		if !strings.Contains(rr.Body.String(), "match not found") {
-			t.Errorf("Expected error message 'match not found', got: %s", rr.Body.String())
-		}
+	testRouteFailures(t, failureRoute{
+		handler: (*Handler).HandleStartTurn,
+		pattern: "POST /api/match-rooms/{roomID}/match/start-turn",
+		cases:   failRoom | failMatch | failMissingAuth | failInvalidToken | failWrongTeam,
 	})
 
 	t.Run("Failure: failed to Encode", func(t *testing.T) {
@@ -1261,45 +1146,6 @@ func TestHandleStartTurn(t *testing.T) {
 						}
 					})
 			})
-	})
-
-	t.Run("Failure: missing Authorization header", func(t *testing.T) {
-		roomID, _, _, h := createTestRoomWithMatch(t)
-
-		rr := doRequest(t, h.HandleStartTurn, "POST /api/match-rooms/{roomID}/match/start-turn", "POST", "/api/match-rooms/"+roomID+"/match/start-turn", "", "")
-
-		if status := rr.Code; status != http.StatusUnauthorized {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusUnauthorized)
-		}
-		if !strings.Contains(rr.Body.String(), "invalid player token") {
-			t.Errorf("Expected error message 'invalid player token', got: %s", rr.Body.String())
-		}
-	})
-
-	t.Run("Failure: invalid token", func(t *testing.T) {
-		roomID, _, _, h := createTestRoomWithMatch(t)
-
-		rr := doRequest(t, h.HandleStartTurn, "POST /api/match-rooms/{roomID}/match/start-turn", "POST", "/api/match-rooms/"+roomID+"/match/start-turn", "", "invalid-token")
-
-		if status := rr.Code; status != http.StatusUnauthorized {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusUnauthorized)
-		}
-		if !strings.Contains(rr.Body.String(), "invalid player token") {
-			t.Errorf("Expected error message 'invalid player token', got: %s", rr.Body.String())
-		}
-	})
-
-	t.Run("Failure: wrong team token", func(t *testing.T) {
-		roomID, playerTokens, _, h := createTestRoomWithMatch(t)
-
-		rr := doRequest(t, h.HandleStartTurn, "POST /api/match-rooms/{roomID}/match/start-turn", "POST", "/api/match-rooms/"+roomID+"/match/start-turn", "", playerTokens[1])
-
-		if status := rr.Code; status != http.StatusUnauthorized {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusUnauthorized)
-		}
-		if !strings.Contains(rr.Body.String(), "invalid player token") {
-			t.Errorf("Expected error message 'invalid player token', got: %s", rr.Body.String())
-		}
 	})
 }
 
@@ -1416,33 +1262,10 @@ func TestHandleConsumeCPUStatus(t *testing.T) {
 		}
 	})
 
-	t.Run("Failure: room not found", func(t *testing.T) {
-		s := NewServerStateManager()
-		h := NewHandler(s)
-
-		rr := doRequest(t, h.HandleConsumeCPUStatus, "POST /api/match-rooms/{roomID}/match/cpu-status/consume", "POST", "/api/match-rooms/NONEXISTENT/match/cpu-status/consume", "", "dummy-token")
-
-		if status := rr.Code; status != http.StatusNotFound {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusNotFound)
-		}
-		if !strings.Contains(rr.Body.String(), "room not found") {
-			t.Errorf("Expected error message 'room not found', got: %s", rr.Body.String())
-		}
-	})
-
-	t.Run("Failure: match not found", func(t *testing.T) {
-		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
-		room := mustRoom(t, s, roomID)
-		room.Match = nil
-
-		rr := doRequest(t, h.HandleConsumeCPUStatus, "POST /api/match-rooms/{roomID}/match/cpu-status/consume", "POST", "/api/match-rooms/"+roomID+"/match/cpu-status/consume", "", playerTokens[0])
-
-		if status := rr.Code; status != http.StatusNotFound {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusNotFound)
-		}
-		if !strings.Contains(rr.Body.String(), "match not found") {
-			t.Errorf("Expected error message 'match not found', got: %s", rr.Body.String())
-		}
+	testRouteFailures(t, failureRoute{
+		handler: (*Handler).HandleConsumeCPUStatus,
+		pattern: "POST /api/match-rooms/{roomID}/match/cpu-status/consume",
+		cases:   failRoom | failMatch | failMissingAuth | failInvalidToken,
 	})
 
 	t.Run("Failure: failed to Encode", func(t *testing.T) {
@@ -1491,32 +1314,6 @@ func TestHandleConsumeCPUStatus(t *testing.T) {
 				}
 			})
 	})
-
-	t.Run("Failure: missing Authorization header", func(t *testing.T) {
-		roomID, _, _, h := createTestRoomWithMatch(t)
-
-		rr := doRequest(t, h.HandleConsumeCPUStatus, "POST /api/match-rooms/{roomID}/match/cpu-status/consume", "POST", "/api/match-rooms/"+roomID+"/match/cpu-status/consume", "", "")
-
-		if status := rr.Code; status != http.StatusUnauthorized {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusUnauthorized)
-		}
-		if !strings.Contains(rr.Body.String(), "invalid player token") {
-			t.Errorf("Expected error message 'invalid player token', got: %s", rr.Body.String())
-		}
-	})
-
-	t.Run("Failure: invalid token", func(t *testing.T) {
-		roomID, _, _, h := createTestRoomWithMatch(t)
-
-		rr := doRequest(t, h.HandleConsumeCPUStatus, "POST /api/match-rooms/{roomID}/match/cpu-status/consume", "POST", "/api/match-rooms/"+roomID+"/match/cpu-status/consume", "", "invalid-token")
-
-		if status := rr.Code; status != http.StatusUnauthorized {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusUnauthorized)
-		}
-		if !strings.Contains(rr.Body.String(), "invalid player token") {
-			t.Errorf("Expected error message 'invalid player token', got: %s", rr.Body.String())
-		}
-	})
 }
 
 func TestHandleResetTurn(t *testing.T) {
@@ -1545,72 +1342,10 @@ func TestHandleResetTurn(t *testing.T) {
 		}
 	})
 
-	t.Run("Failure: room not found", func(t *testing.T) {
-		s := NewServerStateManager()
-		h := NewHandler(s)
-
-		rr := doRequest(t, h.HandleResetTurn, "POST /api/match-rooms/{roomID}/match/reset", "POST", "/api/match-rooms/NONEXISTENT/match/reset", "", "dummy-token")
-
-		if status := rr.Code; status != http.StatusNotFound {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusNotFound)
-		}
-		if !strings.Contains(rr.Body.String(), "room not found") {
-			t.Errorf("Expected error message 'room not found', got: %s", rr.Body.String())
-		}
-	})
-
-	t.Run("Failure: match not found", func(t *testing.T) {
-		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
-		room := mustRoom(t, s, roomID)
-		room.Match = nil
-
-		rr := doRequest(t, h.HandleResetTurn, "POST /api/match-rooms/{roomID}/match/reset", "POST", "/api/match-rooms/"+roomID+"/match/reset", "", playerTokens[0])
-
-		if status := rr.Code; status != http.StatusNotFound {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusNotFound)
-		}
-		if !strings.Contains(rr.Body.String(), "match not found") {
-			t.Errorf("Expected error message 'match not found', got: %s", rr.Body.String())
-		}
-	})
-
-	t.Run("Failure: missing Authorization header", func(t *testing.T) {
-		roomID, _, _, h := createTestRoomWithMatch(t)
-
-		rr := doRequest(t, h.HandleResetTurn, "POST /api/match-rooms/{roomID}/match/reset", "POST", "/api/match-rooms/"+roomID+"/match/reset", "", "")
-
-		if status := rr.Code; status != http.StatusUnauthorized {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusUnauthorized)
-		}
-		if !strings.Contains(rr.Body.String(), "invalid player token") {
-			t.Errorf("Expected error message 'invalid player token', got: %s", rr.Body.String())
-		}
-	})
-
-	t.Run("Failure: invalid token", func(t *testing.T) {
-		roomID, _, _, h := createTestRoomWithMatch(t)
-
-		rr := doRequest(t, h.HandleResetTurn, "POST /api/match-rooms/{roomID}/match/reset", "POST", "/api/match-rooms/"+roomID+"/match/reset", "", "invalid-token")
-
-		if status := rr.Code; status != http.StatusUnauthorized {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusUnauthorized)
-		}
-		if !strings.Contains(rr.Body.String(), "invalid player token") {
-			t.Errorf("Expected error message 'invalid player token', got: %s", rr.Body.String())
-		}
-	})
-
-	t.Run("Failure: wrong team token", func(t *testing.T) {
-		roomID, playerTokens, _, h := createTestRoomWithMatch(t)
-
-		rr := doRequest(t, h.HandleResetTurn, "POST /api/match-rooms/{roomID}/match/reset", "POST", "/api/match-rooms/"+roomID+"/match/reset", "", playerTokens[1])
-
-		if status := rr.Code; status != http.StatusUnauthorized {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusUnauthorized)
-		}
-		if !strings.Contains(rr.Body.String(), "invalid player token") {
-			t.Errorf("Expected error message 'invalid player token', got: %s", rr.Body.String())
-		}
+	testRouteFailures(t, failureRoute{
+		handler: (*Handler).HandleResetTurn,
+		pattern: "POST /api/match-rooms/{roomID}/match/reset",
+		cases:   failRoom | failMatch | failMissingAuth | failInvalidToken | failWrongTeam,
 	})
 }
 
@@ -1654,33 +1389,10 @@ func TestHandleResolveTurn(t *testing.T) {
 		}
 	})
 
-	t.Run("Failure: room not found", func(t *testing.T) {
-		s := NewServerStateManager()
-		h := NewHandler(s)
-
-		rr := doRequest(t, h.HandleResolveTurn, "POST /api/match-rooms/{roomID}/match/resolve", "POST", "/api/match-rooms/NONEXISTENT/match/resolve", "", "dummy-token")
-
-		if status := rr.Code; status != http.StatusNotFound {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusNotFound)
-		}
-		if !strings.Contains(rr.Body.String(), "room not found") {
-			t.Errorf("Expected error message 'room not found', got: %s", rr.Body.String())
-		}
-	})
-
-	t.Run("Failure: match not found", func(t *testing.T) {
-		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
-		room := mustRoom(t, s, roomID)
-		room.Match = nil
-
-		rr := doRequest(t, h.HandleResolveTurn, "POST /api/match-rooms/{roomID}/match/resolve", "POST", "/api/match-rooms/"+roomID+"/match/resolve", "", playerTokens[0])
-
-		if status := rr.Code; status != http.StatusNotFound {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusNotFound)
-		}
-		if !strings.Contains(rr.Body.String(), "match not found") {
-			t.Errorf("Expected error message 'match not found', got: %s", rr.Body.String())
-		}
+	testRouteFailures(t, failureRoute{
+		handler: (*Handler).HandleResolveTurn,
+		pattern: "POST /api/match-rooms/{roomID}/match/resolve",
+		cases:   failRoom | failMatch | failMissingAuth | failInvalidToken | failWrongTeam,
 	})
 
 	t.Run("Failure: failed to Encode", func(t *testing.T) {
@@ -1725,45 +1437,6 @@ func TestHandleResolveTurn(t *testing.T) {
 				}
 			})
 
-	})
-
-	t.Run("Failure: missing Authorization header", func(t *testing.T) {
-		roomID, _, _, h := createTestRoomWithMatch(t)
-
-		rr := doRequest(t, h.HandleResolveTurn, "POST /api/match-rooms/{roomID}/match/resolve", "POST", "/api/match-rooms/"+roomID+"/match/resolve", "", "")
-
-		if status := rr.Code; status != http.StatusUnauthorized {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusUnauthorized)
-		}
-		if !strings.Contains(rr.Body.String(), "invalid player token") {
-			t.Errorf("Expected error message 'invalid player token', got: %s", rr.Body.String())
-		}
-	})
-
-	t.Run("Failure: invalid token", func(t *testing.T) {
-		roomID, _, _, h := createTestRoomWithMatch(t)
-
-		rr := doRequest(t, h.HandleResolveTurn, "POST /api/match-rooms/{roomID}/match/resolve", "POST", "/api/match-rooms/"+roomID+"/match/resolve", "", "invalid-token")
-
-		if status := rr.Code; status != http.StatusUnauthorized {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusUnauthorized)
-		}
-		if !strings.Contains(rr.Body.String(), "invalid player token") {
-			t.Errorf("Expected error message 'invalid player token', got: %s", rr.Body.String())
-		}
-	})
-
-	t.Run("Failure: wrong team token", func(t *testing.T) {
-		roomID, playerTokens, _, h := createTestRoomWithMatch(t)
-
-		rr := doRequest(t, h.HandleResolveTurn, "POST /api/match-rooms/{roomID}/match/resolve", "POST", "/api/match-rooms/"+roomID+"/match/resolve", "", playerTokens[1])
-
-		if status := rr.Code; status != http.StatusUnauthorized {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusUnauthorized)
-		}
-		if !strings.Contains(rr.Body.String(), "invalid player token") {
-			t.Errorf("Expected error message 'invalid player token', got: %s", rr.Body.String())
-		}
 	})
 }
 
@@ -1826,35 +1499,11 @@ func TestHandleSurrender(t *testing.T) {
 		}
 	})
 
-	t.Run("Failure: room not found", func(t *testing.T) {
-		s := NewServerStateManager()
-		h := NewHandler(s)
-
-		jsonBody, _ := json.Marshal(SurrenderRequest{TeamID: 1})
-		rr := doRequest(t, h.HandleSurrender, "POST /api/match-rooms/{roomID}/match/surrender", "POST", "/api/match-rooms/NONEXISTENT/match/surrender", string(jsonBody), "dummy-token")
-
-		if status := rr.Code; status != http.StatusNotFound {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusNotFound)
-		}
-		if !strings.Contains(rr.Body.String(), "room not found") {
-			t.Errorf("Expected error message 'room not found', got: %s", rr.Body.String())
-		}
-	})
-
-	t.Run("Failure: match not found", func(t *testing.T) {
-		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
-		room := mustRoom(t, s, roomID)
-		room.Match = nil
-
-		jsonBody, _ := json.Marshal(SurrenderRequest{TeamID: 1})
-		rr := doRequest(t, h.HandleSurrender, "POST /api/match-rooms/{roomID}/match/surrender", "POST", "/api/match-rooms/"+roomID+"/match/surrender", string(jsonBody), playerTokens[0])
-
-		if status := rr.Code; status != http.StatusNotFound {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusNotFound)
-		}
-		if !strings.Contains(rr.Body.String(), "match not found") {
-			t.Errorf("Expected error message 'match not found', got: %s", rr.Body.String())
-		}
+	testRouteFailures(t, failureRoute{
+		handler: (*Handler).HandleSurrender,
+		pattern: "POST /api/match-rooms/{roomID}/match/surrender",
+		body:    SurrenderRequest{TeamID: 1},
+		cases:   failRoom | failMatch | failMissingAuth | failInvalidToken | failWrongTeam,
 	})
 
 	t.Run("Failure: failed to Encode", func(t *testing.T) {
@@ -1883,48 +1532,6 @@ func TestHandleSurrender(t *testing.T) {
 		assertArrayContract(t, rr.Body.Bytes(), []string{"type", "winnerTeamId",
 			"unitId", "countdown", "newHp"},
 			nil)
-	})
-
-	t.Run("Failure: missing Authorization header", func(t *testing.T) {
-		roomID, _, _, h := createTestRoomWithMatch(t)
-
-		jsonBody, _ := json.Marshal(SurrenderRequest{TeamID: 1})
-		rr := doRequest(t, h.HandleSurrender, "POST /api/match-rooms/{roomID}/match/surrender", "POST", "/api/match-rooms/"+roomID+"/match/surrender", string(jsonBody), "")
-
-		if status := rr.Code; status != http.StatusUnauthorized {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusUnauthorized)
-		}
-		if !strings.Contains(rr.Body.String(), "invalid player token") {
-			t.Errorf("Expected error message 'invalid player token', got: %s", rr.Body.String())
-		}
-	})
-
-	t.Run("Failure: invalid token", func(t *testing.T) {
-		roomID, _, _, h := createTestRoomWithMatch(t)
-
-		jsonBody, _ := json.Marshal(SurrenderRequest{TeamID: 1})
-		rr := doRequest(t, h.HandleSurrender, "POST /api/match-rooms/{roomID}/match/surrender", "POST", "/api/match-rooms/"+roomID+"/match/surrender", string(jsonBody), "invalid-token")
-
-		if status := rr.Code; status != http.StatusUnauthorized {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusUnauthorized)
-		}
-		if !strings.Contains(rr.Body.String(), "invalid player token") {
-			t.Errorf("Expected error message 'invalid player token', got: %s", rr.Body.String())
-		}
-	})
-
-	t.Run("Failure: wrong team token", func(t *testing.T) {
-		roomID, playerTokens, _, h := createTestRoomWithMatch(t)
-
-		jsonBody, _ := json.Marshal(SurrenderRequest{TeamID: 1})
-		rr := doRequest(t, h.HandleSurrender, "POST /api/match-rooms/{roomID}/match/surrender", "POST", "/api/match-rooms/"+roomID+"/match/surrender", string(jsonBody), playerTokens[1])
-
-		if status := rr.Code; status != http.StatusUnauthorized {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusUnauthorized)
-		}
-		if !strings.Contains(rr.Body.String(), "invalid player token") {
-			t.Errorf("Expected error message 'invalid player token', got: %s", rr.Body.String())
-		}
 	})
 }
 
@@ -1961,30 +1568,11 @@ func TestHandleGetMatchConfig(t *testing.T) {
 		}
 	})
 
-	t.Run("Failure: room not found", func(t *testing.T) {
-		s := NewServerStateManager()
-		h := NewHandler(s)
-		rr := doRequest(t, h.HandleGetMatchConfig, "GET /api/match-rooms/{roomID}/match/config", "GET", "/api/match-rooms/NONEXISTENT/match/config", "", "")
-
-		if status := rr.Code; status != http.StatusNotFound {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusNotFound)
-		}
-		if !strings.Contains(rr.Body.String(), "room not found") {
-			t.Errorf("Expected error message 'room not found', got: %s", rr.Body.String())
-		}
-	})
-
-	t.Run("Failure: match not found", func(t *testing.T) {
-		roomID, _, h := newTestRoom(t)
-
-		rr := doRequest(t, h.HandleGetMatchConfig, "GET /api/match-rooms/{roomID}/match/config", "GET", "/api/match-rooms/"+roomID+"/match/config", "", "")
-
-		if status := rr.Code; status != http.StatusNotFound {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusNotFound)
-		}
-		if !strings.Contains(rr.Body.String(), "match not found") {
-			t.Errorf("Expected error message 'match not found', got: %s", rr.Body.String())
-		}
+	testRouteFailures(t, failureRoute{
+		handler:  (*Handler).HandleGetMatchConfig,
+		pattern:  "GET /api/match-rooms/{roomID}/match/config",
+		cases:    failRoom | failMatch,
+		bareRoom: true,
 	})
 
 	t.Run("Failure: failed to Encode", func(t *testing.T) {
@@ -2125,30 +1713,12 @@ func TestHandleGetAllowedTiles(t *testing.T) {
 		}
 	})
 
-	t.Run("Failure: room not found", func(t *testing.T) {
-		s := NewServerStateManager()
-		h := NewHandler(s)
-		rr := doRequest(t, h.HandleGetAllowedTiles, "GET /api/match-rooms/{roomID}/match/allowed-tiles", "GET", "/api/match-rooms/NONEXISTENT/match/allowed-tiles?unitId=16&turnCmdType=placeBomb", "", "")
-
-		if status := rr.Code; status != http.StatusNotFound {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusNotFound)
-		}
-		if !strings.Contains(rr.Body.String(), "room not found") {
-			t.Errorf("Expected error message 'room not found', got: %s", rr.Body.String())
-		}
-	})
-
-	t.Run("Failure: match not found", func(t *testing.T) {
-		roomID, _, h := newTestRoom(t)
-
-		rr := doRequest(t, h.HandleGetAllowedTiles, "GET /api/match-rooms/{roomID}/match/allowed-tiles", "GET", "/api/match-rooms/"+roomID+"/match/allowed-tiles?unitId=16&turnCmdType=placeBomb", "", "")
-
-		if status := rr.Code; status != http.StatusNotFound {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusNotFound)
-		}
-		if !strings.Contains(rr.Body.String(), "match not found") {
-			t.Errorf("Expected error message 'match not found', got: %s", rr.Body.String())
-		}
+	testRouteFailures(t, failureRoute{
+		handler:  (*Handler).HandleGetAllowedTiles,
+		pattern:  "GET /api/match-rooms/{roomID}/match/allowed-tiles",
+		query:    "?unitId=16&turnCmdType=placeBomb",
+		cases:    failRoom | failMatch,
+		bareRoom: true,
 	})
 
 	t.Run("Failure: failed to Encode", func(t *testing.T) {
