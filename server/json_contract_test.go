@@ -1,7 +1,8 @@
 package server
 
 import (
-	"encoding/json"
+	"encoding/json/v2"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -45,11 +46,60 @@ func TestSurrenderRequestDecoding(t *testing.T) {
 				return
 			}
 			var gameEvents []engine.GameEvent
-			if err := json.NewDecoder(rr.Body).Decode(&gameEvents); err != nil {
+			if err := json.UnmarshalRead(rr.Body, &gameEvents); err != nil {
 				t.Fatalf("decode response: %v", err)
 			}
 			if len(gameEvents) != 1 || gameEvents[0].WinnerTeamID != 2 {
 				t.Errorf("gameEvents = %+v, want one event with WinnerTeamID 2", gameEvents)
+			}
+		})
+	}
+}
+
+func TestMatchStateWireShape(t *testing.T) {
+	roomID, _, _, h := createTestRoomWithMatch(t)
+	req := httptest.NewRequest("GET", "/api/match-rooms/"+roomID+"/match/state", nil)
+	rr := httptest.NewRecorder()
+	testMux("GET /api/match-rooms/{roomID}/match/state", h.HandleGetMatchState).ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rr.Code, http.StatusOK)
+	}
+	var state map[string]any
+	if err := json.Unmarshal(rr.Body.Bytes(), &state); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	tests := []struct {
+		key  string
+		want string
+	}{
+		{"turn", "number"},
+		{"activeTeam", "number"},
+		{"inSuddenDeath", "bool"},
+		{"grid", "array"},
+		{"units", "array"},
+		{"bombs", "array"},
+		{"softBlocks", "array"},
+		{"turnCommands", "array"},
+	}
+	if len(state) != len(tests) {
+		t.Errorf("state has %d keys, want %d", len(state), len(tests))
+	}
+	for _, tt := range tests {
+		t.Run(tt.key, func(t *testing.T) {
+			var got string
+			switch state[tt.key].(type) {
+			case []any:
+				got = "array"
+			case float64:
+				got = "number"
+			case bool:
+				got = "bool"
+			default:
+				got = fmt.Sprintf("%T", state[tt.key])
+			}
+			if got != tt.want {
+				t.Errorf("%s is %s, want %s", tt.key, got, tt.want)
 			}
 		})
 	}
