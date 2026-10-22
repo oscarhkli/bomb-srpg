@@ -59,7 +59,7 @@ web-build: web-format web-typecheck
 	cd web && npm run build
 
 web-e2e: build-server
-	cd web && npm run build:e2e && npm run e2e -- $(if $(E2E_BROWSER),--project $(E2E_BROWSER))
+	cd web && npm run build:e2e && E2E_PORT=$$(node -e "const s=require('net').createServer().listen(0,()=>{console.log(s.address().port);s.close()})") npm run e2e -- $(if $(E2E_BROWSER),--project $(E2E_BROWSER))
 
 web-coverage: web-format web-typecheck
 	cd web && npm run test:run -- --coverage
