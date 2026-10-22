@@ -205,11 +205,9 @@ jobs:
         working-directory: web
 
       - name: Install ${{ matrix.browser }}
-        # The Ubuntu mirror sometimes crawls; a fresh attempt usually finds a fast one.
-        run: |
-          timeout -k 10 180 npx playwright install --with-deps ${{ matrix.browser }} ||
-            timeout -k 10 180 npx playwright install --with-deps ${{ matrix.browser }}
+        run: npx playwright install --with-deps ${{ matrix.browser }}
         working-directory: web
+        timeout-minutes: 4
 
       - name: Run e2e tests
         run: make web-e2e E2E_BROWSER=${{ matrix.project }}
