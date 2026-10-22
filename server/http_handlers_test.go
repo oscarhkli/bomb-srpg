@@ -5,6 +5,7 @@ import (
 	"encoding/json/jsontext"
 	"encoding/json/v2"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -126,6 +127,30 @@ func assertMatchStateNested(t *testing.T, raw map[string]any) {
 	} else {
 		assertKeys(t, tc, []string{"type", "unitId", "target"}, "Contract Broken: turnCommand missing key '%s'")
 	}
+}
+
+// BrokenResponseWriter simulates a severed connection or dropped TCP socket mid-transit.
+type BrokenResponseWriter struct {
+	header http.Header
+	Code   int
+}
+
+func (b *BrokenResponseWriter) Header() http.Header {
+	if b.header == nil {
+		b.header = make(http.Header)
+	}
+	return b.header
+}
+
+func (b *BrokenResponseWriter) Write(bytes []byte) (int, error) {
+	return 0, fmt.Errorf("network connection systematically aborted by peer")
+}
+
+func (b *BrokenResponseWriter) WriteHeader(statusCode int) {
+	if b.Code != 0 {
+		return
+	}
+	b.Code = statusCode
 }
 
 func testEncodeFailure(t *testing.T, handler http.Handler, setup func() *http.Request, expectedStatus int) {

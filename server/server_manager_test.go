@@ -3,17 +3,9 @@ package server
 import (
 	"bomb-srpg/engine"
 	"fmt"
-	"log/slog"
 	"reflect"
 	"testing"
 )
-
-func TestMain(m *testing.M) {
-	slog.SetDefault(slog.New(slog.NewTextHandler(nil, &slog.HandlerOptions{
-		Level: slog.LevelError + 1,
-	})))
-	m.Run()
-}
 
 func validGameCfg() engine.GameCfg {
 	return engine.GameCfg{
