@@ -33,16 +33,14 @@ func (c *MatchController) StartInputLoop() {
 	scanner := bufio.NewScanner(c.input)
 
 	for {
-		gameEvents := c.Match.StartTurn()
-		c.View.RenderGameEvents(gameEvents)
+		c.View.RenderGameEvents(c.Match.StartTurn())
 
 		if err := c.View.RenderBoard(c.Match.WorkingState); err != nil {
 			log.Fatalf("Critical Interface Failure: %v", err)
 		}
 
 		if c.Match.WinnerTeamID != 0 {
-			message := winnerMessage(c.Match.WinnerTeamID)
-			c.View.RenderFeedback(true, message)
+			c.View.RenderFeedback(true, winnerMessage(c.Match.WinnerTeamID))
 
 			return
 		}
