@@ -1,11 +1,8 @@
 package server
 
 import (
-	"bytes"
 	"encoding/json/v2"
-	"fmt"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 )
 
@@ -23,13 +20,7 @@ func TestHandleCreateMatch_MaxTurnsBound(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := NewServerStateManager()
-			mux := http.NewServeMux()
-			RegisterRoutes(mux, NewHandler(s))
-			roomID, err := s.CreateMatchRoom()
-			if err != nil {
-				t.Fatalf("Failed to create room: %v", err)
-			}
+			roomID, _, h := newTestRoom(t)
 
 			cfg := validGameCfg()
 			cfg.MaxTurns = tt.maxTurns
@@ -38,12 +29,10 @@ func TestHandleCreateMatch_MaxTurnsBound(t *testing.T) {
 				t.Fatalf("Failed to encode request: %v", err)
 			}
 
-			req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/api/match-rooms/%s/match", roomID), bytes.NewReader(body))
-			rec := httptest.NewRecorder()
-			mux.ServeHTTP(rec, req)
+			rr := doRequest(t, h.HandleCreateMatch, "POST /api/match-rooms/{roomID}/match", http.MethodPost, "/api/match-rooms/"+roomID+"/match", string(body), "")
 
-			if rec.Code != tt.want {
-				t.Errorf("got status %d, want %d (body %q)", rec.Code, tt.want, rec.Body.String())
+			if rr.Code != tt.want {
+				t.Errorf("got status %d, want %d (body %q)", rr.Code, tt.want, rr.Body.String())
 			}
 		})
 	}
