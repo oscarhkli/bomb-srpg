@@ -399,19 +399,9 @@ func TestHandleCreateMatchRoom(t *testing.T) {
 
 func TestHandleCreateNewMatch(t *testing.T) {
 	t.Run("Success: creates a new match in an existing room", func(t *testing.T) {
-		s := NewServerStateManager()
-		h := NewHandler(s)
-		roomID, err := s.CreateMatchRoom()
-		if err != nil {
-			t.Fatalf("Failed to create room: %v", err)
-		}
+		roomID, s, h := newTestRoom(t)
 
-		gameCfg := engine.GameCfg{
-			StagePreset: "Plain",
-			P1Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Fighter", Role: engine.RoleNormal}},
-			P2Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Witch", Role: engine.RoleNormal}},
-			MaxTurns:    10,
-		}
+		gameCfg := validGameCfg()
 		jsonBody, _ := json.Marshal(CreateMatchRequest{GameCfg: gameCfg})
 		rr := doRequest(t, h.HandleCreateMatch, "POST /api/match-rooms/{roomID}/match", "POST", "/api/match-rooms/"+roomID+"/match", string(jsonBody), "")
 
@@ -446,12 +436,7 @@ func TestHandleCreateNewMatch(t *testing.T) {
 	t.Run("Failure: room not found", func(t *testing.T) {
 		s := NewServerStateManager()
 		h := NewHandler(s)
-		gameCfg := engine.GameCfg{
-			StagePreset: "Plain",
-			P1Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Fighter", Role: engine.RoleNormal}},
-			P2Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Witch", Role: engine.RoleNormal}},
-			MaxTurns:    10,
-		}
+		gameCfg := validGameCfg()
 		jsonBody, _ := json.Marshal(gameCfg)
 		rr := doRequest(t, h.HandleCreateMatch, "POST /api/match-rooms/{roomID}/match", "POST", "/api/match-rooms/NONEXISTENT/match", string(jsonBody), "")
 
@@ -464,21 +449,11 @@ func TestHandleCreateNewMatch(t *testing.T) {
 	})
 
 	t.Run("Failure: match already exists", func(t *testing.T) {
-		s := NewServerStateManager()
-		h := NewHandler(s)
-		roomID, err := s.CreateMatchRoom()
-		if err != nil {
-			t.Fatalf("Failed to create room: %v", err)
-		}
+		roomID, s, h := newTestRoom(t)
 		room := mustRoom(t, s, roomID)
 		room.Match = &engine.Match{}
 
-		gameCfg := engine.GameCfg{
-			StagePreset: "Plain",
-			P1Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Fighter", Role: engine.RoleNormal}},
-			P2Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Witch", Role: engine.RoleNormal}},
-			MaxTurns:    10,
-		}
+		gameCfg := validGameCfg()
 		jsonBody, _ := json.Marshal(CreateMatchRequest{GameCfg: gameCfg})
 		rr := doRequest(t, h.HandleCreateMatch, "POST /api/match-rooms/{roomID}/match", "POST", "/api/match-rooms/"+roomID+"/match", string(jsonBody), "")
 
@@ -491,12 +466,7 @@ func TestHandleCreateNewMatch(t *testing.T) {
 	})
 
 	t.Run("Failure: invalid game config", func(t *testing.T) {
-		s := NewServerStateManager()
-		h := NewHandler(s)
-		roomID, err := s.CreateMatchRoom()
-		if err != nil {
-			t.Fatalf("Failed to create room: %v", err)
-		}
+		roomID, _, h := newTestRoom(t)
 
 		gameCfg := engine.GameCfg{
 			StagePreset: "INVALID_STAGE",
@@ -514,12 +484,7 @@ func TestHandleCreateNewMatch(t *testing.T) {
 	})
 
 	t.Run("Failure: invalid JSON format", func(t *testing.T) {
-		s := NewServerStateManager()
-		h := NewHandler(s)
-		roomID, err := s.CreateMatchRoom()
-		if err != nil {
-			t.Fatalf("Failed to create room: %v", err)
-		}
+		roomID, _, h := newTestRoom(t)
 
 		rr := doRequest(t, h.HandleCreateMatch, "POST /api/match-rooms/{roomID}/match", "POST", "/api/match-rooms/"+roomID+"/match", "{invalid json", "")
 
@@ -543,12 +508,7 @@ func TestHandleCreateNewMatch(t *testing.T) {
 	}
 	for _, tt := range roleTests {
 		t.Run("role: "+tt.name, func(t *testing.T) {
-			s := NewServerStateManager()
-			h := NewHandler(s)
-			roomID, err := s.CreateMatchRoom()
-			if err != nil {
-				t.Fatalf("Failed to create room: %v", err)
-			}
+			roomID, _, h := newTestRoom(t)
 
 			body := `{"gameCfg":{"stagePreset":"Plain","maxTurns":10,` +
 				`"p1Slots":[{"archetype":"King","role":"King"},{"archetype":"Fighter","role":` + tt.role + `}],` +
@@ -565,19 +525,9 @@ func TestHandleCreateNewMatch(t *testing.T) {
 	}
 
 	t.Run("Failure: failed to Encode response", func(t *testing.T) {
-		s := NewServerStateManager()
-		h := NewHandler(s)
-		roomID, err := s.CreateMatchRoom()
-		if err != nil {
-			t.Fatalf("Failed to create room: %v", err)
-		}
+		roomID, _, h := newTestRoom(t)
 
-		gameCfg := engine.GameCfg{
-			StagePreset: "Plain",
-			P1Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Fighter", Role: engine.RoleNormal}},
-			P2Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Witch", Role: engine.RoleNormal}},
-			MaxTurns:    10,
-		}
+		gameCfg := validGameCfg()
 		jsonBody, _ := json.Marshal(CreateMatchRequest{GameCfg: gameCfg})
 		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match", strings.NewReader(string(jsonBody)))
 		if err != nil {
@@ -594,18 +544,8 @@ func TestHandleCreateNewMatch(t *testing.T) {
 	})
 
 	t.Run("Test Contract", func(t *testing.T) {
-		s := NewServerStateManager()
-		h := NewHandler(s)
-		roomID, err := s.CreateMatchRoom()
-		if err != nil {
-			t.Fatalf("Failed to create room: %v", err)
-		}
-		gameCfg := engine.GameCfg{
-			StagePreset: "Plain",
-			P1Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Fighter", Role: engine.RoleNormal}},
-			P2Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Witch", Role: engine.RoleNormal}},
-			MaxTurns:    10,
-		}
+		roomID, _, h := newTestRoom(t)
+		gameCfg := validGameCfg()
 		jsonBody, _ := json.Marshal(CreateMatchRequest{GameCfg: gameCfg})
 		rr := doRequest(t, h.HandleCreateMatch, "POST /api/match-rooms/{roomID}/match", "POST", "/api/match-rooms/"+roomID+"/match", string(jsonBody), "")
 
@@ -844,12 +784,7 @@ type ClientMatchStateResponse struct {
 
 func TestHandleGetMatchState(t *testing.T) {
 	t.Run("Success: get match state in an existing room", func(t *testing.T) {
-		s := NewServerStateManager()
-		h := NewHandler(s)
-		roomID, err := s.CreateMatchRoom()
-		if err != nil {
-			t.Fatalf("Failed to create room: %v", err)
-		}
+		roomID, s, h := newTestRoom(t)
 
 		gameCfg := engine.GameCfg{
 			StagePreset: "Divided",
@@ -857,10 +792,7 @@ func TestHandleGetMatchState(t *testing.T) {
 			P2Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Witch", Role: engine.RoleNormal}},
 			MaxTurns:    10,
 		}
-		_, err = s.CreateMatch(roomID, gameCfg)
-		if err != nil {
-			t.Fatalf("Failed to create match: %v", err)
-		}
+		mustCreateMatch(t, s, roomID, gameCfg)
 
 		rr := doRequest(t, h.HandleGetMatchState, "GET /api/match-rooms/{roomID}/match/state", "GET", "/api/match-rooms/"+roomID+"/match/state", "", "")
 
@@ -914,12 +846,7 @@ func TestHandleGetMatchState(t *testing.T) {
 	})
 
 	t.Run("Failure: match not found", func(t *testing.T) {
-		s := NewServerStateManager()
-		h := NewHandler(s)
-		roomID, err := s.CreateMatchRoom()
-		if err != nil {
-			t.Fatalf("Failed to create room: %v", err)
-		}
+		roomID, _, h := newTestRoom(t)
 
 		rr := doRequest(t, h.HandleGetMatchState, "GET /api/match-rooms/{roomID}/match/state", "GET", "/api/match-rooms/"+roomID+"/match/state", "", "")
 
@@ -932,23 +859,10 @@ func TestHandleGetMatchState(t *testing.T) {
 	})
 
 	t.Run("Failure: failed to Encode", func(t *testing.T) {
-		s := NewServerStateManager()
-		h := NewHandler(s)
-		roomID, err := s.CreateMatchRoom()
-		if err != nil {
-			t.Fatalf("Failed to create room: %v", err)
-		}
+		roomID, s, h := newTestRoom(t)
 
-		gameCfg := engine.GameCfg{
-			StagePreset: "Plain",
-			P1Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Fighter", Role: engine.RoleNormal}},
-			P2Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Witch", Role: engine.RoleNormal}},
-			MaxTurns:    10,
-		}
-		_, err = s.CreateMatch(roomID, gameCfg)
-		if err != nil {
-			t.Fatalf("Failed to create match: %v", err)
-		}
+		gameCfg := validGameCfg()
+		mustCreateMatch(t, s, roomID, gameCfg)
 
 		testEncodeFailure(t, testMux("GET /api/match-rooms/{roomID}/match/state", h.HandleGetMatchState),
 			func() *http.Request {
@@ -958,12 +872,7 @@ func TestHandleGetMatchState(t *testing.T) {
 	})
 
 	t.Run("Test Contract", func(t *testing.T) {
-		s := NewServerStateManager()
-		h := NewHandler(s)
-		roomID, err := s.CreateMatchRoom()
-		if err != nil {
-			t.Fatalf("Failed to create room: %v", err)
-		}
+		roomID, s, h := newTestRoom(t)
 
 		gameCfg := engine.GameCfg{
 			StagePreset: "Divided",
@@ -996,26 +905,23 @@ func TestHandleGetMatchState(t *testing.T) {
 	})
 }
 
-func createTestRoomWithMatch(t *testing.T) (string, [2]string, *ServerStateManager, *Handler) {
+func newTestRoom(t *testing.T) (string, *ServerStateManager, *Handler) {
 	t.Helper()
-
 	s := NewServerStateManager()
 	h := NewHandler(s)
 	roomID, err := s.CreateMatchRoom()
 	if err != nil {
 		t.Fatalf("Failed to create room: %v", err)
 	}
+	return roomID, s, h
+}
 
-	gameCfg := engine.GameCfg{
-		StagePreset: "Plain",
-		P1Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Fighter", Role: engine.RoleNormal}},
-		P2Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Witch", Role: engine.RoleNormal}},
-		MaxTurns:    10,
-	}
-	playerTokens, err := s.CreateMatch(roomID, gameCfg)
-	if err != nil {
-		t.Fatalf("Failed to create match: %v", err)
-	}
+func createTestRoomWithMatch(t *testing.T) (string, [2]string, *ServerStateManager, *Handler) {
+	t.Helper()
+
+	roomID, s, h := newTestRoom(t)
+
+	playerTokens := mustCreateMatch(t, s, roomID, validGameCfg())
 
 	return roomID, playerTokens, s, h
 }
@@ -2024,12 +1930,7 @@ func TestHandleSurrender(t *testing.T) {
 
 func TestHandleGetMatchConfig(t *testing.T) {
 	t.Run("Success: get the gameConfig in an existing room", func(t *testing.T) {
-		s := NewServerStateManager()
-		h := NewHandler(s)
-		roomID, err := s.CreateMatchRoom()
-		if err != nil {
-			t.Fatalf("Failed to create room: %v", err)
-		}
+		roomID, s, h := newTestRoom(t)
 
 		gameCfg := engine.GameCfg{
 			StagePreset: "Divided",
@@ -2037,10 +1938,7 @@ func TestHandleGetMatchConfig(t *testing.T) {
 			P2Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Witch", Role: engine.RoleNormal}},
 			MaxTurns:    10,
 		}
-		_, err = s.CreateMatch(roomID, gameCfg)
-		if err != nil {
-			t.Fatalf("Failed to create match: %v", err)
-		}
+		mustCreateMatch(t, s, roomID, gameCfg)
 
 		rr := doRequest(t, h.HandleGetMatchConfig, "GET /api/match-rooms/{roomID}/match/config", "GET", "/api/match-rooms/"+roomID+"/match/config", "", "")
 
@@ -2077,12 +1975,7 @@ func TestHandleGetMatchConfig(t *testing.T) {
 	})
 
 	t.Run("Failure: match not found", func(t *testing.T) {
-		s := NewServerStateManager()
-		h := NewHandler(s)
-		roomID, err := s.CreateMatchRoom()
-		if err != nil {
-			t.Fatalf("Failed to create room: %v", err)
-		}
+		roomID, _, h := newTestRoom(t)
 
 		rr := doRequest(t, h.HandleGetMatchConfig, "GET /api/match-rooms/{roomID}/match/config", "GET", "/api/match-rooms/"+roomID+"/match/config", "", "")
 
@@ -2095,23 +1988,10 @@ func TestHandleGetMatchConfig(t *testing.T) {
 	})
 
 	t.Run("Failure: failed to Encode", func(t *testing.T) {
-		s := NewServerStateManager()
-		h := NewHandler(s)
-		roomID, err := s.CreateMatchRoom()
-		if err != nil {
-			t.Fatalf("Failed to create room: %v", err)
-		}
+		roomID, s, h := newTestRoom(t)
 
-		gameCfg := engine.GameCfg{
-			StagePreset: "Plain",
-			P1Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Fighter", Role: engine.RoleNormal}},
-			P2Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Witch", Role: engine.RoleNormal}},
-			MaxTurns:    10,
-		}
-		_, err = s.CreateMatch(roomID, gameCfg)
-		if err != nil {
-			t.Fatalf("Failed to create match: %v", err)
-		}
+		gameCfg := validGameCfg()
+		mustCreateMatch(t, s, roomID, gameCfg)
 
 		testEncodeFailure(t, testMux("GET /api/match-rooms/{roomID}/match/config", h.HandleGetMatchConfig),
 			func() *http.Request {
@@ -2121,12 +2001,7 @@ func TestHandleGetMatchConfig(t *testing.T) {
 	})
 
 	t.Run("Test Contract", func(t *testing.T) {
-		s := NewServerStateManager()
-		h := NewHandler(s)
-		roomID, err := s.CreateMatchRoom()
-		if err != nil {
-			t.Fatalf("Failed to create room: %v", err)
-		}
+		roomID, s, h := newTestRoom(t)
 
 		gameCfg := engine.GameCfg{
 			StagePreset: "Divided",
@@ -2134,10 +2009,7 @@ func TestHandleGetMatchConfig(t *testing.T) {
 			P2Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Witch", Role: engine.RoleNormal}},
 			MaxTurns:    10,
 		}
-		_, err = s.CreateMatch(roomID, gameCfg)
-		if err != nil {
-			t.Fatalf("Failed to create match: %v", err)
-		}
+		mustCreateMatch(t, s, roomID, gameCfg)
 
 		rr := doRequest(t, h.HandleGetMatchConfig, "GET /api/match-rooms/{roomID}/match/config", "GET", "/api/match-rooms/"+roomID+"/match/config", "", "")
 
@@ -2148,12 +2020,7 @@ func TestHandleGetMatchConfig(t *testing.T) {
 
 func TestHandleGetAllowedTiles(t *testing.T) {
 	t.Run("Success: get the allowedTiles in an existing room", func(t *testing.T) {
-		s := NewServerStateManager()
-		h := NewHandler(s)
-		roomID, err := s.CreateMatchRoom()
-		if err != nil {
-			t.Fatalf("Failed to create room: %v", err)
-		}
+		roomID, s, h := newTestRoom(t)
 
 		gameCfg := engine.GameCfg{
 			StagePreset: "Divided",
@@ -2161,10 +2028,7 @@ func TestHandleGetAllowedTiles(t *testing.T) {
 			P2Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Witch", Role: engine.RoleNormal}},
 			MaxTurns:    10,
 		}
-		_, err = s.CreateMatch(roomID, gameCfg)
-		if err != nil {
-			t.Fatalf("Failed to create match: %v", err)
-		}
+		mustCreateMatch(t, s, roomID, gameCfg)
 
 		rr := doRequest(t, h.HandleGetAllowedTiles, "GET /api/match-rooms/{roomID}/match/allowed-tiles", "GET", "/api/match-rooms/"+roomID+"/match/allowed-tiles?unitId=16&turnCmdType=placeBomb", "", "")
 
@@ -2199,15 +2063,8 @@ func TestHandleGetAllowedTiles(t *testing.T) {
 	})
 
 	t.Run("Success: a boxed-in unit encodes an empty array, not null", func(t *testing.T) {
-		s := NewServerStateManager()
-		h := NewHandler(s)
-		roomID, err := s.CreateMatchRoom()
-		if err != nil {
-			t.Fatalf("Failed to create room: %v", err)
-		}
-		if _, err := s.CreateMatch(roomID, validGameCfg()); err != nil {
-			t.Fatalf("Failed to create match: %v", err)
-		}
+		roomID, s, h := newTestRoom(t)
+		mustCreateMatch(t, s, roomID, validGameCfg())
 
 		// Unit 0x10 spawns at {4,8} with an ally on {3,8}; soft blocks on {5,8} and {4,7}
 		// plus the stage edge below leave it no legal landing tile.
@@ -2227,12 +2084,7 @@ func TestHandleGetAllowedTiles(t *testing.T) {
 	})
 
 	t.Run("Failure: missing query string", func(t *testing.T) {
-		s := NewServerStateManager()
-		h := NewHandler(s)
-		roomID, err := s.CreateMatchRoom()
-		if err != nil {
-			t.Fatalf("Failed to create room: %v", err)
-		}
+		roomID, s, h := newTestRoom(t)
 
 		gameCfg := engine.GameCfg{
 			StagePreset: "Divided",
@@ -2240,10 +2092,7 @@ func TestHandleGetAllowedTiles(t *testing.T) {
 			P2Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Witch", Role: engine.RoleNormal}},
 			MaxTurns:    10,
 		}
-		_, err = s.CreateMatch(roomID, gameCfg)
-		if err != nil {
-			t.Fatalf("Failed to create match: %v", err)
-		}
+		mustCreateMatch(t, s, roomID, gameCfg)
 
 		rr := doRequest(t, h.HandleGetAllowedTiles, "GET /api/match-rooms/{roomID}/match/allowed-tiles", "GET", "/api/match-rooms/"+roomID+"/match/allowed-tiles", "", "")
 
@@ -2256,12 +2105,7 @@ func TestHandleGetAllowedTiles(t *testing.T) {
 	})
 
 	t.Run("Failure: invalid query string", func(t *testing.T) {
-		s := NewServerStateManager()
-		h := NewHandler(s)
-		roomID, err := s.CreateMatchRoom()
-		if err != nil {
-			t.Fatalf("Failed to create room: %v", err)
-		}
+		roomID, s, h := newTestRoom(t)
 
 		gameCfg := engine.GameCfg{
 			StagePreset: "Divided",
@@ -2269,10 +2113,7 @@ func TestHandleGetAllowedTiles(t *testing.T) {
 			P2Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Witch", Role: engine.RoleNormal}},
 			MaxTurns:    10,
 		}
-		_, err = s.CreateMatch(roomID, gameCfg)
-		if err != nil {
-			t.Fatalf("Failed to create match: %v", err)
-		}
+		mustCreateMatch(t, s, roomID, gameCfg)
 
 		rr := doRequest(t, h.HandleGetAllowedTiles, "GET /api/match-rooms/{roomID}/match/allowed-tiles", "GET", "/api/match-rooms/"+roomID+"/match/allowed-tiles?unitId=abc&turnCmdType=move", "", "")
 
@@ -2298,12 +2139,7 @@ func TestHandleGetAllowedTiles(t *testing.T) {
 	})
 
 	t.Run("Failure: match not found", func(t *testing.T) {
-		s := NewServerStateManager()
-		h := NewHandler(s)
-		roomID, err := s.CreateMatchRoom()
-		if err != nil {
-			t.Fatalf("Failed to create room: %v", err)
-		}
+		roomID, _, h := newTestRoom(t)
 
 		rr := doRequest(t, h.HandleGetAllowedTiles, "GET /api/match-rooms/{roomID}/match/allowed-tiles", "GET", "/api/match-rooms/"+roomID+"/match/allowed-tiles?unitId=16&turnCmdType=placeBomb", "", "")
 
@@ -2316,23 +2152,10 @@ func TestHandleGetAllowedTiles(t *testing.T) {
 	})
 
 	t.Run("Failure: failed to Encode", func(t *testing.T) {
-		s := NewServerStateManager()
-		h := NewHandler(s)
-		roomID, err := s.CreateMatchRoom()
-		if err != nil {
-			t.Fatalf("Failed to create room: %v", err)
-		}
+		roomID, s, h := newTestRoom(t)
 
-		gameCfg := engine.GameCfg{
-			StagePreset: "Plain",
-			P1Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Fighter", Role: engine.RoleNormal}},
-			P2Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Witch", Role: engine.RoleNormal}},
-			MaxTurns:    10,
-		}
-		_, err = s.CreateMatch(roomID, gameCfg)
-		if err != nil {
-			t.Fatalf("Failed to create match: %v", err)
-		}
+		gameCfg := validGameCfg()
+		mustCreateMatch(t, s, roomID, gameCfg)
 
 		testEncodeFailure(t, testMux("GET /api/match-rooms/{roomID}/match/allowed-tiles", h.HandleGetAllowedTiles),
 			func() *http.Request {
@@ -2342,12 +2165,7 @@ func TestHandleGetAllowedTiles(t *testing.T) {
 	})
 
 	t.Run("Test Contract", func(t *testing.T) {
-		s := NewServerStateManager()
-		h := NewHandler(s)
-		roomID, err := s.CreateMatchRoom()
-		if err != nil {
-			t.Fatalf("Failed to create room: %v", err)
-		}
+		roomID, s, h := newTestRoom(t)
 
 		gameCfg := engine.GameCfg{
 			StagePreset: "Divided",
@@ -2355,10 +2173,7 @@ func TestHandleGetAllowedTiles(t *testing.T) {
 			P2Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Witch", Role: engine.RoleNormal}},
 			MaxTurns:    10,
 		}
-		_, err = s.CreateMatch(roomID, gameCfg)
-		if err != nil {
-			t.Fatalf("Failed to create match: %v", err)
-		}
+		mustCreateMatch(t, s, roomID, gameCfg)
 
 		rr := doRequest(t, h.HandleGetAllowedTiles, "GET /api/match-rooms/{roomID}/match/allowed-tiles", "GET", "/api/match-rooms/"+roomID+"/match/allowed-tiles?unitId=16&turnCmdType=placeBomb", "", "")
 
