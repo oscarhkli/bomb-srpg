@@ -28,11 +28,7 @@ func assertObjectContract(t *testing.T, body []byte, expectedFields []string, ne
 		if len(rawMap) != len(expectedFields) {
 			t.Errorf("Field count mismatch: want %d, got %d", len(expectedFields), len(rawMap))
 		}
-		for _, field := range expectedFields {
-			if _, exists := rawMap[field]; !exists {
-				t.Errorf("Contract Broken: client code expects key '%s', but it was missing", field)
-			}
-		}
+		assertKeys(t, rawMap, expectedFields, "Contract Broken: client code expects key '%s', but it was missing")
 	}
 	if nestedChecks != nil {
 		nestedChecks(t, rawMap)
@@ -53,11 +49,7 @@ func assertArrayContract(t *testing.T, body []byte, expectedFields []string, ite
 		if len(targetObj) != len(expectedFields) {
 			t.Errorf("Total number of fields exceeded, want %d, got %d", len(expectedFields), len(targetObj))
 		}
-		for _, field := range expectedFields {
-			if _, exists := targetObj[field]; !exists {
-				t.Errorf("Contract Broken: client code expects key '%s', but it was missing", field)
-			}
-		}
+		assertKeys(t, targetObj, expectedFields, "Contract Broken: client code expects key '%s', but it was missing")
 		if itemChecks != nil {
 			itemChecks(t, targetObj)
 		}
@@ -1045,14 +1037,8 @@ func TestHandleSubmitTurnCommand(t *testing.T) {
 				if !ok {
 					t.Fatalf("to is not an object: %#v", item["to"])
 				}
-				for _, field := range []string{"x", "y"} {
-					if _, exists := fromField[field]; !exists {
-						t.Errorf("Contract Broken: from missing key '%s'", field)
-					}
-					if _, exists := toField[field]; !exists {
-						t.Errorf("Contract Broken: to missing key '%s'", field)
-					}
-				}
+				assertKeys(t, fromField, []string{"x", "y"}, "Contract Broken: from missing key '%s'")
+				assertKeys(t, toField, []string{"x", "y"}, "Contract Broken: to missing key '%s'")
 			})
 	})
 }
@@ -1139,11 +1125,7 @@ func TestHandleStartTurn(t *testing.T) {
 						if !ok {
 							t.Fatalf("position is not an object: %#v", item["position"])
 						}
-						for _, field := range []string{"x", "y"} {
-							if _, exists := positionField[field]; !exists {
-								t.Errorf("Contract Broken: position missing key '%s'", field)
-							}
-						}
+						assertKeys(t, positionField, []string{"x", "y"}, "Contract Broken: position missing key '%s'")
 					})
 			})
 	})
@@ -1304,11 +1286,7 @@ func TestHandleConsumeCPUStatus(t *testing.T) {
 				if !ok {
 					t.Fatalf("planGameEvents[0] is not an object: %#v", events[0])
 				}
-				for _, field := range []string{"type", "unitId", "from", "to"} {
-					if _, exists := evt[field]; !exists {
-						t.Errorf("Contract Broken: planGameEvents[0] missing key '%s'", field)
-					}
-				}
+				assertKeys(t, evt, []string{"type", "unitId", "from", "to"}, "Contract Broken: planGameEvents[0] missing key '%s'")
 				if _, ok := raw["resolveTurnGameEvents"].([]any); !ok {
 					t.Errorf("Expected resolveTurnGameEvents array, got %#v", raw["resolveTurnGameEvents"])
 				}
@@ -1427,11 +1405,7 @@ func TestHandleResolveTurn(t *testing.T) {
 				if !ok {
 					t.Fatalf("planGameEvents[0] is not an object: %#v", events[0])
 				}
-				for _, field := range []string{"type", "unitId", "bombId", "position", "range", "countdown"} {
-					if _, exists := evt[field]; !exists {
-						t.Errorf("Contract Broken: planGameEvents[0] missing key '%s'", field)
-					}
-				}
+				assertKeys(t, evt, []string{"type", "unitId", "bombId", "position", "range", "countdown"}, "Contract Broken: planGameEvents[0] missing key '%s'")
 				if _, ok := raw["resolveTurnGameEvents"].([]any); !ok {
 					t.Errorf("Expected resolveTurnGameEvents array, got %#v", raw["resolveTurnGameEvents"])
 				}
