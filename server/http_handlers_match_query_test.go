@@ -284,47 +284,35 @@ func TestHandleGetAllowedTiles(t *testing.T) {
 		}
 	})
 
-	t.Run("Failure: missing query string", func(t *testing.T) {
-		roomID, s, h := newTestRoom(t)
+	queryFailureCfg := engine.GameCfg{
+		StagePreset: "Divided",
+		P1Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Fighter", Role: engine.RoleNormal}},
+		P2Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Witch", Role: engine.RoleNormal}},
+		MaxTurns:    10,
+	}
+	queryFailureTests := []struct {
+		name    string
+		query   string
+		wantMsg string
+	}{
+		{"Failure: missing query string", "", "missing required query parameters"},
+		{"Failure: invalid query string", "?unitId=abc&turnCmdType=move", "Invalid unitId parameter"},
+	}
+	for _, tt := range queryFailureTests {
+		t.Run(tt.name, func(t *testing.T) {
+			roomID, s, h := newTestRoom(t)
+			mustCreateMatch(t, s, roomID, queryFailureCfg)
 
-		gameCfg := engine.GameCfg{
-			StagePreset: "Divided",
-			P1Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Fighter", Role: engine.RoleNormal}},
-			P2Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Witch", Role: engine.RoleNormal}},
-			MaxTurns:    10,
-		}
-		mustCreateMatch(t, s, roomID, gameCfg)
+			rr := doRequest(t, h.HandleGetAllowedTiles, "GET /api/match-rooms/{roomID}/match/allowed-tiles", "GET", "/api/match-rooms/"+roomID+"/match/allowed-tiles"+tt.query, "", "")
 
-		rr := doRequest(t, h.HandleGetAllowedTiles, "GET /api/match-rooms/{roomID}/match/allowed-tiles", "GET", "/api/match-rooms/"+roomID+"/match/allowed-tiles", "", "")
-
-		if status := rr.Code; status != http.StatusBadRequest {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusNotFound)
-		}
-		if !strings.Contains(rr.Body.String(), "missing required query parameters") {
-			t.Errorf("Expected error message 'missing required query parameters', got: %s", rr.Body.String())
-		}
-	})
-
-	t.Run("Failure: invalid query string", func(t *testing.T) {
-		roomID, s, h := newTestRoom(t)
-
-		gameCfg := engine.GameCfg{
-			StagePreset: "Divided",
-			P1Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Fighter", Role: engine.RoleNormal}},
-			P2Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Witch", Role: engine.RoleNormal}},
-			MaxTurns:    10,
-		}
-		mustCreateMatch(t, s, roomID, gameCfg)
-
-		rr := doRequest(t, h.HandleGetAllowedTiles, "GET /api/match-rooms/{roomID}/match/allowed-tiles", "GET", "/api/match-rooms/"+roomID+"/match/allowed-tiles?unitId=abc&turnCmdType=move", "", "")
-
-		if status := rr.Code; status != http.StatusBadRequest {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusNotFound)
-		}
-		if !strings.Contains(rr.Body.String(), "Invalid unitId parameter") {
-			t.Errorf("Expected error message 'Invalid unitId parameter', got: %s", rr.Body.String())
-		}
-	})
+			if got := rr.Code; got != http.StatusBadRequest {
+				t.Errorf("Handler returned wrong status code: got %v want %v", got, http.StatusBadRequest)
+			}
+			if got := rr.Body.String(); !strings.Contains(got, tt.wantMsg) {
+				t.Errorf("Expected error message %q, got: %s", tt.wantMsg, got)
+			}
+		})
+	}
 
 	testRouteFailures(t, failureRoute{
 		handler:  (*Handler).HandleGetAllowedTiles,
