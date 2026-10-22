@@ -206,11 +206,7 @@ func TestTerminalView_RenderTurnHeader(t *testing.T) {
 		var fakeScreen bytes.Buffer
 		view := NewTerminalView(&fakeScreen)
 
-		err := view.RenderTurnHeader(101, 2)
-
-		if err != nil {
-			t.Fatalf("Expected no error, got: %v", err)
-		}
+		view.RenderTurnHeader(101, 2)
 
 		result := fakeScreen.String()
 
@@ -233,11 +229,7 @@ func TestTerminalView_RenderGameEvents(t *testing.T) {
 			engine.NewMatchEndedEvent(1),
 		}
 
-		err := view.RenderGameEvents(gameEvents)
-
-		if err != nil {
-			t.Fatalf("Expected no error, got: %v", err)
-		}
+		view.RenderGameEvents(gameEvents)
 
 		result := fakeScreen.String()
 
@@ -248,4 +240,130 @@ func TestTerminalView_RenderGameEvents(t *testing.T) {
 			t.Errorf("Expected output to contain matchEnded, got:\n%s", result)
 		}
 	})
+}
+
+func TestTerminalView_RenderBoard_Cells(t *testing.T) {
+	unitID := engine.NewUnitID(1, 0)
+	bombID := engine.NewBombID(100, 1, unitID)
+
+	table := []struct {
+		name  string
+		build func() *engine.GameState
+		want  string
+	}{
+		{
+			name: "unit bomb soft block hard block",
+			build: func() *engine.GameState {
+				gs := newTestGameState(3, 3)
+				gs.Bombs[bombID] = &engine.Bomb{ID: bombID, OwnerID: unitID, Countdown: 5}
+				gs.Grid[0][0] = engine.Tile{OccupantType: engine.OccupantUnit, OccupantID: int64(unitID)}
+				gs.Grid[1][1].Type = engine.TerrainBlock
+				gs.Grid[1][2] = engine.Tile{OccupantType: engine.OccupantBomb, OccupantID: int64(bombID)}
+				gs.Grid[2][0].OccupantType = engine.OccupantSoftBlock
+				return gs
+			},
+			want: "Y\\X   0   1   2  \n" +
+				"   +---+---+---+\n" +
+				"0  |U16|   |   | 0\n" +
+				"   +---+---+---+\n" +
+				"1  |   |███|B-5| 1\n" +
+				"   +---+---+---+\n" +
+				"2  |SBK|   |   | 2\n" +
+				"   +---+---+---+\n" +
+				"      0   1   2  \n\n",
+		},
+		{
+			name: "item tile draws blank",
+			build: func() *engine.GameState {
+				gs := newTestGameState(1, 1)
+				gs.Grid[0][0].OccupantType = engine.OccupantItem
+				return gs
+			},
+			want: "Y\\X   0  \n" +
+				"   +---+\n" +
+				"0  |   | 0\n" +
+				"   +---+\n" +
+				"      0  \n\n",
+		},
+		{
+			name: "hard block hides its occupant",
+			build: func() *engine.GameState {
+				gs := newTestGameState(1, 1)
+				gs.Grid[0][0] = engine.Tile{
+					Type:         engine.TerrainBlock,
+					OccupantType: engine.OccupantUnit,
+					OccupantID:   int64(unitID),
+				}
+				return gs
+			},
+			want: "Y\\X   0  \n" +
+				"   +---+\n" +
+				"0  |███| 0\n" +
+				"   +---+\n" +
+				"      0  \n\n",
+		},
+		{
+			name: "non-square grid sizes the column header by row count",
+			build: func() *engine.GameState {
+				return newTestGameState(3, 2)
+			},
+			want: "Y\\X   0   1  \n" +
+				"   +---+---+\n" +
+				"0  |   |   |   | 0\n" +
+				"   +---+---+\n" +
+				"1  |   |   |   | 1\n" +
+				"   +---+---+\n" +
+				"      0   1  \n\n",
+		},
+	}
+
+	for _, tt := range table {
+		t.Run(tt.name, func(t *testing.T) {
+			var screen bytes.Buffer
+			if err := NewTerminalView(&screen).RenderBoard(tt.build()); err != nil {
+				t.Fatalf("RenderBoard() error = %v", err)
+			}
+
+			got := screen.String()
+			if !strings.HasSuffix(got, tt.want) {
+				t.Errorf("RenderBoard() output does not end with:\n%q\ngot:\n%q", tt.want, got)
+			}
+		})
+	}
+}
+
+func TestTerminalView_RenderBoard_BombNotFound(t *testing.T) {
+	var screen bytes.Buffer
+	gs := newTestGameState(1, 1)
+	gs.Grid[0][0] = engine.Tile{OccupantType: engine.OccupantBomb, OccupantID: 0x1234}
+
+	err := NewTerminalView(&screen).RenderBoard(gs)
+	if err == nil || !strings.Contains(err.Error(), "bomb 0x1234 not found") {
+		t.Errorf("RenderBoard() error = %v, want bomb 0x1234 not found", err)
+	}
+}
+
+func TestTerminalView_RenderBoard_LegendAndHeader(t *testing.T) {
+	var screen bytes.Buffer
+	gs := newTestGameState(1, 1)
+	gs.Turn = 7
+	gs.ActiveTeam = 2
+
+	if err := NewTerminalView(&screen).RenderBoard(gs); err != nil {
+		t.Fatalf("RenderBoard() error = %v", err)
+	}
+
+	want := "============== Command Instruction ==============\n" +
+		"End Turn          : " + Yellow + "/commit" + Reset + "\n" +
+		"Reset Current Turn: " + Yellow + "/reset" + Reset + "\n" +
+		"Surrender         : " + Yellow + "/surrender" + Reset + "\n" +
+		"          ------- How to move -------\n" +
+		"Move      : " + Yellow + "move <unit-ID> <target-X> <target-Y>" + Reset + "\n" +
+		"Place Bomb: " + Yellow + "bomb <unit-ID> <target-X> <target-Y>" + Reset + "\n" +
+		"Example   : " + Yellow + "move 16 4 7" + Reset + "\n" +
+		"=================================================\n" +
+		"\n--- TURN 7 PLAYER 2 ---\n\n"
+	if got := screen.String(); !strings.HasPrefix(got, want) {
+		t.Errorf("RenderBoard() output does not start with:\n%q\ngot:\n%q", want, got)
+	}
 }

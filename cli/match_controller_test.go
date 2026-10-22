@@ -1,101 +1,68 @@
 package cli
 
 import (
+	"bytes"
 	"strings"
 	"testing"
 
 	"bomb-srpg/engine"
 )
 
-// SpyMatchView records view calls.
-type SpyMatchView struct {
-	RenderBoardCalled      bool
-	RenderGameConfigCalled bool
-	FeedbackMessage        string
-	FeedbackSuccess        bool
-	RenderTurnHeaderCalled bool
-	RenderGameEventsCalled bool
-}
-
-func (s *SpyMatchView) RenderBoard(gs *engine.GameState) error {
-	s.RenderBoardCalled = true
-	return nil
-}
-
-func (s *SpyMatchView) RenderGameConfig(cfg *engine.GameCfg) error {
-	s.RenderGameConfigCalled = true
-	return nil
-}
-
-func (s *SpyMatchView) RenderFeedback(success bool, msg string) error {
-	s.FeedbackSuccess = success
-	s.FeedbackMessage = msg
-	return nil
-}
-func (s *SpyMatchView) RenderMessage(msg string) error {
-	return nil
-}
-
-func (s *SpyMatchView) RenderTurnHeader(turn, activeTeamID int) error {
-	s.RenderTurnHeaderCalled = true
-	return nil
-}
-
-func (s *SpyMatchView) RenderGameEvents(gameEvents []engine.GameEvent) error {
-	s.RenderGameEventsCalled = true
-	return nil
-}
-
 func TestMatchController_SystemCommands(t *testing.T) {
 	type testCase struct {
 		name          string
 		inputCommands string
-		verify        func(t *testing.T, view *SpyMatchView, match *engine.Match)
+		verify        func(t *testing.T, out string, match *engine.Match)
 	}
 
 	table := []testCase{
 		{
 			name:          "Blank input whitespace elements are skipped",
 			inputCommands: "\n\n   \n",
-			verify: func(t *testing.T, view *SpyMatchView, match *engine.Match) {
-				if view.FeedbackMessage != "" {
-					t.Errorf("Expected loop to ignore spaces, but feedback registered: %q", view.FeedbackMessage)
+			verify: func(t *testing.T, out string, match *engine.Match) {
+				t.Helper()
+				if strings.Contains(out, Green) || strings.Contains(out, Red) {
+					t.Errorf("Expected loop to ignore spaces, but feedback registered: %q", out)
 				}
 			},
 		},
 		{
 			name:          "/config triggers GameCfg view",
 			inputCommands: "/config\n",
-			verify: func(t *testing.T, view *SpyMatchView, match *engine.Match) {
-				if !view.RenderGameConfigCalled {
-					t.Error("Expected /config route to call RenderGameConfig")
+			verify: func(t *testing.T, out string, match *engine.Match) {
+				t.Helper()
+				if !strings.Contains(out, "=== MATCH CONFIGURATION ===") {
+					t.Errorf("Expected /config route to render the game config, got: %q", out)
 				}
 			},
 		},
 		{
 			name:          "/reset executes ResetTurn",
 			inputCommands: "/reset\n",
-			verify: func(t *testing.T, view *SpyMatchView, match *engine.Match) {
-				if !view.FeedbackSuccess || !strings.Contains(view.FeedbackMessage, "reset successfully") {
-					t.Errorf("Expected successful reset confirmation, got: %v - %q", view.FeedbackSuccess, view.FeedbackMessage)
+			verify: func(t *testing.T, out string, match *engine.Match) {
+				t.Helper()
+				if !strings.Contains(out, Green+"Turn reset successfully!") {
+					t.Errorf("Expected successful reset confirmation, got: %q", out)
 				}
 			},
 		},
 		{
 			name:          "/commit execute ResolveTurn and prints log event entries",
 			inputCommands: "/commit\n",
-			verify: func(t *testing.T, view *SpyMatchView, match *engine.Match) {
-				if !view.RenderGameEventsCalled || !view.FeedbackSuccess {
-					t.Error("Expected /commit route to pass events to View and trigger a green status code notice")
+			verify: func(t *testing.T, out string, match *engine.Match) {
+				t.Helper()
+				if !strings.Contains(out, Green+"Turn committed and resolved!"+Reset+"\nengine.GameEvent{Type:\"matchEnded\"") {
+					t.Errorf("Expected /commit route to trigger a green status code notice, got: %q", out)
 				}
 			},
 		},
 		{
 			name:          "/surrender execute Surrender and prints log event entries",
 			inputCommands: "/surrender\n",
-			verify: func(t *testing.T, view *SpyMatchView, match *engine.Match) {
-				if !view.FeedbackSuccess || !strings.Contains(view.FeedbackMessage, "Winner... PLAYER 2!") {
-					t.Errorf("Expected final victory status layout sheet, got: %q", view.FeedbackMessage)
+			verify: func(t *testing.T, out string, match *engine.Match) {
+				t.Helper()
+				if !strings.Contains(out, Green+"PLAYER 1 surrendered!"+Reset+"\nengine.GameEvent{Type:\"matchEnded\"") || !strings.Contains(out, Green+"Winner... PLAYER 2!") {
+					t.Errorf("Expected final victory status layout sheet, got: %q", out)
 				}
 				if match.WinnerTeamID != 2 {
 					t.Errorf("Expected real engine WinnerTeamID to match opponent (2) after Player 1 surrenders, got: %d", match.WinnerTeamID)
@@ -105,9 +72,10 @@ func TestMatchController_SystemCommands(t *testing.T) {
 		{
 			name:          "Invalid system shortcut",
 			inputCommands: "/unknown_action_command\n",
-			verify: func(t *testing.T, view *SpyMatchView, match *engine.Match) {
-				if view.FeedbackSuccess || !strings.Contains(view.FeedbackMessage, "Unknown meta command") {
-					t.Errorf("Expected unknown command failure warning, got: %v - %q", view.FeedbackSuccess, view.FeedbackMessage)
+			verify: func(t *testing.T, out string, match *engine.Match) {
+				t.Helper()
+				if !strings.Contains(out, Red+"Unknown meta command") {
+					t.Errorf("Expected unknown command failure warning, got: %q", out)
 				}
 			},
 		},
@@ -115,8 +83,6 @@ func TestMatchController_SystemCommands(t *testing.T) {
 
 	for _, tt := range table {
 		t.Run(tt.name, func(t *testing.T) {
-			view := &SpyMatchView{}
-
 			match := &engine.Match{
 				WorkingState: &engine.GameState{
 					Turn:       1,
@@ -127,11 +93,12 @@ func TestMatchController_SystemCommands(t *testing.T) {
 			}
 			match.TrueState = match.WorkingState.DeepCopy()
 
-			controller := NewMatchController(match, view, strings.NewReader(tt.inputCommands))
+			var screen bytes.Buffer
+			controller := NewMatchController(match, NewTerminalView(&screen), strings.NewReader(tt.inputCommands))
 
 			controller.StartInputLoop()
 
-			tt.verify(t, view, match)
+			tt.verify(t, screen.String(), match)
 		})
 	}
 }
@@ -140,9 +107,8 @@ func TestMatchController_GameplayActions(t *testing.T) {
 	type testCase struct {
 		name          string
 		inputCommands string
-		setupState    func(gs *engine.GameState)
 		setupMatch    func() *engine.Match
-		verify        func(t *testing.T, view *SpyMatchView, match *engine.Match)
+		verify        func(t *testing.T, out string, match *engine.Match)
 	}
 
 	table := []testCase{
@@ -150,7 +116,7 @@ func TestMatchController_GameplayActions(t *testing.T) {
 			name:          "move command parses valid parameters",
 			inputCommands: "move 16 1 0\n",
 			setupMatch: func() *engine.Match {
-				m := newTestMatch(2, 2)
+				m := newTestMatch()
 				unitID := engine.NewUnitID(1, 0)
 				m.WorkingState.Units[unitID] = &engine.Unit{
 					ID:           unitID,
@@ -165,9 +131,10 @@ func TestMatchController_GameplayActions(t *testing.T) {
 
 				return m
 			},
-			verify: func(t *testing.T, view *SpyMatchView, match *engine.Match) {
-				if !view.FeedbackSuccess {
-					t.Errorf("Expected gameplay router to parse verb, but got error: %q", view.FeedbackMessage)
+			verify: func(t *testing.T, out string, match *engine.Match) {
+				t.Helper()
+				if !strings.Contains(out, Green+"GameEvents:") {
+					t.Errorf("Expected gameplay router to parse verb, but got: %q", out)
 				}
 			},
 		},
@@ -175,7 +142,7 @@ func TestMatchController_GameplayActions(t *testing.T) {
 			name:          "move command parses valid parameters but invalid movement",
 			inputCommands: "move 16 120 0\n",
 			setupMatch: func() *engine.Match {
-				m := newTestMatch(2, 2)
+				m := newTestMatch()
 				unitID := engine.NewUnitID(1, 0)
 				m.WorkingState.Units[unitID] = &engine.Unit{
 					ID:           unitID,
@@ -190,36 +157,35 @@ func TestMatchController_GameplayActions(t *testing.T) {
 
 				return m
 			},
-			verify: func(t *testing.T, view *SpyMatchView, match *engine.Match) {
-				if view.FeedbackSuccess {
+			verify: func(t *testing.T, out string, match *engine.Match) {
+				t.Helper()
+				if strings.Contains(out, Green+"GameEvents:") {
 					t.Error("Expected illegal move coordinates to return a failure status, but reported success")
 				}
-				if !strings.Contains(view.FeedbackMessage, "Invalid move") {
-					t.Errorf("Expected feedback warning parameters to mention 'Invalid move', got: %q", view.FeedbackMessage)
+				if !strings.Contains(out, Red+"Invalid move") {
+					t.Errorf("Expected feedback warning parameters to mention 'Invalid move', got: %q", out)
 				}
 			},
 		},
 		{
 			name:          "move command syntax error",
 			inputCommands: "move 16 1\n",
-			setupMatch: func() *engine.Match {
-				return newTestMatch(2, 2)
-			},
-			verify: func(t *testing.T, view *SpyMatchView, match *engine.Match) {
-				if view.FeedbackSuccess || !strings.Contains(view.FeedbackMessage, "Expected: move") {
-					t.Errorf("Expected short arguments length to trigger syntax warning, got: %q", view.FeedbackMessage)
+			setupMatch:    newTestMatch,
+			verify: func(t *testing.T, out string, match *engine.Match) {
+				t.Helper()
+				if !strings.Contains(out, Red+"Syntax error in move command") || !strings.Contains(out, "Expected: move") {
+					t.Errorf("Expected short arguments length to trigger syntax warning, got: %q", out)
 				}
 			},
 		},
 		{
 			name:          "move command parameter syntax error",
 			inputCommands: "move 16 apple 0\n",
-			setupMatch: func() *engine.Match {
-				return newTestMatch(2, 2)
-			},
-			verify: func(t *testing.T, view *SpyMatchView, match *engine.Match) {
-				if view.FeedbackSuccess || !strings.Contains(view.FeedbackMessage, "Argument Error") {
-					t.Errorf("Expected string parsing validation to capture character errors, got: %q", view.FeedbackMessage)
+			setupMatch:    newTestMatch,
+			verify: func(t *testing.T, out string, match *engine.Match) {
+				t.Helper()
+				if !strings.Contains(out, Red+"Argument Error") {
+					t.Errorf("Expected string parsing validation to capture character errors, got: %q", out)
 				}
 			},
 		},
@@ -227,7 +193,7 @@ func TestMatchController_GameplayActions(t *testing.T) {
 			name:          "bomb command parses valid parameters",
 			inputCommands: "bomb 16 1 0\n",
 			setupMatch: func() *engine.Match {
-				m := newTestMatch(2, 2)
+				m := newTestMatch()
 				unitID := engine.NewUnitID(1, 0)
 				m.WorkingState.Units[unitID] = &engine.Unit{
 					ID:           unitID,
@@ -242,9 +208,10 @@ func TestMatchController_GameplayActions(t *testing.T) {
 
 				return m
 			},
-			verify: func(t *testing.T, view *SpyMatchView, match *engine.Match) {
-				if !view.FeedbackSuccess {
-					t.Errorf("Expected gameplay router to parse verb, but got error: %q", view.FeedbackMessage)
+			verify: func(t *testing.T, out string, match *engine.Match) {
+				t.Helper()
+				if !strings.Contains(out, Green+"GameEvents:") {
+					t.Errorf("Expected gameplay router to parse verb, but got: %q", out)
 				}
 			},
 		},
@@ -252,7 +219,7 @@ func TestMatchController_GameplayActions(t *testing.T) {
 			name:          "bomb command parses valid parameters but invalid bomb placement",
 			inputCommands: "bomb 16 1 0\n",
 			setupMatch: func() *engine.Match {
-				m := newTestMatch(2, 2)
+				m := newTestMatch()
 				unitID := engine.NewUnitID(1, 0)
 				m.WorkingState.Units[unitID] = &engine.Unit{
 					ID:           unitID,
@@ -266,36 +233,35 @@ func TestMatchController_GameplayActions(t *testing.T) {
 
 				return m
 			},
-			verify: func(t *testing.T, view *SpyMatchView, match *engine.Match) {
-				if view.FeedbackSuccess {
+			verify: func(t *testing.T, out string, match *engine.Match) {
+				t.Helper()
+				if strings.Contains(out, Green+"GameEvents:") {
 					t.Error("Expected illegal bomb coordinates to return a failure status, but reported success")
 				}
-				if !strings.Contains(view.FeedbackMessage, "unit 0x10 out of bombs") {
-					t.Errorf("Expected feedback warning parameters to mention 'unit 0x10 out of bombs', got: %q", view.FeedbackMessage)
+				if !strings.Contains(out, Red+"Invalid bomb placement") || !strings.Contains(out, "unit 0x10 out of bombs") {
+					t.Errorf("Expected feedback warning parameters to mention 'unit 0x10 out of bombs', got: %q", out)
 				}
 			},
 		},
 		{
 			name:          "bomb command syntax error",
 			inputCommands: "bomb 16 1\n",
-			setupMatch: func() *engine.Match {
-				return newTestMatch(2, 2)
-			},
-			verify: func(t *testing.T, view *SpyMatchView, match *engine.Match) {
-				if view.FeedbackSuccess || !strings.Contains(view.FeedbackMessage, "Expected: bomb") {
-					t.Errorf("Expected short arguments length to trigger syntax warning, got: %q", view.FeedbackMessage)
+			setupMatch:    newTestMatch,
+			verify: func(t *testing.T, out string, match *engine.Match) {
+				t.Helper()
+				if !strings.Contains(out, Red+"Syntax error in bomb command") || !strings.Contains(out, "Expected: bomb") {
+					t.Errorf("Expected short arguments length to trigger syntax warning, got: %q", out)
 				}
 			},
 		},
 		{
 			name:          "bomb command parameter syntax error",
 			inputCommands: "bomb 16 apple 0\n",
-			setupMatch: func() *engine.Match {
-				return newTestMatch(2, 2)
-			},
-			verify: func(t *testing.T, view *SpyMatchView, match *engine.Match) {
-				if view.FeedbackSuccess || !strings.Contains(view.FeedbackMessage, "Argument Error") {
-					t.Errorf("Expected string parsing validation to capture character errors, got: %q", view.FeedbackMessage)
+			setupMatch:    newTestMatch,
+			verify: func(t *testing.T, out string, match *engine.Match) {
+				t.Helper()
+				if !strings.Contains(out, Red+"Argument Error") {
+					t.Errorf("Expected string parsing validation to capture character errors, got: %q", out)
 				}
 			},
 		},
@@ -303,18 +269,20 @@ func TestMatchController_GameplayActions(t *testing.T) {
 
 	for _, tt := range table {
 		t.Run(tt.name, func(t *testing.T) {
-			view := &SpyMatchView{}
 			match := tt.setupMatch()
-			controller := NewMatchController(match, view, strings.NewReader(tt.inputCommands))
+			var screen bytes.Buffer
+			controller := NewMatchController(match, NewTerminalView(&screen), strings.NewReader(tt.inputCommands))
 
 			controller.StartInputLoop()
 
-			tt.verify(t, view, match)
+			tt.verify(t, screen.String(), match)
 		})
 	}
 }
 
-func newTestMatch(width, height int) *engine.Match {
+func newTestMatch() *engine.Match {
+	const width, height = 2, 2
+
 	grid := make([][]engine.Tile, height)
 	for y, row := range grid {
 		grid[y] = make([]engine.Tile, width)
@@ -339,4 +307,98 @@ func newTestMatch(width, height int) *engine.Match {
 	m.TrueState = m.WorkingState.DeepCopy()
 
 	return m
+}
+
+func TestMatchController_StartInputLoop(t *testing.T) {
+	table := []struct {
+		name    string
+		input   string
+		winner  int
+		want    []string
+		notWant []string
+		prompts int
+	}{
+		{
+			name:    "draw announces and returns",
+			input:   "/reset\n",
+			winner:  -1,
+			want:    []string{"Draw Game!"},
+			notWant: []string{"Enter Command", "reset successfully"},
+		},
+		{
+			name:    "winner announces and returns",
+			input:   "/reset\n",
+			winner:  2,
+			want:    []string{"Winner... PLAYER 2!"},
+			notWant: []string{"Enter Command", "reset successfully"},
+		},
+		{
+			name:    "EOF returns after the first prompt",
+			input:   "",
+			want:    []string{"Enter Command: "},
+			prompts: 1,
+		},
+		{
+			name:    "empty line prompts again",
+			input:   "\n",
+			want:    []string{"Enter Command: "},
+			prompts: 2,
+			notWant: []string{"Unknown", "Input is empty"},
+		},
+		{
+			name:  "slash command reaches the system handler",
+			input: "/reset\n",
+			want:  []string{"Turn reset successfully!"},
+		},
+		{
+			name:  "unknown meta command prints feedback",
+			input: "/nope\n",
+			want:  []string{"Unknown meta command: /nope. Use /config, /reset, /commit, or /surrender"},
+		},
+		{
+			name:  "move with too few tokens",
+			input: "move 16 1\n",
+			want:  []string{"Expected: move <unit_idx> <x> <y>"},
+		},
+		{
+			name:  "bomb with too few tokens",
+			input: "bomb 16 1\n",
+			want:  []string{"Expected: bomb <unit_idx> <x> <y>"},
+		},
+		{
+			name:  "non-integer argument",
+			input: "move 16 apple 0\n",
+			want:  []string{"Argument Error: Unit index, X, and Y must be integers!"},
+		},
+		{
+			name:  "unknown game verb",
+			input: "dance\n",
+			want:  []string{"Unknown meta command: dance"},
+		},
+	}
+
+	for _, tt := range table {
+		t.Run(tt.name, func(t *testing.T) {
+			match := newTestMatch()
+			match.WinnerTeamID = tt.winner
+
+			var screen bytes.Buffer
+			NewMatchController(match, NewTerminalView(&screen), strings.NewReader(tt.input)).StartInputLoop()
+
+			got := screen.String()
+			for _, w := range tt.want {
+				if !strings.Contains(got, w) {
+					t.Errorf("output missing %q, got:\n%s", w, got)
+				}
+			}
+			if n := strings.Count(got, "Enter Command: "); tt.prompts > 0 && n != tt.prompts {
+				t.Errorf("prompt count = %d, want %d", n, tt.prompts)
+			}
+			for _, nw := range tt.notWant {
+				if strings.Contains(got, nw) {
+					t.Errorf("output contains %q, got:\n%s", nw, got)
+				}
+			}
+		})
+	}
 }
