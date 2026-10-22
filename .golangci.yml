@@ -59,6 +59,12 @@ linters:
   settings:
     depguard:
       rules:
+        json:
+          files:
+            - "**/*.go"
+          deny:
+            - pkg: encoding/json$
+              desc: use encoding/json/v2
         engine:
           files:
             - "**/engine/*.go"
