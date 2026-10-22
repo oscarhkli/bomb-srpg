@@ -4,10 +4,12 @@ import (
 	"bomb-srpg/server"
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -26,6 +28,20 @@ func logLevelFromEnv(env string) slog.Level {
 	}
 }
 
+const defaultPort = "8080"
+
+func listenAddr(getenv func(string) string) (string, error) {
+	port := getenv("PORT")
+	if port == "" {
+		port = defaultPort
+	}
+	n, err := strconv.Atoi(port)
+	if err != nil || n < 1 || n > 65535 {
+		return "", fmt.Errorf("invalid PORT %q: want a number from 1 to 65535", port)
+	}
+	return ":" + strconv.Itoa(n), nil
+}
+
 const (
 	readTimeout     = 5 * time.Second
 	writeTimeout    = 5 * time.Second
@@ -34,9 +50,15 @@ const (
 )
 
 func main() {
+	addr, err := listenAddr(os.Getenv)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+
 	if checkHealth(os.Args[1:]) {
 		ctx, cancel := context.WithTimeout(context.Background(), healthTimeout)
-		code := runHealthCheck(ctx, "http://localhost:8080/api/health")
+		code := runHealthCheck(ctx, "http://localhost"+addr+"/api/health")
 		cancel()
 		os.Exit(code)
 	}
@@ -58,15 +80,15 @@ func main() {
 	server.RegisterRoutes(r, handler)
 
 	s := &http.Server{
-		Addr:         ":8080",
+		Addr:         addr,
 		Handler:      server.SecurityHeaders(server.RecoverPanic(logger, r)),
 		ReadTimeout:  readTimeout,
 		WriteTimeout: writeTimeout,
 	}
 
 	go func() {
-		logger.Info("Bomb Tactics Server running on http://localhost:8080")
-		logger.Info("Open http://localhost:8080 in your browser to view the Title Screen!")
+		logger.Info("Bomb Tactics Server running on http://localhost" + addr)
+		logger.Info("Open http://localhost" + addr + " in your browser to view the Title Screen!")
 		if err := s.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Error("Server error", "error", err)
 		}
