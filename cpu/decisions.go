@@ -77,7 +77,9 @@ func Decide(gs *engine.GameState) []engine.TurnCommand {
 		if len(round) == 0 {
 			break
 		}
-		best := slices.MaxFunc(round, func(a, b candidate) int { return cmp.Compare(a.score, b.score) })
+		best := slices.MaxFunc(round, func(a, b candidate) int {
+			return cmp.Compare(a.score, b.score)
+		})
 		if err := applyCandidate(sandbox, best); err != nil {
 			break
 		}
