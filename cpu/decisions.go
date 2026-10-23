@@ -2,6 +2,7 @@ package cpu
 
 import (
 	"bomb-srpg/engine"
+	"cmp"
 	"fmt"
 	"slices"
 )
@@ -24,80 +25,66 @@ func (c candidate) priority() int {
 	return 1
 }
 
-// Decide returns the TurnCommands the CPU plays this turn, in order; empty means no action.
-func Decide(gs *engine.GameState) []engine.TurnCommand {
-	sandbox := gs.DeepCopy()
-	var cmds []engine.TurnCommand
-
-	var allies []*engine.Unit
-	var opponents []*engine.Unit
-	var allyKing *engine.Unit
-	var opponentKing *engine.Unit
+// buildRoster reads positions from gs, so pass the original state, not a sandbox that plans move units in.
+func buildRoster(gs *engine.GameState) (allies []*engine.Unit, base scoreContext, ok bool) {
+	var allyKing, opponentKing *engine.Unit
 	for _, u := range gs.Units {
 		if u.HP <= 0 {
 			continue
 		}
-		if team, _ := u.ID.Decode(); team == 2 {
+		if team, _ := u.ID.Decode(); team == engine.Team2 {
 			allies = append(allies, u)
+			base.allyIDs = append(base.allyIDs, u.ID)
 			if isKingRole(u) {
 				allyKing = u
 			}
 		} else {
-			opponents = append(opponents, u)
+			base.opponentIDs = append(base.opponentIDs, u.ID)
 			if isKingRole(u) {
 				opponentKing = u
 			}
 		}
-
 	}
-
 	if allyKing == nil || opponentKing == nil {
-		return cmds
+		return nil, scoreContext{}, false
+	}
+	base.allyKingID = allyKing.ID
+	base.opponentKingID = opponentKing.ID
+	return allies, base, true
+}
+
+// Decide returns the TurnCommands the CPU plays this turn, in order; empty means no action.
+func Decide(gs *engine.GameState) []engine.TurnCommand {
+	allies, base, ok := buildRoster(gs)
+	if !ok {
+		return nil
 	}
 
-	allyIDs := make([]engine.UnitID, len(allies))
-	for i, u := range allies {
-		allyIDs[i] = u.ID
-	}
-	opponentIDs := make([]engine.UnitID, len(opponents))
-	for i, u := range opponents {
-		opponentIDs[i] = u.ID
-	}
-
+	sandbox := gs.DeepCopy()
+	var cmds []engine.TurnCommand
 	for range maxAttempts {
-		var best *candidate
+		var round []candidate
 		for _, unit := range allies {
-			sc := scoreContext{
-				actorID:        unit.ID,
-				allyIDs:        allyIDs,
-				opponentIDs:    opponentIDs,
-				allyKingID:     allyKing.ID,
-				opponentKingID: opponentKing.ID,
-				actorOrigin:    unit.Position,
-			}
+			sc := base
+			sc.actorID = unit.ID
+			sc.actorOrigin = unit.Position
 			c, err := bestCandidateFor(sc, sandbox)
-			if err != nil {
+			if err != nil || len(c.turnCommands) == 0 {
 				continue
 			}
-			if len(c.turnCommands) == 0 {
-				continue
-			}
-			if best == nil || c.score > best.score {
-				best = &c
-			}
+			round = append(round, c)
 		}
-
-		if best == nil {
+		if len(round) == 0 {
 			break
 		}
-
-		if err := applyCandidate(sandbox, *best); err != nil {
+		best := slices.MaxFunc(round, func(a, b candidate) int {
+			return cmp.Compare(a.score, b.score)
+		})
+		if err := applyCandidate(sandbox, best); err != nil {
 			break
 		}
-
 		cmds = append(cmds, best.turnCommands...)
 	}
-
 	return cmds
 }
 

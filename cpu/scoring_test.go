@@ -2,6 +2,7 @@ package cpu
 
 import (
 	"bomb-srpg/engine"
+	"cmp"
 	"errors"
 	"testing"
 )
@@ -310,5 +311,221 @@ func TestEvaluate_OriginalGameStateUntouched(t *testing.T) {
 	}
 	if gs.Units[actor.ID].BombUsed != 0 {
 		t.Errorf("gs.Units[actor.ID].BombUsed = %d, want 0", gs.Units[actor.ID].BombUsed)
+	}
+}
+
+func TestEvaluate_TurnResultSets(t *testing.T) {
+	type fixture struct {
+		bombOwner func(actor, fighter, opponent engine.UnitID) engine.UnitID
+		countdown int
+		fighterHP int
+		kingHP    int
+		allyIDs   func(actor, fighter engine.UnitID) []engine.UnitID
+		bombAt    engine.Coordinate
+		setup     func(gs *engine.GameState)
+	}
+	score := func(t *testing.T, f fixture) int {
+		t.Helper()
+		gs := newTestGameState(9, 9)
+		actor := addKing(gs, engine.NewUnitID(1, 1), engine.Coordinate{X: 2, Y: 2})
+		actor.HP = 5
+		if f.kingHP != 0 {
+			actor.HP = f.kingHP
+		}
+		fighter := addFighter(gs, engine.NewUnitID(1, 2), engine.Coordinate{X: 2, Y: 5})
+		fighter.HP = f.fighterHP
+		opponentKing := addKing(gs, engine.NewUnitID(2, 1), engine.Coordinate{X: 8, Y: 8})
+		if f.setup != nil {
+			f.setup(gs)
+		}
+		owner := f.bombOwner(actor.ID, fighter.ID, opponentKing.ID)
+		bombID := engine.NewBombID(0, 0, owner)
+		gs.Bombs[bombID] = &engine.Bomb{ID: bombID, OwnerID: owner, Position: f.bombAt, Range: 1, Countdown: f.countdown}
+		gs.Grid[f.bombAt.Y][f.bombAt.X] = engine.Tile{Type: engine.TerrainPlain, OccupantType: engine.OccupantBomb, OccupantID: int64(bombID)}
+		sc := scoreContext{
+			actorID:        actor.ID,
+			allyIDs:        f.allyIDs(actor.ID, fighter.ID),
+			opponentIDs:    []engine.UnitID{opponentKing.ID},
+			allyKingID:     actor.ID,
+			opponentKingID: opponentKing.ID,
+			actorOrigin:    actor.Position,
+		}
+		got, err := evaluate(sc, gs, nil)
+		if err != nil {
+			t.Fatalf("evaluate() unexpected err = %v", err)
+		}
+		return got.score
+	}
+
+	opponent := func(_, _, o engine.UnitID) engine.UnitID { return o }
+	system := func(_, _, _ engine.UnitID) engine.UnitID { return engine.SystemUnitID }
+	allyOwned := func(a, _, _ engine.UnitID) engine.UnitID { return a }
+	fighterOwned := func(_, f, _ engine.UnitID) engine.UnitID { return f }
+	both := func(a, f engine.UnitID) []engine.UnitID { return []engine.UnitID{a, f} }
+	fighterOnly := func(_, f engine.UnitID) []engine.UnitID { return []engine.UnitID{f} }
+	nearActor := engine.Coordinate{X: 3, Y: 2}
+	nearFighter := engine.Coordinate{X: 3, Y: 5}
+	farAway := engine.Coordinate{X: 6, Y: 0}
+
+	gate := engine.Coordinate{X: 4, Y: 0}
+	wallWithGate := func(soft bool) func(gs *engine.GameState) {
+		return func(gs *engine.GameState) {
+			for y := 1; y < 9; y++ {
+				setTerrainBlock(gs, engine.Coordinate{X: 4, Y: y})
+			}
+			if soft {
+				addSoftBlock(gs, 1, gate)
+			} else {
+				setTerrainBlock(gs, gate)
+			}
+		}
+	}
+	nextToGate := engine.Coordinate{X: 3, Y: 0}
+
+	tests := []struct {
+		name string
+		a, b fixture
+		want int
+	}{
+		{
+			name: "opponent bomb on the actor scores below no bomb",
+			a:    fixture{bombOwner: opponent, countdown: 1, fighterHP: 5, allyIDs: both, bombAt: nearActor},
+			b:    fixture{bombOwner: opponent, countdown: 1, fighterHP: 5, allyIDs: both, bombAt: farAway},
+			want: -1,
+		},
+		{
+			name: "sudden-death bomb scores like an opponent bomb",
+			a:    fixture{bombOwner: system, countdown: 1, fighterHP: 5, allyIDs: both, bombAt: nearActor},
+			b:    fixture{bombOwner: opponent, countdown: 1, fighterHP: 5, allyIDs: both, bombAt: nearActor},
+			want: 0,
+		},
+		{
+			name: "ally bomb scores above an opponent bomb",
+			a:    fixture{bombOwner: allyOwned, countdown: 1, fighterHP: 5, allyIDs: both, bombAt: nearActor},
+			b:    fixture{bombOwner: opponent, countdown: 1, fighterHP: 5, allyIDs: both, bombAt: nearActor},
+			want: 1,
+		},
+		{
+			name: "ally dying in its own bomb scores below dying in an opponent bomb",
+			a:    fixture{bombOwner: allyOwned, countdown: 5, fighterHP: 1, allyIDs: both, bombAt: nearFighter},
+			b:    fixture{bombOwner: opponent, countdown: 5, fighterHP: 1, allyIDs: both, bombAt: nearFighter},
+			want: -1,
+		},
+		{
+			name: "ally King outside allyIDs dies like one inside",
+			a:    fixture{bombOwner: fighterOwned, countdown: 5, fighterHP: 5, kingHP: 1, allyIDs: fighterOnly, bombAt: nearActor},
+			b:    fixture{bombOwner: fighterOwned, countdown: 5, fighterHP: 5, kingHP: 1, allyIDs: both, bombAt: nearActor},
+			want: 0,
+		},
+		{
+			name: "destroyed soft block that opens the way to the opponent King scores above an intact wall",
+			a:    fixture{bombOwner: system, countdown: 1, fighterHP: 5, allyIDs: both, bombAt: nextToGate, setup: wallWithGate(true)},
+			b:    fixture{bombOwner: system, countdown: 1, fighterHP: 5, allyIDs: both, bombAt: nextToGate, setup: wallWithGate(false)},
+			want: 1,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := cmp.Compare(score(t, tt.a), score(t, tt.b))
+
+			if got != tt.want {
+				t.Errorf("cmp(score(a), score(b)) = %d, want %d", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestEvaluate_UnitDeathMovesScore(t *testing.T) {
+	const (
+		actorIdx = iota
+		allyKingIdx
+		opponentKingIdx
+	)
+	spot := engine.Coordinate{X: 4, Y: 2}
+	away := engine.Coordinate{X: 7, Y: 2}
+	tests := []struct {
+		name   string
+		victim int
+		want   int
+	}{
+		{name: "opponent King killed", victim: opponentKingIdx, want: killKingScore},
+		{name: "ally King killed", victim: allyKingIdx, want: -killKingScore},
+		{name: "ally fighter killed", victim: actorIdx, want: -killUnitScore / 2},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			score := func(victimPos engine.Coordinate) int {
+				pos := [3]engine.Coordinate{{X: 0, Y: 8}, {X: 8, Y: 8}, {X: 8, Y: 0}}
+				pos[tt.victim] = victimPos
+				gs := newTestGameState(9, 9)
+				actor := addFighter(gs, engine.NewUnitID(1, 1), pos[actorIdx])
+				allyKing := addKing(gs, engine.NewUnitID(1, 2), pos[allyKingIdx])
+				opponentKing := addKing(gs, engine.NewUnitID(2, 1), pos[opponentKingIdx])
+				[]*engine.Unit{actor, allyKing, opponentKing}[tt.victim].HP = 1
+
+				bombID := engine.NewBombID(0, 0, engine.SystemUnitID)
+				bombPos := engine.Coordinate{X: 3, Y: 2}
+				gs.Bombs[bombID] = &engine.Bomb{ID: bombID, OwnerID: engine.SystemUnitID, Position: bombPos, Range: 1, Countdown: 1}
+				gs.Grid[bombPos.Y][bombPos.X] = engine.Tile{Type: engine.TerrainPlain, OccupantType: engine.OccupantBomb, OccupantID: int64(bombID)}
+
+				sc := scoreContext{
+					actorID:        actor.ID,
+					allyIDs:        []engine.UnitID{actor.ID},
+					opponentIDs:    []engine.UnitID{opponentKing.ID},
+					allyKingID:     allyKing.ID,
+					opponentKingID: opponentKing.ID,
+					actorOrigin:    actor.Position,
+				}
+				got, err := evaluate(sc, gs, nil)
+				if err != nil {
+					t.Fatalf("evaluate() unexpected err = %v", err)
+				}
+				return got.score
+			}
+
+			got := score(spot) - score(away)
+
+			if tt.want > 0 && got < tt.want || tt.want < 0 && got > tt.want {
+				t.Errorf("score(hit) - score(miss) = %d, want at least %d in that direction", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestEvaluate_SoftBlockOffThePathAddsNoReachability(t *testing.T) {
+	score := func(withSoftBlock bool) int {
+		gs := newTestGameState(9, 9)
+		actor := addFighter(gs, engine.NewUnitID(1, 1), engine.Coordinate{X: 0, Y: 8})
+		allyKing := addKing(gs, engine.NewUnitID(1, 2), engine.Coordinate{X: 8, Y: 8})
+		opponentKing := addKing(gs, engine.NewUnitID(2, 1), engine.Coordinate{X: 8, Y: 0})
+		if withSoftBlock {
+			addSoftBlock(gs, 1, engine.Coordinate{X: 1, Y: 1})
+		}
+
+		bombID := engine.NewBombID(0, 0, engine.SystemUnitID)
+		bombPos := engine.Coordinate{X: 1, Y: 2}
+		gs.Bombs[bombID] = &engine.Bomb{ID: bombID, OwnerID: engine.SystemUnitID, Position: bombPos, Range: 1, Countdown: 1}
+		gs.Grid[bombPos.Y][bombPos.X] = engine.Tile{Type: engine.TerrainPlain, OccupantType: engine.OccupantBomb, OccupantID: int64(bombID)}
+
+		sc := scoreContext{
+			actorID:        actor.ID,
+			allyIDs:        []engine.UnitID{actor.ID},
+			opponentIDs:    []engine.UnitID{opponentKing.ID},
+			allyKingID:     allyKing.ID,
+			opponentKingID: opponentKing.ID,
+			actorOrigin:    actor.Position,
+		}
+		got, err := evaluate(sc, gs, nil)
+		if err != nil {
+			t.Fatalf("evaluate() unexpected err = %v", err)
+		}
+		return got.score
+	}
+
+	got := score(true)
+	want := score(false)
+
+	if got != want {
+		t.Errorf("score with a destroyed soft block off the path = %d, want %d (same as without it)", got, want)
 	}
 }
