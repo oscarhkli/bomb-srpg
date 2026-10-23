@@ -51,41 +51,6 @@ func aliveCount(gs *engine.GameState, ids []engine.UnitID, kingID engine.UnitID)
 	return count
 }
 
-type unitSnapshot struct {
-	distToKing     int
-	aliveOpponents int
-	aliveAllies    int
-}
-
-func snapshotUnits(gs *engine.GameState, sc scoreContext, actor, opponentKing *engine.Unit) unitSnapshot {
-	return unitSnapshot{
-		distToKing:     reachDistToUnit(gs, actor, actor.Position, opponentKing),
-		aliveOpponents: aliveCount(gs, sc.opponentIDs, sc.opponentKingID),
-		aliveAllies:    aliveCount(gs, sc.allyIDs, sc.allyKingID),
-	}
-}
-
-func buildTurnResult(sc scoreContext, turn int, gameEvents []engine.GameEvent, before, after unitSnapshot) turnResult {
-	tr := turnResult{
-		turn:                  turn,
-		affectedTiles:         make(map[engine.Coordinate]struct{}),
-		allyAffectedTiles:     make(map[engine.Coordinate]struct{}),
-		opponentAffectedTiles: make(map[engine.Coordinate]struct{}),
-		diedUnits:             make(map[engine.UnitID]struct{}),
-		suicides:              make(map[engine.UnitID]struct{}),
-		distToKingBefore:      before.distToKing,
-		distToKingAfter:       after.distToKing,
-		aliveOpponentsBefore:  before.aliveOpponents,
-		aliveOpponentsAfter:   after.aliveOpponents,
-		aliveAlliesBefore:     before.aliveAllies,
-		aliveAlliesAfter:      after.aliveAllies,
-	}
-	for _, evt := range gameEvents {
-		tr.fold(sc, evt)
-	}
-	return tr
-}
-
 func (tr *turnResult) fold(sc scoreContext, evt engine.GameEvent) {
 	switch evt.Type {
 	case engine.GameEvtBombExploded:
@@ -127,11 +92,23 @@ func evaluate(sc scoreContext, gs *engine.GameState, cmds []engine.TurnCommand) 
 		actor := scratch.Units[sc.actorID]
 		opponentKing := scratch.Units[sc.opponentKingID]
 
-		before := snapshotUnits(scratch, sc, actor, opponentKing)
-		gameEvents := scratch.ResolveBombExplosionAndDamage()
-		after := snapshotUnits(scratch, sc, actor, opponentKing)
-
-		tr := buildTurnResult(sc, t, gameEvents, before, after)
+		tr := turnResult{
+			turn:                  t,
+			affectedTiles:         make(map[engine.Coordinate]struct{}),
+			allyAffectedTiles:     make(map[engine.Coordinate]struct{}),
+			opponentAffectedTiles: make(map[engine.Coordinate]struct{}),
+			diedUnits:             make(map[engine.UnitID]struct{}),
+			suicides:              make(map[engine.UnitID]struct{}),
+			distToKingBefore:      reachDistToUnit(scratch, actor, actor.Position, opponentKing),
+			aliveOpponentsBefore:  aliveCount(scratch, sc.opponentIDs, sc.opponentKingID),
+			aliveAlliesBefore:     aliveCount(scratch, sc.allyIDs, sc.allyKingID),
+		}
+		for _, evt := range scratch.ResolveBombExplosionAndDamage() {
+			tr.fold(sc, evt)
+		}
+		tr.distToKingAfter = reachDistToUnit(scratch, actor, actor.Position, opponentKing)
+		tr.aliveOpponentsAfter = aliveCount(scratch, sc.opponentIDs, sc.opponentKingID)
+		tr.aliveAlliesAfter = aliveCount(scratch, sc.allyIDs, sc.allyKingID)
 		for _, entry := range factors {
 			total += profile[entry.id] * entry.factor(scratch, sc, tr)
 		}
