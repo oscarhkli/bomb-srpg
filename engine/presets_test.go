@@ -155,6 +155,16 @@ func TestGetStagePreset(t *testing.T) {
 	}
 }
 
+func TestStagePresets_MaxTurnsBound(t *testing.T) {
+	for _, s := range stagePresetsRegistry() {
+		t.Run(s.Name, func(t *testing.T) {
+			if s.MaxTurns < 0 || s.MaxTurns > maxTurnsLimit {
+				t.Errorf("MaxTurns for %s = %d, want within 0..%d", s.Name, s.MaxTurns, maxTurnsLimit)
+			}
+		})
+	}
+}
+
 func TestStagePresets(t *testing.T) {
 	for _, s := range stagePresetsRegistry() {
 		t.Run(s.Name, func(t *testing.T) {

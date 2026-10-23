@@ -500,6 +500,34 @@ func TestInitGameState_Suite(t *testing.T) {
 	}
 }
 
+func TestInitGameState_MaxTurns(t *testing.T) {
+	tests := []struct {
+		name     string
+		maxTurns int
+		wantErr  error
+	}{
+		{name: "zero is sudden death from turn 1", maxTurns: 0},
+		{name: "preset-sized value", maxTurns: 60},
+		{name: "upper bound", maxTurns: maxTurnsLimit},
+		{name: "negative", maxTurns: -1, wantErr: ErrInvalidMaxTurns},
+		{name: "above upper bound", maxTurns: maxTurnsLimit + 1, wantErr: ErrInvalidMaxTurns},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := initGameState(GameCfg{
+				StagePreset: "Plain",
+				MaxTurns:    tt.maxTurns,
+				P1Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
+				P2Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
+			})
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("got error %v, want %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
 func TestInitGameState_LayoutGridCompilation(t *testing.T) {
 	tests := []struct {
 		name         string

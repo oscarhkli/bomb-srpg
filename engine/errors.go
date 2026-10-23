@@ -18,6 +18,7 @@ var (
 	ErrInvalidStagePreset   = errors.New("invalid stage preset")
 	ErrInvalidTeamSize      = errors.New("invalid team size")
 	ErrInvalidTeamFormation = errors.New("invalid team formation")
+	ErrInvalidMaxTurns      = errors.New("invalid max turns")
 	ErrMissingKing          = errors.New("missing king")
 	ErrInvalidStageLayout   = errors.New("invalid stage layout")
 	ErrInvalidTerrain       = errors.New("invalid terrain")
