@@ -18,13 +18,6 @@ export default defineConfig({
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
     { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
-    {
-      name: 'firefox-canvas',
-      use: {
-        ...devices['Desktop Firefox'],
-        launchOptions: { firefoxUserPrefs: { 'webgl.disabled': true } },
-      },
-    },
     { name: 'webkit', use: { ...devices['Desktop Safari'] } },
   ],
   webServer: {

@@ -181,7 +181,6 @@ jobs:
         include:
           - { project: chromium, browser: chromium }
           - { project: firefox, browser: firefox }
-          - { project: firefox-canvas, browser: firefox }
           - { project: webkit, browser: webkit }
     steps:
       - name: Checkout repository
