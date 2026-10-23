@@ -203,8 +203,9 @@ jobs:
         run: npm ci
         working-directory: web
 
+      # Only webkit needs apt packages; chromium and firefox use the runner image's libraries.
       - name: Install ${{ matrix.browser }}
-        run: npx playwright install --with-deps ${{ matrix.browser }}
+        run: npx playwright install ${{ matrix.browser == 'webkit' && '--with-deps' || '' }} ${{ matrix.browser }}
         working-directory: web
         timeout-minutes: 4
 
