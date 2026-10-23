@@ -739,10 +739,10 @@ func TestBuildRoster_PositionsFromInput(t *testing.T) {
 		t.Fatalf("applyCandidate() unexpected err = %v", err)
 	}
 
-	r, ok := buildRoster(gs)
+	allies, _, ok := buildRoster(gs)
 
-	if !ok || len(r.allies) != 1 || r.allies[0].Position != origin {
-		t.Errorf("buildRoster() = %+v, %v, want the ally King at %+v", r, ok, origin)
+	if !ok || len(allies) != 1 || allies[0].Position != origin {
+		t.Errorf("buildRoster() = %+v, %v, want the ally King at %+v", allies, ok, origin)
 	}
 }
 

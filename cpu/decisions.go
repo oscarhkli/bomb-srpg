@@ -2,6 +2,7 @@ package cpu
 
 import (
 	"bomb-srpg/engine"
+	"cmp"
 	"fmt"
 	"slices"
 )
@@ -24,62 +25,37 @@ func (c candidate) priority() int {
 	return 1
 }
 
-type roster struct {
-	allies       []*engine.Unit
-	allyIDs      []engine.UnitID
-	opponentIDs  []engine.UnitID
-	allyKing     *engine.Unit
-	opponentKing *engine.Unit
-}
-
 // buildRoster reads positions from gs, so pass the original state, not a sandbox that plans move units in.
-func buildRoster(gs *engine.GameState) (roster, bool) {
-	var r roster
+func buildRoster(gs *engine.GameState) (allies []*engine.Unit, base scoreContext, ok bool) {
+	var allyKing, opponentKing *engine.Unit
 	for _, u := range gs.Units {
 		if u.HP <= 0 {
 			continue
 		}
 		if team, _ := u.ID.Decode(); team == engine.Team2 {
-			r.allies = append(r.allies, u)
-			r.allyIDs = append(r.allyIDs, u.ID)
+			allies = append(allies, u)
+			base.allyIDs = append(base.allyIDs, u.ID)
 			if isKingRole(u) {
-				r.allyKing = u
+				allyKing = u
 			}
 		} else {
-			r.opponentIDs = append(r.opponentIDs, u.ID)
+			base.opponentIDs = append(base.opponentIDs, u.ID)
 			if isKingRole(u) {
-				r.opponentKing = u
+				opponentKing = u
 			}
 		}
 	}
-	return r, r.allyKing != nil && r.opponentKing != nil
-}
-
-func bestRoundCandidate(r roster, sandbox *engine.GameState) *candidate {
-	var best *candidate
-	for _, unit := range r.allies {
-		sc := scoreContext{
-			actorID:        unit.ID,
-			allyIDs:        r.allyIDs,
-			opponentIDs:    r.opponentIDs,
-			allyKingID:     r.allyKing.ID,
-			opponentKingID: r.opponentKing.ID,
-			actorOrigin:    unit.Position,
-		}
-		c, err := bestCandidateFor(sc, sandbox)
-		if err != nil || len(c.turnCommands) == 0 {
-			continue
-		}
-		if best == nil || c.score > best.score {
-			best = &c
-		}
+	if allyKing == nil || opponentKing == nil {
+		return nil, scoreContext{}, false
 	}
-	return best
+	base.allyKingID = allyKing.ID
+	base.opponentKingID = opponentKing.ID
+	return allies, base, true
 }
 
 // Decide returns the TurnCommands the CPU plays this turn, in order; empty means no action.
 func Decide(gs *engine.GameState) []engine.TurnCommand {
-	r, ok := buildRoster(gs)
+	allies, base, ok := buildRoster(gs)
 	if !ok {
 		return nil
 	}
@@ -87,11 +63,22 @@ func Decide(gs *engine.GameState) []engine.TurnCommand {
 	sandbox := gs.DeepCopy()
 	var cmds []engine.TurnCommand
 	for range maxAttempts {
-		best := bestRoundCandidate(r, sandbox)
-		if best == nil {
+		var round []candidate
+		for _, unit := range allies {
+			sc := base
+			sc.actorID = unit.ID
+			sc.actorOrigin = unit.Position
+			c, err := bestCandidateFor(sc, sandbox)
+			if err != nil || len(c.turnCommands) == 0 {
+				continue
+			}
+			round = append(round, c)
+		}
+		if len(round) == 0 {
 			break
 		}
-		if err := applyCandidate(sandbox, *best); err != nil {
+		best := slices.MaxFunc(round, func(a, b candidate) int { return cmp.Compare(a.score, b.score) })
+		if err := applyCandidate(sandbox, best); err != nil {
 			break
 		}
 		cmds = append(cmds, best.turnCommands...)
