@@ -218,6 +218,7 @@ func TestServerStateManager_LastActivityUpdated(t *testing.T) {
 			action: func(t *testing.T, s *ServerStateManager, roomID string, tokens [2]string) {
 				t.Helper()
 				room := mustRoom(t, s, roomID)
+				room.Match.WorkingState.ActiveTeam = 2
 				s.runCPUTurn(room, room.Match)
 			},
 		},

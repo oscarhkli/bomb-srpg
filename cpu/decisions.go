@@ -3,6 +3,7 @@ package cpu
 import (
 	"bomb-srpg/engine"
 	"cmp"
+	"errors"
 	"fmt"
 	"slices"
 )
@@ -54,14 +55,17 @@ func buildRoster(gs *engine.GameState) (allies []*engine.Unit, base scoreContext
 }
 
 // Decide returns the TurnCommands the CPU plays this turn, in order; empty means no action.
-func Decide(gs *engine.GameState) []engine.TurnCommand {
+// The commands are valid to apply even when the error is non-nil: it joins the failures of units
+// that were skipped, and the plans of the remaining units are still returned.
+func Decide(gs *engine.GameState) ([]engine.TurnCommand, error) {
 	allies, base, ok := buildRoster(gs)
 	if !ok {
-		return nil
+		return nil, nil
 	}
 
 	sandbox := gs.DeepCopy()
 	var cmds []engine.TurnCommand
+	var errs []error
 	for range maxAttempts {
 		var round []candidate
 		for _, unit := range allies {
@@ -69,7 +73,11 @@ func Decide(gs *engine.GameState) []engine.TurnCommand {
 			sc.actorID = unit.ID
 			sc.actorOrigin = unit.Position
 			c, err := bestCandidateFor(sc, sandbox)
-			if err != nil || len(c.turnCommands) == 0 {
+			if err != nil {
+				errs = append(errs, fmt.Errorf("unit %#x: %w", unit.ID, err))
+				continue
+			}
+			if len(c.turnCommands) == 0 {
 				continue
 			}
 			round = append(round, c)
@@ -81,11 +89,12 @@ func Decide(gs *engine.GameState) []engine.TurnCommand {
 			return cmp.Compare(a.score, b.score)
 		})
 		if err := applyCandidate(sandbox, best); err != nil {
+			errs = append(errs, fmt.Errorf("apply best candidate for unit %#x: %w", best.turnCommands[0].UnitID, err))
 			break
 		}
 		cmds = append(cmds, best.turnCommands...)
 	}
-	return cmds
+	return cmds, errors.Join(errs...)
 }
 
 func isKingRole(u *engine.Unit) bool {

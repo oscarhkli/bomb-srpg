@@ -1,6 +1,18 @@
 package cpu
 
-import "bomb-srpg/engine"
+import (
+	"bomb-srpg/engine"
+	"testing"
+)
+
+func mustDecide(t *testing.T, gs *engine.GameState) []engine.TurnCommand {
+	t.Helper()
+	cmds, err := Decide(gs)
+	if err != nil {
+		t.Fatalf("Decide() error = %v", err)
+	}
+	return cmds
+}
 
 func newTestGameState(width, height int) *engine.GameState {
 	grid := make([][]engine.Tile, height)
