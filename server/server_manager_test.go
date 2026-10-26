@@ -71,6 +71,7 @@ func TestMapError(t *testing.T) {
 		{"room not found", ErrRoomNotFound, 404, "room not found"},
 		{"match not found", ErrMatchNotFound, 404, "match not found"},
 		{"match exists", ErrMatchExists, 409, "match already exists"},
+		{"cpu turn in progress", ErrCPUTurnInProgress, 409, "cpu turn in progress"},
 		{"invalid config", ErrInvalidConfig, 400, "invalid game config"},
 		{"invalid player token", ErrInvalidToken, 401, "invalid player token"},
 

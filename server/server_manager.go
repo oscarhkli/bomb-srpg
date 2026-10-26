@@ -20,14 +20,15 @@ import (
 const CleanupInterval = 60 * time.Minute
 
 var (
-	ErrRoomNotFound    = errors.New("room not found")
-	ErrMatchEnded      = errors.New("match already ended")
-	ErrMatchInProgress = errors.New("match still in progress")
-	ErrMatchExists     = errors.New("match already exists")
-	ErrMatchNotFound   = errors.New("match not found")
-	ErrInvalidConfig   = errors.New("invalid game config")
-	ErrInvalidTurnCmd  = errors.New("invalid turn command")
-	ErrInvalidToken    = errors.New("invalid player token")
+	ErrRoomNotFound      = errors.New("room not found")
+	ErrMatchEnded        = errors.New("match already ended")
+	ErrMatchInProgress   = errors.New("match still in progress")
+	ErrMatchExists       = errors.New("match already exists")
+	ErrMatchNotFound     = errors.New("match not found")
+	ErrInvalidConfig     = errors.New("invalid game config")
+	ErrInvalidTurnCmd    = errors.New("invalid turn command")
+	ErrInvalidToken      = errors.New("invalid player token")
+	ErrCPUTurnInProgress = errors.New("cpu turn in progress")
 )
 
 // mapError converts an error to an HTTP status code and message.
@@ -39,7 +40,7 @@ func mapError(err error) (int, string) {
 		return http.StatusConflict, err.Error()
 	case errors.Is(err, ErrInvalidConfig):
 		return http.StatusBadRequest, err.Error()
-	case errors.Is(err, ErrInvalidTurnCmd):
+	case errors.Is(err, ErrInvalidTurnCmd), errors.Is(err, ErrCPUTurnInProgress):
 		return http.StatusConflict, err.Error()
 	case errors.Is(err, ErrInvalidToken):
 		return http.StatusUnauthorized, err.Error()
@@ -219,6 +220,13 @@ func (mr *MatchRoom) validatePlayerToken(teamID int, token string) error {
 	return nil
 }
 
+func (mr *MatchRoom) rejectDuringCPUTurn() error {
+	if mr.Match.CPU.Phase == engine.TurnPhasePlanning {
+		return ErrCPUTurnInProgress
+	}
+	return nil
+}
+
 func (mr *MatchRoom) validateAnyMatchPlayerToken(token string) error {
 	if !matchToken(mr.PlayerTokens[0], token) && !matchToken(mr.PlayerTokens[1], token) {
 		return ErrInvalidToken
@@ -344,6 +352,9 @@ func (s *ServerStateManager) SubmitTurnCommand(roomID string, cmd engine.TurnCom
 	if err := room.validatePlayerToken(teamID, token); err != nil {
 		return nil, err
 	}
+	if err := room.rejectDuringCPUTurn(); err != nil {
+		return nil, err
+	}
 
 	gameEvents, err := room.Match.ApplyTurnCommand(cmd)
 	if err != nil {
@@ -413,6 +424,10 @@ func (s *ServerStateManager) runCPUTurn(room *MatchRoom, match *engine.Match) {
 
 	if match.WinnerTeamID != 0 {
 		room.Logger.Info("CPU turn abandoned: match already ended")
+		return
+	}
+	if match.WorkingState.ActiveTeam != engine.Team2 {
+		room.Logger.Info("CPU turn abandoned: not the CPU's turn")
 		return
 	}
 
@@ -499,6 +514,9 @@ func (s *ServerStateManager) ResetTurn(roomID, token string) error {
 	if err := room.validatePlayerToken(teamID, token); err != nil {
 		return err
 	}
+	if err := room.rejectDuringCPUTurn(); err != nil {
+		return err
+	}
 
 	room.Match.ResetTurn()
 
@@ -523,6 +541,9 @@ func (s *ServerStateManager) ResolveTurn(roomID, token string) ([]engine.GameEve
 
 	teamID := room.Match.WorkingState.ActiveTeam
 	if err := room.validatePlayerToken(teamID, token); err != nil {
+		return nil, nil, err
+	}
+	if err := room.rejectDuringCPUTurn(); err != nil {
 		return nil, nil, err
 	}
 

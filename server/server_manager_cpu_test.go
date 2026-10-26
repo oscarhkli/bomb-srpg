@@ -388,6 +388,13 @@ func TestServerStateManager_runCPUTurn_Abandons(t *testing.T) {
 			},
 			wantPhase: engine.TurnPhaseReady,
 		},
+		{
+			name: "Not CPU's Turn",
+			swap: func(t *testing.T, room *MatchRoom) {
+				t.Helper()
+			},
+			wantPhase: engine.TurnPhaseReady,
+		},
 	}
 
 	for _, tt := range tests {
@@ -628,5 +635,120 @@ func TestServerStateManager_ConsumeCPUStatus(t *testing.T) {
 				t.Errorf("Expected gameEvents to be empty, got %#v and %#v", planGameEvents, resolveTurnGameEvents)
 			}
 		})
+	}
+}
+
+func newCPUTurnRoom(t *testing.T) (string, [2]string, *ServerStateManager) {
+	t.Helper()
+	roomID, tokens, s := createTestRoomWithCfg(t, vsCpuGameCfg())
+	room := mustRoom(t, s, roomID)
+	room.Match.WorkingState.Turn = 2
+	room.Match.WorkingState.ActiveTeam = 2
+	room.Match.TrueState = room.Match.WorkingState.DeepCopy()
+	return roomID, tokens, s
+}
+
+func TestServerStateManager_CPUTurnGate(t *testing.T) {
+	cpuMove := engine.NewMoveCommand(engine.NewUnitID(2, 0), engine.Coordinate{X: 4, Y: 1})
+
+	calls := []struct {
+		name string
+		call func(s *ServerStateManager, roomID, token string) error
+		// resolved is true when a successful call advances the turn.
+		resolved bool
+	}{
+		{
+			name: "SubmitTurnCommand",
+			call: func(s *ServerStateManager, roomID, token string) error {
+				_, err := s.SubmitTurnCommand(roomID, cpuMove, token)
+				return err
+			},
+		},
+		{
+			name: "ResetTurn",
+			call: func(s *ServerStateManager, roomID, token string) error {
+				return s.ResetTurn(roomID, token)
+			},
+		},
+		{
+			name: "ResolveTurn",
+			call: func(s *ServerStateManager, roomID, token string) error {
+				_, _, err := s.ResolveTurn(roomID, token)
+				return err
+			},
+			resolved: true,
+		},
+	}
+
+	phases := []struct {
+		name    string
+		phase   engine.CPUTurnPhase
+		wantErr error
+	}{
+		{"Planning", engine.TurnPhasePlanning, ErrCPUTurnInProgress},
+		{"Ready", engine.TurnPhaseReady, nil},
+		{"Idle", engine.TurnPhaseIdle, nil},
+	}
+
+	for _, c := range calls {
+		for _, p := range phases {
+			t.Run(c.name+"/"+p.name, func(t *testing.T) {
+				roomID, tokens, s := newCPUTurnRoom(t)
+				room := mustRoom(t, s, roomID)
+				room.Match.CPU.Phase = p.phase
+
+				err := c.call(s, roomID, tokens[1])
+				if !errors.Is(err, p.wantErr) {
+					t.Fatalf("error = %v, want %v", err, p.wantErr)
+				}
+
+				wantTurn, wantTeam := 2, 2
+				if p.wantErr == nil && c.resolved {
+					wantTurn, wantTeam = 3, 1
+				}
+				if got := room.Match.TrueState.Turn; got != wantTurn {
+					t.Errorf("Turn = %d, want %d", got, wantTurn)
+				}
+				if got := room.Match.TrueState.ActiveTeam; got != wantTeam {
+					t.Errorf("ActiveTeam = %d, want %d", got, wantTeam)
+				}
+			})
+		}
+	}
+
+	t.Run("Bad token still gets 401", func(t *testing.T) {
+		roomID, _, s := newCPUTurnRoom(t)
+		mustRoom(t, s, roomID).Match.CPU.Phase = engine.TurnPhasePlanning
+		if _, _, err := s.ResolveTurn(roomID, "wrong"); !errors.Is(err, ErrInvalidToken) {
+			t.Errorf("error = %v, want %v", err, ErrInvalidToken)
+		}
+	})
+}
+
+func TestServerStateManager_CPUTurnGate_NotGated(t *testing.T) {
+	roomID, tokens, s := newCPUTurnRoom(t)
+	room := mustRoom(t, s, roomID)
+	room.Match.CPU.Phase = engine.TurnPhasePlanning
+
+	if _, _, err := s.StartTurn(roomID, tokens[1]); err != nil {
+		t.Fatalf("StartTurn() error = %v", err)
+	}
+	if got, want := room.Match.CPU.Phase, engine.TurnPhasePlanning; got != want {
+		t.Errorf("Phase after StartTurn = %v, want %v", got, want)
+	}
+
+	phase, _, _, err := s.ConsumeCPUStatus(roomID, tokens[0])
+	if err != nil {
+		t.Fatalf("ConsumeCPUStatus() error = %v", err)
+	}
+	if want := engine.TurnPhasePlanning; phase != want {
+		t.Errorf("ConsumeCPUStatus phase = %v, want %v", phase, want)
+	}
+
+	if _, err := s.Surrender(roomID, 1, tokens[0]); err != nil {
+		t.Fatalf("Surrender() error = %v", err)
+	}
+	if got, want := room.Match.WinnerTeamID, 2; got != want {
+		t.Errorf("WinnerTeamID = %d, want %d", got, want)
 	}
 }
