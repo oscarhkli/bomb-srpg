@@ -137,7 +137,7 @@ Surrender: `POST /surrender` (either team, any time).
 - **VS-CPU Turn Handoff**: The CPU's turn runs in a goroutine kicked off from `StartTurn()`, buffering events on `Match.CPU` until the frontend polls them. See [VS-CPU Turn Sequence](diagrams/vs-cpu-turn-sequence.md).
 - **Boss Prologue over Full VS-COM**: the first CPU opponent is a single `RoleBoss` unit against a 5-unit human team. This is a narrower rules surface that ships single-player sooner and acs a future Tutorial/Story Mode.
 - **CPU Decision Boundary**: `cpu.Decide()` is a pure function. `server.runCPUTurn` is the sole caller, applying returned commands to the real `WorkingState` via `ApplyTurnCommand` under the room mutex.
-- **Propose-Then-Validate, Bounded Replan**: `cpu` never pre-validates a plan. `ApplyTurnCommand`'s legality checks are the sole authority, and a failed apply mid-plan triggers one re-`Decide()` for the remaining scope rather than being treated as a contract violation.
+- **Propose-Then-Validate, Bounded Replan**: `cpu` never pre-validates a plan. `ApplyTurnCommand`'s legality checks are the sole authority, and a failed apply mid-plan triggers a re-`Decide()` for the remaining scope, bounded by `maxCPUReplanAttempts`, rather than being treated as a contract violation. A `Decide` error is logged and its commands are still applied.
 
 ## 11. CPU Decision Making
 

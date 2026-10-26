@@ -3,8 +3,10 @@ package cpu
 import (
 	"bomb-srpg/engine"
 	"errors"
+	"fmt"
 	"reflect"
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -210,7 +212,7 @@ func TestDecide_NoKingOnASide_ReturnsEmpty(t *testing.T) {
 	addKing(gs, engine.NewUnitID(1, 1), engine.Coordinate{X: 4, Y: 4})
 	addFighter(gs, engine.NewUnitID(1, 2), engine.Coordinate{X: 4, Y: 0})
 
-	if got := Decide(gs); len(got) != 0 {
+	if got := mustDecide(t, gs); len(got) != 0 {
 		t.Errorf("Decide() = %+v, want empty", got)
 	}
 }
@@ -222,7 +224,7 @@ func TestDecide_DeadAllyExcludedFromPlanning(t *testing.T) {
 	deadAlly.HP = 0
 	addKing(gs, engine.NewUnitID(1, 1), engine.Coordinate{X: 8, Y: 8})
 
-	got := Decide(gs)
+	got := mustDecide(t, gs)
 
 	if len(got) == 0 || got[0].UnitID != allyKing.ID {
 		t.Fatalf("Decide() = %+v, want at least one command from the live ally King %v", got, allyKing.ID)
@@ -291,7 +293,7 @@ func TestDecide_FrozenFighterNeverSuicides(t *testing.T) {
 	twinCorridorWithBreakthrough(gs, true)
 	before := gs.DeepCopy()
 
-	got := Decide(gs)
+	got := mustDecide(t, gs)
 
 	for _, cmd := range got {
 		if cmd.Type == engine.TurnCmdPlaceBomb {
@@ -308,7 +310,7 @@ func TestDecide_MobileFighterMovesThenBombsSafely(t *testing.T) {
 	fighter1, fighter2 := twinCorridorWithBreakthrough(gs, false)
 	before := gs.DeepCopy()
 
-	got := Decide(gs)
+	got := mustDecide(t, gs)
 
 	if len(got) != 4 {
 		t.Fatalf("Decide() = %+v, want 4 commands (move+bomb from each fighter)", got)
@@ -356,7 +358,7 @@ func TestDecide_MoveCommandWinsOnItsOwn(t *testing.T) {
 		engine.NewMoveCommand(engine.NewUnitID(2, 1), engine.Coordinate{X: 7, Y: 1}),
 	}
 
-	got := Decide(gs)
+	got := mustDecide(t, gs)
 
 	if !slices.Equal(got, want) {
 		t.Errorf("Decide() = %+v, want %+v", got, want)
@@ -380,7 +382,7 @@ func TestDecide_MovesEvenWhenEveryPlanScoresBelowNeutral(t *testing.T) {
 
 	before := gs.DeepCopy()
 
-	got := Decide(gs)
+	got := mustDecide(t, gs)
 
 	if len(got) != 1 || got[0].Type != engine.TurnCmdMove || got[0].UnitID != allyKing.ID {
 		t.Fatalf("Decide() = %+v, want a single move from %v", got, allyKing.ID)
@@ -407,7 +409,7 @@ func TestDecide_PrefersFartherSafeTile(t *testing.T) {
 	gs.Bombs[bombB] = &engine.Bomb{ID: bombB, OwnerID: engine.NewUnitID(1, 0), Position: bombBPos, Range: 2, Countdown: 2}
 	gs.Grid[bombBPos.Y][bombBPos.X] = engine.Tile{Type: engine.TerrainPlain, OccupantType: engine.OccupantBomb, OccupantID: int64(bombB)}
 
-	got := Decide(gs)
+	got := mustDecide(t, gs)
 
 	if len(got) != 1 || got[0].Type != engine.TurnCmdMove || got[0].UnitID != boss.ID {
 		t.Fatalf("Decide() = %+v, want a single move from %v", got, boss.ID)
@@ -436,7 +438,7 @@ func TestDecide_MovesToFarthestSafeTile(t *testing.T) {
 
 	farTiles := []engine.Coordinate{{X: 5, Y: 1}, {X: 7, Y: 3}}
 
-	got := Decide(gs)
+	got := mustDecide(t, gs)
 
 	if len(got) != 1 || got[0].Type != engine.TurnCmdMove || got[0].UnitID != boss.ID || !slices.Contains(farTiles, got[0].Target) {
 		t.Errorf("Decide() = %+v, want a single move from %v to one of %+v", got, boss.ID, farTiles)
@@ -509,7 +511,7 @@ func TestDecide(t *testing.T) {
 			gs := tt.setup()
 			before := gs.DeepCopy()
 
-			got := Decide(gs)
+			got := mustDecide(t, gs)
 
 			if len(got) != len(tt.want) {
 				t.Fatalf("Decide() = %+v, want %+v", got, tt.want)
@@ -643,7 +645,7 @@ func TestDecide_Roster(t *testing.T) {
 			gs := newTestGameState(9, 9)
 			tt.setup(gs)
 
-			got := Decide(gs)
+			got := mustDecide(t, gs)
 
 			if tt.wantEmpty != (len(got) == 0) {
 				t.Fatalf("Decide() = %+v, want empty = %v", got, tt.wantEmpty)
@@ -666,7 +668,7 @@ func TestDecide_EmptyPlansEndLoop(t *testing.T) {
 	}
 	addKing(gs, engine.NewUnitID(1, 1), engine.Coordinate{X: 0, Y: 0})
 
-	if got := Decide(gs); len(got) != 0 {
+	if got := mustDecide(t, gs); len(got) != 0 {
 		t.Errorf("Decide() = %+v, want no commands", got)
 	}
 }
@@ -676,7 +678,7 @@ func TestDecide_SingleBestMove(t *testing.T) {
 	corridorWithBreakthrough(gs)
 	addFighter(gs, engine.NewUnitID(2, 3), engine.Coordinate{X: 0, Y: 1})
 
-	got := Decide(gs)
+	got := mustDecide(t, gs)
 
 	fighter := engine.NewUnitID(2, 1)
 	want := []engine.TurnCommand{
@@ -706,7 +708,7 @@ func TestDecide_DoesNotMutateInput(t *testing.T) {
 			tt.setup(gs)
 			want := gs.DeepCopy()
 
-			if got := Decide(gs); len(got) == 0 {
+			if got := mustDecide(t, gs); len(got) == 0 {
 				t.Fatalf("Decide() = empty, want commands so the sandbox is exercised")
 			}
 
@@ -721,7 +723,7 @@ func TestDecide_HighestScoringAllyActsFirst(t *testing.T) {
 	gs := newTestGameState(9, 5)
 	fighter1, fighter2 := twinCorridorWithBreakthrough(gs, false)
 
-	got := Decide(gs)
+	got := mustDecide(t, gs)
 
 	if len(got) != 4 || got[0].UnitID != fighter1.ID || got[1].UnitID != fighter1.ID ||
 		got[2].UnitID != fighter2.ID || got[3].UnitID != fighter2.ID {
@@ -767,7 +769,7 @@ func TestDecide_IdleAllyDoesNotEndRound(t *testing.T) {
 		gs.Grid[b.pos.Y][b.pos.X] = engine.Tile{Type: engine.TerrainPlain, OccupantType: engine.OccupantBomb, OccupantID: int64(id)}
 	}
 
-	got := Decide(gs)
+	got := mustDecide(t, gs)
 
 	want := []engine.TurnCommand{
 		engine.NewMoveCommand(fighter.ID, engine.Coordinate{X: 5, Y: 3}),
@@ -775,5 +777,48 @@ func TestDecide_IdleAllyDoesNotEndRound(t *testing.T) {
 	}
 	if !slices.Equal(got, want) {
 		t.Errorf("Decide() = %+v, want %+v (an ally whose best plan is empty must not end the round)", got, want)
+	}
+}
+
+func TestDecide_ReturnsErrorWhenActiveTeamIsNotCPU(t *testing.T) {
+	gs := newTestGameState(9, 5)
+	fighter1, fighter2 := twinCorridorWithBreakthrough(gs, false)
+	gs.ActiveTeam = 2
+
+	cmds, err := Decide(gs)
+
+	if !errors.Is(err, engine.ErrNotActiveTeam) {
+		t.Fatalf("Decide() error = %v, want %v", err, engine.ErrNotActiveTeam)
+	}
+	if len(cmds) != 0 {
+		t.Errorf("Decide() = %+v, want no commands", cmds)
+	}
+	for _, fighter := range []*engine.Unit{fighter1, fighter2} {
+		if want := fmt.Sprintf("%#x", fighter.ID); !strings.Contains(err.Error(), want) {
+			t.Errorf("Decide() error = %q, want it to name unit %s", err, want)
+		}
+	}
+}
+
+func TestDecide_ReturnsErrorWhenAllyDesynced(t *testing.T) {
+	gs := newTestGameState(9, 5)
+	fighter1, fighter2 := twinCorridorWithBreakthrough(gs, false)
+	gs.Grid[fighter1.Position.Y][fighter1.Position.X].OccupantID = int64(fighter2.ID)
+
+	cmds, err := Decide(gs)
+
+	if !errors.Is(err, engine.ErrDesynced) {
+		t.Fatalf("Decide() error = %v, want %v", err, engine.ErrDesynced)
+	}
+	if want := fmt.Sprintf("%#x", fighter1.ID); !strings.Contains(err.Error(), want) {
+		t.Errorf("Decide() error = %q, want it to name unit %s", err, want)
+	}
+	if len(cmds) == 0 {
+		t.Fatal("Decide() = no commands, want the healthy ally's plan")
+	}
+	for _, cmd := range cmds {
+		if cmd.UnitID != fighter2.ID {
+			t.Errorf("Decide() command %+v, want only unit %#x", cmd, fighter2.ID)
+		}
 	}
 }

@@ -2,8 +2,11 @@ package server
 
 import (
 	"bomb-srpg/engine"
+	"context"
 	"encoding/json/v2"
 	"errors"
+	"fmt"
+	"log/slog"
 	"slices"
 	"sync"
 	"testing"
@@ -15,13 +18,14 @@ import (
 type recordingDecider struct {
 	match         *engine.Match
 	plan          func(gs *engine.GameState, call int) []engine.TurnCommand
+	err           error
 	calls         int
 	observedPhase engine.CPUTurnPhase
 	observedBombs int
 	called        chan struct{}
 }
 
-func (d *recordingDecider) decide(gs *engine.GameState) []engine.TurnCommand {
+func (d *recordingDecider) decide(gs *engine.GameState) ([]engine.TurnCommand, error) {
 	call := d.calls
 	if call == 0 {
 		d.observedPhase = d.match.CPU.Phase
@@ -35,9 +39,9 @@ func (d *recordingDecider) decide(gs *engine.GameState) []engine.TurnCommand {
 	}
 
 	if d.plan == nil {
-		return nil
+		return nil, d.err
 	}
-	return d.plan(gs, call)
+	return d.plan(gs, call), d.err
 }
 
 func vsCpuGameCfg() engine.GameCfg {
@@ -437,10 +441,10 @@ func TestServerStateManager_ReadsDuringCPUTurn(t *testing.T) {
 	match := room.Match
 
 	planning, release := make(chan struct{}), make(chan struct{})
-	s.decide = func(*engine.GameState) []engine.TurnCommand {
+	s.decide = func(*engine.GameState) ([]engine.TurnCommand, error) {
 		close(planning)
 		<-release
-		return nil
+		return nil, nil
 	}
 
 	cpuDone := make(chan struct{})
@@ -499,7 +503,7 @@ func TestServerStateManager_runCPUTurn_Panic(t *testing.T) {
 	room.Match.CPU.Phase = engine.TurnPhasePlanning
 	match := room.Match
 
-	s.decide = func(*engine.GameState) []engine.TurnCommand { panic("decide exploded") }
+	s.decide = func(*engine.GameState) ([]engine.TurnCommand, error) { panic("decide exploded") }
 
 	s.runCPUTurn(room, match)
 
@@ -750,5 +754,99 @@ func TestServerStateManager_CPUTurnGate_NotGated(t *testing.T) {
 	}
 	if got, want := room.Match.WinnerTeamID, 2; got != want {
 		t.Errorf("WinnerTeamID = %d, want %d", got, want)
+	}
+}
+
+type captureHandler struct {
+	mu      sync.Mutex
+	records []slog.Record
+}
+
+func (h *captureHandler) Enabled(_ context.Context, level slog.Level) bool {
+	return level >= slog.LevelWarn
+}
+
+func (h *captureHandler) Handle(_ context.Context, r slog.Record) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.records = append(h.records, r)
+	return nil
+}
+
+func (h *captureHandler) WithAttrs([]slog.Attr) slog.Handler { return h }
+
+func (h *captureHandler) WithGroup(string) slog.Handler { return h }
+
+func TestServerStateManager_runCPUTurn_DecideError(t *testing.T) {
+	cpuUnitID := engine.NewUnitID(2, 0)
+	decideErr := fmt.Errorf("unit %#x: %w", cpuUnitID, engine.ErrDesynced)
+
+	tests := []struct {
+		name     string
+		cmds     []engine.TurnCommand
+		wantMove bool
+	}{
+		{
+			name:     "Partial Commands Applied",
+			cmds:     []engine.TurnCommand{engine.NewMoveCommand(cpuUnitID, engine.Coordinate{X: 4, Y: 1})},
+			wantMove: true,
+		},
+		{
+			name: "No Commands",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			roomID, _, s := newCPUTurnRoom(t)
+			room := mustRoom(t, s, roomID)
+			h := &captureHandler{}
+			room.Logger = slog.New(h)
+			room.Match.CPU.Phase = engine.TurnPhasePlanning
+			match := room.Match
+
+			decider := &recordingDecider{
+				match:  match,
+				plan:   func(*engine.GameState, int) []engine.TurnCommand { return tt.cmds },
+				err:    decideErr,
+				called: make(chan struct{}, 1),
+			}
+			s.decide = decider.decide
+
+			s.runCPUTurn(room, match)
+
+			if got, want := decider.calls, 1; got != want {
+				t.Errorf("decide calls = %d, want %d", got, want)
+			}
+			if got, want := match.CPU.Phase, engine.TurnPhaseReady; got != want {
+				t.Errorf("Phase = %v, want %v", got, want)
+			}
+			if got, want := match.TrueState.ActiveTeam, 1; got != want {
+				t.Errorf("ActiveTeam = %d, want %d", got, want)
+			}
+			if got := hasGameEvent(match.CPU.PlanGameEvents, engine.GameEvtUnitMoved, cpuUnitID); got != tt.wantMove {
+				t.Errorf("move applied = %v, want %v, events %#v", got, tt.wantMove, match.CPU.PlanGameEvents)
+			}
+
+			h.mu.Lock()
+			defer h.mu.Unlock()
+			if len(h.records) != 1 {
+				t.Fatalf("got %d log records, want 1", len(h.records))
+			}
+			rec := h.records[0]
+			if rec.Level != slog.LevelWarn || rec.Message != "CPU decide reported errors" {
+				t.Errorf("record = %v %q, want Warn %q", rec.Level, rec.Message, "CPU decide reported errors")
+			}
+			var logged error
+			rec.Attrs(func(a slog.Attr) bool {
+				if a.Key == "error" {
+					logged, _ = a.Value.Any().(error)
+				}
+				return true
+			})
+			if !errors.Is(logged, engine.ErrDesynced) {
+				t.Errorf("logged error = %v, want %v", logged, engine.ErrDesynced)
+			}
+		})
 	}
 }

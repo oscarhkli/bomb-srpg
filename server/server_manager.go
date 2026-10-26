@@ -86,7 +86,7 @@ type MatchRoom struct {
 type ServerStateManager struct {
 	Rooms          sync.Map
 	generateRoomID func(int) (string, error)
-	decide         func(*engine.GameState) []engine.TurnCommand
+	decide         func(*engine.GameState) ([]engine.TurnCommand, error)
 	Logger         *slog.Logger
 }
 
@@ -443,7 +443,11 @@ func (s *ServerStateManager) runCPUTurn(room *MatchRoom, match *engine.Match) {
 
 	var err error
 	for attempt := range maxCPUReplanAttempts {
-		if err = applyPlan(match, s.decide(match.WorkingState)); err == nil {
+		cmds, decideErr := s.decide(match.WorkingState)
+		if decideErr != nil {
+			room.Logger.Warn("CPU decide reported errors", "attempt", attempt, "error", decideErr)
+		}
+		if err = applyPlan(match, cmds); err == nil {
 			break
 		}
 		room.Logger.Warn("CPU plan rejected, replanning", "attempt", attempt, "error", err)
