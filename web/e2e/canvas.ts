@@ -1,12 +1,16 @@
 import { expect, type APIRequestContext, type Page } from '@playwright/test';
 import type { GameState, Unit } from '../src/api/types';
 import {
+  BUTTON_LABEL_BOMB,
   BUTTON_LABEL_MOVE,
   BUTTON_LABEL_YES,
   DEPTH_ALLOWED_TILE_OVERLAY,
+  DEPTH_SUDDEN_DEATH_OVERLAY,
   SPRITE_GROUND_MARGIN,
   TILE_SIZE,
 } from '../src/constants';
+
+const DEFAULT_POLL_TIMEOUT_MS = 5_000;
 
 export interface Point {
   x: number;
@@ -125,11 +129,17 @@ async function targetCenter(page: Page, target: Target): Promise<Point | undefin
   );
 }
 
-async function waitForTarget(page: Page, target: Target, description: string): Promise<Point> {
+async function waitForTarget(
+  page: Page,
+  target: Target,
+  description: string,
+  timeout = DEFAULT_POLL_TIMEOUT_MS
+): Promise<Point> {
   let point: Point | undefined;
   await expect
     .poll(async () => (point = await targetCenter(page, target)) !== undefined, {
       message: description,
+      timeout,
     })
     .toBe(true);
   if (!point) {
@@ -156,11 +166,16 @@ async function clickTarget(page: Page, target: Target, description: string): Pro
   await click(page, await waitForTarget(page, target, description));
 }
 
-export async function waitForText(page: Page, label: string): Promise<Point> {
+export async function waitForText(
+  page: Page,
+  label: string,
+  timeout = DEFAULT_POLL_TIMEOUT_MS
+): Promise<Point> {
   return waitForTarget(
     page,
     { kind: 'text', label },
-    `visible text "${label}" in the active scene`
+    `visible text "${label}" in the active scene`,
+    timeout
   );
 }
 
@@ -176,6 +191,14 @@ export async function clickMoveButton(page: Page): Promise<void> {
   await clickTarget(page, { kind: 'spriteButton', labelKey: BUTTON_LABEL_MOVE }, 'Move button');
 }
 
+export async function clickBombButton(page: Page): Promise<void> {
+  await clickTarget(page, { kind: 'spriteButton', labelKey: BUTTON_LABEL_BOMB }, 'Bomb button');
+}
+
+export async function textVisible(page: Page, label: string): Promise<boolean> {
+  return (await targetCenter(page, { kind: 'text', label })) !== undefined;
+}
+
 export async function clickConfirmYes(page: Page): Promise<void> {
   await clickTarget(page, { kind: 'spriteButton', labelKey: BUTTON_LABEL_YES }, 'Yes button');
 }
@@ -188,6 +211,26 @@ export async function clickAllowedTile(page: Page, index: number): Promise<Point
   const tile = await waitForTarget(page, { kind: 'allowedTile', index }, `allowed tile ${index}`);
   await click(page, tile);
   return tile;
+}
+
+export async function clickAllowedTileNextTo(page: Page, unitId: number): Promise<Point> {
+  const from = await unitCenter(page, unitId);
+  const tilePx = (await pixelScale(page)) * TILE_SIZE;
+  const tolerance = tilePx / 4;
+  for (let index = 0; ; index++) {
+    const tile = await targetCenter(page, { kind: 'allowedTile', index });
+    if (!tile) {
+      throw new Error(`no allowed tile one step from unit ${unitId}`);
+    }
+    const dx = Math.abs(tile.x - from.x);
+    const dy = Math.abs(tile.y - from.y);
+    const sideways = Math.abs(dx - tilePx) < tolerance && dy < tolerance;
+    const vertical = Math.abs(dy - tilePx) < tolerance && dx < tolerance;
+    if (sideways || vertical) {
+      await click(page, tile);
+      return tile;
+    }
+  }
 }
 
 export async function waitForInput(page: Page): Promise<void> {
@@ -258,4 +301,76 @@ export async function teamUnit(
     throw new Error(`no unit for team ${team} in room ${room}`);
   }
   return unit;
+}
+
+export interface BombSample {
+  drawn: number;
+  containers: number;
+  overlay: boolean;
+}
+
+export interface CutsceneSummary {
+  before: number;
+  atStart: number;
+  atEnd: number;
+  max: number;
+}
+
+export async function watchBombs(page: Page): Promise<void> {
+  await page.addInitScript((overlayDepth: number) => {
+    interface BombScene {
+      scene: { key: string };
+      bombGraphicsById: Map<number, unknown>;
+      occupantObjects: { type: string }[];
+      children: { list: { type: string; depth: number; visible: boolean }[] };
+    }
+    const w = window as unknown as { __game?: Phaser.Game; __bombWatch: BombSample[] };
+    w.__bombWatch = [];
+    const tick = (): void => {
+      const scene = w.__game?.scene.getScenes(true)[0] as unknown as BombScene | undefined;
+      if (scene?.scene.key === 'MatchScene') {
+        const sample: BombSample = {
+          drawn: scene.bombGraphicsById.size,
+          containers: scene.occupantObjects.filter(o => o.type === 'Container').length,
+          overlay: scene.children.list.some(
+            o => o.type === 'Graphics' && o.depth === overlayDepth && o.visible
+          ),
+        };
+        const last = w.__bombWatch[w.__bombWatch.length - 1];
+        if (
+          !last ||
+          last.drawn !== sample.drawn ||
+          last.containers !== sample.containers ||
+          last.overlay !== sample.overlay
+        ) {
+          w.__bombWatch.push(sample);
+        }
+      }
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }, DEPTH_SUDDEN_DEATH_OVERLAY);
+}
+
+export function readBombWatch(page: Page): Promise<BombSample[]> {
+  return page.evaluate(() => (window as unknown as { __bombWatch: BombSample[] }).__bombWatch);
+}
+
+export function summariseCutscenes(samples: BombSample[]): CutsceneSummary[] {
+  const result: CutsceneSummary[] = [];
+  let before = 0;
+  let open: CutsceneSummary | undefined;
+  for (const sample of samples) {
+    if (sample.overlay && !open) {
+      open = { before, atStart: sample.drawn, atEnd: sample.drawn, max: sample.drawn };
+      result.push(open);
+    } else if (sample.overlay && open) {
+      open.atEnd = sample.drawn;
+      open.max = Math.max(open.max, sample.drawn);
+    } else {
+      open = undefined;
+      before = sample.drawn;
+    }
+  }
+  return result;
 }
