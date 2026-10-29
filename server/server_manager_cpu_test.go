@@ -850,3 +850,91 @@ func TestServerStateManager_runCPUTurn_DecideError(t *testing.T) {
 		})
 	}
 }
+
+func TestServerStateManager_runCPUTurn_EndsMatch(t *testing.T) {
+	gameCfg := vsCpuGameCfg()
+	gameCfg.MaxTurns = 0
+	roomID, tokens, s := createTestRoomWithCfg(t, gameCfg)
+	room := mustRoom(t, s, roomID)
+	room.Match.WorkingState.Turn = 2
+	room.Match.WorkingState.ActiveTeam = 2
+	room.Match.TrueState = room.Match.WorkingState.DeepCopy()
+
+	kingID := engine.NewUnitID(2, 0)
+	kingPos := room.Match.WorkingState.Units[kingID].Position
+	target := freeNeighbour(t, room.Match.WorkingState, kingPos)
+	if _, err := room.Match.CommandPlaceBomb(kingID, target); err != nil {
+		t.Fatalf("CommandPlaceBomb() error = %v", err)
+	}
+	for _, gs := range []*engine.GameState{room.Match.WorkingState, room.Match.TrueState} {
+		for _, bomb := range gs.Bombs {
+			if bomb.OwnerID == kingID {
+				bomb.Countdown = 1
+			}
+		}
+	}
+	countHazards := func(gs *engine.GameState) int {
+		n := 0
+		for _, bomb := range gs.Bombs {
+			if bomb.OwnerID == engine.SystemUnitID {
+				n++
+			}
+		}
+		return n
+	}
+	hazardsBefore := countHazards(room.Match.WorkingState)
+
+	decider := &recordingDecider{match: room.Match, called: make(chan struct{}, 1)}
+	s.decide = decider.decide
+	room.Match.CPU.Phase = engine.TurnPhasePlanning
+	s.runCPUTurn(room, room.Match)
+
+	if got, want := room.Match.WinnerTeamID, 1; got != want {
+		t.Errorf("Expected winner %d, got %d", want, got)
+	}
+	if got, want := room.Match.CPU.Phase, engine.TurnPhaseReady; got != want {
+		t.Errorf("Expected phase %v, got %v", want, got)
+	}
+	if got, want := room.Match.WorkingState.Turn, 2; got != want {
+		t.Errorf("Expected turn %d to stay, got %d", want, got)
+	}
+	if got, want := room.Match.WorkingState.ActiveTeam, 2; got != want {
+		t.Errorf("Expected active team %d to stay, got %d", want, got)
+	}
+	if got := countHazards(room.Match.WorkingState); got > hazardsBefore {
+		t.Errorf("Expected at most %d hazards, got %d", hazardsBefore, got)
+	}
+
+	phase, planGameEvents, resolveTurnGameEvents, err := s.ConsumeCPUStatus(roomID, tokens[0])
+	if err != nil {
+		t.Fatalf("ConsumeCPUStatus() error = %v", err)
+	}
+	if got, want := phase, engine.TurnPhaseReady; got != want {
+		t.Errorf("Expected first consume %v, got %v", want, got)
+	}
+	if !slices.ContainsFunc(resolveTurnGameEvents, func(evt engine.GameEvent) bool {
+		return evt.Type == engine.GameEvtMatchEnded && evt.WinnerTeamID == 1
+	}) {
+		t.Errorf("Expected a matchEnded event with winner 1, got %+v", resolveTurnGameEvents)
+	}
+	for name, gameEvents := range map[string][]engine.GameEvent{
+		"plan":    planGameEvents,
+		"resolve": resolveTurnGameEvents,
+	} {
+		if hasGameEvent(gameEvents, engine.GameEvtBombPlaced, engine.SystemUnitID) {
+			t.Errorf("Expected no hazard bombPlaced event in the %s events, got %+v", name, gameEvents)
+		}
+	}
+	for consume := 2; consume <= 3; consume++ {
+		phase, _, _, err := s.ConsumeCPUStatus(roomID, tokens[0])
+		if err != nil {
+			t.Fatalf("ConsumeCPUStatus() error = %v", err)
+		}
+		if got, want := phase, engine.TurnPhaseIdle; got != want {
+			t.Errorf("Expected consume %d to be %v, got %v", consume, want, got)
+		}
+	}
+	if got, want := decider.calls, 1; got != want {
+		t.Errorf("Expected decide to run %d time, got %d", want, got)
+	}
+}

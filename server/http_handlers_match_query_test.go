@@ -126,9 +126,7 @@ func TestHandleGetMatchState(t *testing.T) {
 		tokens := mustCreateMatch(t, s, roomID, gameCfg)
 		unitID := engine.NewUnitID(1, 0)
 		pos := engine.Coordinate{X: 4, Y: 7}
-		if _, _, err := s.StartTurn(roomID, tokens[0]); err != nil {
-			t.Fatalf("StartTurn() error = %v", err)
-		}
+		startTurnForTest(t, s, roomID, tokens[0])
 		if _, err := s.SubmitTurnCommand(roomID, engine.NewPlaceBombCommand(unitID, pos), tokens[0]); err != nil {
 			t.Fatalf("SubmitTurnCommand(place bomb) error = %v", err)
 		}

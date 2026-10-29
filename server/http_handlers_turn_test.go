@@ -5,6 +5,7 @@ import (
 	"encoding/json/v2"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -609,4 +610,95 @@ func TestHandleSurrender(t *testing.T) {
 			"unitId", "countdown", "newHp"},
 			nil)
 	})
+}
+
+func TestHandleResolveTurn_SuddenDeathMatchEnd(t *testing.T) {
+	roomID, s, h := newTestRoom(t)
+	gameCfg := validGameCfg()
+	gameCfg.MaxTurns = 0
+	tokens := mustCreateMatch(t, s, roomID, gameCfg)
+	startTurnForTest(t, s, roomID, tokens[0])
+
+	room := mustRoom(t, s, roomID)
+	hazardCountdowns := make(map[engine.BombID]int)
+	for id, bomb := range room.Match.WorkingState.Bombs {
+		if bomb.OwnerID == engine.SystemUnitID {
+			hazardCountdowns[id] = bomb.Countdown
+		}
+	}
+	if got, want := len(hazardCountdowns), 2; got != want {
+		t.Fatalf("Expected exactly %d hazards after starting the turn, found %d", want, got)
+	}
+
+	kingID := engine.NewUnitID(1, 0)
+	kingPos := room.Match.WorkingState.Units[kingID].Position
+	target := freeNeighbour(t, room.Match.WorkingState, kingPos)
+	if _, err := s.SubmitTurnCommand(roomID, engine.NewPlaceBombCommand(kingID, target), tokens[0]); err != nil {
+		t.Fatalf("SubmitTurnCommand() error = %v", err)
+	}
+	for _, bomb := range room.Match.WorkingState.Bombs {
+		if bomb.OwnerID == kingID {
+			bomb.Countdown = 1
+		}
+	}
+
+	rr := doRequest(t, h.HandleResolveTurn, "POST /api/match-rooms/{roomID}/match/resolve", "POST", "/api/match-rooms/"+roomID+"/match/resolve", "", tokens[0])
+	if got, want := rr.Code, http.StatusOK; got != want {
+		t.Fatalf("Expected status %v, got %v", want, got)
+	}
+	var response ResolveTurnResponse
+	if err := json.UnmarshalRead(rr.Body, &response); err != nil {
+		t.Fatalf("Failed to decode response JSON payload: %v", err)
+	}
+
+	if !slices.ContainsFunc(response.ResolveTurnGameEvents, func(evt engine.GameEvent) bool {
+		return evt.Type == engine.GameEvtMatchEnded && evt.WinnerTeamID == 2
+	}) {
+		t.Errorf("Expected a matchEnded event with winner 2, got %+v", response.ResolveTurnGameEvents)
+	}
+	if got, want := room.Match.WinnerTeamID, 2; got != want {
+		t.Errorf("Expected winner %v, got %v", want, got)
+	}
+	for name, gameEvents := range map[string][]engine.GameEvent{
+		"plan":    response.PlanGameEvents,
+		"resolve": response.ResolveTurnGameEvents,
+	} {
+		if hasGameEvent(gameEvents, engine.GameEvtBombPlaced, engine.SystemUnitID) {
+			t.Errorf("Expected no hazard bombPlaced event in the %s events, got %+v", name, gameEvents)
+		}
+	}
+
+	stateRR := doRequest(t, h.HandleGetMatchState, "GET /api/match-rooms/{roomID}/match/state", "GET", "/api/match-rooms/"+roomID+"/match/state", "", "")
+	var state struct {
+		Turn          int           `json:"turn"`
+		InSuddenDeath bool          `json:"inSuddenDeath"`
+		Bombs         []engine.Bomb `json:"bombs"`
+	}
+	if err := json.UnmarshalRead(stateRR.Body, &state); err != nil {
+		t.Fatalf("Failed to decode state JSON payload: %v", err)
+	}
+	if !state.InSuddenDeath {
+		t.Error("Expected the state to stay in sudden death")
+	}
+	if got, want := state.Turn, 1; got != want {
+		t.Errorf("Expected turn %d to stay, got %d", want, got)
+	}
+	remaining := 0
+	for _, bomb := range state.Bombs {
+		if bomb.OwnerID != engine.SystemUnitID {
+			continue
+		}
+		remaining++
+		before, ok := hazardCountdowns[bomb.ID]
+		if !ok {
+			t.Errorf("Expected hazard %#x to be one of the recorded ones", bomb.ID)
+			continue
+		}
+		if got, want := bomb.Countdown, before-1; got != want {
+			t.Errorf("Expected hazard %#x countdown %d, got %d", bomb.ID, want, got)
+		}
+	}
+	if remaining > len(hazardCountdowns) {
+		t.Errorf("Expected at most %d hazards in the state, got %d", len(hazardCountdowns), remaining)
+	}
 }
