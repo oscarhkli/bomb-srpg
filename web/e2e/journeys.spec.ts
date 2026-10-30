@@ -106,8 +106,12 @@ test("a hot-seat match ends without surrender when a King's bomb goes off", asyn
   await clickAllowedTileNextTo(page, king.id);
   await clickConfirmYes(page);
   await expect.poll(async () => (await matchState(request, room)).bombs).toHaveLength(1);
+  const [placed] = (await matchState(request, room)).bombs;
+  if (!placed) {
+    throw new Error('the King bomb was not placed');
+  }
 
-  for (let turn = 1; turn <= 4; turn++) {
+  for (let turn = 1; turn < placed.countdown; turn++) {
     await endTurn(page);
     await expect
       .poll(async () => matchState(request, room))

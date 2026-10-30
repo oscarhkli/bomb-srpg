@@ -217,6 +217,7 @@ export async function clickAllowedTileNextTo(page: Page, unitId: number): Promis
   const from = await unitCenter(page, unitId);
   const tilePx = (await pixelScale(page)) * TILE_SIZE;
   const tolerance = tilePx / 4;
+  await waitForTarget(page, { kind: 'allowedTile', index: 0 }, 'allowed tile 0');
   for (let index = 0; ; index++) {
     const tile = await targetCenter(page, { kind: 'allowedTile', index });
     if (!tile) {
