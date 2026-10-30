@@ -199,7 +199,8 @@ func (gs *GameState) IsLandingLegal(target Coordinate, _ OccupantType) error {
 }
 
 // StartTurn sets up the environmental boundaries for the upcoming round.
-// Returns GameEvents when the match enters SuddenDeath. A repeat call in the same turn drops nothing and returns the same events.
+// Returns GameEvents when the match enters SuddenDeath.
+// A repeat call in the same turn drops nothing and returns the same events.
 func (m *Match) StartTurn() []GameEvent {
 	winner := m.evaluateVictoryConditions()
 	if winner != MatchInProgress {
