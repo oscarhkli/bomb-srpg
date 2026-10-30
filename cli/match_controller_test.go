@@ -103,6 +103,31 @@ func TestMatchController_SystemCommands(t *testing.T) {
 	}
 }
 
+func TestMatchController_HazardEventsPrintedOncePerTurn(t *testing.T) {
+	match, err := engine.InitGame(engine.GameCfg{
+		StagePreset:    "Plain",
+		P1Slots:        []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Fighter", Role: engine.RoleNormal}},
+		P2Slots:        []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Fighter", Role: engine.RoleNormal}},
+		MaxTurns:       0,
+		AllowResetTurn: true,
+	})
+	if err != nil {
+		t.Fatalf("InitGame failed: %v", err)
+	}
+
+	var screen bytes.Buffer
+	controller := NewMatchController(match, NewTerminalView(&screen), strings.NewReader("/config\n/config\n/config\n"))
+
+	controller.StartInputLoop()
+
+	if got, want := strings.Count(screen.String(), `Type:"bombPlaced"`), 2; got != want {
+		t.Errorf("printed bombPlaced events = %d, want %d", got, want)
+	}
+	if got, want := len(match.WorkingState.Bombs), 2; got != want {
+		t.Errorf("bombs on the board = %d, want %d", got, want)
+	}
+}
+
 func TestMatchController_GameplayActions(t *testing.T) {
 	type testCase struct {
 		name          string
