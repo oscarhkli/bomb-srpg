@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := test
-.PHONY: fmt vet test test-race lint lint-all pre-push install-hooks coverage build build-server run run-server web-dev web-format web-typecheck web-test web-lint web-build web-e2e web-coverage gen-spec-index
+.PHONY: fmt vet test test-race bench lint lint-all pre-push install-hooks coverage build build-server run run-server web-dev web-format web-typecheck web-test web-lint web-build web-e2e web-coverage gen-spec-index
 
 fmt:
 	go fmt ./...
@@ -12,6 +12,9 @@ test: vet
 
 test-race: vet
 	go test -race ./cli/... ./cmd/srpg-web/... ./cpu/... ./engine/... ./server/...
+
+bench: vet
+	go test -run '^$$' -bench=. -benchmem -count=3 ./cli/... ./cmd/srpg-web/... ./cpu/... ./engine/... ./server/...
 
 lint:
 	golangci-lint run ./cli/... ./cmd/... ./cpu/... ./engine/... ./server/...
