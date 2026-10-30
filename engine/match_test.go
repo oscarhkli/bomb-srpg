@@ -2202,3 +2202,138 @@ func TestGameState_PlaceBomb_SystemUnit(t *testing.T) {
 		})
 	}
 }
+
+func TestMatch_StartTurn_Idempotent(t *testing.T) {
+	king, ok := GetArchetype("King")
+	if !ok {
+		t.Fatalf("Archetype King does not exist")
+	}
+	fighter, ok := GetArchetype("Fighter")
+	if !ok {
+		t.Fatalf("Archetype Fighter does not exist")
+	}
+
+	newMatch := func(turn int) *Match {
+		m := newTestMatch(4, 3)
+		m.TrueState.Turn = turn
+		m.WorkingState.Turn = turn
+		units := []*Unit{
+			{ID: NewUnitID(1, 0), Team: 1, HP: 1, Position: Coordinate{0, 0}, Type: king, Role: RoleKing},
+			{ID: NewUnitID(2, 0), Team: 2, HP: 1, Position: Coordinate{0, 1}, Type: king, Role: RoleKing},
+			{ID: NewUnitID(1, 1), Team: 1, HP: 1, Position: Coordinate{3, 0}, Type: fighter},
+			{ID: NewUnitID(2, 1), Team: 2, HP: 1, Position: Coordinate{3, 1}, Type: fighter},
+		}
+		for _, u := range units {
+			m.WorkingState.Units[u.ID] = u
+			m.WorkingState.Grid[u.Position.Y][u.Position.X].OccupantType = OccupantUnit
+			m.WorkingState.Grid[u.Position.Y][u.Position.X].OccupantID = int64(u.ID)
+		}
+		m.TrueState = m.WorkingState.DeepCopy()
+
+		return m
+	}
+
+	snapshot := func(gameEvents []GameEvent) []GameEvent {
+		snap := make([]GameEvent, len(gameEvents))
+		for i, evt := range gameEvents {
+			snap[i] = evt
+			if evt.Position != nil {
+				pos := *evt.Position
+				snap[i].Position = &pos
+			}
+		}
+
+		return snap
+	}
+
+	table := []struct {
+		name          string
+		turn          int
+		afterFirst    func(m *Match, first []GameEvent)
+		wantBombs     int
+		wantSuddenDth bool
+		wantReplay    bool
+	}{
+		{
+			name:          "sudden death: second call replays and drops nothing",
+			turn:          101,
+			wantBombs:     2,
+			wantSuddenDth: true,
+			wantReplay:    true,
+		},
+		{
+			name: "returned events are a copy",
+			turn: 101,
+			afterFirst: func(_ *Match, first []GameEvent) {
+				first[0].Position.X += 1
+				first[0].Type = GameEvtUnitDied
+			},
+			wantBombs:     2,
+			wantSuddenDth: true,
+			wantReplay:    true,
+		},
+		{
+			name:          "ResetTurn between calls keeps the hazards and the events",
+			turn:          101,
+			afterFirst:    func(m *Match, _ []GameEvent) { m.ResetTurn() },
+			wantBombs:     2,
+			wantSuddenDth: true,
+			wantReplay:    true,
+		},
+		{
+			name: "a new turn drops new hazards",
+			turn: 101,
+			afterFirst: func(m *Match, _ []GameEvent) {
+				m.TrueState.Turn++
+				m.WorkingState.Turn++
+			},
+			wantBombs:     4,
+			wantSuddenDth: true,
+		},
+		{
+			name:       "outside sudden death a repeat returns empty",
+			turn:       1,
+			wantBombs:  0,
+			wantReplay: true,
+		},
+	}
+
+	for _, tt := range table {
+		t.Run(tt.name, func(t *testing.T) {
+			m := newMatch(tt.turn)
+
+			first := m.StartTurn()
+			want := snapshot(first)
+			if tt.afterFirst != nil {
+				tt.afterFirst(m, first)
+			}
+			second := m.StartTurn()
+
+			if got := len(m.WorkingState.Bombs); got != tt.wantBombs {
+				t.Errorf("bombs = %d, want %d", got, tt.wantBombs)
+			}
+			if got := m.WorkingState.InSuddenDeath; got != tt.wantSuddenDth {
+				t.Errorf("InSuddenDeath = %v, want %v", got, tt.wantSuddenDth)
+			}
+			if len(m.PlaybackLog) != 0 {
+				t.Errorf("PlaybackLog = %#v, want empty", m.PlaybackLog)
+			}
+			if tt.wantReplay {
+				if !reflect.DeepEqual(second, want) {
+					t.Errorf("second call = %#v, want the first call's events %#v", second, want)
+				}
+				return
+			}
+			if len(second) != SuddenDeathBombs {
+				t.Fatalf("second call returned %d events, want %d", len(second), SuddenDeathBombs)
+			}
+			for _, evt := range second {
+				for _, old := range want {
+					if evt.BombID == old.BombID {
+						t.Errorf("new turn reused bomb ID %v", evt.BombID)
+					}
+				}
+			}
+		})
+	}
+}

@@ -5,6 +5,7 @@ import (
 	"encoding/json/v2"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -182,6 +183,34 @@ func TestHandleStartTurn(t *testing.T) {
 		}
 		if want, got := response.InSuddenDeath, true; want != got {
 			t.Errorf("Expected suddenDeath to be true, got %v", got)
+		}
+	})
+
+	t.Run("repeat call in the same turn drops no more hazards", func(t *testing.T) {
+		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
+		room := mustRoom(t, s, roomID)
+		room.Match.TrueState.Turn = 1000
+		room.Match.WorkingState.Turn = 1000
+
+		var responses [2]StartTurnResponse
+		for i := range responses {
+			rr := doRequest(t, h.HandleStartTurn, "POST /api/match-rooms/{roomID}/match/start-turn", "POST", "/api/match-rooms/"+roomID+"/match/start-turn", "", playerTokens[0])
+			if status := rr.Code; status != http.StatusOK {
+				t.Fatalf("call %d: status = %v, want %v", i+1, status, http.StatusOK)
+			}
+			if err := json.UnmarshalRead(rr.Body, &responses[i]); err != nil {
+				t.Fatalf("call %d: failed to decode response JSON payload: %v", i+1, err)
+			}
+		}
+
+		if !reflect.DeepEqual(responses[0].GameEvents, responses[1].GameEvents) {
+			t.Errorf("gameEvents differ between calls: %+v vs %+v", responses[0].GameEvents, responses[1].GameEvents)
+		}
+		if !responses[1].InSuddenDeath {
+			t.Errorf("Expected suddenDeath to be true on the repeat call")
+		}
+		if got, want := len(room.Match.WorkingState.Bombs), 2; got != want {
+			t.Errorf("bombs after two calls = %d, want %d", got, want)
 		}
 	})
 
