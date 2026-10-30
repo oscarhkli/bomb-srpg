@@ -5,6 +5,7 @@ import {
   roomId,
   summariseCutscenes,
   waitForInput,
+  waitForText,
   watchBombs,
 } from './canvas';
 import { endTurn, startTwoPlayerMatch, startVsCpuRoom } from './flows';
@@ -82,4 +83,38 @@ test('hot-seat sudden death drops the hazards once per turn, after the cutscene 
   expect(cutscenes[0]).toMatchObject({ before: 0, atStart: 0, atEnd: 2 });
   expect(cutscenes[1]).toMatchObject({ before: 2, atStart: 2, atEnd: 4 });
   expect(samples.at(-1)).toMatchObject({ drawn: 4, containers: 4 });
+});
+
+test('hot-seat sudden death: a failed resolve and a retry add no extra hazards', async ({
+  page,
+  request,
+}) => {
+  test.setTimeout(60_000);
+  const failure = 'resolve failed (injected by the test)';
+  let failed = false;
+  await page.route('**/match/resolve', route => {
+    if (failed) {
+      return route.continue();
+    }
+    failed = true;
+    return route.fulfill({ status: 500, body: failure });
+  });
+  await startTwoPlayerMatch(page, { instantSuddenDeath: true });
+  const room = await roomId(page);
+
+  await endTurn(page);
+  await waitForText(page, failure);
+  await waitForInput(page);
+
+  const afterFailure = await matchState(request, room);
+  expect(afterFailure.turn).toBe(1);
+  expect(afterFailure.bombs).toHaveLength(2);
+
+  await endTurn(page);
+  await expect
+    .poll(async () => matchState(request, room))
+    .toMatchObject({ turn: 2, activeTeam: 2 });
+  await waitForInput(page);
+
+  expect((await matchState(request, room)).bombs).toHaveLength(4);
 });
