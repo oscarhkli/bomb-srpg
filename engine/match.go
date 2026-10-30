@@ -199,27 +199,39 @@ func (gs *GameState) IsLandingLegal(target Coordinate, _ OccupantType) error {
 }
 
 // StartTurn sets up the environmental boundaries for the upcoming round.
-// Returns GameEvents when the match enters SuddenDeath.
+// Returns GameEvents when the match enters SuddenDeath. A repeat call in the same turn drops nothing and returns the same events.
 func (m *Match) StartTurn() []GameEvent {
 	winner := m.evaluateVictoryConditions()
 	if winner != MatchInProgress {
 		return []GameEvent{}
 	}
 
+	if m.startedTurn == m.TrueState.Turn {
+		return cloneGameEvents(m.WorkingState.TurnStartEvents)
+	}
+
 	if m.TrueState.Turn <= m.GameCfg.MaxTurns {
 		m.WorkingState.InSuddenDeath = false
+		m.recordTurnStart([]GameEvent{})
 		return []GameEvent{}
 	}
 
 	m.WorkingState.InSuddenDeath = true
 	m.injectSuddenDeathHazards()
-	m.TrueState = m.WorkingState.DeepCopy()
 
 	gameEvents := make([]GameEvent, len(m.PlaybackLog))
 	copy(gameEvents, m.PlaybackLog)
 	m.PlaybackLog = nil
+	m.TrueState = m.WorkingState.DeepCopy()
+	m.recordTurnStart(gameEvents)
 
-	return gameEvents
+	return cloneGameEvents(gameEvents)
+}
+
+func (m *Match) recordTurnStart(gameEvents []GameEvent) {
+	m.WorkingState.TurnStartEvents = cloneGameEvents(gameEvents)
+	m.TrueState.TurnStartEvents = cloneGameEvents(gameEvents)
+	m.startedTurn = m.TrueState.Turn
 }
 
 // injectSuddenDeathHazards drops up to SuddenDeathBombs bombs on random empty tiles.
