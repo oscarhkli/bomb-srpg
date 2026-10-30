@@ -61,6 +61,25 @@ func mustCreateMatch(t *testing.T, s *ServerStateManager, roomID string, gameCfg
 	return tokens
 }
 
+func startTurnForTest(t *testing.T, s *ServerStateManager, roomID, token string) {
+	t.Helper()
+	if _, _, err := s.StartTurn(roomID, token); err != nil {
+		t.Fatalf("StartTurn() error = %v", err)
+	}
+}
+
+func freeNeighbour(t *testing.T, gs *engine.GameState, pos engine.Coordinate) engine.Coordinate {
+	t.Helper()
+	for _, step := range []engine.Coordinate{{X: 0, Y: -1}, {X: 0, Y: 1}, {X: -1, Y: 0}, {X: 1, Y: 0}} {
+		target := engine.Coordinate{X: pos.X + step.X, Y: pos.Y + step.Y}
+		if gs.IsLandingLegal(target, engine.OccupantBomb) == nil {
+			return target
+		}
+	}
+	t.Fatalf("no free neighbour next to %v", pos)
+	return engine.Coordinate{}
+}
+
 func TestMapError(t *testing.T) {
 	tests := []struct {
 		name     string
