@@ -50,7 +50,10 @@ func benchState(b *testing.B, preset string, roster benchRoster, bombs int) *eng
 			}
 		}
 	}
-	for i := range min(bombs, len(empty)) {
+	if len(empty) < bombs {
+		b.Fatalf("%s has %d free tiles, want at least %d for the bombs", preset, len(empty), bombs)
+	}
+	for i := range bombs {
 		pos := empty[i*len(empty)/bombs]
 		id := engine.NewBombID(1, i+1, engine.SystemUnitID)
 		gs.Bombs[id] = &engine.Bomb{ID: id, OwnerID: engine.SystemUnitID, Position: pos, Range: benchBombRange, Countdown: benchBombCountdown}

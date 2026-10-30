@@ -866,11 +866,9 @@ func TestServerStateManager_runCPUTurn_EndsMatch(t *testing.T) {
 	if _, err := room.Match.CommandPlaceBomb(kingID, target); err != nil {
 		t.Fatalf("CommandPlaceBomb() error = %v", err)
 	}
-	for _, gs := range []*engine.GameState{room.Match.WorkingState, room.Match.TrueState} {
-		for _, bomb := range gs.Bombs {
-			if bomb.OwnerID == kingID {
-				bomb.Countdown = 1
-			}
+	for _, bomb := range room.Match.WorkingState.Bombs {
+		if bomb.OwnerID == kingID {
+			bomb.Countdown = 1
 		}
 	}
 	countHazards := func(gs *engine.GameState) int {
@@ -882,7 +880,6 @@ func TestServerStateManager_runCPUTurn_EndsMatch(t *testing.T) {
 		}
 		return n
 	}
-	hazardsBefore := countHazards(room.Match.WorkingState)
 
 	decider := &recordingDecider{match: room.Match, called: make(chan struct{}, 1)}
 	s.decide = decider.decide
@@ -901,8 +898,8 @@ func TestServerStateManager_runCPUTurn_EndsMatch(t *testing.T) {
 	if got, want := room.Match.WorkingState.ActiveTeam, 2; got != want {
 		t.Errorf("Expected active team %d to stay, got %d", want, got)
 	}
-	if got := countHazards(room.Match.WorkingState); got > hazardsBefore {
-		t.Errorf("Expected at most %d hazards, got %d", hazardsBefore, got)
+	if got := countHazards(room.Match.WorkingState); got != 0 {
+		t.Errorf("Expected no hazards, got %d", got)
 	}
 
 	phase, planGameEvents, resolveTurnGameEvents, err := s.ConsumeCPUStatus(roomID, tokens[0])
