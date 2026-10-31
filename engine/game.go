@@ -228,7 +228,34 @@ func (gs *GameState) DeepCopy() *GameState {
 	if gs.TurnCommands != nil {
 		clone.TurnCommands = slices.Clone(gs.TurnCommands)
 	}
+	clone.TurnStartEvents = cloneGameEvents(gs.TurnStartEvents)
 	return &clone
+}
+
+func cloneGameEvents(src []GameEvent) []GameEvent {
+	if src == nil {
+		return nil
+	}
+
+	dst := make([]GameEvent, len(src))
+	for i, evt := range src {
+		dst[i] = evt
+		if evt.Position != nil {
+			pos := *evt.Position
+			dst[i].Position = &pos
+		}
+		if evt.From != nil {
+			from := *evt.From
+			dst[i].From = &from
+		}
+		if evt.To != nil {
+			to := *evt.To
+			dst[i].To = &to
+		}
+		dst[i].AffectedPositions = slices.Clone(evt.AffectedPositions)
+	}
+
+	return dst
 }
 
 // V must hold no reference fields.

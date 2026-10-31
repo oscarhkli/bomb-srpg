@@ -103,6 +103,44 @@ func TestMatchController_SystemCommands(t *testing.T) {
 	}
 }
 
+func TestMatchController_HazardEventsPrintedOncePerTurn(t *testing.T) {
+	table := []struct {
+		name  string
+		input string
+		want  int
+	}{
+		{name: "three commands in one turn", input: "/config\n/config\n/config\n", want: 2},
+		{name: "a commit starts the next turn", input: "/config\n/commit\n/config\n", want: 4},
+	}
+
+	for _, tt := range table {
+		t.Run(tt.name, func(t *testing.T) {
+			match, err := engine.InitGame(engine.GameCfg{
+				StagePreset:    "Plain",
+				P1Slots:        []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Fighter", Role: engine.RoleNormal}},
+				P2Slots:        []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Fighter", Role: engine.RoleNormal}},
+				MaxTurns:       0,
+				AllowResetTurn: true,
+			})
+			if err != nil {
+				t.Fatalf("InitGame failed: %v", err)
+			}
+
+			var screen bytes.Buffer
+			controller := NewMatchController(match, NewTerminalView(&screen), strings.NewReader(tt.input))
+
+			controller.StartInputLoop()
+
+			if got := strings.Count(screen.String(), `Type:"bombPlaced"`); got != tt.want {
+				t.Errorf("printed bombPlaced events = %d, want %d", got, tt.want)
+			}
+			if got := len(match.WorkingState.Bombs); got != tt.want {
+				t.Errorf("bombs on the board = %d, want %d", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestMatchController_GameplayActions(t *testing.T) {
 	type testCase struct {
 		name          string

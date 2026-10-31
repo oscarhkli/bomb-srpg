@@ -314,6 +314,7 @@ type GameState struct {
 	Bombs           map[BombID]*Bomb   // Active bombs by ID
 	SoftBlocks      map[int]*SoftBlock // Soft blocks by ID
 	TurnCommands    []TurnCommand      // Pending commands for current turn
+	TurnStartEvents []GameEvent        // Hazard events of the current turn start
 }
 
 // MarshalJSON emits the client-facing shape, with the entity maps flattened to arrays.
@@ -382,6 +383,7 @@ type Match struct {
 	PlaybackLog  []GameEvent // events since the last ResolveTurn
 	CPU          CPUState
 	WinnerTeamID int // 0 = in progress, 1/2 = winner, -1 = draw
+	startedTurn  int // TrueState.Turn of the last turn start; 0 before the first
 }
 
 const (

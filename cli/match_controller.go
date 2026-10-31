@@ -32,8 +32,13 @@ func winnerMessage(winnerTeamID int) string {
 func (c *MatchController) StartInputLoop() {
 	scanner := bufio.NewScanner(c.input)
 
+	startedTurn := 0
+
 	for {
-		c.View.RenderGameEvents(c.Match.StartTurn())
+		if c.Match.WorkingState.Turn != startedTurn {
+			c.View.RenderGameEvents(c.Match.StartTurn())
+			startedTurn = c.Match.WorkingState.Turn
+		}
 
 		if err := c.View.RenderBoard(c.Match.WorkingState); err != nil {
 			log.Fatalf("Critical Interface Failure: %v", err)
