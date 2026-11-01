@@ -42,6 +42,8 @@ type ClientMatchStateResponse struct {
 	Bombs        []*engine.Bomb       `json:"bombs"`
 	SoftBlocks   []*engine.SoftBlock  `json:"softBlocks"`
 	TurnCommands []engine.TurnCommand `json:"turnCommands"`
+
+	TurnStartEvents []engine.GameEvent `json:"turnStartEvents"`
 }
 
 func TestHandleGetMatchState(t *testing.T) {
@@ -141,7 +143,7 @@ func TestHandleGetMatchState(t *testing.T) {
 		rr := doRequest(t, h.HandleGetMatchState, "GET /api/match-rooms/{roomID}/match/state", "GET", "/api/match-rooms/"+roomID+"/match/state", "", "")
 
 		assertObjectContract(t, rr.Body.Bytes(),
-			[]string{"turn", "inSuddenDeath", "activeTeam", "grid", "units", "bombs", "softBlocks", "turnCommands"},
+			[]string{"turn", "inSuddenDeath", "activeTeam", "grid", "units", "bombs", "softBlocks", "turnCommands", "turnStartEvents"},
 			assertMatchStateNested)
 	})
 }

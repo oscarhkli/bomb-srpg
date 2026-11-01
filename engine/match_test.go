@@ -2337,3 +2337,59 @@ func TestMatch_StartTurn_Idempotent(t *testing.T) {
 		})
 	}
 }
+
+func TestMatch_TurnStartEvents_EmptiedWhenTheTurnEnds(t *testing.T) {
+	std1 := teamFormation{King: new(true), OrdinaryUnitsAlive: []bool{true, true, false, true}}
+	std2 := teamFormation{King: new(true), OrdinaryUnitsAlive: []bool{true, true, false, false}}
+
+	newHazardMatch := func(t *testing.T) *Match {
+		t.Helper()
+		m := newTestMatchWithTeams(t, std1, std2)
+		m.TrueState.Turn = m.GameCfg.MaxTurns + 1
+		m.WorkingState.Turn = m.GameCfg.MaxTurns + 1
+		if got := len(m.StartTurn()); got != SuddenDeathBombs {
+			t.Fatalf("StartTurn() returned %d events, want %d", got, SuddenDeathBombs)
+		}
+
+		return m
+	}
+
+	table := []struct {
+		name string
+		end  func(m *Match)
+	}{
+		{
+			name: "ResolveTurn that advances the turn",
+			end:  func(m *Match) { m.ResolveTurn() },
+		},
+		{
+			name: "ResolveTurn that ends the match",
+			end: func(m *Match) {
+				m.WorkingState.Units[NewUnitID(2, 0)].HP = 0
+				m.ResolveTurn()
+				if m.WinnerTeamID != 1 {
+					t.Fatalf("WinnerTeamID = %d, want 1", m.WinnerTeamID)
+				}
+			},
+		},
+		{
+			name: "Surrender",
+			end:  func(m *Match) { m.Surrender(2) },
+		},
+	}
+
+	for _, tt := range table {
+		t.Run(tt.name, func(t *testing.T) {
+			m := newHazardMatch(t)
+
+			tt.end(m)
+
+			if got := len(m.WorkingState.TurnStartEvents); got != 0 {
+				t.Errorf("WorkingState.TurnStartEvents has %d events, want 0", got)
+			}
+			if got := len(m.TrueState.TurnStartEvents); got != 0 {
+				t.Errorf("TrueState.TurnStartEvents has %d events, want 0", got)
+			}
+		})
+	}
+}

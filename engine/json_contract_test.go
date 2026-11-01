@@ -200,10 +200,11 @@ func TestGameStateEncoding(t *testing.T) {
 
 	full := GameState{
 		Turn: 2, InSuddenDeath: true, ActiveTeam: 2, Grid: grid,
-		Units:        map[UnitID]*Unit{17: {ID: 17, Type: Archetype{Name: "King"}, Position: pos, Team: 1, HP: 1}},
-		Bombs:        map[BombID]*Bomb{70000: {ID: 70000, OwnerID: 17, Position: pos, Range: 2, Countdown: 3}},
-		SoftBlocks:   map[int]*SoftBlock{4: {ID: 4, Position: pos}},
-		TurnCommands: []TurnCommand{NewMoveCommand(17, pos)},
+		Units:           map[UnitID]*Unit{17: {ID: 17, Type: Archetype{Name: "King"}, Position: pos, Team: 1, HP: 1}},
+		Bombs:           map[BombID]*Bomb{70000: {ID: 70000, OwnerID: 17, Position: pos, Range: 2, Countdown: 3}},
+		SoftBlocks:      map[int]*SoftBlock{4: {ID: 4, Position: pos}},
+		TurnCommands:    []TurnCommand{NewMoveCommand(17, pos)},
+		TurnStartEvents: []GameEvent{NewBombPlacedEvent(17, 70000, pos, 2, 3)},
 	}
 	const wantFull = `{
 			"turn": 2,
@@ -240,6 +241,15 @@ func TestGameStateEncoding(t *testing.T) {
 				"type": "move",
 				"unitId": 17,
 				"target": {"x": 1, "y": 2}
+			}],
+			"turnStartEvents": [{
+				"type": "bombPlaced",
+				"unitId": 17,
+				"bombId": 70000,
+				"position": {"x": 1, "y": 2},
+				"newHp": 0,
+				"range": 2,
+				"countdown": 3
 			}]
 		}`
 
@@ -255,7 +265,8 @@ func TestGameStateEncoding(t *testing.T) {
 				"units": [],
 				"bombs": [],
 				"softBlocks": [],
-				"turnCommands": []
+				"turnCommands": [],
+				"turnStartEvents": []
 			}`,
 		},
 		{"with collections", full, wantFull},
