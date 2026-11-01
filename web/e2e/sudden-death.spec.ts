@@ -1,11 +1,15 @@
 import { expect, test } from '@playwright/test';
 import {
+  clickAllowedTile,
   clickConfirmYes,
+  clickMoveButton,
   clickText,
+  clickUnit,
   matchState,
   readBombWatch,
   roomId,
   summariseCutscenes,
+  teamUnit,
   waitForInput,
   waitForText,
   watchBombs,
@@ -76,6 +80,27 @@ test('hot-seat sudden death drops the hazards once per turn, after the cutscene 
     expect(bombIds).toContain(evt.bombId);
   }
 
+  const unit = await teamUnit(request, room, 1);
+  await clickUnit(page, unit.id);
+  await clickMoveButton(page);
+  await clickAllowedTile(page, 0);
+  await clickConfirmYes(page);
+  await expect
+    .poll(async () => (await matchState(request, room)).units.find(u => u.id === unit.id))
+    .toMatchObject({ hasMoved: true });
+  await clickText(page, MATCH_SUMMARY_BUTTON_LABEL);
+  await clickText(page, RESET_BUTTON_LABEL);
+  await clickConfirmYes(page);
+  await expect
+    .poll(async () => (await matchState(request, room)).units.find(u => u.id === unit.id))
+    .toMatchObject({ hasMoved: false });
+  await waitForInput(page);
+
+  const afterReset = await matchState(request, room);
+  expect(afterReset.turnStartEvents).toHaveLength(2);
+  expect(afterReset.bombs).toHaveLength(2);
+  expect((await readBombWatch(page)).at(-1)).toMatchObject({ drawn: 2, containers: 2 });
+
   await endTurn(page);
   await expect
     .poll(async () => matchState(request, room))
@@ -134,11 +159,10 @@ test('hot-seat sudden death: a failed resolve and a retry add no extra hazards',
   expect(samples.at(-1)).toMatchObject({ drawn: 4, containers: 4 });
 });
 
-test('hot-seat: hazards listed in turnStartEvents are not drawn before their cutscene, also after a reset', async ({
+test('hot-seat: hazards listed in turnStartEvents are not drawn before their cutscene', async ({
   page,
 }) => {
   test.setTimeout(60_000);
-  let stateReads = 0;
   await page.route('**/match/state', async route => {
     const response = await route.fetch();
     const state = (await response.json()) as GameState;
@@ -162,7 +186,6 @@ test('hot-seat: hazards listed in turnStartEvents are not drawn before their cut
       range: b.range,
       countdown: b.countdown,
     }));
-    stateReads++;
     await route.fulfill({
       response,
       json: { ...state, bombs: [...state.bombs, ...bombs], turnStartEvents },
@@ -170,15 +193,6 @@ test('hot-seat: hazards listed in turnStartEvents are not drawn before their cut
   });
   await watchBombs(page);
   await startTwoPlayerMatch(page);
-
-  expect((await readBombWatch(page)).at(-1)).toMatchObject({ drawn: 0, containers: 0 });
-
-  const readsBeforeReset = stateReads;
-  await clickText(page, MATCH_SUMMARY_BUTTON_LABEL);
-  await clickText(page, RESET_BUTTON_LABEL);
-  await clickConfirmYes(page);
-  await expect.poll(() => stateReads).toBeGreaterThan(readsBeforeReset);
-  await waitForInput(page);
 
   expect((await readBombWatch(page)).at(-1)).toMatchObject({ drawn: 0, containers: 0 });
 });

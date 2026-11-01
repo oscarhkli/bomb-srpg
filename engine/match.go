@@ -29,7 +29,8 @@ func (m *Match) Surrender(teamID int) []GameEvent {
 	}
 
 	m.PlaybackLog = nil
-	m.clearTurnStartEvents()
+	m.WorkingState.TurnStartEvents = nil
+	m.TrueState.TurnStartEvents = nil
 
 	return []GameEvent{
 		NewMatchEndedEvent(m.WinnerTeamID),
@@ -236,11 +237,6 @@ func (m *Match) recordTurnStart(gameEvents []GameEvent) {
 	m.startedTurn = m.TrueState.Turn
 }
 
-func (m *Match) clearTurnStartEvents() {
-	m.WorkingState.TurnStartEvents = nil
-	m.TrueState.TurnStartEvents = nil
-}
-
 // injectSuddenDeathHazards drops up to SuddenDeathBombs bombs on random empty tiles.
 func (m *Match) injectSuddenDeathHazards() {
 	var emptyTilePos []Coordinate
@@ -290,7 +286,7 @@ func (m *Match) ResolveTurn() (planGameEvents, resolveTurnGameEvents []GameEvent
 		}
 	}
 
-	m.clearTurnStartEvents()
+	m.WorkingState.TurnStartEvents = nil
 	m.TrueState = m.WorkingState.DeepCopy()
 
 	resolveTurnGameEvents = make([]GameEvent, len(m.PlaybackLog))

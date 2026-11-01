@@ -81,7 +81,6 @@ export function hazardsUnplayed(turn: number, hazardsPlayedTurn: number): boolea
   return turn > hazardsPlayedTurn;
 }
 
-// Hides this turn's hazard bombs until their cutscene has played.
 export function bombsToDraw(state: GameState, hazardsPlayedTurn: number): Bomb[] {
   if (!hazardsUnplayed(state.turn, hazardsPlayedTurn)) {
     return state.bombs;

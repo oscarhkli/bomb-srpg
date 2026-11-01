@@ -1180,6 +1180,20 @@ describe('MatchScene', () => {
       expect(drawnBombs(scene)).toBe(0);
     });
 
+    it('keeps hiding the listed hazards after the board is redrawn by a reset', async () => {
+      queueMatchStates(hazardState());
+      vi.mocked(resetTurn).mockResolvedValue(undefined);
+      const scene = await bootScene({ playerTokens: ['team1-token', 'team2-token'] });
+
+      clickSummaryPanelButton('reset');
+      const [yesButtonContainer] = lastContainers(2);
+      pointerDownOf(yesButtonContainer!)();
+      await flush();
+
+      expect(resetTurn).toHaveBeenCalledOnce();
+      expect(drawnBombs(scene)).toBe(0);
+    });
+
     it('draws the bombs when turnStartEvents is empty', async () => {
       queueMatchStates(hazardState({ turnStartEvents: [] }));
 
