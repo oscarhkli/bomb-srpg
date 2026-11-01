@@ -320,14 +320,15 @@ type GameState struct {
 // MarshalJSON emits the client-facing shape, with the entity maps flattened to arrays.
 func (gs *GameState) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
-		Turn          int           `json:"turn"`
-		InSuddenDeath bool          `json:"inSuddenDeath"`
-		ActiveTeam    int           `json:"activeTeam"`
-		Grid          [][]Tile      `json:"grid"`
-		Units         []*Unit       `json:"units"`
-		Bombs         []*Bomb       `json:"bombs"`
-		SoftBlocks    []*SoftBlock  `json:"softBlocks"`
-		TurnCommands  []TurnCommand `json:"turnCommands"`
+		Turn            int           `json:"turn"`
+		InSuddenDeath   bool          `json:"inSuddenDeath"`
+		ActiveTeam      int           `json:"activeTeam"`
+		Grid            [][]Tile      `json:"grid"`
+		Units           []*Unit       `json:"units"`
+		Bombs           []*Bomb       `json:"bombs"`
+		SoftBlocks      []*SoftBlock  `json:"softBlocks"`
+		TurnCommands    []TurnCommand `json:"turnCommands"`
+		TurnStartEvents []GameEvent   `json:"turnStartEvents"`
 	}{
 		gs.Turn,
 		gs.InSuddenDeath,
@@ -337,6 +338,7 @@ func (gs *GameState) MarshalJSON() ([]byte, error) {
 		slices.Collect(maps.Values(gs.Bombs)),
 		slices.Collect(maps.Values(gs.SoftBlocks)),
 		gs.TurnCommands,
+		gs.TurnStartEvents,
 	})
 }
 

@@ -81,6 +81,7 @@ func TestMatchStateWireShape(t *testing.T) {
 		{"bombs", "array"},
 		{"softBlocks", "array"},
 		{"turnCommands", "array"},
+		{"turnStartEvents", "array"},
 	}
 	if len(state) != len(tests) {
 		t.Errorf("state has %d keys, want %d", len(state), len(tests))
