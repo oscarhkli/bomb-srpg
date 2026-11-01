@@ -159,7 +159,7 @@ test('hot-seat sudden death: a failed resolve and a retry add no extra hazards',
   expect(samples.at(-1)).toMatchObject({ drawn: 4, containers: 4 });
 });
 
-test('hot-seat: hazards listed in turnStartEvents are not drawn before their cutscene', async ({
+test('hot-seat: bombs listed in turnStartEvents are not drawn while the cutscene has not played', async ({
   page,
 }) => {
   test.setTimeout(60_000);

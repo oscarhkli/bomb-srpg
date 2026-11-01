@@ -81,6 +81,8 @@ export function hazardsUnplayed(turn: number, hazardsPlayedTurn: number): boolea
   return turn > hazardsPlayedTurn;
 }
 
+// Hides only bombs named by bombPlaced events in turnStartEvents, and only while
+// hazardsUnplayed; every other bomb is returned.
 export function bombsToDraw(state: GameState, hazardsPlayedTurn: number): Bomb[] {
   if (!hazardsUnplayed(state.turn, hazardsPlayedTurn)) {
     return state.bombs;

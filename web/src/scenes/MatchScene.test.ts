@@ -1238,7 +1238,7 @@ describe('MatchScene', () => {
         vi.mocked(startTurn).mockResolvedValue(suddenDeathResponse);
       });
 
-      it('(a) plays the cutscene once with the start-turn events', async () => {
+      it('plays the cutscene once with the start-turn events', async () => {
         queueMatchStates(hazardState());
 
         await bootScene();
@@ -1247,7 +1247,7 @@ describe('MatchScene', () => {
         expect(suddenDeathCutscenePlay).toHaveBeenCalledWith(hazardEvents, expect.any(Function));
       });
 
-      it('(b) does not play it again when a failed resolve re-enters beginTurn for the same turn', async () => {
+      it('does not play it again when a failed resolve re-enters beginTurn for the same turn', async () => {
         queueMatchStates(hazardState());
         vi.mocked(resolveTurn).mockRejectedValueOnce(new Error('resolve failed'));
         await bootScene();
@@ -1258,7 +1258,7 @@ describe('MatchScene', () => {
         expect(suddenDeathCutscenePlay).toHaveBeenCalledOnce();
       });
 
-      it('(c) plays it again once the turn number goes up', async () => {
+      it('plays it again once the turn number goes up', async () => {
         const turn1 = hazardState();
         const turn2 = hazardState({ turn: 2, activeTeam: 2 });
         queueMatchStates(turn1, turn1, turn2);
@@ -1270,7 +1270,7 @@ describe('MatchScene', () => {
         expect(suddenDeathCutscenePlay).toHaveBeenCalledTimes(2);
       });
 
-      it('(d) a new create resets it, so a rematch plays turn 1 again', async () => {
+      it('a new create resets it, so a rematch plays turn 1 again', async () => {
         queueMatchStates(hazardState());
         const scene = await bootScene();
         fireShutdown();
@@ -1281,7 +1281,7 @@ describe('MatchScene', () => {
         expect(suddenDeathCutscenePlay).toHaveBeenCalledTimes(2);
       });
 
-      it('(e) a redraw of the same turn after the cutscene draws the hazards', async () => {
+      it('a redraw of the same turn after the cutscene draws the hazards', async () => {
         queueMatchStates(hazardState());
         vi.mocked(resolveTurn).mockRejectedValueOnce(new Error('resolve failed'));
         const scene = await bootScene();
