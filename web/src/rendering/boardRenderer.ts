@@ -77,6 +77,21 @@ export function renderStageBackground(
   ctx.terrainObjects.push(bg);
 }
 
+export function hazardsUnplayed(turn: number, hazardsPlayedTurn: number): boolean {
+  return turn > hazardsPlayedTurn;
+}
+
+// Hides this turn's hazard bombs until their cutscene has played.
+export function bombsToDraw(state: GameState, hazardsPlayedTurn: number): Bomb[] {
+  if (!hazardsUnplayed(state.turn, hazardsPlayedTurn)) {
+    return state.bombs;
+  }
+  const hidden = new Set(
+    state.turnStartEvents.filter(evt => evt.type === 'bombPlaced').map(evt => evt.bombId)
+  );
+  return state.bombs.filter(bomb => !hidden.has(bomb.id));
+}
+
 // Rebuilds units, soft blocks, and bombs from state; terrain is untouched.
 export function renderOccupants(ctx: BoardRenderContext, state: GameState): void {
   destroyAll(ctx.occupantObjects);

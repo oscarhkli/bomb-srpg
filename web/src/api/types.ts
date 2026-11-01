@@ -93,6 +93,7 @@ export interface GameState {
   bombs: Bomb[];
   softBlocks: SoftBlock[];
   turnCommands: TurnCommand[];
+  turnStartEvents: GameEvent[];
 }
 
 export interface TurnCommand {

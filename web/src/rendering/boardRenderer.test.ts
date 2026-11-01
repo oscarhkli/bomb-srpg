@@ -6,15 +6,18 @@ import {
   makeUnit as unit,
   makeSoftBlock as softBlock,
   makeBomb as bomb,
+  makeBombPlacedEvent,
 } from '../test/fixtures';
 import { TILE_SIZE, SPRITE_GROUND_MARGIN, DEPTH_STAGE_BACKGROUND } from '../constants';
-import type { Bomb, GameState, SoftBlock, Tile, Unit } from '../api/types';
+import type { Bomb, GameEvent, GameState, SoftBlock, Tile, Unit } from '../api/types';
 import type { BombGraphics } from './resolveTurnPlayer';
 import {
   establishBoardLayout,
   renderStageBackground,
   renderOccupants,
   renderBomb,
+  bombsToDraw,
+  hazardsUnplayed,
   tileCenter,
   resolveUnitTextureKey,
   type BoardRenderContext,
@@ -50,6 +53,7 @@ function state(
     bombs: parts.bombs ?? [],
     softBlocks: parts.softBlocks ?? [],
     turnCommands: [],
+    turnStartEvents: [],
   };
 }
 
@@ -344,5 +348,65 @@ describe('renderOccupants — teardown', () => {
 
     expect(bg.destroy).not.toHaveBeenCalled();
     expect(c.terrainObjects).toEqual([bg]);
+  });
+});
+
+describe('hazardsUnplayed', () => {
+  it.each([
+    { turn: 2, played: 1, want: true },
+    { turn: 1, played: 1, want: false },
+    { turn: 1, played: 2, want: false },
+  ])('turn $turn, played $played -> $want', ({ turn, played, want }) => {
+    expect(hazardsUnplayed(turn, played)).toBe(want);
+  });
+});
+
+describe('bombsToDraw', () => {
+  const hazard = bomb({ id: 1, ownerId: 0 });
+  const older = bomb({ id: 2, ownerId: 0 });
+  const withEvents = (turn: number, turnStartEvents: GameEvent[]): GameState => ({
+    ...state([[plainTile()]], { bombs: [hazard, older] }),
+    turn,
+    turnStartEvents,
+  });
+  const placed = [makeBombPlacedEvent({ bombId: 1 })];
+
+  it.each<{
+    name: string;
+    turn: number;
+    played: number;
+    events: GameEvent[];
+    want: number[];
+  }>([
+    {
+      name: 'hides a listed hazard before its cutscene',
+      turn: 2,
+      played: 1,
+      events: placed,
+      want: [2],
+    },
+    {
+      name: 'shows it once the cutscene played this turn',
+      turn: 2,
+      played: 2,
+      events: placed,
+      want: [1, 2],
+    },
+    {
+      name: 'shows everything when no events are listed',
+      turn: 2,
+      played: 1,
+      events: [],
+      want: [1, 2],
+    },
+    {
+      name: 'hides nothing for a non-bombPlaced event with the same id',
+      turn: 2,
+      played: 1,
+      events: [{ type: 'bombExploded', bombId: 1 }],
+      want: [1, 2],
+    },
+  ])('$name', ({ turn, played, events, want }) => {
+    expect(bombsToDraw(withEvents(turn, events), played).map(b => b.id)).toEqual(want);
   });
 });

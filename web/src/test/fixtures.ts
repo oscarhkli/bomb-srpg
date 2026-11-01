@@ -72,6 +72,7 @@ export function makeState(overrides: Partial<GameState> = {}): GameState {
     bombs: [],
     softBlocks: [],
     turnCommands: [],
+    turnStartEvents: [],
     ...overrides,
   };
 }

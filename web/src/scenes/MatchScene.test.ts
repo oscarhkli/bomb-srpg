@@ -1139,6 +1139,147 @@ describe('MatchScene', () => {
     });
   });
 
+  describe('turn start events', () => {
+    const hazardCells = [
+      { x: 0, y: 0 },
+      { x: 1, y: 0 },
+    ];
+    const hazardBombs = hazardCells.map((position, i) =>
+      makeBomb({ id: i + 1, ownerId: 0, position, range: 2, countdown: 3 })
+    );
+    const hazardEvents = hazardBombs.map(b =>
+      makeBombPlacedEvent({ bombId: b.id, position: b.position })
+    );
+    const suddenDeathResponse = { inSuddenDeath: true, gameEvents: hazardEvents };
+
+    function hazardState(overrides: Partial<GameState> = {}): GameState {
+      return makeState({
+        grid: [[plainTile(), plainTile()]],
+        bombs: hazardBombs,
+        turnStartEvents: hazardEvents,
+        ...overrides,
+      });
+    }
+
+    function drawnBombs(scene: MatchScene): number {
+      return (scene as unknown as { bombGraphicsById: Map<number, unknown> }).bombGraphicsById.size;
+    }
+
+    async function clickResolveAndConfirm(): Promise<void> {
+      clickSummaryPanelButton('resolve');
+      const [yesButtonContainer] = lastContainers(2);
+      pointerDownOf(yesButtonContainer!)();
+      await flush();
+    }
+
+    it('draws no hazard bomb listed in turnStartEvents before its cutscene', async () => {
+      queueMatchStates(hazardState());
+
+      const scene = await bootScene();
+
+      expect(drawnBombs(scene)).toBe(0);
+    });
+
+    it('draws the bombs when turnStartEvents is empty', async () => {
+      queueMatchStates(hazardState({ turnStartEvents: [] }));
+
+      const scene = await bootScene();
+
+      expect(drawnBombs(scene)).toBe(2);
+    });
+
+    it('sends getMatchState, startTurn, getMatchState, consumeCpuStatus in that order for a first VS CPU sudden-death beginTurn', async () => {
+      vi.mocked(getMatchConfig).mockResolvedValue(makeCfg({ vsCpu: true }));
+      const calls: string[] = [];
+      vi.mocked(getMatchState).mockImplementation(() => {
+        calls.push('getMatchState');
+        return Promise.resolve(hazardState({ activeTeam: 2, turnStartEvents: [] }));
+      });
+      vi.mocked(startTurn).mockImplementation(() => {
+        calls.push('startTurn');
+        return Promise.resolve(suddenDeathResponse);
+      });
+      vi.mocked(consumeCpuStatus).mockImplementation(() => {
+        calls.push('consumeCpuStatus');
+        return Promise.resolve({
+          turnPhase: 'TurnPhaseReady',
+          planGameEvents: [],
+          resolveTurnGameEvents: [{ type: 'matchEnded', winnerTeamId: 2 }],
+        });
+      });
+
+      await bootScene();
+
+      expect(calls).toEqual([
+        'getMatchState',
+        'getMatchState',
+        'startTurn',
+        'getMatchState',
+        'consumeCpuStatus',
+      ]);
+    });
+
+    describe('hazard cutscene guard', () => {
+      beforeEach(() => {
+        vi.mocked(startTurn).mockResolvedValue(suddenDeathResponse);
+      });
+
+      it('(a) plays the cutscene once with the start-turn events', async () => {
+        queueMatchStates(hazardState());
+
+        await bootScene();
+
+        expect(suddenDeathCutscenePlay).toHaveBeenCalledOnce();
+        expect(suddenDeathCutscenePlay).toHaveBeenCalledWith(hazardEvents, expect.any(Function));
+      });
+
+      it('(b) does not play it again when a failed resolve re-enters beginTurn for the same turn', async () => {
+        queueMatchStates(hazardState());
+        vi.mocked(resolveTurn).mockRejectedValueOnce(new Error('resolve failed'));
+        await bootScene();
+
+        await clickResolveAndConfirm();
+
+        expect(startTurn).toHaveBeenCalledTimes(2);
+        expect(suddenDeathCutscenePlay).toHaveBeenCalledOnce();
+      });
+
+      it('(c) plays it again once the turn number goes up', async () => {
+        const turn1 = hazardState();
+        const turn2 = hazardState({ turn: 2, activeTeam: 2 });
+        queueMatchStates(turn1, turn1, turn2);
+        vi.mocked(resolveTurn).mockResolvedValue({ planGameEvents: [], resolveTurnGameEvents: [] });
+        await bootScene();
+
+        await clickResolveAndConfirm();
+
+        expect(suddenDeathCutscenePlay).toHaveBeenCalledTimes(2);
+      });
+
+      it('(d) a new create resets it, so a rematch plays turn 1 again', async () => {
+        queueMatchStates(hazardState());
+        const scene = await bootScene();
+        fireShutdown();
+
+        scene.create({ roomId: 'room-abc', playerTokens: ['t1', 't2'] });
+        await flush();
+
+        expect(suddenDeathCutscenePlay).toHaveBeenCalledTimes(2);
+      });
+
+      it('(e) a redraw of the same turn after the cutscene draws the hazards', async () => {
+        queueMatchStates(hazardState());
+        vi.mocked(resolveTurn).mockRejectedValueOnce(new Error('resolve failed'));
+        const scene = await bootScene();
+        expect(drawnBombs(scene)).toBe(0);
+
+        await clickResolveAndConfirm();
+
+        expect(drawnBombs(scene)).toBe(2);
+      });
+    });
+  });
+
   describe('VS CPU turn', () => {
     function readyStatus(overrides: Partial<CpuStatusResponse> = {}): CpuStatusResponse {
       return {
