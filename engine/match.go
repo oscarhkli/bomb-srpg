@@ -29,6 +29,8 @@ func (m *Match) Surrender(teamID int) []GameEvent {
 	}
 
 	m.PlaybackLog = nil
+	m.WorkingState.TurnStartEvents = nil
+	m.TrueState.TurnStartEvents = nil
 
 	return []GameEvent{
 		NewMatchEndedEvent(m.WinnerTeamID),
@@ -284,6 +286,7 @@ func (m *Match) ResolveTurn() (planGameEvents, resolveTurnGameEvents []GameEvent
 		}
 	}
 
+	m.WorkingState.TurnStartEvents = nil
 	m.TrueState = m.WorkingState.DeepCopy()
 
 	resolveTurnGameEvents = make([]GameEvent, len(m.PlaybackLog))

@@ -30,6 +30,8 @@ import {
   renderStageBackground,
   renderOccupants,
   renderBomb,
+  bombsToDraw,
+  hazardsUnplayed,
   tileCenter,
   occupantDepth,
   type BoardRenderContext,
@@ -80,6 +82,7 @@ export default class MatchScene extends Phaser.Scene {
   private occupantObjects: Phaser.GameObjects.GameObject[] = [];
   private unitSpritesById = new Map<number, Phaser.GameObjects.Sprite>();
   private bombGraphicsById = new Map<number, BombGraphics>();
+  private hazardsPlayedTurn = 0;
   private softBlockSpritesById = new Map<number, Phaser.GameObjects.Sprite>();
   private allowedTilesCache = new Map<string, Coordinate[]>();
   private turnCommandPanel!: TurnCommandPanel;
@@ -113,6 +116,7 @@ export default class MatchScene extends Phaser.Scene {
     this.roomId = data.roomId;
     this.playerTokens = data.playerTokens;
     this.victoryActionTaken = false;
+    this.hazardsPlayedTurn = 0;
     this.isSubmitting = false;
     this.interactionsEnabled = false;
     this.summaryPanelOpen = false;
@@ -233,7 +237,8 @@ export default class MatchScene extends Phaser.Scene {
         });
       });
 
-      if (resp.inSuddenDeath) {
+      if (resp.inSuddenDeath && hazardsUnplayed(state.turn, this.hazardsPlayedTurn)) {
+        this.hazardsPlayedTurn = state.turn;
         this.gameState = await getMatchState();
         if (gen !== this.generation) {
           return;
@@ -849,7 +854,10 @@ export default class MatchScene extends Phaser.Scene {
   private renderBoard(state: GameState): void {
     this.gameState = state;
     this.gameStateLoaded = true;
-    renderOccupants(this.boardCtx(), state);
+    renderOccupants(this.boardCtx(), {
+      ...state,
+      bombs: bombsToDraw(state, this.hazardsPlayedTurn),
+    });
   }
 
   private tryRenderStageBackground(): void {

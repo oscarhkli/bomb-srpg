@@ -652,5 +652,6 @@
       }
     }
   ],
-  "turnCommands": null
+  "turnCommands": null,
+  "turnStartEvents": []
 }

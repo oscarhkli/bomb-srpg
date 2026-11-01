@@ -2,6 +2,7 @@ package server
 
 import (
 	"bomb-srpg/engine"
+	"cmp"
 	"encoding/json/v2"
 	"net/http"
 	"net/http/httptest"
@@ -211,6 +212,60 @@ func TestHandleStartTurn(t *testing.T) {
 		}
 		if got, want := len(room.Match.WorkingState.Bombs), 2; got != want {
 			t.Errorf("bombs after two calls = %d, want %d", got, want)
+		}
+	})
+
+	t.Run("GET state carries the turn start events until the turn is resolved", func(t *testing.T) {
+		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
+		room := mustRoom(t, s, roomID)
+		room.Match.TrueState.Turn = 1000
+		room.Match.WorkingState.Turn = 1000
+
+		getState := func() ClientMatchStateResponse {
+			t.Helper()
+			rr := doRequest(t, h.HandleGetMatchState, "GET /api/match-rooms/{roomID}/match/state", "GET", "/api/match-rooms/"+roomID+"/match/state", "", "")
+			var state ClientMatchStateResponse
+			if err := json.UnmarshalRead(rr.Body, &state); err != nil {
+				t.Fatalf("Failed to decode state: %v", err)
+			}
+
+			return state
+		}
+
+		if got := getState().TurnStartEvents; len(got) != 0 {
+			t.Errorf("turnStartEvents before start-turn = %+v, want none", got)
+		}
+
+		rr := doRequest(t, h.HandleStartTurn, "POST /api/match-rooms/{roomID}/match/start-turn", "POST", "/api/match-rooms/"+roomID+"/match/start-turn", "", playerTokens[0])
+		var response StartTurnResponse
+		if err := json.UnmarshalRead(rr.Body, &response); err != nil {
+			t.Fatalf("Failed to decode response JSON payload: %v", err)
+		}
+
+		state := getState()
+		if !reflect.DeepEqual(state.TurnStartEvents, response.GameEvents) {
+			t.Errorf("turnStartEvents = %+v, want the response gameEvents %+v", state.TurnStartEvents, response.GameEvents)
+		}
+		hazards := make(map[engine.BombID]engine.Coordinate)
+		for _, bomb := range state.Bombs {
+			if bomb.OwnerID == engine.SystemUnitID {
+				hazards[bomb.ID] = bomb.Position
+			}
+		}
+		if len(hazards) != len(response.GameEvents) {
+			t.Fatalf("hazard bombs = %d, want %d", len(hazards), len(response.GameEvents))
+		}
+		for _, evt := range response.GameEvents {
+			if pos, ok := hazards[evt.BombID]; !ok || pos != *evt.Position {
+				t.Errorf("event %+v has no hazard bomb at its position; hazards = %+v", evt, hazards)
+			}
+		}
+
+		if _, _, err := s.ResolveTurn(roomID, playerTokens[0]); err != nil {
+			t.Fatalf("ResolveTurn() error = %v", err)
+		}
+		if got := getState().TurnStartEvents; len(got) != 0 {
+			t.Errorf("turnStartEvents after resolve = %+v, want none", got)
 		}
 	})
 
@@ -449,6 +504,53 @@ func TestHandleResetTurn(t *testing.T) {
 
 		if got, want := room.Match.WorkingState.Units[unitID].HasMoved, false; got != want {
 			t.Errorf("Expected Unit %#X HasMoved reset to %v, got %v", unitID, want, got)
+		}
+	})
+
+	t.Run("GET state keeps the turn start events after a reset", func(t *testing.T) {
+		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
+		room := mustRoom(t, s, roomID)
+		room.Match.GameCfg.AllowResetTurn = true
+		room.Match.TrueState.Turn = 1000
+		room.Match.WorkingState.Turn = 1000
+
+		getState := func() ClientMatchStateResponse {
+			t.Helper()
+			rr := doRequest(t, h.HandleGetMatchState, "GET /api/match-rooms/{roomID}/match/state", "GET", "/api/match-rooms/"+roomID+"/match/state", "", "")
+			var state ClientMatchStateResponse
+			if err := json.UnmarshalRead(rr.Body, &state); err != nil {
+				t.Fatalf("Failed to decode state: %v", err)
+			}
+
+			return state
+		}
+
+		rr := doRequest(t, h.HandleStartTurn, "POST /api/match-rooms/{roomID}/match/start-turn", "POST", "/api/match-rooms/"+roomID+"/match/start-turn", "", playerTokens[0])
+		var response StartTurnResponse
+		if err := json.UnmarshalRead(rr.Body, &response); err != nil {
+			t.Fatalf("Failed to decode response JSON payload: %v", err)
+		}
+		if len(response.GameEvents) == 0 {
+			t.Fatal("start-turn returned no hazard events")
+		}
+		byID := func(a, b *engine.Bomb) int { return cmp.Compare(a.ID, b.ID) }
+		bombsBefore := getState().Bombs
+		slices.SortFunc(bombsBefore, byID)
+
+		unitID := engine.NewUnitID(1, 0)
+		room.Match.WorkingState.Units[unitID].HasMoved = true
+		doRequest(t, h.HandleResetTurn, "POST /api/match-rooms/{roomID}/match/reset", "POST", "/api/match-rooms/"+roomID+"/match/reset", "", playerTokens[0])
+
+		if room.Match.WorkingState.Units[unitID].HasMoved {
+			t.Fatal("reset did not discard the planned action")
+		}
+		state := getState()
+		if !reflect.DeepEqual(state.TurnStartEvents, response.GameEvents) {
+			t.Errorf("turnStartEvents after reset = %+v, want the response gameEvents %+v", state.TurnStartEvents, response.GameEvents)
+		}
+		slices.SortFunc(state.Bombs, byID)
+		if !reflect.DeepEqual(state.Bombs, bombsBefore) {
+			t.Errorf("bombs after reset = %+v, want %+v", state.Bombs, bombsBefore)
 		}
 	})
 
