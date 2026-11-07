@@ -245,7 +245,11 @@ func TestServerStateManager_StartTurn_CPUTurn(t *testing.T) {
 			name:     "Sudden Death Injected Before Planning",
 			vsCpu:    true,
 			maxTurns: 1,
-			setup:    cpuTurnPending,
+			setup: func(t *testing.T, room *MatchRoom) int {
+				t.Helper()
+				room.Match.ResolveTurn()
+				return 1
+			},
 			plan: func(gs *engine.GameState, call int) []engine.TurnCommand {
 				return nil
 			},
@@ -871,14 +875,18 @@ func TestServerStateManager_runCPUTurn_EndsMatch(t *testing.T) {
 			bomb.Countdown = 1
 		}
 	}
-	countHazards := func(gs *engine.GameState) int {
-		n := 0
-		for _, bomb := range gs.Bombs {
+	hazardIDs := func(gs *engine.GameState) []engine.BombID {
+		var ids []engine.BombID
+		for id, bomb := range gs.Bombs {
 			if bomb.OwnerID == engine.SystemUnitID {
-				n++
+				ids = append(ids, id)
 			}
 		}
-		return n
+		return ids
+	}
+	hazardsBefore := hazardIDs(room.Match.WorkingState)
+	if len(hazardsBefore) == 0 {
+		t.Fatal("Expected hazards at creation with MaxTurns 0")
 	}
 
 	decider := &recordingDecider{match: room.Match, called: make(chan struct{}, 1)}
@@ -898,8 +906,10 @@ func TestServerStateManager_runCPUTurn_EndsMatch(t *testing.T) {
 	if got, want := room.Match.WorkingState.ActiveTeam, 2; got != want {
 		t.Errorf("Expected active team %d to stay, got %d", want, got)
 	}
-	if got := countHazards(room.Match.WorkingState); got != 0 {
-		t.Errorf("Expected no hazards, got %d", got)
+	for _, id := range hazardIDs(room.Match.WorkingState) {
+		if !slices.Contains(hazardsBefore, id) {
+			t.Errorf("Expected no new hazards, found bomb %v", id)
+		}
 	}
 
 	phase, planGameEvents, resolveTurnGameEvents, err := s.ConsumeCPUStatus(roomID, tokens[0])

@@ -579,10 +579,9 @@ func TestServerStateManager_StartTurn(t *testing.T) {
 			name: "Success",
 			setup: func(t *testing.T) (string, *ServerStateManager, string) {
 				t.Helper()
-				roomID, tokens, s := createTestRoom(t)
-				room := mustRoom(t, s, roomID)
-				room.Match.TrueState.Turn = 1000
-				room.Match.WorkingState.Turn = 1000
+				gameCfg := validGameCfg()
+				gameCfg.MaxTurns = 0
+				roomID, tokens, s := createTestRoomWithCfg(t, gameCfg)
 				return roomID, s, tokens[0]
 			},
 			wantErr: nil,

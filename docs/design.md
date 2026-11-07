@@ -42,8 +42,8 @@
 - **Turn Secrecy Pattern**: Active turn planning is fully hidden from the opposing player to preserve the Turn Reset capability. Opponents see a passive waiting status during the planning phase.
 - **Unified Event Broadcast**: Upon turn commitment, the backend generates an identical chronological Action Queue array and distributes it to both clients.
 - **Frontend Queue Playback**: Clients process incoming batch payloads using a sequential async loop, ensuring both players watch animations unfold with perfect deterministic lockstep alignment.
-- **Explicit Turn Start Flow**: The server does NOT auto-call `StartTurn()` on match creation. Instead, the client explicitly calls `POST /match/start-turn` to begin each turn (including Turn 1). This allows the UI to render the clean initial state, then animate sudden-death bomb drops when they occur on Turn 1 with `MaxTurns=0`.
-- **Turn Startup Sudden Death Checks**: State machine transition and boundary rules—such as checking if `TrueState.Turn >= Config.MaxTurn`—are evaluated at the very beginning of a new turn (`StartTurn()`). This ensures map alterations and automated sudden-death bomb injections are fully populated and rendered before a player can input commands. Setting `MaxTurn = 0` forces instant sudden death on Turn 1.
+- **Engine-Driven Turn Start**: The engine begins every turn itself: turn 1 when the match is created, each later turn at the end of `ResolveTurn()`. Sudden-death bombs are placed at that moment and show up in `GET /match/state` as `turnStartEvents`, so the UI can render the state and animate the drops. The start-turn call only replays the stored events.
+- **Turn Startup Sudden Death Checks**: The sudden-death rule runs when the engine begins a turn: from the turn after `Config.MaxTurns` onward it injects the sudden-death bombs before any player can input commands, unless the match has ended. Setting `MaxTurns = 0` forces sudden death from turn 1.
 - **Decoupled Analytical Queries**: Victory evaluations (`EvaluateVictoryConditions()`) are written as pure, read-only, stateless functions that return data structures without producing side effects. The top-level `ResolveTurn()` orchestrator handles updating properties and injecting the definitive termination token (`MatchEndedEvent`) into the public stream, allowing AI modules to securely query hypothetical sandboxes without corrupting telemetry arrays.
 - **Stateless Lounge-to-Game Manager**: Session lifetimes are managed via a `web.ServerStateManager`. The server starts in a "Lounge" state, dynamically allocates a match pointer (`engine.InitGame`) upon user action, and triggers a clean teardown (`ActiveMatch = nil`) upon match completion, returning to the Lounge.
 
@@ -95,17 +95,17 @@ User input                        Serializes JSON             No I/O
                                   Calls engine methods
 ```
 
-### 8.2 Turn Lifecycle (Client-Driven)
+### 8.2 Turn Lifecycle (Engine-Driven)
 
-The server does **not** auto-call `StartTurn()` on match creation. Client explicitly starts each turn:
+The engine begins turn 1 when the match is created and the next turn at the end of each resolve. Sudden-death bombs are placed then and appear in `GET /state` as `turnStartEvents`:
 
 1. `POST /match-rooms/{id}/match` → `CreateMatch` (full GameCfg), returns 201
-2. `GET /match-rooms/{id}/match/state` → clean Turn 1 state (no sudden death yet)
-3. `POST /match-rooms/{id}/match/start-turn` → `StartTurn()` injects sudden death if `MaxTurns=0`
-4. `GET /match/state` → state with bombs (animatable)
-5. Planning: `POST /turn-commands`, `POST /reset` (sandbox)
-6. `POST /resolve` → `ResolveTurn()`, returns events + next turn
-7. Loop: `GET /state` → `POST /start-turn` → ...
+2. `GET /match-rooms/{id}/match/state` → Turn 1 state, with the hazard bombs and `turnStartEvents` if `MaxTurns=0`
+3. Planning: `POST /turn-commands`, `POST /reset` (sandbox; the hazards and `turnStartEvents` survive a reset)
+4. `POST /resolve` → `ResolveTurn()`, returns events; the next turn has already begun
+5. Loop: `GET /state` → planning → `POST /resolve` → ...
+
+`POST /start-turn` only replays the stored `turnStartEvents`; it changes no state.
 
 Surrender: `POST /surrender` (either team, any time).
 
