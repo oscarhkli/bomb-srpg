@@ -356,17 +356,7 @@ func TestServerStateManager_ConsumeCPUStatus_LaunchesCPUTurn(t *testing.T) {
 					t.Fatalf("StartTurn() error = %v", err)
 				}
 			} else {
-				turnPhase, _, _, err := s.ConsumeCPUStatus(roomID, tokens[tokenIdx])
-				if err != nil {
-					t.Fatalf("ConsumeCPUStatus() error = %v", err)
-				}
-				wantTurnPhase := engine.TurnPhaseIdle
-				if tt.wantCPUTurn {
-					wantTurnPhase = engine.TurnPhasePlanning
-				}
-				if turnPhase != wantTurnPhase {
-					t.Errorf("ConsumeCPUStatus() turnPhase = %v, want %v", turnPhase, wantTurnPhase)
-				}
+				consumeAndCheckPhase(t, s, roomID, tokens[tokenIdx], tt.wantCPUTurn)
 			}
 
 			if tt.wantCPUTurn {
@@ -399,6 +389,21 @@ func TestServerStateManager_ConsumeCPUStatus_LaunchesCPUTurn(t *testing.T) {
 				tt.validate(t, room, decider)
 			}
 		})
+	}
+}
+
+func consumeAndCheckPhase(t *testing.T, s *ServerStateManager, roomID string, token string, wantCPUTurn bool) {
+	t.Helper()
+	turnPhase, _, _, err := s.ConsumeCPUStatus(roomID, token)
+	if err != nil {
+		t.Fatalf("ConsumeCPUStatus() error = %v", err)
+	}
+	wantTurnPhase := engine.TurnPhaseIdle
+	if wantCPUTurn {
+		wantTurnPhase = engine.TurnPhasePlanning
+	}
+	if turnPhase != wantTurnPhase {
+		t.Errorf("ConsumeCPUStatus() turnPhase = %v, want %v", turnPhase, wantTurnPhase)
 	}
 }
 
