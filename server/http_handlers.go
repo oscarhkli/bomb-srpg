@@ -275,7 +275,8 @@ type CPUStatusResponse struct {
 	ResolveTurnGameEvents []engine.GameEvent  `json:"resolveTurnGameEvents"`
 }
 
-// HandleConsumeCPUStatus returns the CPU turn phase and events; a Ready phase resets to Idle.
+// HandleConsumeCPUStatus returns the CPU turn phase and events, and resets a Ready phase to Idle.
+// It launches the CPU turn first if one is due.
 func (h *Handler) HandleConsumeCPUStatus(w http.ResponseWriter, r *http.Request) {
 	roomID := r.PathValue("roomID")
 
