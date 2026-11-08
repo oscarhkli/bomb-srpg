@@ -43,28 +43,31 @@ run: build
 run-server: build-server
 	./bin/srpg-web
 
-web-dev:
+web/node_modules: web/package-lock.json
+	cd web && npm ci
+
+web-dev: web/node_modules
 	cd web && npm run dev
 
-web-format:
+web-format: web/node_modules
 	cd web && npm run format
 
-web-typecheck:
+web-typecheck: web/node_modules
 	cd web && npm run typecheck
 
-web-test: web-format web-typecheck
+web-test: web/node_modules web-format web-typecheck
 	cd web && npm run test:run
 
-web-lint:
+web-lint: web/node_modules
 	cd web && npm run format:check && npm run lint
 
-web-build: web-format web-typecheck
+web-build: web/node_modules web-format web-typecheck
 	cd web && npm run build
 
-web-e2e: build-server
+web-e2e: build-server web/node_modules
 	cd web && npm run build:e2e && E2E_PORT=$$(node -e "const s=require('net').createServer().listen(0,()=>{console.log(s.address().port);s.close()})") npm run e2e -- $(if $(E2E_BROWSER),--project $(E2E_BROWSER))
 
-web-coverage: web-format web-typecheck
+web-coverage: web/node_modules web-format web-typecheck
 	cd web && npm run test:run -- --coverage
 
 gen-spec-index:
