@@ -200,41 +200,33 @@ func (gs *GameState) IsLandingLegal(target Coordinate, _ OccupantType) error {
 	return nil
 }
 
-// StartTurn sets up the environmental boundaries for the upcoming round.
-// Returns GameEvents when the match enters SuddenDeath.
-// A repeat call in the same turn drops nothing and returns the same events.
+// StartTurn returns the hazard events for the current turn.
+// It changes no state; a repeat call in the same turn returns the same events.
 func (m *Match) StartTurn() []GameEvent {
-	winner := m.evaluateVictoryConditions()
-	if winner != MatchInProgress {
+	gameEvents := cloneGameEvents(m.WorkingState.TurnStartEvents)
+	if gameEvents == nil {
 		return []GameEvent{}
 	}
 
-	if m.startedTurn == m.TrueState.Turn {
-		return cloneGameEvents(m.WorkingState.TurnStartEvents)
-	}
-
-	if m.TrueState.Turn <= m.GameCfg.MaxTurns {
-		m.WorkingState.InSuddenDeath = false
-		m.recordTurnStart([]GameEvent{})
-		return []GameEvent{}
-	}
-
-	m.WorkingState.InSuddenDeath = true
-	m.injectSuddenDeathHazards()
-
-	gameEvents := make([]GameEvent, len(m.PlaybackLog))
-	copy(gameEvents, m.PlaybackLog)
-	m.PlaybackLog = nil
-	m.TrueState = m.WorkingState.DeepCopy()
-	m.recordTurnStart(gameEvents)
-
-	return cloneGameEvents(gameEvents)
+	return gameEvents
 }
 
-func (m *Match) recordTurnStart(gameEvents []GameEvent) {
-	m.WorkingState.TurnStartEvents = cloneGameEvents(gameEvents)
-	m.TrueState.TurnStartEvents = cloneGameEvents(gameEvents)
-	m.startedTurn = m.TrueState.Turn
+// beginTurn runs once per turn, with PlaybackLog empty.
+func (m *Match) beginTurn() {
+	m.WorkingState.TurnStartEvents = nil
+
+	if m.WinnerTeamID == 0 && m.evaluateVictoryConditions() == MatchInProgress {
+		if m.TrueState.Turn <= m.GameCfg.MaxTurns {
+			m.WorkingState.InSuddenDeath = false
+		} else {
+			m.WorkingState.InSuddenDeath = true
+			m.injectSuddenDeathHazards()
+			m.WorkingState.TurnStartEvents = cloneGameEvents(m.PlaybackLog)
+			m.PlaybackLog = nil
+		}
+	}
+
+	m.TrueState = m.WorkingState.DeepCopy()
 }
 
 // injectSuddenDeathHazards drops up to SuddenDeathBombs bombs on random empty tiles.
@@ -260,6 +252,7 @@ func (m *Match) injectSuddenDeathHazards() {
 }
 
 // ResolveTurn detonates due bombs, then advances the turn or ends the match, and commits WorkingState to TrueState.
+// It then begins the next turn, so sudden-death hazards are already in both states on return.
 // Returns the events logged during planning and those produced by resolution; MatchEndedEvent lands in the latter.
 func (m *Match) ResolveTurn() (planGameEvents, resolveTurnGameEvents []GameEvent) {
 	planGameEvents = make([]GameEvent, len(m.PlaybackLog))
@@ -286,12 +279,13 @@ func (m *Match) ResolveTurn() (planGameEvents, resolveTurnGameEvents []GameEvent
 		}
 	}
 
-	m.WorkingState.TurnStartEvents = nil
 	m.TrueState = m.WorkingState.DeepCopy()
 
 	resolveTurnGameEvents = make([]GameEvent, len(m.PlaybackLog))
 	copy(resolveTurnGameEvents, m.PlaybackLog)
 	m.PlaybackLog = nil
+
+	m.beginTurn()
 
 	return planGameEvents, resolveTurnGameEvents
 }

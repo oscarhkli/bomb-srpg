@@ -978,7 +978,7 @@ func TestMatch_StartTurn_NotTriggeringSuddenDeath(t *testing.T) {
 	})
 }
 
-func TestMatch_StartTurn_SuddenDeath(t *testing.T) {
+func TestMatch_BeginTurn_SuddenDeath(t *testing.T) {
 	king, ok := GetArchetype("King")
 	if !ok {
 		t.Fatalf("Archetype King does not exist")
@@ -1011,6 +1011,7 @@ func TestMatch_StartTurn_SuddenDeath(t *testing.T) {
 		m.WorkingState.Grid[1][3].OccupantType = OccupantUnit
 		m.WorkingState.Grid[1][3].OccupantID = int64(u4)
 
+		m.beginTurn()
 		gameEvents := m.StartTurn()
 
 		if got, want := len(m.WorkingState.Bombs), SuddenDeathBombs; got != want {
@@ -1050,6 +1051,7 @@ func TestMatch_StartTurn_SuddenDeath(t *testing.T) {
 		m.WorkingState.Grid[8][0].OccupantType = OccupantUnit
 		m.WorkingState.Grid[8][0].OccupantID = int64(u4)
 
+		m.beginTurn()
 		gameEvents := m.StartTurn()
 
 		if got, want := len(m.WorkingState.Bombs), 2; got != want {
@@ -1083,6 +1085,7 @@ func TestMatch_StartTurn_SuddenDeath(t *testing.T) {
 		m.WorkingState.Grid[4][0].OccupantType = OccupantUnit
 		m.WorkingState.Grid[4][0].OccupantID = int64(u4)
 
+		m.beginTurn()
 		gameEvents := m.StartTurn()
 
 		if got, want := len(m.WorkingState.Bombs), 0; got != want {
@@ -2286,6 +2289,7 @@ func TestMatch_StartTurn_Idempotent(t *testing.T) {
 			afterFirst: func(m *Match, _ []GameEvent) {
 				m.TrueState.Turn++
 				m.WorkingState.Turn++
+				m.beginTurn()
 			},
 			wantBombs:     4,
 			wantSuddenDth: true,
@@ -2301,6 +2305,7 @@ func TestMatch_StartTurn_Idempotent(t *testing.T) {
 	for _, tt := range table {
 		t.Run(tt.name, func(t *testing.T) {
 			m := newMatch(tt.turn)
+			m.beginTurn()
 
 			first := m.StartTurn()
 			want := snapshot(first)
@@ -2338,58 +2343,152 @@ func TestMatch_StartTurn_Idempotent(t *testing.T) {
 	}
 }
 
-func TestMatch_TurnStartEvents_EmptiedWhenTheTurnEnds(t *testing.T) {
+func TestMatch_BeginTurn(t *testing.T) {
 	std1 := teamFormation{King: new(true), OrdinaryUnitsAlive: []bool{true, true, false, true}}
 	std2 := teamFormation{King: new(true), OrdinaryUnitsAlive: []bool{true, true, false, false}}
 
-	newHazardMatch := func(t *testing.T) *Match {
-		t.Helper()
-		m := newTestMatchWithTeams(t, std1, std2)
-		m.TrueState.Turn = m.GameCfg.MaxTurns + 1
-		m.WorkingState.Turn = m.GameCfg.MaxTurns + 1
-		if got := len(m.StartTurn()); got != SuddenDeathBombs {
-			t.Fatalf("StartTurn() returned %d events, want %d", got, SuddenDeathBombs)
-		}
+	initGame := func(maxTurns int) func(t *testing.T) *Match {
+		return func(t *testing.T) *Match {
+			t.Helper()
+			m, err := InitGame(GameCfg{
+				StagePreset: "Plain",
+				MaxTurns:    maxTurns,
+				P1Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
+				P2Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Bandit", Role: RoleNormal}},
+			})
+			if err != nil {
+				t.Fatalf("InitGame() error = %v", err)
+			}
 
-		return m
+			return m
+		}
+	}
+	teamsAt := func(maxTurns, turn int) func(t *testing.T) *Match {
+		return func(t *testing.T) *Match {
+			t.Helper()
+			m := newTestMatchWithTeams(t, std1, std2)
+			m.GameCfg.MaxTurns = maxTurns
+			m.TrueState.Turn = turn
+			m.WorkingState.Turn = turn
+
+			return m
+		}
+	}
+	resolve := func(m *Match) []GameEvent {
+		_, resolveEvents := m.ResolveTurn()
+
+		return resolveEvents
 	}
 
 	table := []struct {
-		name string
-		end  func(m *Match)
+		name          string
+		build         func(t *testing.T) *Match
+		act           func(m *Match) []GameEvent
+		wantBombs     int
+		wantSuddenDth bool
+		wantEnded     bool
 	}{
 		{
-			name: "ResolveTurn that advances the turn",
-			end:  func(m *Match) { m.ResolveTurn() },
+			name:          "InitGame with MaxTurns 0 drops hazards",
+			build:         initGame(0),
+			wantBombs:     SuddenDeathBombs,
+			wantSuddenDth: true,
 		},
 		{
-			name: "ResolveTurn that ends the match",
-			end: func(m *Match) {
+			name:  "InitGame with MaxTurns 5 drops none",
+			build: initGame(5),
+		},
+		{
+			name:          "ResolveTurn from Turn = MaxTurns enters sudden death",
+			build:         teamsAt(3, 3),
+			act:           resolve,
+			wantBombs:     SuddenDeathBombs,
+			wantSuddenDth: true,
+		},
+		{
+			name:  "ResolveTurn from Turn = MaxTurns-1 drops none",
+			build: teamsAt(3, 2),
+			act:   resolve,
+		},
+		{
+			name:  "match-ending ResolveTurn drops none",
+			build: teamsAt(3, 4),
+			act: func(m *Match) []GameEvent {
 				m.WorkingState.Units[NewUnitID(2, 0)].HP = 0
-				m.ResolveTurn()
-				if m.WinnerTeamID != 1 {
-					t.Fatalf("WinnerTeamID = %d, want 1", m.WinnerTeamID)
-				}
+
+				return resolve(m)
 			},
+			wantEnded: true,
 		},
 		{
-			name: "Surrender",
-			end:  func(m *Match) { m.Surrender(2) },
+			name:  "Surrender then ResolveTurn drops none",
+			build: teamsAt(3, 4),
+			act: func(m *Match) []GameEvent {
+				m.Surrender(2)
+
+				return resolve(m)
+			},
+			wantEnded: true,
 		},
+	}
+
+	checkState := func(t *testing.T, label string, gs *GameState, wantBombs int) {
+		t.Helper()
+		if got := len(gs.Bombs); got != wantBombs {
+			t.Errorf("%s bombs = %d, want %d", label, got, wantBombs)
+		}
+		if got := len(gs.TurnStartEvents); got != wantBombs {
+			t.Fatalf("%s TurnStartEvents = %d, want %d", label, got, wantBombs)
+		}
+		for _, evt := range gs.TurnStartEvents {
+			if evt.Type != GameEvtBombPlaced {
+				t.Errorf("%s event type = %v, want %v", label, evt.Type, GameEvtBombPlaced)
+			}
+			bomb, ok := gs.Bombs[evt.BombID]
+			if !ok {
+				t.Errorf("%s event bomb %v is not in the state", label, evt.BombID)
+				continue
+			}
+			if bomb.OwnerID != SystemUnitID {
+				t.Errorf("%s bomb owner = %v, want %v", label, bomb.OwnerID, SystemUnitID)
+			}
+		}
 	}
 
 	for _, tt := range table {
 		t.Run(tt.name, func(t *testing.T) {
-			m := newHazardMatch(t)
-
-			tt.end(m)
-
-			if got := len(m.WorkingState.TurnStartEvents); got != 0 {
-				t.Errorf("WorkingState.TurnStartEvents has %d events, want 0", got)
+			m := tt.build(t)
+			if !tt.wantEnded {
+				if got := m.evaluateVictoryConditions(); got != MatchInProgress {
+					t.Fatalf("evaluateVictoryConditions() = %d, want MatchInProgress", got)
+				}
 			}
-			if got := len(m.TrueState.TurnStartEvents); got != 0 {
-				t.Errorf("TrueState.TurnStartEvents has %d events, want 0", got)
+			if tt.act != nil {
+				resolveEvents := tt.act(m)
+				for _, evt := range resolveEvents {
+					if evt.Type == GameEvtBombPlaced {
+						t.Errorf("resolve events hold a bombPlaced: %#v", evt)
+					}
+				}
 			}
+			if tt.wantEnded && m.WinnerTeamID == 0 {
+				t.Fatalf("WinnerTeamID = 0, want the match ended")
+			}
+			if !tt.wantEnded {
+				if got := m.WorkingState.InSuddenDeath; got != tt.wantSuddenDth {
+					t.Errorf("InSuddenDeath = %v, want %v", got, tt.wantSuddenDth)
+				}
+			}
+			if len(m.PlaybackLog) != 0 {
+				t.Errorf("PlaybackLog = %#v, want empty", m.PlaybackLog)
+			}
+
+			checkState(t, "WorkingState", m.WorkingState, tt.wantBombs)
+			checkState(t, "TrueState", m.TrueState, tt.wantBombs)
+
+			m.ResetTurn()
+
+			checkState(t, "WorkingState after ResetTurn", m.WorkingState, tt.wantBombs)
 		})
 	}
 }
