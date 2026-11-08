@@ -394,7 +394,7 @@ func TestServerStateManager_ConsumeCPUStatus_LaunchesCPUTurn(t *testing.T) {
 
 func consumeAndCheckPhase(t *testing.T, s *ServerStateManager, roomID string, token string, wantCPUTurn bool) {
 	t.Helper()
-	turnPhase, _, _, err := s.ConsumeCPUStatus(roomID, token)
+	turnPhase, planGameEvents, resolveTurnGameEvents, err := s.ConsumeCPUStatus(roomID, token)
 	if err != nil {
 		t.Fatalf("ConsumeCPUStatus() error = %v", err)
 	}
@@ -404,6 +404,9 @@ func consumeAndCheckPhase(t *testing.T, s *ServerStateManager, roomID string, to
 	}
 	if turnPhase != wantTurnPhase {
 		t.Errorf("ConsumeCPUStatus() turnPhase = %v, want %v", turnPhase, wantTurnPhase)
+	}
+	if wantCPUTurn && (len(planGameEvents) != 0 || len(resolveTurnGameEvents) != 0) {
+		t.Errorf("ConsumeCPUStatus() events = %#v and %#v, want none while planning", planGameEvents, resolveTurnGameEvents)
 	}
 }
 
