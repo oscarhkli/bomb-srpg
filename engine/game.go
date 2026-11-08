@@ -19,18 +19,21 @@ func terrainToken() map[rune]TerrainType {
 	}
 }
 
-// InitGame validates the config, builds the initial GameState, and returns a ready-to-play Match.
+// InitGame validates the config, builds the initial GameState, and returns a Match with turn 1 already begun.
 func InitGame(gameCfg GameCfg) (*Match, error) {
 	gameState, err := initGameState(gameCfg)
 	if err != nil {
 		return nil, err
 	}
 
-	return &Match{
+	m := &Match{
 		TrueState:    gameState,
 		WorkingState: gameState.DeepCopy(),
 		GameCfg:      gameCfg,
-	}, nil
+	}
+	m.beginTurn()
+
+	return m, nil
 }
 
 func teamSize(team []TeamSlot) int {

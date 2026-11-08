@@ -385,7 +385,6 @@ type Match struct {
 	PlaybackLog  []GameEvent // events since the last ResolveTurn
 	CPU          CPUState
 	WinnerTeamID int // 0 = in progress, 1/2 = winner, -1 = draw
-	startedTurn  int // TrueState.Turn of the last turn start; 0 before the first
 }
 
 const (

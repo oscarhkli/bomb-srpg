@@ -148,12 +148,21 @@ func TestHandleSubmitTurnCommand(t *testing.T) {
 	})
 }
 
+func createSuddenDeathRoom(t *testing.T) (string, [2]string, *ServerStateManager, *Handler) {
+	t.Helper()
+	roomID, s, h := newTestRoom(t)
+	gameCfg := validGameCfg()
+	gameCfg.MaxTurns = 0
+	gameCfg.AllowResetTurn = true
+	tokens := mustCreateMatch(t, s, roomID, gameCfg)
+
+	return roomID, tokens, s, h
+}
+
 func TestHandleStartTurn(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
-		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
+		roomID, playerTokens, s, h := createSuddenDeathRoom(t)
 		room := mustRoom(t, s, roomID)
-		room.Match.TrueState.Turn = 1000
-		room.Match.WorkingState.Turn = 1000
 
 		rr := doRequest(t, h.HandleStartTurn, "POST /api/match-rooms/{roomID}/match/start-turn", "POST", "/api/match-rooms/"+roomID+"/match/start-turn", "", playerTokens[0])
 
@@ -188,10 +197,8 @@ func TestHandleStartTurn(t *testing.T) {
 	})
 
 	t.Run("repeat call in the same turn drops no more hazards", func(t *testing.T) {
-		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
+		roomID, playerTokens, s, h := createSuddenDeathRoom(t)
 		room := mustRoom(t, s, roomID)
-		room.Match.TrueState.Turn = 1000
-		room.Match.WorkingState.Turn = 1000
 
 		var responses [2]StartTurnResponse
 		for i := range responses {
@@ -216,10 +223,7 @@ func TestHandleStartTurn(t *testing.T) {
 	})
 
 	t.Run("GET state carries the turn start events until the turn is resolved", func(t *testing.T) {
-		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
-		room := mustRoom(t, s, roomID)
-		room.Match.TrueState.Turn = 1000
-		room.Match.WorkingState.Turn = 1000
+		roomID, playerTokens, s, h := createSuddenDeathRoom(t)
 
 		getState := func() ClientMatchStateResponse {
 			t.Helper()
@@ -232,8 +236,9 @@ func TestHandleStartTurn(t *testing.T) {
 			return state
 		}
 
-		if got := getState().TurnStartEvents; len(got) != 0 {
-			t.Errorf("turnStartEvents before start-turn = %+v, want none", got)
+		firstEvents := getState().TurnStartEvents
+		if got, want := len(firstEvents), 2; got != want {
+			t.Errorf("turnStartEvents before start-turn = %+v, want %d", firstEvents, want)
 		}
 
 		rr := doRequest(t, h.HandleStartTurn, "POST /api/match-rooms/{roomID}/match/start-turn", "POST", "/api/match-rooms/"+roomID+"/match/start-turn", "", playerTokens[0])
@@ -264,8 +269,14 @@ func TestHandleStartTurn(t *testing.T) {
 		if _, _, err := s.ResolveTurn(roomID, playerTokens[0]); err != nil {
 			t.Fatalf("ResolveTurn() error = %v", err)
 		}
-		if got := getState().TurnStartEvents; len(got) != 0 {
-			t.Errorf("turnStartEvents after resolve = %+v, want none", got)
+		nextEvents := getState().TurnStartEvents
+		if got, want := len(nextEvents), 2; got != want {
+			t.Fatalf("turnStartEvents after resolve = %+v, want %d", nextEvents, want)
+		}
+		for _, evt := range nextEvents {
+			if slices.ContainsFunc(firstEvents, func(old engine.GameEvent) bool { return old.BombID == evt.BombID }) {
+				t.Errorf("turnStartEvents after resolve reuse bomb ID %v", evt.BombID)
+			}
 		}
 	})
 
@@ -288,10 +299,7 @@ func TestHandleStartTurn(t *testing.T) {
 	})
 
 	t.Run("Test Contract", func(t *testing.T) {
-		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
-		room := mustRoom(t, s, roomID)
-		room.Match.TrueState.Turn = 99999
-		room.Match.WorkingState.Turn = 99999
+		roomID, playerTokens, _, h := createSuddenDeathRoom(t)
 
 		rr := doRequest(t, h.HandleStartTurn, "POST /api/match-rooms/{roomID}/match/start-turn", "POST", "/api/match-rooms/"+roomID+"/match/start-turn", "", playerTokens[0])
 
@@ -508,11 +516,8 @@ func TestHandleResetTurn(t *testing.T) {
 	})
 
 	t.Run("GET state keeps the turn start events after a reset", func(t *testing.T) {
-		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
+		roomID, playerTokens, s, h := createSuddenDeathRoom(t)
 		room := mustRoom(t, s, roomID)
-		room.Match.GameCfg.AllowResetTurn = true
-		room.Match.TrueState.Turn = 1000
-		room.Match.WorkingState.Turn = 1000
 
 		getState := func() ClientMatchStateResponse {
 			t.Helper()
