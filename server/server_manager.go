@@ -21,7 +21,6 @@ const CleanupInterval = 60 * time.Minute
 
 var (
 	ErrRoomNotFound      = errors.New("room not found")
-	ErrMatchEnded        = errors.New("match already ended")
 	ErrMatchInProgress   = errors.New("match still in progress")
 	ErrMatchExists       = errors.New("match already exists")
 	ErrMatchNotFound     = errors.New("match not found")
@@ -64,7 +63,6 @@ func mapError(err error) (int, string) {
 		errors.Is(err, engine.ErrInvalidLanding),
 		errors.Is(err, engine.ErrDesynced),
 		errors.Is(err, engine.ErrOutOfBounds),
-		errors.Is(err, ErrMatchEnded),
 		errors.Is(err, ErrMatchInProgress):
 		return http.StatusConflict, err.Error()
 	default:
@@ -364,39 +362,6 @@ func (s *ServerStateManager) SubmitTurnCommand(roomID string, cmd engine.TurnCom
 
 	room.LastActivity = time.Now()
 	return gameEvents, nil
-}
-
-// StartTurn launches CPU planning when it is the CPU's turn and none is running.
-// Returns whether sudden death is active and the hazard GameEvents.
-func (s *ServerStateManager) StartTurn(roomID, token string) (bool, []engine.GameEvent, error) {
-	room, err := s.loadRoom(roomID)
-	if err != nil {
-		return false, nil, err
-	}
-
-	room.mu.Lock()
-	defer room.mu.Unlock()
-
-	if room.Match == nil {
-		room.Logger.Warn("match not found")
-		return false, nil, fmt.Errorf("%w: roomID=%s", ErrMatchNotFound, roomID)
-	}
-
-	teamID := room.Match.WorkingState.ActiveTeam
-	if err := room.validatePlayerToken(teamID, token); err != nil {
-		return false, nil, err
-	}
-
-	gameEvents := room.Match.StartTurn()
-
-	if room.Match.WinnerTeamID != 0 {
-		return false, nil, fmt.Errorf("%w: match already ended", ErrMatchEnded)
-	}
-
-	s.launchCPUTurnIfDueLocked(room)
-
-	room.LastActivity = time.Now()
-	return room.Match.WorkingState.InSuddenDeath, gameEvents, nil
 }
 
 const maxCPUReplanAttempts = 5

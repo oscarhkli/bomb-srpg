@@ -160,7 +160,6 @@ func TestServerStateManager_ConsumeCPUStatus_LaunchesCPUTurn(t *testing.T) {
 		name           string
 		vsCpu          bool
 		maxTurns       int
-		startTurn      bool
 		setup          func(t *testing.T, room *MatchRoom) int
 		plan           func(gs *engine.GameState, call int) []engine.TurnCommand
 		wantCPUTurn    bool
@@ -292,18 +291,6 @@ func TestServerStateManager_ConsumeCPUStatus_LaunchesCPUTurn(t *testing.T) {
 			},
 		},
 		{
-			name:      "StartTurn Launches",
-			vsCpu:     true,
-			startTurn: true,
-			setup:     cpuTurnPending,
-			plan: func(gs *engine.GameState, call int) []engine.TurnCommand {
-				return legalCPUMove
-			},
-			wantCPUTurn:    true,
-			wantCalls:      1,
-			wantActiveTeam: 1,
-		},
-		{
 			name:  "Match Ended",
 			vsCpu: true,
 			setup: func(t *testing.T, room *MatchRoom) int {
@@ -351,13 +338,7 @@ func TestServerStateManager_ConsumeCPUStatus_LaunchesCPUTurn(t *testing.T) {
 			decider := &recordingDecider{match: room.Match, plan: tt.plan, called: make(chan struct{}, 1)}
 			s.decide = decider.decide
 
-			if tt.startTurn {
-				if _, _, err := s.StartTurn(roomID, tokens[tokenIdx]); err != nil {
-					t.Fatalf("StartTurn() error = %v", err)
-				}
-			} else {
-				consumeAndCheckPhase(t, s, roomID, tokens[tokenIdx], tt.wantCPUTurn)
-			}
+			consumeAndCheckPhase(t, s, roomID, tokens[tokenIdx], tt.wantCPUTurn)
 
 			if tt.wantCPUTurn {
 				select {
@@ -838,13 +819,6 @@ func TestServerStateManager_CPUTurnGate_NotGated(t *testing.T) {
 	roomID, tokens, s := newCPUTurnRoom(t)
 	room := mustRoom(t, s, roomID)
 	room.Match.CPU.Phase = engine.TurnPhasePlanning
-
-	if _, _, err := s.StartTurn(roomID, tokens[1]); err != nil {
-		t.Fatalf("StartTurn() error = %v", err)
-	}
-	if got, want := room.Match.CPU.Phase, engine.TurnPhasePlanning; got != want {
-		t.Errorf("Phase after StartTurn = %v, want %v", got, want)
-	}
 
 	phase, _, _, err := s.ConsumeCPUStatus(roomID, tokens[0])
 	if err != nil {

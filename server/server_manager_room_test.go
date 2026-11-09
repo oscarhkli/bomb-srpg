@@ -164,20 +164,6 @@ func TestServerStateManager_LastActivityUpdated(t *testing.T) {
 			},
 		},
 		{
-			name: "StartTurn updates LastActivity",
-			setup: func(t *testing.T) (string, *ServerStateManager, [2]string) {
-				t.Helper()
-				roomID, tokens, s := createTestRoom(t)
-				return roomID, s, tokens
-			},
-			action: func(t *testing.T, s *ServerStateManager, roomID string, tokens [2]string) {
-				t.Helper()
-				if _, _, err := s.StartTurn(roomID, tokens[0]); err != nil {
-					t.Fatalf("StartTurn() error = %v", err)
-				}
-			},
-		},
-		{
 			name: "ResetTurn updates LastActivity",
 			setup: func(t *testing.T) (string, *ServerStateManager, [2]string) {
 				t.Helper()

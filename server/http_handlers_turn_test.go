@@ -159,173 +159,6 @@ func createSuddenDeathRoom(t *testing.T) (string, [2]string, *ServerStateManager
 	return roomID, tokens, s, h
 }
 
-func TestHandleStartTurn(t *testing.T) {
-	t.Run("Success", func(t *testing.T) {
-		roomID, playerTokens, s, h := createSuddenDeathRoom(t)
-		room := mustRoom(t, s, roomID)
-
-		rr := doRequest(t, h.HandleStartTurn, "POST /api/match-rooms/{roomID}/match/start-turn", "POST", "/api/match-rooms/"+roomID+"/match/start-turn", "", playerTokens[0])
-
-		if status := rr.Code; status != http.StatusOK {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusOK)
-		}
-
-		expectedHeader := "application/json"
-		if contentType := rr.Header().Get("Content-Type"); contentType != expectedHeader {
-			t.Errorf("Handler returned wrong content type: got %v want %v", contentType, expectedHeader)
-		}
-
-		var response StartTurnResponse
-		if err := json.UnmarshalRead(rr.Body, &response); err != nil {
-			t.Fatalf("Failed to decode response JSON payload: %v", err)
-		}
-
-		if got, want := len(room.Match.WorkingState.Bombs), 2; got != want {
-			t.Errorf("Expected SuddenDeath triggered and drop %d bombs, got %d", want, got)
-		}
-		if len(response.GameEvents) != 2 {
-			t.Errorf("expected 2 GameEvent returned, got %d", len(response.GameEvents))
-		}
-		for _, evt := range response.GameEvents {
-			if evt.Type != engine.GameEvtBombPlaced {
-				t.Errorf("malformed EvtBombPlaced returned: %+v", evt)
-			}
-		}
-		if want, got := response.InSuddenDeath, true; want != got {
-			t.Errorf("Expected suddenDeath to be true, got %v", got)
-		}
-	})
-
-	t.Run("repeat call in the same turn drops no more hazards", func(t *testing.T) {
-		roomID, playerTokens, s, h := createSuddenDeathRoom(t)
-		room := mustRoom(t, s, roomID)
-
-		var responses [2]StartTurnResponse
-		for i := range responses {
-			rr := doRequest(t, h.HandleStartTurn, "POST /api/match-rooms/{roomID}/match/start-turn", "POST", "/api/match-rooms/"+roomID+"/match/start-turn", "", playerTokens[0])
-			if status := rr.Code; status != http.StatusOK {
-				t.Fatalf("call %d: status = %v, want %v", i+1, status, http.StatusOK)
-			}
-			if err := json.UnmarshalRead(rr.Body, &responses[i]); err != nil {
-				t.Fatalf("call %d: failed to decode response JSON payload: %v", i+1, err)
-			}
-		}
-
-		if !reflect.DeepEqual(responses[0].GameEvents, responses[1].GameEvents) {
-			t.Errorf("gameEvents differ between calls: %+v vs %+v", responses[0].GameEvents, responses[1].GameEvents)
-		}
-		if !responses[1].InSuddenDeath {
-			t.Errorf("Expected suddenDeath to be true on the repeat call")
-		}
-		if got, want := len(room.Match.WorkingState.Bombs), 2; got != want {
-			t.Errorf("bombs after two calls = %d, want %d", got, want)
-		}
-	})
-
-	t.Run("GET state carries the turn start events until the turn is resolved", func(t *testing.T) {
-		roomID, playerTokens, s, h := createSuddenDeathRoom(t)
-
-		getState := func() ClientMatchStateResponse {
-			t.Helper()
-			rr := doRequest(t, h.HandleGetMatchState, "GET /api/match-rooms/{roomID}/match/state", "GET", "/api/match-rooms/"+roomID+"/match/state", "", "")
-			var state ClientMatchStateResponse
-			if err := json.UnmarshalRead(rr.Body, &state); err != nil {
-				t.Fatalf("Failed to decode state: %v", err)
-			}
-
-			return state
-		}
-
-		firstEvents := getState().TurnStartEvents
-		if got, want := len(firstEvents), 2; got != want {
-			t.Errorf("turnStartEvents before start-turn = %+v, want %d", firstEvents, want)
-		}
-
-		rr := doRequest(t, h.HandleStartTurn, "POST /api/match-rooms/{roomID}/match/start-turn", "POST", "/api/match-rooms/"+roomID+"/match/start-turn", "", playerTokens[0])
-		var response StartTurnResponse
-		if err := json.UnmarshalRead(rr.Body, &response); err != nil {
-			t.Fatalf("Failed to decode response JSON payload: %v", err)
-		}
-
-		state := getState()
-		if !reflect.DeepEqual(state.TurnStartEvents, response.GameEvents) {
-			t.Errorf("turnStartEvents = %+v, want the response gameEvents %+v", state.TurnStartEvents, response.GameEvents)
-		}
-		hazards := make(map[engine.BombID]engine.Coordinate)
-		for _, bomb := range state.Bombs {
-			if bomb.OwnerID == engine.SystemUnitID {
-				hazards[bomb.ID] = bomb.Position
-			}
-		}
-		if len(hazards) != len(response.GameEvents) {
-			t.Fatalf("hazard bombs = %d, want %d", len(hazards), len(response.GameEvents))
-		}
-		for _, evt := range response.GameEvents {
-			if pos, ok := hazards[evt.BombID]; !ok || pos != *evt.Position {
-				t.Errorf("event %+v has no hazard bomb at its position; hazards = %+v", evt, hazards)
-			}
-		}
-
-		if _, _, err := s.ResolveTurn(roomID, playerTokens[0]); err != nil {
-			t.Fatalf("ResolveTurn() error = %v", err)
-		}
-		nextEvents := getState().TurnStartEvents
-		if got, want := len(nextEvents), 2; got != want {
-			t.Fatalf("turnStartEvents after resolve = %+v, want %d", nextEvents, want)
-		}
-		for _, evt := range nextEvents {
-			if slices.ContainsFunc(firstEvents, func(old engine.GameEvent) bool { return old.BombID == evt.BombID }) {
-				t.Errorf("turnStartEvents after resolve reuse bomb ID %v", evt.BombID)
-			}
-		}
-	})
-
-	testRouteFailures(t, failureRoute{
-		handler: (*Handler).HandleStartTurn,
-		pattern: "POST /api/match-rooms/{roomID}/match/start-turn",
-		cases:   failRoom | failMatch | failMissingAuth | failInvalidToken | failWrongTeam,
-	})
-
-	t.Run("Failure: failed to Encode", func(t *testing.T) {
-		roomID, playerTokens, _, h := createTestRoomWithMatch(t)
-
-		testEncodeFailure(t, testMux("POST /api/match-rooms/{roomID}/match/start-turn", h.HandleStartTurn),
-			func() *http.Request {
-				req, _ := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/start-turn", nil)
-				req.Header.Set("Content-Type", "application/json")
-				req.Header.Set("Authorization", "Bearer "+playerTokens[0])
-				return req
-			}, http.StatusOK)
-	})
-
-	t.Run("Test Contract", func(t *testing.T) {
-		roomID, playerTokens, _, h := createSuddenDeathRoom(t)
-
-		rr := doRequest(t, h.HandleStartTurn, "POST /api/match-rooms/{roomID}/match/start-turn", "POST", "/api/match-rooms/"+roomID+"/match/start-turn", "", playerTokens[0])
-
-		assertObjectContract(t, rr.Body.Bytes(),
-			[]string{"inSuddenDeath", "gameEvents"},
-			func(t *testing.T, raw map[string]any) {
-				t.Helper()
-				gameEventsBytes, err := json.Marshal(raw["gameEvents"])
-				if err != nil {
-					t.Fatalf("Failed to re-marshal gameEvents: %v", err)
-				}
-				assertArrayContract(t, gameEventsBytes,
-					[]string{"type", "unitId", "bombId", "position", "range", "countdown",
-						"newHp"},
-					func(t *testing.T, item map[string]any) {
-						t.Helper()
-						positionField, ok := item["position"].(map[string]any)
-						if !ok {
-							t.Fatalf("position is not an object: %#v", item["position"])
-						}
-						assertKeys(t, positionField, []string{"x", "y"}, "Contract Broken: position missing key '%s'")
-					})
-			})
-	})
-}
-
 func TestHandleConsumeCPUStatus(t *testing.T) {
 	unitID := engine.NewUnitID(1, 0)
 
@@ -530,13 +363,9 @@ func TestHandleResetTurn(t *testing.T) {
 			return state
 		}
 
-		rr := doRequest(t, h.HandleStartTurn, "POST /api/match-rooms/{roomID}/match/start-turn", "POST", "/api/match-rooms/"+roomID+"/match/start-turn", "", playerTokens[0])
-		var response StartTurnResponse
-		if err := json.UnmarshalRead(rr.Body, &response); err != nil {
-			t.Fatalf("Failed to decode response JSON payload: %v", err)
-		}
-		if len(response.GameEvents) == 0 {
-			t.Fatal("start-turn returned no hazard events")
+		wantEvents := getState().TurnStartEvents
+		if len(wantEvents) == 0 {
+			t.Fatal("state at creation has no hazard events")
 		}
 		byID := func(a, b *engine.Bomb) int { return cmp.Compare(a.ID, b.ID) }
 		bombsBefore := getState().Bombs
@@ -550,8 +379,8 @@ func TestHandleResetTurn(t *testing.T) {
 			t.Fatal("reset did not discard the planned action")
 		}
 		state := getState()
-		if !reflect.DeepEqual(state.TurnStartEvents, response.GameEvents) {
-			t.Errorf("turnStartEvents after reset = %+v, want the response gameEvents %+v", state.TurnStartEvents, response.GameEvents)
+		if !reflect.DeepEqual(state.TurnStartEvents, wantEvents) {
+			t.Errorf("turnStartEvents after reset = %+v, want %+v", state.TurnStartEvents, wantEvents)
 		}
 		slices.SortFunc(state.Bombs, byID)
 		if !reflect.DeepEqual(state.Bombs, bombsBefore) {
@@ -753,7 +582,6 @@ func TestHandleResolveTurn_SuddenDeathMatchEnd(t *testing.T) {
 	gameCfg := validGameCfg()
 	gameCfg.MaxTurns = 0
 	tokens := mustCreateMatch(t, s, roomID, gameCfg)
-	startTurnForTest(t, s, roomID, tokens[0])
 
 	room := mustRoom(t, s, roomID)
 	hazardCountdowns := make(map[engine.BombID]int)

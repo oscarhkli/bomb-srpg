@@ -4,6 +4,7 @@ import (
 	"bomb-srpg/engine"
 	"encoding/json/v2"
 	"net/http"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -96,6 +97,57 @@ func TestHandleGetMatchState(t *testing.T) {
 		}
 	})
 
+	t.Run("carries the turn start events until the turn is resolved", func(t *testing.T) {
+		roomID, tokens, s, h := createSuddenDeathRoom(t)
+
+		getState := func() ClientMatchStateResponse {
+			t.Helper()
+			rr := doRequest(t, h.HandleGetMatchState, "GET /api/match-rooms/{roomID}/match/state", "GET", "/api/match-rooms/"+roomID+"/match/state", "", "")
+			var state ClientMatchStateResponse
+			if err := json.UnmarshalRead(rr.Body, &state); err != nil {
+				t.Fatalf("Failed to decode state: %v", err)
+			}
+
+			return state
+		}
+
+		state := getState()
+		firstEvents := state.TurnStartEvents
+		if got, want := len(firstEvents), 2; got != want {
+			t.Fatalf("turnStartEvents at creation = %+v, want %d", firstEvents, want)
+		}
+		hazards := make(map[engine.BombID]engine.Coordinate)
+		for _, bomb := range state.Bombs {
+			if bomb.OwnerID == engine.SystemUnitID {
+				hazards[bomb.ID] = bomb.Position
+			}
+		}
+		if len(hazards) != len(firstEvents) {
+			t.Fatalf("hazard bombs = %d, want %d", len(hazards), len(firstEvents))
+		}
+		for _, evt := range firstEvents {
+			if pos, ok := hazards[evt.BombID]; !ok || pos != *evt.Position {
+				t.Errorf("event %+v has no hazard bomb at its position; hazards = %+v", evt, hazards)
+			}
+		}
+		if got := getState().TurnStartEvents; !reflect.DeepEqual(got, firstEvents) {
+			t.Errorf("second GET turnStartEvents = %+v, want %+v", got, firstEvents)
+		}
+
+		if _, _, err := s.ResolveTurn(roomID, tokens[0]); err != nil {
+			t.Fatalf("ResolveTurn() error = %v", err)
+		}
+		nextEvents := getState().TurnStartEvents
+		if got, want := len(nextEvents), 2; got != want {
+			t.Fatalf("turnStartEvents after resolve = %+v, want %d", nextEvents, want)
+		}
+		for _, evt := range nextEvents {
+			if slices.ContainsFunc(firstEvents, func(old engine.GameEvent) bool { return old.BombID == evt.BombID }) {
+				t.Errorf("turnStartEvents after resolve reuse bomb ID %v", evt.BombID)
+			}
+		}
+	})
+
 	testRouteFailures(t, failureRoute{
 		handler:  (*Handler).HandleGetMatchState,
 		pattern:  "GET /api/match-rooms/{roomID}/match/state",
@@ -128,7 +180,6 @@ func TestHandleGetMatchState(t *testing.T) {
 		tokens := mustCreateMatch(t, s, roomID, gameCfg)
 		unitID := engine.NewUnitID(1, 0)
 		pos := engine.Coordinate{X: 4, Y: 7}
-		startTurnForTest(t, s, roomID, tokens[0])
 		if _, err := s.SubmitTurnCommand(roomID, engine.NewPlaceBombCommand(unitID, pos), tokens[0]); err != nil {
 			t.Fatalf("SubmitTurnCommand(place bomb) error = %v", err)
 		}
