@@ -322,7 +322,7 @@ export async function watchBombs(page: Page): Promise<void> {
     interface BombScene {
       scene: { key: string };
       bombGraphicsById: Map<number, unknown>;
-      occupantObjects: { type: string }[];
+      occupantObjects: { type: string; active: boolean }[];
       children: { list: { type: string; depth: number; visible: boolean }[] };
     }
     const w = window as unknown as { __game?: Phaser.Game; __bombWatch: BombSample[] };
@@ -332,7 +332,7 @@ export async function watchBombs(page: Page): Promise<void> {
       if (scene?.scene.key === 'MatchScene') {
         const sample: BombSample = {
           drawn: scene.bombGraphicsById.size,
-          containers: scene.occupantObjects.filter(o => o.type === 'Container').length,
+          containers: scene.occupantObjects.filter(o => o.type === 'Container' && o.active).length,
           overlay: scene.children.list.some(
             o => o.type === 'Graphics' && o.depth === overlayDepth && o.visible
           ),

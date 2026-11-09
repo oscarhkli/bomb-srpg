@@ -5,11 +5,13 @@ import {
   clickMoveButton,
   clickText,
   clickUnit,
+  inputAccepted,
   matchState,
   readBombWatch,
   roomId,
   summariseCutscenes,
   teamUnit,
+  textVisible,
   waitForInput,
   waitForText,
   watchBombs,
@@ -59,6 +61,47 @@ test('VS CPU sudden death: hazards are drawn once per turn through the first CPU
   });
   expect(consumed.ok()).toBe(true);
   expect(((await consumed.json()) as CpuStatusResponse).turnPhase).toBe('TurnPhaseIdle');
+});
+
+test("VS CPU sudden death over three rounds keeps the drawn bombs equal to the server's", async ({
+  page,
+  request,
+}) => {
+  test.setTimeout(180_000);
+  await watchBombs(page);
+  const { room } = await startVsCpuRoom(page, request, 0);
+
+  for (const turn of [1, 3, 5, 7]) {
+    let outcome = 'wait';
+    await expect
+      .poll(
+        async () => {
+          const state = await matchState(request, room);
+          if (state.turn === turn && state.activeTeam === 1 && (await inputAccepted(page))) {
+            outcome = 'ready';
+          } else if (
+            (await textVisible(page, 'Winner...')) ||
+            (await textVisible(page, 'Draw Game'))
+          ) {
+            outcome = 'ended';
+          }
+          return outcome;
+        },
+        { message: `the human's turn ${turn} or the end screen`, timeout: 40_000 }
+      )
+      .not.toBe('wait');
+    test.skip(outcome === 'ended', 'match ended before turn 7');
+
+    const server = await matchState(request, room);
+    const sample = (await readBombWatch(page)).at(-1);
+    expect(sample, `bomb sample at turn ${turn}`).toMatchObject({
+      drawn: server.bombs.length,
+      containers: server.bombs.length,
+    });
+    if (turn < 7) {
+      await endTurn(page);
+    }
+  }
 });
 
 test('hot-seat sudden death drops the hazards once per turn, after the cutscene starts', async ({
