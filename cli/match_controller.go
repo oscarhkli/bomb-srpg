@@ -36,7 +36,7 @@ func (c *MatchController) StartInputLoop() {
 
 	for {
 		if c.Match.WorkingState.Turn != startedTurn {
-			c.View.RenderGameEvents(c.Match.StartTurn())
+			c.View.RenderGameEvents(c.Match.WorkingState.TurnStartEvents)
 			startedTurn = c.Match.WorkingState.Turn
 		}
 
