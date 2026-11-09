@@ -234,17 +234,17 @@ export async function clickAllowedTileNextTo(page: Page, unitId: number): Promis
   }
 }
 
-export function inputAccepted(page: Page): Promise<boolean> {
-  return page.evaluate(() => {
-    const scene = window.__game?.scene.getScenes(true)[0] as
-      { interactionsEnabled?: boolean; isSubmitting?: boolean } | undefined;
-    return scene?.interactionsEnabled === true && scene.isSubmitting === false;
-  });
-}
-
 export async function waitForInput(page: Page): Promise<void> {
   await expect
-    .poll(() => inputAccepted(page), { message: 'the match to accept input', timeout: 30_000 })
+    .poll(
+      () =>
+        page.evaluate(() => {
+          const scene = window.__game?.scene.getScenes(true)[0] as
+            { interactionsEnabled?: boolean; isSubmitting?: boolean } | undefined;
+          return scene?.interactionsEnabled === true && scene.isSubmitting === false;
+        }),
+      { message: 'the match to accept input', timeout: 30_000 }
+    )
     .toBe(true);
 }
 
@@ -322,7 +322,7 @@ export async function watchBombs(page: Page): Promise<void> {
     interface BombScene {
       scene: { key: string };
       bombGraphicsById: Map<number, unknown>;
-      occupantObjects: { type: string; active: boolean }[];
+      occupantObjects: { type: string }[];
       children: { list: { type: string; depth: number; visible: boolean }[] };
     }
     const w = window as unknown as { __game?: Phaser.Game; __bombWatch: BombSample[] };
@@ -332,7 +332,7 @@ export async function watchBombs(page: Page): Promise<void> {
       if (scene?.scene.key === 'MatchScene') {
         const sample: BombSample = {
           drawn: scene.bombGraphicsById.size,
-          containers: scene.occupantObjects.filter(o => o.type === 'Container' && o.active).length,
+          containers: scene.occupantObjects.filter(o => o.type === 'Container').length,
           overlay: scene.children.list.some(
             o => o.type === 'Graphics' && o.depth === overlayDepth && o.visible
           ),
