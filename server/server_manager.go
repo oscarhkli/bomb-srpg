@@ -366,7 +366,7 @@ func (s *ServerStateManager) SubmitTurnCommand(roomID string, cmd engine.TurnCom
 	return gameEvents, nil
 }
 
-// StartTurn starts the room's turn, launching CPU planning when it is the CPU's turn.
+// StartTurn launches CPU planning when it is the CPU's turn and none is running.
 // Returns whether sudden death is active and the hazard GameEvents.
 func (s *ServerStateManager) StartTurn(roomID, token string) (bool, []engine.GameEvent, error) {
 	room, err := s.loadRoom(roomID)
@@ -393,19 +393,26 @@ func (s *ServerStateManager) StartTurn(roomID, token string) (bool, []engine.Gam
 		return false, nil, fmt.Errorf("%w: match already ended", ErrMatchEnded)
 	}
 
-	if room.Match.GameCfg.VSCpu && teamID == 2 && room.Match.CPU.Phase != engine.TurnPhasePlanning {
-		room.Match.CPU.Phase = engine.TurnPhasePlanning
-		// A Ready phase here means the last turn's events were never consumed; they are stale.
-		room.Match.CPU.PlanGameEvents = nil
-		room.Match.CPU.ResolveTurnGameEvents = nil
-		go s.runCPUTurn(room, room.Match)
-	}
+	s.launchCPUTurnIfDueLocked(room)
 
 	room.LastActivity = time.Now()
 	return room.Match.WorkingState.InSuddenDeath, gameEvents, nil
 }
 
 const maxCPUReplanAttempts = 5
+
+// Phase Ready on team 2's turn is stale: the finished turn would have moved play to team 1 or set a winner.
+func (s *ServerStateManager) launchCPUTurnIfDueLocked(room *MatchRoom) {
+	match := room.Match
+	if !match.GameCfg.VSCpu || match.WinnerTeamID != 0 || match.WorkingState.ActiveTeam != engine.Team2 ||
+		match.CPU.Phase == engine.TurnPhasePlanning {
+		return
+	}
+	match.CPU.Phase = engine.TurnPhasePlanning
+	match.CPU.PlanGameEvents = nil
+	match.CPU.ResolveTurnGameEvents = nil
+	go s.runCPUTurn(room, match)
+}
 
 // runCPUTurn plays the CPU's turn to completion, holding the room lock throughout.
 // It abandons if the match was replaced, deleted, or already won while the goroutine was queued.
@@ -469,7 +476,8 @@ func applyPlan(match *engine.Match, plan []engine.TurnCommand) error {
 	return nil
 }
 
-// ConsumeCPUStatus returns the CPU turn phase and events; a Ready phase resets to Idle.
+// ConsumeCPUStatus returns the CPU turn phase and events, and resets a Ready phase to Idle.
+// It launches the CPU turn first if one is due.
 func (s *ServerStateManager) ConsumeCPUStatus(roomID, token string) (engine.CPUTurnPhase, []engine.GameEvent, []engine.GameEvent, error) {
 	room, err := s.loadRoom(roomID)
 	if err != nil {
@@ -487,6 +495,8 @@ func (s *ServerStateManager) ConsumeCPUStatus(roomID, token string) (engine.CPUT
 	if err := room.validateAnyMatchPlayerToken(token); err != nil {
 		return 0, nil, nil, err
 	}
+
+	s.launchCPUTurnIfDueLocked(room)
 
 	turnPhase := room.Match.CPU.Phase
 	planGameEvents, resolveTurnGameEvents := room.Match.CPU.PlanGameEvents, room.Match.CPU.ResolveTurnGameEvents
