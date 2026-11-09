@@ -1255,7 +1255,7 @@ describe('MatchScene', () => {
     });
 
     describe('hazard cutscene guard', () => {
-      it('plays the cutscene once with the start-turn events', async () => {
+      it('plays the cutscene once with the turnStartEvents', async () => {
         queueMatchStates(hazardState());
 
         await bootScene();
@@ -1298,7 +1298,7 @@ describe('MatchScene', () => {
         expect(suddenDeathCutscenePlay).toHaveBeenCalledOnce();
       });
 
-      it('draws no hazard before the cutscene, and plays it once, after a CPU poll failure lands on the next turn', async () => {
+      it('draws no hazard before the cutscene, and plays it once, after a CPU poll recovery lands on the next turn', async () => {
         vi.mocked(getMatchConfig).mockResolvedValue(makeCfg({ vsCpu: true }));
         const nextHazardEvents = [
           makeBombPlacedEvent({ bombId: 3, position: { x: 0, y: 0 } }),
