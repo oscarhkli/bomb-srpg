@@ -200,17 +200,6 @@ func (gs *GameState) IsLandingLegal(target Coordinate, _ OccupantType) error {
 	return nil
 }
 
-// StartTurn returns the hazard events for the current turn.
-// It changes no state; a repeat call in the same turn returns the same events.
-func (m *Match) StartTurn() []GameEvent {
-	gameEvents := cloneGameEvents(m.WorkingState.TurnStartEvents)
-	if gameEvents == nil {
-		return []GameEvent{}
-	}
-
-	return gameEvents
-}
-
 // beginTurn runs once per turn, with PlaybackLog empty.
 func (m *Match) beginTurn() {
 	m.WorkingState.TurnStartEvents = nil
