@@ -61,7 +61,7 @@ import type {
 } from '../api/types';
 
 type CpuPollResult =
-  { ok: true; status: CpuStatusResponse } | { ok: false; reason: 'timeout' | 'idle' };
+  { ok: true; status: CpuStatusResponse } | { ok: false; reason: 'timeout' | 'idle' | 'error' };
 
 export interface MatchSceneData {
   roomId: string;
@@ -272,7 +272,13 @@ export default class MatchScene extends Phaser.Scene {
     const startedAt = Date.now();
     let attempt = 0;
     for (;;) {
-      const resp = await consumeCpuStatus();
+      let resp: CpuStatusResponse;
+      try {
+        resp = await consumeCpuStatus();
+      } catch (err) {
+        console.error('consumeCpuStatus() failed during a CPU turn', err);
+        return { ok: false, reason: 'error' };
+      }
       if (gen !== this.generation) {
         return { ok: false, reason: 'timeout' };
       }

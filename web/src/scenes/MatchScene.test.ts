@@ -1713,6 +1713,23 @@ describe('MatchScene', () => {
       expect(turnBannerPlay).toHaveBeenCalledTimes(2);
     });
 
+    it('runs the same recovery when consumeCpuStatus rejects', async () => {
+      queueMatchStates(
+        makeState({ grid: [[plainTile()]], activeTeam: 2, turn: 1 }),
+        makeState({ grid: [[plainTile()]], activeTeam: 1, turn: 2 })
+      );
+      vi.mocked(consumeCpuStatus).mockRejectedValue(new Error('network fail'));
+      vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+      await bootScene();
+      fireCameraFadeOutComplete();
+      await flush();
+
+      expect(getMatchState).toHaveBeenCalledTimes(4);
+      expect(playResolveTurnEvents).not.toHaveBeenCalled();
+      expect(turnBannerPlay).toHaveBeenCalledTimes(2);
+    });
+
     it('resolves a backoff wait via its own shutdown listener, not just the scheduled timer', async () => {
       queueMatchStates(
         makeState({ grid: [[plainTile()]], activeTeam: 2, turn: 1 }),
