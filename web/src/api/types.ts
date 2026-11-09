@@ -171,11 +171,6 @@ export interface AllowedTilesRequest {
 
 export type AllowedTilesResponse = Coordinate[];
 
-export interface StartTurnResponse {
-  inSuddenDeath: boolean;
-  gameEvents: GameEvent[];
-}
-
 export interface ResolveTurnResponse {
   planGameEvents: GameEvent[];
   resolveTurnGameEvents: GameEvent[];

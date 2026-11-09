@@ -9,7 +9,6 @@ import type {
   AllowedTilesRequest,
   AllowedTilesResponse,
   GameCfg,
-  StartTurnResponse,
   Catalog,
   CpuStatusResponse,
   ResolveTurnResponse,
@@ -118,15 +117,6 @@ export async function getMatchState(): Promise<GameState> {
   const roomId = requireRoomId();
   const res = await fetch(buildUrl(`/api/match-rooms/${roomId}/match/state`));
   return handleResponse<GameState>(res);
-}
-
-export async function startTurn(): Promise<StartTurnResponse> {
-  const roomId = requireRoomId();
-  const res = await fetch(buildUrl(`/api/match-rooms/${roomId}/match/start-turn`), {
-    method: 'POST',
-    headers: authHeaders(),
-  });
-  return handleResponse<StartTurnResponse>(res);
 }
 
 export async function consumeCpuStatus(): Promise<CpuStatusResponse> {

@@ -7,7 +7,6 @@ import {
   createMatchRoom,
   createMatch,
   getMatchState,
-  startTurn,
   consumeCpuStatus,
   submitTurnCommand,
   resetTurn,
@@ -18,14 +17,13 @@ import {
   rematch,
   deleteMatch,
 } from './client';
-import { makeState, makeCfg, makeBombPlacedEvent } from '../test/fixtures';
+import { makeState, makeCfg } from '../test/fixtures';
 import type {
   Archetype,
   GameState,
   GameEvent,
   GameCfg,
   TurnCommand,
-  StartTurnResponse,
   StagePreset,
   Catalog,
   CpuStatusResponse,
@@ -215,34 +213,6 @@ describe('api.ts', () => {
       expect(error).toBeInstanceOf(ApiError);
       expect((error as ApiError).status).toBe(404);
       expect((error as ApiError).message).toBe('match not found');
-    });
-  });
-
-  describe('startTurn', () => {
-    const gameEventFixture: GameEvent[] = [
-      makeBombPlacedEvent({ position: { x: 1, y: 0 }, range: 1, countdown: 5 }),
-    ];
-    const fixture: StartTurnResponse = {
-      inSuddenDeath: false,
-      gameEvents: gameEventFixture,
-    };
-
-    it('should POST with Authorization header and return startTurnResponse', async () => {
-      mockOk(200, fixture);
-
-      const result = await startTurn();
-
-      expect(result).toEqual(fixture);
-      const [, options] = mockFetch.mock.calls[0] as [string, RequestInit];
-      expect(options.headers).toHaveProperty('Authorization', 'Bearer test-token-abc');
-    });
-
-    it('should throw ApiError on invalid token', async () => {
-      mockErr(401, 'invalid player token');
-
-      const error = await startTurn().catch((e: unknown) => e);
-      expect(error).toBeInstanceOf(ApiError);
-      expect((error as ApiError).status).toBe(401);
     });
   });
 
