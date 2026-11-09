@@ -47,7 +47,6 @@
   - [x] List Archetypes
   - [x] New Match with user-defined Game Config
 - [x] HTTP Handlers for Turn resolution and Match lifecycle
-  - [x] Start Turn
   - [x] Reset
   - [x] Commit
   - [x] Surrender with delete Match
