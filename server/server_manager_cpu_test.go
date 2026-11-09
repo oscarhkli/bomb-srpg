@@ -141,7 +141,7 @@ func TestApplyPlan(t *testing.T) {
 	}
 }
 
-func TestServerStateManager_StartTurn_CPUTurn(t *testing.T) {
+func TestServerStateManager_ConsumeCPUStatus_LaunchesCPUTurn(t *testing.T) {
 	humanUnitID := engine.NewUnitID(1, 0)
 	cpuUnitID := engine.NewUnitID(2, 0)
 
@@ -160,6 +160,7 @@ func TestServerStateManager_StartTurn_CPUTurn(t *testing.T) {
 		name           string
 		vsCpu          bool
 		maxTurns       int
+		startTurn      bool
 		setup          func(t *testing.T, room *MatchRoom) int
 		plan           func(gs *engine.GameState, call int) []engine.TurnCommand
 		wantCPUTurn    bool
@@ -291,6 +292,31 @@ func TestServerStateManager_StartTurn_CPUTurn(t *testing.T) {
 			},
 		},
 		{
+			name:      "StartTurn Launches",
+			vsCpu:     true,
+			startTurn: true,
+			setup:     cpuTurnPending,
+			plan: func(gs *engine.GameState, call int) []engine.TurnCommand {
+				return legalCPUMove
+			},
+			wantCPUTurn:    true,
+			wantCalls:      1,
+			wantActiveTeam: 1,
+		},
+		{
+			name:  "Match Ended",
+			vsCpu: true,
+			setup: func(t *testing.T, room *MatchRoom) int {
+				t.Helper()
+				tokenIdx := cpuTurnPending(t, room)
+				room.Match.WinnerTeamID = 1
+				return tokenIdx
+			},
+			wantCPUTurn:    false,
+			wantCalls:      0,
+			wantActiveTeam: 2,
+		},
+		{
 			name:           "Not VS CPU",
 			vsCpu:          false,
 			setup:          cpuTurnPending,
@@ -325,8 +351,12 @@ func TestServerStateManager_StartTurn_CPUTurn(t *testing.T) {
 			decider := &recordingDecider{match: room.Match, plan: tt.plan, called: make(chan struct{}, 1)}
 			s.decide = decider.decide
 
-			if _, _, err := s.StartTurn(roomID, tokens[tokenIdx]); err != nil {
-				t.Fatalf("StartTurn() error = %v", err)
+			if tt.startTurn {
+				if _, _, err := s.StartTurn(roomID, tokens[tokenIdx]); err != nil {
+					t.Fatalf("StartTurn() error = %v", err)
+				}
+			} else {
+				consumeAndCheckPhase(t, s, roomID, tokens[tokenIdx], tt.wantCPUTurn)
 			}
 
 			if tt.wantCPUTurn {
@@ -359,6 +389,78 @@ func TestServerStateManager_StartTurn_CPUTurn(t *testing.T) {
 				tt.validate(t, room, decider)
 			}
 		})
+	}
+}
+
+func consumeAndCheckPhase(t *testing.T, s *ServerStateManager, roomID string, token string, wantCPUTurn bool) {
+	t.Helper()
+	turnPhase, planGameEvents, resolveTurnGameEvents, err := s.ConsumeCPUStatus(roomID, token)
+	if err != nil {
+		t.Fatalf("ConsumeCPUStatus() error = %v", err)
+	}
+	wantTurnPhase := engine.TurnPhaseIdle
+	if wantCPUTurn {
+		wantTurnPhase = engine.TurnPhasePlanning
+	}
+	if turnPhase != wantTurnPhase {
+		t.Errorf("ConsumeCPUStatus() turnPhase = %v, want %v", turnPhase, wantTurnPhase)
+	}
+	if wantCPUTurn && (len(planGameEvents) != 0 || len(resolveTurnGameEvents) != 0) {
+		t.Errorf("ConsumeCPUStatus() events = %#v and %#v, want none while planning", planGameEvents, resolveTurnGameEvents)
+	}
+}
+
+func TestServerStateManager_ConsumeCPUStatus_InvalidToken(t *testing.T) {
+	roomID, _, s := newCPUTurnRoom(t)
+	room := mustRoom(t, s, roomID)
+	decider := &recordingDecider{match: room.Match, called: make(chan struct{}, 1)}
+	s.decide = decider.decide
+
+	if _, _, _, err := s.ConsumeCPUStatus(roomID, "wrong"); !errors.Is(err, ErrInvalidToken) {
+		t.Fatalf("ConsumeCPUStatus() error = %v, want %v", err, ErrInvalidToken)
+	}
+
+	room.mu.RLock()
+	defer room.mu.RUnlock()
+	if got := decider.calls; got != 0 {
+		t.Errorf("decide calls = %d, want 0", got)
+	}
+	if got, want := room.Match.CPU.Phase, engine.TurnPhaseIdle; got != want {
+		t.Errorf("Phase = %v, want %v", got, want)
+	}
+}
+
+func TestServerStateManager_launchCPUTurnIfDueLocked_LaunchesOnce(t *testing.T) {
+	cpuUnitID := engine.NewUnitID(2, 0)
+	roomID, _, s := newCPUTurnRoom(t)
+	room := mustRoom(t, s, roomID)
+	decider := &recordingDecider{match: room.Match, called: make(chan struct{}, 1)}
+	s.decide = decider.decide
+
+	marker := engine.NewUnitMovedEvent(cpuUnitID, engine.Coordinate{X: 0, Y: 0}, engine.Coordinate{X: 1, Y: 0})
+
+	room.mu.Lock()
+	s.launchCPUTurnIfDueLocked(room)
+	room.Match.CPU.PlanGameEvents = []engine.GameEvent{marker}
+	s.launchCPUTurnIfDueLocked(room)
+	if got, want := room.Match.CPU.Phase, engine.TurnPhasePlanning; got != want {
+		t.Errorf("Phase = %v, want %v", got, want)
+	}
+	if got := room.Match.CPU.PlanGameEvents; !hasGameEvent(got, engine.GameEvtUnitMoved, cpuUnitID) {
+		t.Errorf("PlanGameEvents = %#v, want the marker kept by the second call", got)
+	}
+	room.mu.Unlock()
+
+	select {
+	case <-decider.called:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Timed out waiting for the CPU goroutine to invoke decide")
+	}
+
+	room.mu.Lock()
+	defer room.mu.Unlock()
+	if got, want := decider.calls, 1; got != want {
+		t.Errorf("decide calls = %d, want %d", got, want)
 	}
 }
 
@@ -501,9 +603,8 @@ func TestServerStateManager_ReadsDuringCPUTurn(t *testing.T) {
 }
 
 func TestServerStateManager_runCPUTurn_Panic(t *testing.T) {
-	roomID, tokens, s := createTestRoomWithCfg(t, vsCpuGameCfg())
+	roomID, tokens, s := newCPUTurnRoom(t)
 	room := mustRoom(t, s, roomID)
-	room.Match.WorkingState.ActiveTeam = 2
 	room.Match.CPU.Phase = engine.TurnPhasePlanning
 	match := room.Match
 
@@ -514,7 +615,7 @@ func TestServerStateManager_runCPUTurn_Panic(t *testing.T) {
 	if got, want := match.CPU.Phase, engine.TurnPhaseReady; got != want {
 		t.Errorf("Expected phase %v after the panic, got %v", want, got)
 	}
-	if got, want := match.TrueState.Turn, 2; got != want {
+	if got, want := match.TrueState.Turn, 3; got != want {
 		t.Errorf("Expected the forfeited turn to still advance to %d, got %d", want, got)
 	}
 
