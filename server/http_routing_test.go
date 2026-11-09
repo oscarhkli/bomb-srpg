@@ -166,30 +166,6 @@ func TestHTTPRouting(t *testing.T) {
 			wantStatus: http.StatusMethodNotAllowed,
 		},
 		{
-			name:       "POST /api/match-rooms/{roomID}/match/start-turn (404 - no room)",
-			method:     "POST",
-			path:       "/api/match-rooms/DUMMY/match/start-turn",
-			wantStatus: http.StatusNotFound,
-		},
-		{
-			name:       "GET /api/match-rooms/{roomID}/match/start-turn (405)",
-			method:     "GET",
-			path:       "/api/match-rooms/DUMMY/match/start-turn",
-			wantStatus: http.StatusMethodNotAllowed,
-		},
-		{
-			name:       "PUT /api/match-rooms/{roomID}/match/start-turn (405)",
-			method:     "PUT",
-			path:       "/api/match-rooms/DUMMY/match/start-turn",
-			wantStatus: http.StatusMethodNotAllowed,
-		},
-		{
-			name:       "DELETE /api/match-rooms/{roomID}/match/start-turn (405)",
-			method:     "DELETE",
-			path:       "/api/match-rooms/DUMMY/match/start-turn",
-			wantStatus: http.StatusMethodNotAllowed,
-		},
-		{
 			name:       "POST /api/match-rooms/{roomID}/match/reset (404 - no room)",
 			method:     "POST",
 			path:       "/api/match-rooms/DUMMY/match/reset",
@@ -365,8 +341,7 @@ func TestHTTPRouting(t *testing.T) {
 			if body != nil {
 				req.Header.Set("Content-Type", "application/json")
 			}
-			if strings.Contains(tt.name, "turn-commands") || strings.Contains(tt.name, "start-turn") ||
-				strings.Contains(tt.name, "reset") || strings.Contains(tt.name, "resolve") ||
+			if strings.Contains(tt.name, "turn-commands") || strings.Contains(tt.name, "reset") || strings.Contains(tt.name, "resolve") ||
 				strings.Contains(tt.name, "cpu-status") ||
 				strings.Contains(tt.name, "surrender") || strings.Contains(tt.name, "rematch") ||
 				(tt.method == http.MethodDelete && strings.HasSuffix(tt.path, "/match")) {
@@ -387,5 +362,20 @@ func TestHTTPRouting(t *testing.T) {
 
 			_, _ = io.Copy(io.Discard, resp.Body)
 		})
+	}
+}
+
+func TestStartTurnRouteRemoved(t *testing.T) {
+	roomID, tokens, s := createTestRoom(t)
+	mux := http.NewServeMux()
+	RegisterRoutes(mux, NewHandler(s))
+
+	req := httptest.NewRequest(http.MethodPost, "/api/match-rooms/"+roomID+"/match/start-turn", nil)
+	req.Header.Set("Authorization", "Bearer "+tokens[0])
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+
+	if got, want := rr.Code, http.StatusNotFound; got != want {
+		t.Errorf("POST start-turn status = %d, want %d", got, want)
 	}
 }

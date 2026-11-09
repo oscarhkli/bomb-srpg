@@ -241,32 +241,6 @@ func (h *Handler) HandleSubmitTurnCommand(w http.ResponseWriter, r *http.Request
 	h.writeJSON(w, http.StatusOK, gameEvents, "encode gameEvents failed")
 }
 
-// StartTurnResponse is returned to provide the result of Sudden Death.
-type StartTurnResponse struct {
-	InSuddenDeath bool               `json:"inSuddenDeath"`
-	GameEvents    []engine.GameEvent `json:"gameEvents"`
-}
-
-// HandleStartTurn starts the room's turn.
-func (h *Handler) HandleStartTurn(w http.ResponseWriter, r *http.Request) {
-	roomID := r.PathValue("roomID")
-
-	token, ok := h.requireToken(w, r)
-	if !ok {
-		return
-	}
-
-	inSuddenDeath, gameEvents, err := h.Manager.StartTurn(roomID, token)
-	if err != nil {
-		h.handleError(w, err, "start turn failed", "roomID", roomID)
-		return
-	}
-	h.Logger.Debug("start turn", "roomID", roomID, "gameEvents", gameEvents)
-
-	res := StartTurnResponse{InSuddenDeath: inSuddenDeath, GameEvents: gameEvents}
-	h.writeJSON(w, http.StatusOK, res, "encode start turn response failed")
-}
-
 // CPUStatusResponse wraps CPUTurnPhase and the CPU turn's gameEvents, split by phase so the
 // client can animate the CPU's actions and their resolution apart.
 type CPUStatusResponse struct {

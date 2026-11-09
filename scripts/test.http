@@ -88,11 +88,6 @@ Authorization: Bearer {{token1}}
 }
 
 
-### Start Turn
-POST {{baseUrl}}/api/match-rooms/{{roomId}}/match/start-turn
-Authorization: Bearer {{token1}}
-
-
 ### Reset Turn
 POST {{baseUrl}}/api/match-rooms/{{roomId}}/match/reset
 Authorization: Bearer {{token1}}
