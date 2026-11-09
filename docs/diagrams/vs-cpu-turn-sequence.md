@@ -15,28 +15,29 @@ sequenceDiagram
     activate SV
     SV->>SV: lock room mutex
     SV->>EN: match.ResolveTurn()  — human
+    EN->>EN: begin the CPU's turn, place hazard bombs<br/>(none unless Turn > MaxTurns)
     EN-->>SV: plan + resolveTurn GameEvents (human)<br/>TrueState committed, ActiveTeam → 2
     SV->>SV: unlock room mutex
     SV-->>FE: 200 OK, GameEvents (human)<br/>concatenated until p4-spec009
     deactivate SV
     FE->>FE: play GameEvents (human)
 
-    FE->>SV: POST /start-turn  (token for ActiveTeam 2)
-    activate SV
-    SV->>SV: lock room mutex
-    SV->>EN: match.StartTurn()  — opens the CPU's turn
-    EN-->>SV: hazard GameEvents + InSuddenDeath<br/>(empty unless Turn > MaxTurns)
-    SV->>SV: VsCpu && ActiveTeam == 2 && Phase != Planning ?
-    SV->>SV: CPU.Phase = TurnPhasePlanning
-    SV->>GO: go runCPUTurn(match)
-    SV->>SV: unlock room mutex
-    SV-->>FE: 200 OK, { inSuddenDeath, gameEvents }
-    deactivate SV
+    FE->>SV: GET /state
+    SV-->>FE: state with hazard bombs and turnStartEvents
 
     par frontend animates the turn opening
         FE->>FE: sudden-death cutscene (if inSuddenDeath)
         FE->>FE: turn banner (CPU's turn)
-    and CPU plans concurrently
+    and first consume launches the CPU turn
+        FE->>SV: POST /cpu-status/consume  (either player's token)
+        activate SV
+        SV->>SV: lock room mutex
+        SV->>SV: VsCpu && ActiveTeam == 2 && Phase != Planning ?
+        SV->>SV: CPU.Phase = TurnPhasePlanning
+        SV->>GO: go runCPUTurn(match)
+        SV->>SV: unlock room mutex
+        SV-->>FE: phase: planning
+        deactivate SV
         GO->>GO: lock room mutex
         GO->>CP: Decide(WorkingState)  — post-hazard board
         CP-->>GO: plan []TurnCommand
@@ -50,7 +51,7 @@ sequenceDiagram
         GO->>GO: unlock room mutex
     end
 
-    FE->>SV: POST /cpu-status/consume
+    FE->>SV: POST /cpu-status/consume  (repeats until ready)
     Note over SV,GO: blocks on the room mutex while runCPUTurn<br/>holds it — a de facto long-poll
     SV-->>FE: phase: ready, planGameEvents + resolveTurnGameEvents
     Note over SV: read-and-clear —<br/>both slices flushed, Phase → TurnPhaseIdle
@@ -61,9 +62,9 @@ sequenceDiagram
 
 1. `ResolveTurn()` runs twice, but never concurrently with itself — the calls sit inside the same room mutex, never overlapping in wall-clock time. The human call fully commits `TrueState` and releases the lock before the goroutine is ever scheduled, so the goroutine reads the human's committed result, not a stale copy.
    It returns two slices: the events accumulated during planning, and those produced by the resolution itself (`MatchEndedEvent` included). The split is positional, not type-based — `ResolveTurn()` drains `PlaybackLog` before detonating, so planning events cannot leak into the second slice regardless of which types either phase emits.
-2. The CPU's turn opens exactly like the human's, through `POST /start-turn`. Sudden-death injection lives only in `Match.StartTurn()`, so launching the goroutine from anywhere earlier would have `Decide()` planning against a board missing that turn's hazards. `Phase` must flip to `TurnPhasePlanning` before the mutex unlocks — otherwise a poll landing between unlock and goroutine-start reads a stale `TurnPhaseIdle` and the frontend thinks there's nothing to wait for. The `Phase != TurnPhasePlanning` guard keeps a repeated `/start-turn` from launching a second goroutine; a `TurnPhaseReady` left behind by a missed consume is stale at this point, so its `ResolveTurnGameEvents` are dropped rather than allowed to suppress the launch.
-3. The client holds both player tokens and selects by `ActiveTeam`, so it authenticates the CPU's `/start-turn` with team 2's token under the existing rule — no relaxation, and `StartTurnResponse` is identical on both paths.
-4. Frontend flow: animate `GameEvents (human)` → `/start-turn` → animate hazards and banner → `/cpu-status/consume` → animate `planGameEvents`, pause, animate `resolveTurnGameEvents`. The pause stands in for the human pressing Resolve; without it the CPU's move and the explosion it triggers read as one event. `planning` is a legitimate response the client retries on: `/start-turn` flips `Phase` under the lock but launches the goroutine asynchronously, so a consume can acquire the room mutex first and see `planning` with no events. Once the goroutine holds the lock the consume blocks on it instead, so most calls return `ready` directly — the client cannot rely on either.
+2. The engine injects the CPU turn's hazards when it begins the turn, at the end of the human's `ResolveTurn()`, before anything launches the goroutine. `Decide()` therefore plans against a board that already holds them. The first `POST /cpu-status/consume` launches `runCPUTurn`. `Phase` flips to `TurnPhasePlanning` under the room lock before consume returns, so a later poll never reads a stale `TurnPhaseIdle`.
+3. The `Phase != TurnPhasePlanning` guard sits in consume. It keeps a repeated consume from launching a second goroutine. A `TurnPhaseReady` left behind by a missed consume is stale at this point, so its `ResolveTurnGameEvents` are dropped rather than allowed to suppress the launch.
+4. Consume takes either player's token, so the client authenticates it with the token it already holds. The client animates the human resolve, reads `GET /state` once, plays the hazard cutscene and banner from that state, then polls consume. The pause between the plan and resolve animations stands in for the human pressing Resolve; without it the CPU's move and the explosion it triggers read as one event. `planning` is a legitimate response the client retries on: the first consume flips `Phase` under the lock but launches the goroutine asynchronously, so a later consume can acquire the room mutex first and see `planning` with no events. Once the goroutine holds the lock the consume blocks on it instead, so most calls return `ready` directly. The client cannot rely on either.
 5. `cpu.Decide()` returns a full plan, not one command at a time — `runCPUTurn` applies it mechanically. `cpu` never pre-validates the plan against engine rules; `ApplyTurnCommand` is the sole authority. A failed apply mid-plan re-invokes `Decide()` against the now-current `WorkingState` for the remaining scope (bounded retries), rather than aborting outright or blindly continuing. See [Technical Design Spec §10](../design.md#10-vs-cpu) for the full rationale.
 6. `/cpu-status/consume` is `POST`, not `GET`: it read-and-clears both event slices on every call, breaking GET's idempotency guarantee. Upgrade path: an append-only event journal, decoupled from this mailbox and never cleared, would let a non-destructive `GET /cpu-status` return alongside it — swap method/route, drop the clear, no other change needed.
 

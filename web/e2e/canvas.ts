@@ -234,17 +234,17 @@ export async function clickAllowedTileNextTo(page: Page, unitId: number): Promis
   }
 }
 
+export function inputAccepted(page: Page): Promise<boolean> {
+  return page.evaluate(() => {
+    const scene = window.__game?.scene.getScenes(true)[0] as
+      { interactionsEnabled?: boolean; isSubmitting?: boolean } | undefined;
+    return scene?.interactionsEnabled === true && scene.isSubmitting === false;
+  });
+}
+
 export async function waitForInput(page: Page): Promise<void> {
   await expect
-    .poll(
-      () =>
-        page.evaluate(() => {
-          const scene = window.__game?.scene.getScenes(true)[0] as
-            { interactionsEnabled?: boolean; isSubmitting?: boolean } | undefined;
-          return scene?.interactionsEnabled === true && scene.isSubmitting === false;
-        }),
-      { message: 'the match to accept input', timeout: 30_000 }
-    )
+    .poll(() => inputAccepted(page), { message: 'the match to accept input', timeout: 30_000 })
     .toBe(true);
 }
 

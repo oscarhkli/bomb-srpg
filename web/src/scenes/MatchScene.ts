@@ -10,7 +10,6 @@ import {
   resolveTurn,
   resetTurn,
   surrender,
-  startTurn,
   rematch,
   deleteMatch,
   consumeCpuStatus,
@@ -218,9 +217,12 @@ export default class MatchScene extends Phaser.Scene {
       initToken(this.playerTokens[state.activeTeam - 1]!);
       this.refreshTurnPanelIfReady();
 
-      const resp = await startTurn();
-      if (gen !== this.generation) {
-        return;
+      const hazardEvents =
+        state.inSuddenDeath && hazardsUnplayed(state.turn, this.hazardsPlayedTurn)
+          ? state.turnStartEvents.filter(event => event.type === 'bombPlaced')
+          : undefined;
+      if (hazardEvents) {
+        this.hazardsPlayedTurn = state.turn;
       }
 
       void this.gameCfgPromise.then(cfg => {
@@ -237,16 +239,8 @@ export default class MatchScene extends Phaser.Scene {
         });
       });
 
-      if (resp.inSuddenDeath && hazardsUnplayed(state.turn, this.hazardsPlayedTurn)) {
-        this.hazardsPlayedTurn = state.turn;
-        this.gameState = await getMatchState();
-        if (gen !== this.generation) {
-          return;
-        }
-        const bombPlacedEvents = resp.gameEvents.filter(event => event.type === 'bombPlaced');
-        await this.suddenDeathCutscene.play(bombPlacedEvents, event =>
-          this.dropSuddenDeathBomb(event)
-        );
+      if (hazardEvents) {
+        await this.suddenDeathCutscene.play(hazardEvents, event => this.dropSuddenDeathBomb(event));
         if (gen !== this.generation) {
           return;
         }

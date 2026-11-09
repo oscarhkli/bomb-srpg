@@ -42,7 +42,7 @@
 - **Turn Secrecy Pattern**: Active turn planning is fully hidden from the opposing player to preserve the Turn Reset capability. Opponents see a passive waiting status during the planning phase.
 - **Unified Event Broadcast**: Upon turn commitment, the backend generates an identical chronological Action Queue array and distributes it to both clients.
 - **Frontend Queue Playback**: Clients process incoming batch payloads using a sequential async loop, ensuring both players watch animations unfold with perfect deterministic lockstep alignment.
-- **Engine-Driven Turn Start**: The engine begins every turn itself: turn 1 when the match is created, each later turn at the end of `ResolveTurn()`. Sudden-death bombs are placed at that moment and show up in `GET /match/state` as `turnStartEvents`, so the UI can render the state and animate the drops. The start-turn call only replays the stored events.
+- **Engine-Driven Turn Start**: The engine begins every turn itself: turn 1 when the match is created, each later turn at the end of `ResolveTurn()`. Sudden-death bombs are placed at that moment and show up in `GET /match/state` as `turnStartEvents`, so the UI can render the state and animate the drops.
 - **Turn Startup Sudden Death Checks**: The sudden-death rule runs when the engine begins a turn: from the turn after `Config.MaxTurns` onward it injects the sudden-death bombs before any player can input commands, unless the match has ended. Setting `MaxTurns = 0` forces sudden death from turn 1.
 - **Decoupled Analytical Queries**: Victory evaluations (`EvaluateVictoryConditions()`) are written as pure, read-only, stateless functions that return data structures without producing side effects. The top-level `ResolveTurn()` orchestrator handles updating properties and injecting the definitive termination token (`MatchEndedEvent`) into the public stream, allowing AI modules to securely query hypothetical sandboxes without corrupting telemetry arrays.
 - **Stateless Lounge-to-Game Manager**: Session lifetimes are managed via a `web.ServerStateManager`. The server starts in a "Lounge" state, dynamically allocates a match pointer (`engine.InitGame`) upon user action, and triggers a clean teardown (`ActiveMatch = nil`) upon match completion, returning to the Lounge.
@@ -105,8 +105,6 @@ The engine begins turn 1 when the match is created and the next turn at the end 
 4. `POST /resolve` → `ResolveTurn()`, returns events; the next turn has already begun
 5. Loop: `GET /state` → planning → `POST /resolve` → ...
 
-`POST /start-turn` only replays the stored `turnStartEvents`; it changes no state.
-
 Surrender: `POST /surrender` (either team, any time).
 
 ### 8.3 Key Decisions
@@ -134,7 +132,7 @@ Surrender: `POST /surrender` (either team, any time).
 
 ## 10. VS CPU
 
-- **VS-CPU Turn Handoff**: The CPU's turn runs in a goroutine kicked off from `StartTurn()`, buffering events on `Match.CPU` until the frontend polls them. See [VS-CPU Turn Sequence](diagrams/vs-cpu-turn-sequence.md).
+- **VS-CPU Turn Handoff**: The CPU's turn runs in a goroutine kicked off by the first `POST /cpu-status/consume` of the CPU's turn, buffering events on `Match.CPU` until the frontend polls them. See [VS-CPU Turn Sequence](diagrams/vs-cpu-turn-sequence.md).
 - **Boss Prologue over Full VS-COM**: the first CPU opponent is a single `RoleBoss` unit against a 5-unit human team. This is a narrower rules surface that ships single-player sooner and acs a future Tutorial/Story Mode.
 - **CPU Decision Boundary**: `cpu.Decide()` is a pure function. `server.runCPUTurn` is the sole caller, applying returned commands to the real `WorkingState` via `ApplyTurnCommand` under the room mutex.
 - **Propose-Then-Validate, Bounded Replan**: `cpu` never pre-validates a plan. `ApplyTurnCommand`'s legality checks are the sole authority, and a failed apply mid-plan triggers a re-`Decide()` for the remaining scope, bounded by `maxCPUReplanAttempts`, rather than being treated as a contract violation. A `Decide` error is logged and its commands are still applied.
@@ -180,4 +178,4 @@ To preserve strategic depth and prevent infinite execution exploits within a sin
   - Do nothing.
 - **Sandbox Verification**: These status restrictions operate entirely within the engine's `WorkingState` scratchpad.
   - Executing a `/reset` system command completely restores a unit's action availability flags.
-  - Transitioning via an authoritative `/commit` command completely flushes and refreshes these action limits back to zero inside `StartTurn()` for the upcoming round.
+  - Transitioning via an authoritative `/commit` command completely flushes and refreshes these action limits back to zero when the engine begins the next round.
