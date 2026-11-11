@@ -35,5 +35,8 @@
   },
   "dependencies": {
     "phaser": "^4.2.1"
+  },
+  "overrides": {
+    "minimatch": "^11.0.1"
   }
 }
