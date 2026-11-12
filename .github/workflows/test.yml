@@ -57,6 +57,16 @@ jobs:
           only-new-issues: true
           args: ./cli/... ./cmd/... ./cpu/... ./engine/... ./server/...
 
+  shell_lint:
+    name: "Lint Shell"
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Run shellcheck
+        run: make shell-lint
+
   web_tests:
     name: "Run Web Tests"
     runs-on: ubuntu-24.04

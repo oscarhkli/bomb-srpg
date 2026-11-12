@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := test
-.PHONY: fmt vet test test-race bench lint lint-all pre-push install-hooks coverage build build-server run run-server web-dev web-format web-typecheck web-test web-lint web-build web-e2e image-smoke web-coverage gen-spec-index
+.PHONY: fmt vet test test-race bench lint lint-all shell-lint pre-push install-hooks coverage build build-server run run-server web-dev web-format web-typecheck web-test web-lint web-build web-e2e image-smoke web-coverage gen-spec-index
 
 fmt:
 	go fmt ./...
@@ -21,6 +21,9 @@ lint:
 
 lint-all:
 	golangci-lint run --new-from-rev= ./cli/... ./cmd/... ./cpu/... ./engine/... ./server/...
+
+shell-lint:
+	shellcheck scripts/*.sh
 
 pre-push: lint test web-lint web-test
 
