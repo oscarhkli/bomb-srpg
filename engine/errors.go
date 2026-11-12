@@ -17,12 +17,12 @@ var (
 
 	ErrInvalidStagePreset   = errors.New("invalid stage preset")
 	ErrInvalidTeamSize      = errors.New("invalid team size")
-	ErrInvalidTeamFormation = errors.New("invalid team formation")
-	ErrInvalidMaxTurns      = errors.New("invalid max turns")
+	errInvalidTeamFormation = errors.New("invalid team formation")
+	errInvalidMaxTurns      = errors.New("invalid max turns")
 	ErrMissingKing          = errors.New("missing king")
 	ErrInvalidStageLayout   = errors.New("invalid stage layout")
 	ErrInvalidTerrain       = errors.New("invalid terrain")
-	ErrInvalidUnitRole      = errors.New("invalid unit role")
+	errInvalidUnitRole      = errors.New("invalid unit role")
 	ErrUnknownArchetype     = errors.New("unknown archetype")
 
 	ErrOutOfBounds = errors.New("out of bounds")

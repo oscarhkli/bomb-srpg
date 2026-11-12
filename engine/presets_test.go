@@ -147,7 +147,7 @@ func TestGetStagePreset(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, exists := GetStagePreset(tt.inputName)
+			_, exists := getStagePreset(tt.inputName)
 			if exists != tt.expectedExists {
 				t.Errorf("Expected exists to be %v, got %v", tt.expectedExists, exists)
 			}
@@ -168,7 +168,7 @@ func TestStagePresets_MaxTurnsBound(t *testing.T) {
 func TestStagePresets(t *testing.T) {
 	for _, s := range stagePresetsRegistry() {
 		t.Run(s.Name, func(t *testing.T) {
-			stagePreset, exists := GetStagePreset(s.Name)
+			stagePreset, exists := getStagePreset(s.Name)
 			if !exists {
 				t.Fatalf("Stage preset %s should exist", s.Name)
 			}
@@ -226,7 +226,7 @@ func TestStagePresets(t *testing.T) {
 func TestStagePrests_Sanity(t *testing.T) {
 	rule := MovementRule{
 		MaxSteps:        -1,
-		Pattern:         PatternCardinal,
+		Pattern:         patternCardinal,
 		CanTurn:         true,
 		PassPermissions: PassUnits | PassSoftBlocks | PassItems,
 	}
@@ -243,7 +243,7 @@ func TestStagePrests_Sanity(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			stagePreset, exists := GetStagePreset(s.Name)
+			stagePreset, exists := getStagePreset(s.Name)
 			if !exists {
 				t.Fatalf("Stage preset %s should exist", s.Name)
 			}

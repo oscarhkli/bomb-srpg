@@ -1,15 +1,14 @@
 package engine
 
-// IsWithinBounds checks if the given coordinate is within the grid boundaries.
-func (gs *GameState) IsWithinBounds(pos Coordinate) bool {
+func (gs *GameState) isWithinBounds(pos Coordinate) bool {
 	if len(gs.Grid) == 0 || len(gs.Grid[0]) == 0 {
 		return false
 	}
 	return pos.X >= 0 && pos.X < len(gs.Grid[0]) && pos.Y >= 0 && pos.Y < len(gs.Grid)
 }
 
-func (gs *GameState) ClearStageTile(pos Coordinate) {
-	if !gs.IsWithinBounds(pos) {
+func (gs *GameState) clearStageTile(pos Coordinate) {
+	if !gs.isWithinBounds(pos) {
 		return
 	}
 
@@ -18,7 +17,7 @@ func (gs *GameState) ClearStageTile(pos Coordinate) {
 }
 
 func (gs *GameState) UpdateStageOccupant(pos Coordinate, occupantType OccupantType, id int64) {
-	if !gs.IsWithinBounds(pos) {
+	if !gs.isWithinBounds(pos) {
 		return
 	}
 
@@ -26,7 +25,6 @@ func (gs *GameState) UpdateStageOccupant(pos Coordinate, occupantType OccupantTy
 	gs.Grid[pos.Y][pos.X].OccupantID = id
 }
 
-// DeduceBombCountDown returns the countdown for a newly placed bomb.
-func (gs *GameState) DeduceBombCountDown() int {
-	return BombDefaultCountDown
+func (gs *GameState) deduceBombCountDown() int {
+	return bombDefaultCountDown
 }

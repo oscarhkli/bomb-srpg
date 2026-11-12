@@ -1,10 +1,10 @@
 package engine
 
-// BombDefaultCountDown is the countdown in turns of a newly placed bomb.
-const BombDefaultCountDown int = 5
+// bombDefaultCountDown is the countdown in turns of a newly placed bomb.
+const bombDefaultCountDown int = 5
 
-// BombDefaultPower is the default explosion range in tiles.
-const BombDefaultPower int = 2
+// bombDefaultPower is the default explosion range in tiles.
+const bombDefaultPower int = 2
 
 // SuddenDeathBombs is the maximum number of bombs dropped per Sudden Death turn.
 const SuddenDeathBombs int = 2
@@ -20,7 +20,7 @@ func archetypesRegistry() []Archetype {
 			BombPower:    2,
 			MaxBombCount: 1,
 			BaseHP:       1,
-			PresetSkills: SkillNone,
+			PresetSkills: skillNone,
 			Selectable:   false,
 		},
 		{
@@ -31,7 +31,7 @@ func archetypesRegistry() []Archetype {
 			BombPower:    2,
 			MaxBombCount: 1,
 			BaseHP:       1,
-			PresetSkills: SkillNone,
+			PresetSkills: skillNone,
 			Selectable:   true,
 		},
 		{
@@ -42,7 +42,7 @@ func archetypesRegistry() []Archetype {
 			BombPower:    2,
 			MaxBombCount: 1,
 			BaseHP:       1,
-			PresetSkills: SkillNone,
+			PresetSkills: skillNone,
 			Selectable:   true,
 		},
 		{
@@ -53,7 +53,7 @@ func archetypesRegistry() []Archetype {
 			BombPower:    2,
 			MaxBombCount: 1,
 			BaseHP:       1,
-			PresetSkills: SkillNone,
+			PresetSkills: skillNone,
 			Selectable:   true,
 		},
 		{
@@ -64,7 +64,7 @@ func archetypesRegistry() []Archetype {
 			BombPower:    2,
 			MaxBombCount: 1,
 			BaseHP:       1,
-			PresetSkills: SkillNone,
+			PresetSkills: skillNone,
 			Selectable:   false,
 		},
 	}
@@ -160,8 +160,7 @@ func stagePresetsRegistry() []StagePreset {
 	}
 }
 
-// GetStagePreset returns the stage preset and whether it exists.
-func GetStagePreset(name string) (StagePreset, bool) {
+func getStagePreset(name string) (StagePreset, bool) {
 	for _, s := range stagePresetsRegistry() {
 		if s.Name == name {
 			return s, true
