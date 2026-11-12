@@ -9,10 +9,10 @@ import (
 )
 
 const (
-	Reset  = "\033[0m"
-	Red    = "\033[31m"
-	Green  = "\033[32m"
-	Yellow = "\033[33m"
+	reset  = "\033[0m"
+	red    = "\033[31m"
+	green  = "\033[32m"
+	yellow = "\033[33m"
 )
 
 type TerminalView struct {
@@ -23,9 +23,8 @@ func NewTerminalView(o io.Writer) *TerminalView {
 	return &TerminalView{output: o}
 }
 
-// RenderBoard prints a 2D ASCII grid representation of the map.
 // Not every terrain and occupant type is drawn; it is a debugging view.
-func (v *TerminalView) RenderBoard(gs *engine.GameState) error {
+func (v *TerminalView) renderBoard(gs *engine.GameState) error {
 	if gs == nil {
 		return errors.New("cannot render board: GameState pointer is nil")
 	}
@@ -34,7 +33,7 @@ func (v *TerminalView) RenderBoard(gs *engine.GameState) error {
 	}
 
 	v.renderLegend()
-	v.RenderTurnHeader(gs.Turn, gs.ActiveTeam)
+	v.renderTurnHeader(gs.Turn, gs.ActiveTeam)
 
 	fmt.Fprint(v.output, "Y\\X  ")
 	v.renderColumnNumbers(len(gs.Grid))
@@ -70,13 +69,13 @@ func (v *TerminalView) RenderBoard(gs *engine.GameState) error {
 
 func (v *TerminalView) renderLegend() {
 	fmt.Fprintln(v.output, "============== Command Instruction ==============")
-	fmt.Fprintf(v.output, "End Turn          : %s/commit%s\n", Yellow, Reset)
-	fmt.Fprintf(v.output, "Reset Current Turn: %s/reset%s\n", Yellow, Reset)
-	fmt.Fprintf(v.output, "Surrender         : %s/surrender%s\n", Yellow, Reset)
+	fmt.Fprintf(v.output, "End Turn          : %s/commit%s\n", yellow, reset)
+	fmt.Fprintf(v.output, "Reset Current Turn: %s/reset%s\n", yellow, reset)
+	fmt.Fprintf(v.output, "Surrender         : %s/surrender%s\n", yellow, reset)
 	fmt.Fprintln(v.output, "          ------- How to move -------")
-	fmt.Fprintf(v.output, "Move      : %smove <unit-ID> <target-X> <target-Y>%s\n", Yellow, Reset)
-	fmt.Fprintf(v.output, "Place Bomb: %sbomb <unit-ID> <target-X> <target-Y>%s\n", Yellow, Reset)
-	fmt.Fprintf(v.output, "Example   : %smove 16 4 7%s\n", Yellow, Reset)
+	fmt.Fprintf(v.output, "Move      : %smove <unit-ID> <target-X> <target-Y>%s\n", yellow, reset)
+	fmt.Fprintf(v.output, "Place Bomb: %sbomb <unit-ID> <target-X> <target-Y>%s\n", yellow, reset)
+	fmt.Fprintf(v.output, "Example   : %smove 16 4 7%s\n", yellow, reset)
 	fmt.Fprintln(v.output, "=================================================")
 }
 
@@ -108,8 +107,7 @@ func cellText(gs *engine.GameState, tile engine.Tile) (string, error) {
 	return "   ", nil
 }
 
-// RenderGameConfig prints the match configuration options to the console.
-func (v *TerminalView) RenderGameConfig(cfg *engine.GameCfg) error {
+func (v *TerminalView) renderGameConfig(cfg *engine.GameCfg) error {
 	if cfg == nil {
 		return errors.New("cannot render game config: GameCfg pointer is nil")
 	}
@@ -122,24 +120,24 @@ func (v *TerminalView) RenderGameConfig(cfg *engine.GameCfg) error {
 	return nil
 }
 
-func (v *TerminalView) RenderMessage(message string) {
+func (v *TerminalView) renderMessage(message string) {
 	fmt.Fprintf(v.output, "%s", message)
 }
 
-func (v *TerminalView) RenderFeedback(success bool, message string) {
+func (v *TerminalView) renderFeedback(success bool, message string) {
 	if success {
-		fmt.Fprintf(v.output, "%s%s%s\n", Green, message, Reset)
+		fmt.Fprintf(v.output, "%s%s%s\n", green, message, reset)
 	} else {
-		fmt.Fprintf(v.output, "%s%s%s\n", Red, message, Reset)
+		fmt.Fprintf(v.output, "%s%s%s\n", red, message, reset)
 	}
 }
 
-func (v *TerminalView) RenderTurnHeader(turn, activeTeamID int) {
+func (v *TerminalView) renderTurnHeader(turn, activeTeamID int) {
 	fmt.Fprintf(v.output, "\n--- TURN %d PLAYER %d ---\n\n", turn, activeTeamID)
 }
 
-func (v *TerminalView) RenderGameEvents(gameEvents []engine.GameEvent) {
+func (v *TerminalView) renderGameEvents(gameEvents []engine.GameEvent) {
 	for _, evt := range gameEvents {
-		v.RenderMessage(fmt.Sprintf("%#v\n", evt))
+		v.renderMessage(fmt.Sprintf("%#v\n", evt))
 	}
 }

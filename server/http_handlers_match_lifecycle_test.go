@@ -21,7 +21,7 @@ func TestHandleCreateMatchRoom(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		http.HandlerFunc(h.HandleCreateMatchRoom).ServeHTTP(rr, req)
+		http.HandlerFunc(h.handleCreateMatchRoom).ServeHTTP(rr, req)
 
 		if status := rr.Code; status != http.StatusCreated {
 			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusCreated)
@@ -32,7 +32,7 @@ func TestHandleCreateMatchRoom(t *testing.T) {
 			t.Errorf("Handler returned wrong content type: got %v want %v", contentType, expectedHeader)
 		}
 
-		var response CreateMatchRoomResponse
+		var response createMatchRoomResponse
 		if err := json.UnmarshalRead(rr.Body, &response); err != nil {
 			t.Fatalf("Failed to decode response JSON payload: %v", err)
 		}
@@ -43,7 +43,7 @@ func TestHandleCreateMatchRoom(t *testing.T) {
 	})
 
 	t.Run("Failure: failed to Encode", func(t *testing.T) {
-		testEncodeFailure(t, http.HandlerFunc(h.HandleCreateMatchRoom),
+		testEncodeFailure(t, http.HandlerFunc(h.handleCreateMatchRoom),
 			func() *http.Request {
 				req, _ := http.NewRequest("POST", "/api/match-rooms", nil)
 				return req
@@ -54,7 +54,7 @@ func TestHandleCreateMatchRoom(t *testing.T) {
 		req, _ := http.NewRequest("POST", "/api/match-rooms", nil)
 		rr := httptest.NewRecorder()
 
-		http.HandlerFunc(h.HandleCreateMatchRoom).ServeHTTP(rr, req)
+		http.HandlerFunc(h.handleCreateMatchRoom).ServeHTTP(rr, req)
 
 		assertObjectContract(t, rr.Body.Bytes(), []string{"id"}, nil)
 	})
@@ -65,7 +65,7 @@ func TestHandleCreateMatchRoom(t *testing.T) {
 
 		roomIDs := []string{"ID001", "ID002", "ID003", "ID004", "ID005"}
 		for _, id := range roomIDs {
-			s.Rooms.Store(id, &MatchRoom{ID: id})
+			s.Rooms.Store(id, &matchRoom{ID: id})
 		}
 		callCount := 0
 		s.generateRoomID = func(int) (string, error) {
@@ -80,7 +80,7 @@ func TestHandleCreateMatchRoom(t *testing.T) {
 		req, _ := http.NewRequest("POST", "/api/match-rooms", nil)
 		rr := httptest.NewRecorder()
 
-		http.HandlerFunc(h.HandleCreateMatchRoom).ServeHTTP(rr, req)
+		http.HandlerFunc(h.handleCreateMatchRoom).ServeHTTP(rr, req)
 
 		if status := rr.Code; status != http.StatusInternalServerError {
 			t.Errorf("Expected 500, got %d", status)
@@ -98,8 +98,8 @@ func TestHandleCreateNewMatch(t *testing.T) {
 		roomID, s, h := newTestRoom(t)
 
 		gameCfg := validGameCfg()
-		jsonBody, _ := json.Marshal(CreateMatchRequest{GameCfg: gameCfg})
-		rr := doRequest(t, h.HandleCreateMatch, "POST /api/match-rooms/{roomID}/match", "POST", "/api/match-rooms/"+roomID+"/match", string(jsonBody), "")
+		jsonBody, _ := json.Marshal(createMatchRequest{GameCfg: gameCfg})
+		rr := doRequest(t, h.handleCreateMatch, "POST /api/match-rooms/{roomID}/match", "POST", "/api/match-rooms/"+roomID+"/match", string(jsonBody), "")
 
 		if status := rr.Code; status != http.StatusCreated {
 			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusCreated)
@@ -108,7 +108,7 @@ func TestHandleCreateNewMatch(t *testing.T) {
 			t.Errorf("Handler returned wrong content type: got %v want %v", contentType, "application/json")
 		}
 
-		var response CreateMatchResponse
+		var response createMatchResponse
 		if err := json.UnmarshalRead(rr.Body, &response); err != nil {
 			t.Fatalf("Failed to decode response JSON payload: %v", err)
 		}
@@ -130,9 +130,9 @@ func TestHandleCreateNewMatch(t *testing.T) {
 	})
 
 	testRouteFailures(t, failureRoute{
-		handler: (*Handler).HandleCreateMatch,
+		handler: (*Handler).handleCreateMatch,
 		pattern: "POST /api/match-rooms/{roomID}/match",
-		body:    CreateMatchRequest{GameCfg: validGameCfg()},
+		body:    createMatchRequest{GameCfg: validGameCfg()},
 		cases:   failRoom,
 	})
 
@@ -142,8 +142,8 @@ func TestHandleCreateNewMatch(t *testing.T) {
 		room.Match = &engine.Match{}
 
 		gameCfg := validGameCfg()
-		jsonBody, _ := json.Marshal(CreateMatchRequest{GameCfg: gameCfg})
-		rr := doRequest(t, h.HandleCreateMatch, "POST /api/match-rooms/{roomID}/match", "POST", "/api/match-rooms/"+roomID+"/match", string(jsonBody), "")
+		jsonBody, _ := json.Marshal(createMatchRequest{GameCfg: gameCfg})
+		rr := doRequest(t, h.handleCreateMatch, "POST /api/match-rooms/{roomID}/match", "POST", "/api/match-rooms/"+roomID+"/match", string(jsonBody), "")
 
 		if status := rr.Code; status != http.StatusConflict {
 			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusConflict)
@@ -160,8 +160,8 @@ func TestHandleCreateNewMatch(t *testing.T) {
 			StagePreset: "INVALID_STAGE",
 			MaxTurns:    10,
 		}
-		jsonBody, _ := json.Marshal(CreateMatchRequest{GameCfg: gameCfg})
-		rr := doRequest(t, h.HandleCreateMatch, "POST /api/match-rooms/{roomID}/match", "POST", "/api/match-rooms/"+roomID+"/match", string(jsonBody), "")
+		jsonBody, _ := json.Marshal(createMatchRequest{GameCfg: gameCfg})
+		rr := doRequest(t, h.handleCreateMatch, "POST /api/match-rooms/{roomID}/match", "POST", "/api/match-rooms/"+roomID+"/match", string(jsonBody), "")
 
 		if status := rr.Code; status != http.StatusBadRequest {
 			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusBadRequest)
@@ -174,7 +174,7 @@ func TestHandleCreateNewMatch(t *testing.T) {
 	t.Run("Failure: invalid JSON format", func(t *testing.T) {
 		roomID, _, h := newTestRoom(t)
 
-		rr := doRequest(t, h.HandleCreateMatch, "POST /api/match-rooms/{roomID}/match", "POST", "/api/match-rooms/"+roomID+"/match", "{invalid json", "")
+		rr := doRequest(t, h.handleCreateMatch, "POST /api/match-rooms/{roomID}/match", "POST", "/api/match-rooms/"+roomID+"/match", "{invalid json", "")
 
 		if status := rr.Code; status != http.StatusBadRequest {
 			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusBadRequest)
@@ -204,7 +204,7 @@ func TestHandleCreateNewMatch(t *testing.T) {
 			req := httptest.NewRequest("POST", "/api/match-rooms/"+roomID+"/match", strings.NewReader(body))
 
 			rr := httptest.NewRecorder()
-			testMux("POST /api/match-rooms/{roomID}/match", h.HandleCreateMatch).ServeHTTP(rr, req)
+			testMux("POST /api/match-rooms/{roomID}/match", h.handleCreateMatch).ServeHTTP(rr, req)
 
 			if status := rr.Code; status != tt.wantStatus {
 				t.Errorf("Handler returned wrong status code: got %v want %v", status, tt.wantStatus)
@@ -216,14 +216,14 @@ func TestHandleCreateNewMatch(t *testing.T) {
 		roomID, _, h := newTestRoom(t)
 
 		gameCfg := validGameCfg()
-		jsonBody, _ := json.Marshal(CreateMatchRequest{GameCfg: gameCfg})
+		jsonBody, _ := json.Marshal(createMatchRequest{GameCfg: gameCfg})
 		req, err := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match", strings.NewReader(string(jsonBody)))
 		if err != nil {
 			t.Fatalf("Failed to create request: %v", err)
 		}
 		req.Header.Set("Content-Type", "application/json")
 
-		testEncodeFailure(t, testMux("POST /api/match-rooms/{roomID}/match", h.HandleCreateMatch),
+		testEncodeFailure(t, testMux("POST /api/match-rooms/{roomID}/match", h.handleCreateMatch),
 			func() *http.Request {
 				req, _ := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match", strings.NewReader(string(jsonBody)))
 				req.Header.Set("Content-Type", "application/json")
@@ -234,8 +234,8 @@ func TestHandleCreateNewMatch(t *testing.T) {
 	t.Run("Test Contract", func(t *testing.T) {
 		roomID, _, h := newTestRoom(t)
 		gameCfg := validGameCfg()
-		jsonBody, _ := json.Marshal(CreateMatchRequest{GameCfg: gameCfg})
-		rr := doRequest(t, h.HandleCreateMatch, "POST /api/match-rooms/{roomID}/match", "POST", "/api/match-rooms/"+roomID+"/match", string(jsonBody), "")
+		jsonBody, _ := json.Marshal(createMatchRequest{GameCfg: gameCfg})
+		rr := doRequest(t, h.handleCreateMatch, "POST /api/match-rooms/{roomID}/match", "POST", "/api/match-rooms/"+roomID+"/match", string(jsonBody), "")
 
 		assertObjectContract(t, rr.Body.Bytes(), []string{"success", "playerTokens"}, nil)
 	})
@@ -245,7 +245,7 @@ func TestHandleRematch(t *testing.T) {
 	t.Run("Success: wipes existing Match and creates a new one", func(t *testing.T) {
 		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
 
-		rr := doRequest(t, h.HandleRematch, "POST /api/match-rooms/{roomID}/rematch", "POST", "/api/match-rooms/"+roomID+"/rematch", "", playerTokens[0])
+		rr := doRequest(t, h.handleRematch, "POST /api/match-rooms/{roomID}/rematch", "POST", "/api/match-rooms/"+roomID+"/rematch", "", playerTokens[0])
 
 		if status := rr.Code; status != http.StatusCreated {
 			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusCreated)
@@ -254,7 +254,7 @@ func TestHandleRematch(t *testing.T) {
 			t.Errorf("Handler returned wrong content type: got %v want %v", contentType, "application/json")
 		}
 
-		var response CreateMatchResponse
+		var response createMatchResponse
 		if err := json.UnmarshalRead(rr.Body, &response); err != nil {
 			t.Fatalf("Failed to decode response JSON payload: %v", err)
 		}
@@ -279,16 +279,16 @@ func TestHandleRematch(t *testing.T) {
 	})
 
 	testRouteFailures(t, failureRoute{
-		handler:   (*Handler).HandleRematch,
+		handler:   (*Handler).handleRematch,
 		pattern:   "POST /api/match-rooms/{roomID}/rematch",
 		cases:     failRoom | failMatch | failMissingAuth | failInvalidToken,
-		matchGone: func(room *MatchRoom) { room.GameCfg = nil },
+		matchGone: func(room *matchRoom) { room.GameCfg = nil },
 	})
 
 	t.Run("Failure: failed to Encode response", func(t *testing.T) {
 		roomID, playerTokens, _, h := createTestRoomWithMatch(t)
 
-		testEncodeFailure(t, testMux("POST /api/match-rooms/{roomID}/rematch", h.HandleRematch),
+		testEncodeFailure(t, testMux("POST /api/match-rooms/{roomID}/rematch", h.handleRematch),
 			func() *http.Request {
 				req, _ := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/rematch", nil)
 				req.Header.Set("Authorization", "Bearer "+playerTokens[0])
@@ -299,7 +299,7 @@ func TestHandleRematch(t *testing.T) {
 	t.Run("Test Contract", func(t *testing.T) {
 		roomID, playerTokens, _, h := createTestRoomWithMatch(t)
 
-		rr := doRequest(t, h.HandleRematch, "POST /api/match-rooms/{roomID}/rematch", "POST", "/api/match-rooms/"+roomID+"/rematch", "", playerTokens[0])
+		rr := doRequest(t, h.handleRematch, "POST /api/match-rooms/{roomID}/rematch", "POST", "/api/match-rooms/"+roomID+"/rematch", "", playerTokens[0])
 
 		assertObjectContract(t, rr.Body.Bytes(), []string{"success", "playerTokens"}, nil)
 	})
@@ -311,7 +311,7 @@ func TestHandleDeleteMatch(t *testing.T) {
 		room := mustRoom(t, s, roomID)
 		room.Match.WinnerTeamID = 1
 
-		rr := doRequest(t, h.HandleDeleteMatch, "DELETE /api/match-rooms/{roomID}/match", "DELETE", "/api/match-rooms/"+roomID+"/match", "", playerTokens[0])
+		rr := doRequest(t, h.handleDeleteMatch, "DELETE /api/match-rooms/{roomID}/match", "DELETE", "/api/match-rooms/"+roomID+"/match", "", playerTokens[0])
 
 		if status := rr.Code; status != http.StatusNoContent {
 			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusNoContent)
@@ -326,7 +326,7 @@ func TestHandleDeleteMatch(t *testing.T) {
 		room := mustRoom(t, s, roomID)
 		room.Match = nil
 
-		rr := doRequest(t, h.HandleDeleteMatch, "DELETE /api/match-rooms/{roomID}/match", "DELETE", "/api/match-rooms/"+roomID+"/match", "", playerTokens[0])
+		rr := doRequest(t, h.handleDeleteMatch, "DELETE /api/match-rooms/{roomID}/match", "DELETE", "/api/match-rooms/"+roomID+"/match", "", playerTokens[0])
 
 		if status := rr.Code; status != http.StatusNoContent {
 			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusNoContent)
@@ -336,7 +336,7 @@ func TestHandleDeleteMatch(t *testing.T) {
 	t.Run("Failure: match still in progress", func(t *testing.T) {
 		roomID, playerTokens, _, h := createTestRoomWithMatch(t)
 
-		rr := doRequest(t, h.HandleDeleteMatch, "DELETE /api/match-rooms/{roomID}/match", "DELETE", "/api/match-rooms/"+roomID+"/match", "", playerTokens[0])
+		rr := doRequest(t, h.handleDeleteMatch, "DELETE /api/match-rooms/{roomID}/match", "DELETE", "/api/match-rooms/"+roomID+"/match", "", playerTokens[0])
 
 		if status := rr.Code; status != http.StatusConflict {
 			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusConflict)
@@ -347,7 +347,7 @@ func TestHandleDeleteMatch(t *testing.T) {
 	})
 
 	testRouteFailures(t, failureRoute{
-		handler: (*Handler).HandleDeleteMatch,
+		handler: (*Handler).handleDeleteMatch,
 		pattern: "DELETE /api/match-rooms/{roomID}/match",
 		cases:   failRoom | failMissingAuth | failInvalidToken,
 	})

@@ -16,7 +16,7 @@ func validGameCfg() engine.GameCfg {
 	}
 }
 
-func assertGameCfgSynced(t *testing.T, room *MatchRoom) {
+func assertGameCfgSynced(t *testing.T, room *matchRoom) {
 	t.Helper()
 	if room.GameCfg == nil {
 		t.Fatal("Expected room.GameCfg to be set")
@@ -29,8 +29,8 @@ func assertGameCfgSynced(t *testing.T, room *MatchRoom) {
 func createTestRoomWithCfg(t *testing.T, gameCfg engine.GameCfg) (string, [2]string, *ServerStateManager) {
 	t.Helper()
 	s := NewServerStateManager()
-	roomID, _ := s.CreateMatchRoom()
-	tokens, _ := s.CreateMatch(roomID, gameCfg)
+	roomID, _ := s.createMatchRoom()
+	tokens, _ := s.createMatch(roomID, gameCfg)
 	return roomID, tokens, s
 }
 
@@ -39,13 +39,13 @@ func createTestRoom(t *testing.T) (string, [2]string, *ServerStateManager) {
 	return createTestRoomWithCfg(t, validGameCfg())
 }
 
-func mustRoom(t *testing.T, s *ServerStateManager, roomID string) *MatchRoom {
+func mustRoom(t *testing.T, s *ServerStateManager, roomID string) *matchRoom {
 	t.Helper()
 	roomVal, ok := s.Rooms.Load(roomID)
 	if !ok {
 		t.Fatalf("Room %s not found", roomID)
 	}
-	room, ok := roomVal.(*MatchRoom)
+	room, ok := roomVal.(*matchRoom)
 	if !ok {
 		t.Fatalf("Room %s has type %T, want *MatchRoom", roomID, roomVal)
 	}
@@ -54,7 +54,7 @@ func mustRoom(t *testing.T, s *ServerStateManager, roomID string) *MatchRoom {
 
 func mustCreateMatch(t *testing.T, s *ServerStateManager, roomID string, gameCfg engine.GameCfg) [2]string {
 	t.Helper()
-	tokens, err := s.CreateMatch(roomID, gameCfg)
+	tokens, err := s.createMatch(roomID, gameCfg)
 	if err != nil {
 		t.Fatalf("CreateMatch() error = %v", err)
 	}
@@ -80,12 +80,12 @@ func TestMapError(t *testing.T) {
 		wantCode int
 		wantMsg  string
 	}{
-		{"room not found", ErrRoomNotFound, 404, "room not found"},
-		{"match not found", ErrMatchNotFound, 404, "match not found"},
-		{"match exists", ErrMatchExists, 409, "match already exists"},
-		{"cpu turn in progress", ErrCPUTurnInProgress, 409, "cpu turn in progress"},
-		{"invalid config", ErrInvalidConfig, 400, "invalid game config"},
-		{"invalid player token", ErrInvalidToken, 401, "invalid player token"},
+		{"room not found", errRoomNotFound, 404, "room not found"},
+		{"match not found", errMatchNotFound, 404, "match not found"},
+		{"match exists", errMatchExists, 409, "match already exists"},
+		{"cpu turn in progress", errCPUTurnInProgress, 409, "cpu turn in progress"},
+		{"invalid config", errInvalidConfig, 400, "invalid game config"},
+		{"invalid player token", errInvalidToken, 401, "invalid player token"},
 
 		{"invalid stage preset", engine.ErrInvalidStagePreset, 400, "invalid stage preset"},
 		{"invalid team size", engine.ErrInvalidTeamSize, 400, "invalid team size"},

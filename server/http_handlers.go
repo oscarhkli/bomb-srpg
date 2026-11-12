@@ -66,49 +66,43 @@ func (h *Handler) writeJSON(w http.ResponseWriter, status int, res any, logMsg s
 func (h *Handler) extractBearerToken(r *http.Request) (string, error) {
 	auth := r.Header.Get("Authorization")
 	if auth == "" {
-		return "", ErrInvalidToken
+		return "", errInvalidToken
 	}
 	token := strings.TrimPrefix(auth, "Bearer ")
 	if token == auth {
-		return "", ErrInvalidToken
+		return "", errInvalidToken
 	}
 	return token, nil
 }
 
-// HealthCheckResponse wraps the status (typically OK) when health check is called.
-type HealthCheckResponse struct {
+type healthCheckResponse struct {
 	Status string `json:"status"`
 }
 
-// HandleHealthCheck returns OK as a server health check.
-func (h *Handler) HandleHealthCheck(w http.ResponseWriter, _ *http.Request) {
-	res := HealthCheckResponse{Status: "ok"}
+func (h *Handler) handleHealthCheck(w http.ResponseWriter, _ *http.Request) {
+	res := healthCheckResponse{Status: "ok"}
 	h.writeJSON(w, http.StatusOK, res, "encode health check failed")
 }
 
-// CatalogResponse is returned when the Match Catalog is requested.
-type CatalogResponse struct {
+type catalogResponse struct {
 	Archetypes   []engine.Archetype   `json:"archetypes"`
 	StagePresets []engine.StagePreset `json:"stagePresets"`
 }
 
-// HandleGetCatalog returns the selectable archetypes and the stage presets for the lobby.
-func (h *Handler) HandleGetCatalog(w http.ResponseWriter, _ *http.Request) {
+func (h *Handler) handleGetCatalog(w http.ResponseWriter, _ *http.Request) {
 	archetypes := engine.GetAllArchetypes()
 	stagePresets := engine.GetAllStagePresets()
 
-	res := CatalogResponse{Archetypes: archetypes, StagePresets: stagePresets}
+	res := catalogResponse{Archetypes: archetypes, StagePresets: stagePresets}
 	h.writeJSON(w, http.StatusOK, res, "encode catalog failed")
 }
 
-// CreateMatchRoomResponse is returned when a new match room is created.
-type CreateMatchRoomResponse struct {
+type createMatchRoomResponse struct {
 	ID string `json:"id"`
 }
 
-// HandleCreateMatchRoom creates an empty room and returns its ID.
-func (h *Handler) HandleCreateMatchRoom(w http.ResponseWriter, _ *http.Request) {
-	id, err := h.Manager.CreateMatchRoom()
+func (h *Handler) handleCreateMatchRoom(w http.ResponseWriter, _ *http.Request) {
+	id, err := h.Manager.createMatchRoom()
 	if err != nil {
 		h.Logger.Error("create match room failed", "error", err)
 		http.Error(w, "Failed to create new MatchRoom", http.StatusInternalServerError)
@@ -118,56 +112,52 @@ func (h *Handler) HandleCreateMatchRoom(w http.ResponseWriter, _ *http.Request) 
 	location := fmt.Sprintf("/api/match-rooms/%s", id)
 	w.Header().Set("Location", location)
 
-	res := CreateMatchRoomResponse{ID: id}
+	res := createMatchRoomResponse{ID: id}
 	h.writeJSON(w, http.StatusCreated, res, "encode match room failed", "roomID", id)
 
 	h.Logger.Info("match room created", "roomID", id)
 }
 
-// CreateMatchRequest is the HandleCreateMatch body.
-type CreateMatchRequest struct {
+type createMatchRequest struct {
 	GameCfg engine.GameCfg `json:"gameCfg"`
 }
 
-// CreateMatchResponse is returned when a new match is created.
-type CreateMatchResponse struct {
+type createMatchResponse struct {
 	Success      bool      `json:"success"`
 	PlayerTokens [2]string `json:"playerTokens"`
 }
 
-// HandleCreateMatch starts a match in the room from the posted GameCfg.
-func (h *Handler) HandleCreateMatch(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handleCreateMatch(w http.ResponseWriter, r *http.Request) {
 	roomID := r.PathValue("roomID")
 
-	var req CreateMatchRequest
+	var req createMatchRequest
 	if err := json.UnmarshalRead(r.Body, &req); err != nil {
 		h.Logger.Warn("invalid config format", "error", err)
 		http.Error(w, "Invalid configuration format", http.StatusBadRequest)
 		return
 	}
 
-	tokens, err := h.Manager.CreateMatch(roomID, req.GameCfg)
+	tokens, err := h.Manager.createMatch(roomID, req.GameCfg)
 
-	if !h.handleCreateMatch(tokens, err, roomID, w) {
+	if !h.writeMatchCreated(tokens, err, roomID, w) {
 		return
 	}
 
 	h.Logger.Info("match created", "roomID", roomID)
 }
 
-func (h *Handler) handleCreateMatch(tokens [2]string, err error, roomID string, w http.ResponseWriter) bool {
+func (h *Handler) writeMatchCreated(tokens [2]string, err error, roomID string, w http.ResponseWriter) bool {
 	if err != nil {
 		h.handleError(w, err, "create match failed", "roomID", roomID)
 		return false
 	}
 
-	res := CreateMatchResponse{Success: true, PlayerTokens: tokens}
+	res := createMatchResponse{Success: true, PlayerTokens: tokens}
 	h.writeJSON(w, http.StatusCreated, res, "encode match failed", "roomID", roomID)
 	return true
 }
 
-// HandleRematch replaces the room's Match with a fresh one.
-func (h *Handler) HandleRematch(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handleRematch(w http.ResponseWriter, r *http.Request) {
 	roomID := r.PathValue("roomID")
 
 	token, ok := h.requireToken(w, r)
@@ -175,17 +165,16 @@ func (h *Handler) HandleRematch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tokens, err := h.Manager.Rematch(roomID, token)
+	tokens, err := h.Manager.rematch(roomID, token)
 
-	if !h.handleCreateMatch(tokens, err, roomID, w) {
+	if !h.writeMatchCreated(tokens, err, roomID, w) {
 		return
 	}
 
 	h.Logger.Info("rematch created", "roomID", roomID)
 }
 
-// HandleDeleteMatch removes the room's concluded Match and responds 204 with no body.
-func (h *Handler) HandleDeleteMatch(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handleDeleteMatch(w http.ResponseWriter, r *http.Request) {
 	roomID := r.PathValue("roomID")
 
 	token, ok := h.requireToken(w, r)
@@ -193,7 +182,7 @@ func (h *Handler) HandleDeleteMatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.Manager.DeleteMatch(roomID, token); err != nil {
+	if err := h.Manager.deleteMatch(roomID, token); err != nil {
 		h.handleError(w, err, "delete match failed", "roomID", roomID)
 		return
 	}
@@ -203,11 +192,10 @@ func (h *Handler) HandleDeleteMatch(w http.ResponseWriter, r *http.Request) {
 	h.Logger.Info("match deleted", "roomID", roomID)
 }
 
-// HandleGetMatchState returns the room's WorkingState.
-func (h *Handler) HandleGetMatchState(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handleGetMatchState(w http.ResponseWriter, r *http.Request) {
 	roomID := r.PathValue("roomID")
 
-	gs, err := h.Manager.GetMatchState(roomID)
+	gs, err := h.Manager.getMatchState(roomID)
 	if err != nil {
 		h.handleError(w, err, "get match state failed", "roomID", roomID)
 		return
@@ -216,8 +204,7 @@ func (h *Handler) HandleGetMatchState(w http.ResponseWriter, r *http.Request) {
 	h.writeJSON(w, http.StatusOK, gs, "encode gameState failed")
 }
 
-// HandleSubmitTurnCommand applies a planning command and returns its events.
-func (h *Handler) HandleSubmitTurnCommand(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handleSubmitTurnCommand(w http.ResponseWriter, r *http.Request) {
 	roomID := r.PathValue("roomID")
 
 	var req engine.TurnCommand
@@ -232,7 +219,7 @@ func (h *Handler) HandleSubmitTurnCommand(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	gameEvents, err := h.Manager.SubmitTurnCommand(roomID, req, token)
+	gameEvents, err := h.Manager.submitTurnCommand(roomID, req, token)
 	if err != nil {
 		h.handleError(w, err, "submit turn command failed", "roomID", roomID)
 		return
@@ -241,17 +228,17 @@ func (h *Handler) HandleSubmitTurnCommand(w http.ResponseWriter, r *http.Request
 	h.writeJSON(w, http.StatusOK, gameEvents, "encode gameEvents failed")
 }
 
-// CPUStatusResponse wraps CPUTurnPhase and the CPU turn's gameEvents, split by phase so the
+// cpuStatusResponse wraps CPUTurnPhase and the CPU turn's gameEvents, split by phase so the
 // client can animate the CPU's actions and their resolution apart.
-type CPUStatusResponse struct {
+type cpuStatusResponse struct {
 	TurnPhase             engine.CPUTurnPhase `json:"turnPhase"`
 	PlanGameEvents        []engine.GameEvent  `json:"planGameEvents"`
 	ResolveTurnGameEvents []engine.GameEvent  `json:"resolveTurnGameEvents"`
 }
 
-// HandleConsumeCPUStatus returns the CPU turn phase and events, and resets a Ready phase to Idle.
+// handleConsumeCPUStatus returns the CPU turn phase and events, and resets a Ready phase to Idle.
 // It launches the CPU turn first if one is due.
-func (h *Handler) HandleConsumeCPUStatus(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handleConsumeCPUStatus(w http.ResponseWriter, r *http.Request) {
 	roomID := r.PathValue("roomID")
 
 	token, ok := h.requireToken(w, r)
@@ -259,19 +246,18 @@ func (h *Handler) HandleConsumeCPUStatus(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	turnPhase, planGameEvents, resolveTurnGameEvents, err := h.Manager.ConsumeCPUStatus(roomID, token)
+	turnPhase, planGameEvents, resolveTurnGameEvents, err := h.Manager.consumeCPUStatus(roomID, token)
 	if err != nil {
 		h.handleError(w, err, "consume cpu status failed", "roomID", roomID)
 		return
 	}
 	h.Logger.Debug("consume cpu status", "roomID", roomID, "turnPhase", turnPhase, "planGameEvents", planGameEvents, "resolveTurnGameEvents", resolveTurnGameEvents)
 
-	res := CPUStatusResponse{TurnPhase: turnPhase, PlanGameEvents: planGameEvents, ResolveTurnGameEvents: resolveTurnGameEvents}
+	res := cpuStatusResponse{TurnPhase: turnPhase, PlanGameEvents: planGameEvents, ResolveTurnGameEvents: resolveTurnGameEvents}
 	h.writeJSON(w, http.StatusOK, res, "encode cpu status response failed")
 }
 
-// HandleResetTurn discards the planned actions for the current turn and responds 204 with no body.
-func (h *Handler) HandleResetTurn(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handleResetTurn(w http.ResponseWriter, r *http.Request) {
 	roomID := r.PathValue("roomID")
 
 	token, ok := h.requireToken(w, r)
@@ -279,7 +265,7 @@ func (h *Handler) HandleResetTurn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.Manager.ResetTurn(roomID, token); err != nil {
+	if err := h.Manager.resetTurn(roomID, token); err != nil {
 		h.handleError(w, err, "reset turn failed", "roomID", roomID)
 		return
 	}
@@ -287,14 +273,13 @@ func (h *Handler) HandleResetTurn(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// ResolveTurnResponse splits the turn's events by phase so the client can animate the resolution apart.
-type ResolveTurnResponse struct {
+// resolveTurnResponse splits the turn's events by phase so the client can animate the resolution apart.
+type resolveTurnResponse struct {
 	PlanGameEvents        []engine.GameEvent `json:"planGameEvents"`
 	ResolveTurnGameEvents []engine.GameEvent `json:"resolveTurnGameEvents"`
 }
 
-// HandleResolveTurn resolves the planned turn.
-func (h *Handler) HandleResolveTurn(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handleResolveTurn(w http.ResponseWriter, r *http.Request) {
 	roomID := r.PathValue("roomID")
 
 	token, ok := h.requireToken(w, r)
@@ -302,27 +287,25 @@ func (h *Handler) HandleResolveTurn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	planGameEvents, resolveTurnGameEvents, err := h.Manager.ResolveTurn(roomID, token)
+	planGameEvents, resolveTurnGameEvents, err := h.Manager.resolveTurn(roomID, token)
 	if err != nil {
 		h.handleError(w, err, "resolve turn failed", "roomID", roomID)
 		return
 	}
 	h.Logger.Debug("resolve turn", "roomID", roomID, "planGameEvents", planGameEvents, "resolveTurnGameEvents", resolveTurnGameEvents)
 
-	res := ResolveTurnResponse{PlanGameEvents: planGameEvents, ResolveTurnGameEvents: resolveTurnGameEvents}
+	res := resolveTurnResponse{PlanGameEvents: planGameEvents, ResolveTurnGameEvents: resolveTurnGameEvents}
 	h.writeJSON(w, http.StatusOK, res, "encode resolve turn response failed")
 }
 
-// SurrenderRequest is the HandleSurrender body.
-type SurrenderRequest struct {
+type surrenderRequest struct {
 	TeamID int `json:"teamId"`
 }
 
-// HandleSurrender ends the match with the other team winning.
-func (h *Handler) HandleSurrender(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handleSurrender(w http.ResponseWriter, r *http.Request) {
 	roomID := r.PathValue("roomID")
 
-	var req SurrenderRequest
+	var req surrenderRequest
 	if err := json.UnmarshalRead(r.Body, &req); err != nil {
 		h.Logger.Warn("invalid surrender request format", "error", err)
 		http.Error(w, "Invalid surrenderRequest format", http.StatusBadRequest)
@@ -334,7 +317,7 @@ func (h *Handler) HandleSurrender(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	gameEvents, err := h.Manager.Surrender(roomID, req.TeamID, token)
+	gameEvents, err := h.Manager.surrender(roomID, req.TeamID, token)
 	if err != nil {
 		h.handleError(w, err, "surrender failed", "roomID", roomID)
 		return
@@ -343,10 +326,9 @@ func (h *Handler) HandleSurrender(w http.ResponseWriter, r *http.Request) {
 	h.writeJSON(w, http.StatusOK, gameEvents, "encode gameEvents failed")
 }
 
-// HandleGetMatchConfig returns the room's GameCfg.
-func (h *Handler) HandleGetMatchConfig(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handleGetMatchConfig(w http.ResponseWriter, r *http.Request) {
 	roomID := r.PathValue("roomID")
-	gameCfg, err := h.Manager.GetMatchConfig(roomID)
+	gameCfg, err := h.Manager.getMatchConfig(roomID)
 	if err != nil {
 		h.handleError(w, err, "get match config failed", "roomID", roomID)
 		return
@@ -355,8 +337,7 @@ func (h *Handler) HandleGetMatchConfig(w http.ResponseWriter, r *http.Request) {
 	h.writeJSON(w, http.StatusOK, gameCfg, "encode gameConfig failed")
 }
 
-// HandleGetAllowedTiles returns the tiles a unit can use for a command type.
-func (h *Handler) HandleGetAllowedTiles(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handleGetAllowedTiles(w http.ResponseWriter, r *http.Request) {
 	roomID := r.PathValue("roomID")
 	unitIDStr := r.URL.Query().Get("unitId")
 	turnCmdType := r.URL.Query().Get("turnCmdType")
@@ -372,7 +353,7 @@ func (h *Handler) HandleGetAllowedTiles(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	allowed, err := h.Manager.GetAllowedTiles(roomID, engine.UnitID(unitID), engine.TurnCmdType(turnCmdType))
+	allowed, err := h.Manager.getAllowedTiles(roomID, engine.UnitID(unitID), engine.TurnCmdType(turnCmdType))
 	if err != nil {
 		h.handleError(w, err, "get allowed tiles failed", "roomID", roomID)
 		return

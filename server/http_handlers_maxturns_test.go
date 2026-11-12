@@ -24,12 +24,12 @@ func TestHandleCreateMatch_MaxTurnsBound(t *testing.T) {
 
 			cfg := validGameCfg()
 			cfg.MaxTurns = tt.maxTurns
-			body, err := json.Marshal(CreateMatchRequest{GameCfg: cfg})
+			body, err := json.Marshal(createMatchRequest{GameCfg: cfg})
 			if err != nil {
 				t.Fatalf("Failed to encode request: %v", err)
 			}
 
-			rr := doRequest(t, h.HandleCreateMatch, "POST /api/match-rooms/{roomID}/match", http.MethodPost, "/api/match-rooms/"+roomID+"/match", string(body), "")
+			rr := doRequest(t, h.handleCreateMatch, "POST /api/match-rooms/{roomID}/match", http.MethodPost, "/api/match-rooms/"+roomID+"/match", string(body), "")
 
 			if rr.Code != tt.want {
 				t.Errorf("got status %d, want %d (body %q)", rr.Code, tt.want, rr.Body.String())

@@ -129,24 +129,23 @@ func assertMatchStateNested(t *testing.T, raw map[string]any) {
 	}
 }
 
-// BrokenResponseWriter simulates a severed connection or dropped TCP socket mid-transit.
-type BrokenResponseWriter struct {
+type brokenResponseWriter struct {
 	header http.Header
 	Code   int
 }
 
-func (b *BrokenResponseWriter) Header() http.Header {
+func (b *brokenResponseWriter) Header() http.Header {
 	if b.header == nil {
 		b.header = make(http.Header)
 	}
 	return b.header
 }
 
-func (b *BrokenResponseWriter) Write(bytes []byte) (int, error) {
+func (b *brokenResponseWriter) Write(bytes []byte) (int, error) {
 	return 0, fmt.Errorf("network connection systematically aborted by peer")
 }
 
-func (b *BrokenResponseWriter) WriteHeader(statusCode int) {
+func (b *brokenResponseWriter) WriteHeader(statusCode int) {
 	if b.Code != 0 {
 		return
 	}
@@ -156,7 +155,7 @@ func (b *BrokenResponseWriter) WriteHeader(statusCode int) {
 func testEncodeFailure(t *testing.T, handler http.Handler, setup func() *http.Request, expectedStatus int) {
 	t.Helper()
 	req := setup()
-	brokenWriter := &BrokenResponseWriter{}
+	brokenWriter := &brokenResponseWriter{}
 	handler.ServeHTTP(brokenWriter, req)
 	if brokenWriter.Code != expectedStatus {
 		t.Errorf("Expected initial header setup to attempt status %d, got %d", expectedStatus, brokenWriter.Code)
@@ -192,7 +191,7 @@ func newTestRoom(t *testing.T) (string, *ServerStateManager, *Handler) {
 	t.Helper()
 	s := NewServerStateManager()
 	h := NewHandler(s)
-	roomID, err := s.CreateMatchRoom()
+	roomID, err := s.createMatchRoom()
 	if err != nil {
 		t.Fatalf("Failed to create room: %v", err)
 	}
@@ -215,7 +214,7 @@ type failureRoute struct {
 	query     string
 	body      any
 	cases     failureSet
-	matchGone func(room *MatchRoom)
+	matchGone func(room *matchRoom)
 	bareRoom  bool
 }
 
@@ -305,8 +304,8 @@ func TestHandler_extractBearerToken(t *testing.T) {
 		wantToken string
 		wantErr   error
 	}{
-		{"Missing header", "", true, "", ErrInvalidToken},
-		{"Missing Bearer prefix", "abc123", false, "", ErrInvalidToken},
+		{"Missing header", "", true, "", errInvalidToken},
+		{"Missing Bearer prefix", "abc123", false, "", errInvalidToken},
 		{"Valid Bearer token", "Bearer abc123", false, "abc123", nil},
 	}
 
@@ -340,7 +339,7 @@ func TestHandleHealthCheck(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		http.HandlerFunc(h.HandleHealthCheck).ServeHTTP(rr, req)
+		http.HandlerFunc(h.handleHealthCheck).ServeHTTP(rr, req)
 
 		if status := rr.Code; status != http.StatusOK {
 			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusOK)
@@ -351,7 +350,7 @@ func TestHandleHealthCheck(t *testing.T) {
 			t.Errorf("Handler returned wrong content type: got %v want %v", contentType, expectedHeader)
 		}
 
-		var response HealthCheckResponse
+		var response healthCheckResponse
 		if err := json.UnmarshalRead(rr.Body, &response); err != nil {
 			t.Fatalf("Failed to decode response JSON payload: %v", err)
 		}
@@ -362,7 +361,7 @@ func TestHandleHealthCheck(t *testing.T) {
 	})
 
 	t.Run("Failure: failed to Encode", func(t *testing.T) {
-		testEncodeFailure(t, http.HandlerFunc(h.HandleHealthCheck),
+		testEncodeFailure(t, http.HandlerFunc(h.handleHealthCheck),
 			func() *http.Request {
 				req, _ := http.NewRequest("GET", "/api/health", nil)
 				return req
@@ -373,7 +372,7 @@ func TestHandleHealthCheck(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/api/health", nil)
 		rr := httptest.NewRecorder()
 
-		http.HandlerFunc(h.HandleHealthCheck).ServeHTTP(rr, req)
+		http.HandlerFunc(h.handleHealthCheck).ServeHTTP(rr, req)
 
 		assertObjectContract(t, rr.Body.Bytes(), []string{"status"}, nil)
 	})
@@ -390,7 +389,7 @@ func TestHandleGetCatalog(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		http.HandlerFunc(h.HandleGetCatalog).ServeHTTP(rr, req)
+		http.HandlerFunc(h.handleGetCatalog).ServeHTTP(rr, req)
 
 		if status := rr.Code; status != http.StatusOK {
 			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusOK)
@@ -418,7 +417,7 @@ func TestHandleGetCatalog(t *testing.T) {
 	})
 
 	t.Run("Failure: failed to Encode", func(t *testing.T) {
-		testEncodeFailure(t, http.HandlerFunc(h.HandleGetCatalog),
+		testEncodeFailure(t, http.HandlerFunc(h.handleGetCatalog),
 			func() *http.Request {
 				req, _ := http.NewRequest("GET", "/api/catalog", nil)
 				return req
@@ -429,7 +428,7 @@ func TestHandleGetCatalog(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/api/catalog", nil)
 		rr := httptest.NewRecorder()
 
-		http.HandlerFunc(h.HandleGetCatalog).ServeHTTP(rr, req)
+		http.HandlerFunc(h.handleGetCatalog).ServeHTTP(rr, req)
 
 		assertObjectContract(t, rr.Body.Bytes(), []string{"archetypes", "stagePresets"}, func(t *testing.T, raw map[string]any) {
 			t.Helper()

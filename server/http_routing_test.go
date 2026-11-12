@@ -320,7 +320,7 @@ func TestHTTPRouting(t *testing.T) {
 
 	turnCmdBody, _ := json.Marshal(engine.NewMoveCommand(engine.NewUnitID(1, 0), engine.Coordinate{X: 4, Y: 7}))
 
-	surrenderReqBody, _ := json.Marshal(SurrenderRequest{TeamID: 1})
+	surrenderReqBody, _ := json.Marshal(surrenderRequest{TeamID: 1})
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
