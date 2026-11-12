@@ -219,3 +219,16 @@ jobs:
           name: playwright-report-${{ matrix.project }}
           path: web/e2e/playwright-report/
           retention-days: 7
+
+  image_smoke:
+    name: "Run Docker Image Smoke Test"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Smoke test the production image
+        run: make image-smoke
