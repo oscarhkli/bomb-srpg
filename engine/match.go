@@ -11,8 +11,8 @@ func (m *Match) ResetTurn() {
 	m.PlaybackLog = nil
 }
 
-// SubmitAction logs gameEvent; without AllowResetTurn it also commits WorkingState to TrueState.
-func (m *Match) SubmitAction(gameEvent GameEvent) {
+// submitAction logs gameEvent; without AllowResetTurn it also commits WorkingState to TrueState.
+func (m *Match) submitAction(gameEvent GameEvent) {
 	m.PlaybackLog = append(m.PlaybackLog, gameEvent)
 
 	if !m.GameCfg.AllowResetTurn {
@@ -41,7 +41,7 @@ func (m *Match) Surrender(teamID int) []GameEvent {
 func (m *Match) ApplyTurnCommand(cmd TurnCommand) ([]GameEvent, error) {
 	switch cmd.Type {
 	case TurnCmdMove:
-		return m.CommandMoveUnit(cmd.UnitID, cmd.Target)
+		return m.commandMoveUnit(cmd.UnitID, cmd.Target)
 	case TurnCmdPlaceBomb:
 		return m.CommandPlaceBomb(cmd.UnitID, cmd.Target)
 	default:
@@ -49,13 +49,12 @@ func (m *Match) ApplyTurnCommand(cmd TurnCommand) ([]GameEvent, error) {
 	}
 }
 
-// CommandMoveUnit applies MoveUnit to WorkingState and logs the resulting event.
-func (m *Match) CommandMoveUnit(unitID UnitID, target Coordinate) ([]GameEvent, error) {
+func (m *Match) commandMoveUnit(unitID UnitID, target Coordinate) ([]GameEvent, error) {
 	gameEvent, err := m.WorkingState.MoveUnit(unitID, target)
 	if err != nil {
 		return nil, err
 	}
-	m.SubmitAction(gameEvent)
+	m.submitAction(gameEvent)
 	return []GameEvent{gameEvent}, nil
 }
 
@@ -81,7 +80,7 @@ func (gs *GameState) MoveUnit(unitID UnitID, target Coordinate) (GameEvent, erro
 	}
 
 	oldPos := unit.Position
-	gs.ClearStageTile(oldPos)
+	gs.clearStageTile(oldPos)
 	gs.UpdateStageOccupant(target, OccupantUnit, int64(unitID))
 	unit.Position = target
 	unit.HasMoved = true
@@ -100,7 +99,7 @@ func (gs *GameState) validateActiveUnit(unitID UnitID) (*Unit, error) {
 	if unit.Team != gs.ActiveTeam {
 		return nil, fmt.Errorf("%w: unit %#x not active team", ErrNotActiveTeam, unitID)
 	}
-	if !gs.IsWithinBounds(unit.Position) {
+	if !gs.isWithinBounds(unit.Position) {
 		return nil, fmt.Errorf("%w: unit %#x out of bounds", ErrOutOfBounds, unitID)
 	}
 	cell := gs.Grid[unit.Position.Y][unit.Position.X]
@@ -116,7 +115,7 @@ func (m *Match) CommandPlaceBomb(unitID UnitID, target Coordinate) ([]GameEvent,
 	if err != nil {
 		return nil, err
 	}
-	m.SubmitAction(gameEvent)
+	m.submitAction(gameEvent)
 	return []GameEvent{gameEvent}, nil
 }
 
@@ -125,7 +124,7 @@ func (m *Match) CommandPlaceBomb(unitID UnitID, target Coordinate) ([]GameEvent,
 // bomb range, or the cell is not landable.
 func (gs *GameState) PlaceBomb(unitID UnitID, target Coordinate) (GameEvent, error) {
 	if unitID == SystemUnitID {
-		return gs.dropBomb(unitID, target, BombDefaultPower), nil
+		return gs.dropBomb(unitID, target, bombDefaultPower), nil
 	}
 
 	unit, err := gs.validateBombPlacement(unitID, target)
@@ -153,7 +152,7 @@ func (gs *GameState) validateBombPlacement(unitID UnitID, target Coordinate) (*U
 		return nil, fmt.Errorf("%w: unit %#x out of bombs", ErrOutOfBombs, unitID)
 	}
 
-	tiles := gs.FindReachableTiles(unit.Position, unit.NewBombPlacementRule())
+	tiles := gs.FindReachableTiles(unit.Position, unit.newBombPlacementRule())
 
 	if _, ok := tiles[target]; !ok {
 		return nil, ErrOutOfBombRange
@@ -173,17 +172,17 @@ func (gs *GameState) dropBomb(ownerID UnitID, target Coordinate, power int) Game
 		OwnerID:   ownerID,
 		Position:  target,
 		Range:     power,
-		Countdown: gs.DeduceBombCountDown(),
+		Countdown: gs.deduceBombCountDown(),
 	}
 	gs.Bombs[bomb.ID] = bomb
 	gs.UpdateStageOccupant(target, OccupantBomb, int64(bomb.ID))
 
-	return NewBombPlacedEvent(ownerID, bomb.ID, target, bomb.Range, bomb.Countdown)
+	return newBombPlacedEvent(ownerID, bomb.ID, target, bomb.Range, bomb.Countdown)
 }
 
 // IsLandingLegal checks if the target is legal to be landed by a certain occupantType.
 func (gs *GameState) IsLandingLegal(target Coordinate, _ OccupantType) error {
-	if !gs.IsWithinBounds(target) {
+	if !gs.isWithinBounds(target) {
 		return fmt.Errorf("%w: coordinate %v out of bounds", ErrOutOfBounds, target)
 	}
 
@@ -204,7 +203,7 @@ func (gs *GameState) IsLandingLegal(target Coordinate, _ OccupantType) error {
 func (m *Match) beginTurn() {
 	m.WorkingState.TurnStartEvents = nil
 
-	if m.WinnerTeamID == 0 && m.evaluateVictoryConditions() == MatchInProgress {
+	if m.WinnerTeamID == 0 && m.evaluateVictoryConditions() == matchInProgress {
 		if m.TrueState.Turn <= m.GameCfg.MaxTurns {
 			m.WorkingState.InSuddenDeath = false
 		} else {
@@ -236,7 +235,7 @@ func (m *Match) injectSuddenDeathHazards() {
 	limit := min(len(emptyTilePos), SuddenDeathBombs)
 
 	for _, target := range emptyTilePos[:limit] {
-		m.SubmitAction(m.WorkingState.dropBomb(SystemUnitID, target, BombDefaultPower))
+		m.submitAction(m.WorkingState.dropBomb(SystemUnitID, target, bombDefaultPower))
 	}
 }
 
@@ -316,7 +315,7 @@ func (gs *GameState) tickCountdownsAndQueueFuses() ([]BombID, map[BombID]bool, [
 		}
 
 		bomb.Countdown--
-		gameEvents = append(gameEvents, NewBombCountdownUpdatedEvent(id, bomb.Position, bomb.Countdown))
+		gameEvents = append(gameEvents, newBombCountdownUpdatedEvent(id, bomb.Position, bomb.Countdown))
 		if bomb.Countdown == 0 {
 			queue = append(queue, id)
 			ignited[id] = true
@@ -348,9 +347,9 @@ func (gs *GameState) processChainDetonations(
 			owner.BombUsed = max(owner.BombUsed-1, 0)
 		}
 
-		affectedTiles := gs.FindReachableTilesOnSnapshot(currBomb.Position, frozenGrid, MovementRule{
+		affectedTiles := gs.findReachableTilesOnSnapshot(currBomb.Position, frozenGrid, MovementRule{
 			MaxSteps:              currBomb.Range,
-			Pattern:               PatternCardinal,
+			Pattern:               patternCardinal,
 			PassPermissions:       PassUnits,
 			StopOnNonUnitOccupant: true,
 		})
@@ -368,7 +367,7 @@ func (gs *GameState) processChainDetonations(
 					explosionQueue = append(explosionQueue, nextBombID)
 				}
 			case OccupantUnit:
-				damagedUnits[tile.UnitID()] = true
+				damagedUnits[tile.unitID()] = true
 			case OccupantSoftBlock:
 				destroyedSoftBlocks[int(tile.OccupantID)] = true
 			case OccupantItem:
@@ -377,9 +376,9 @@ func (gs *GameState) processChainDetonations(
 			}
 		}
 
-		gs.ClearStageTile(currBomb.Position)
+		gs.clearStageTile(currBomb.Position)
 		delete(gs.Bombs, currBombID)
-		gameEvents = append(gameEvents, NewBombExplodedEvent(currBombID, currBomb.Position, affectedPos))
+		gameEvents = append(gameEvents, newBombExplodedEvent(currBombID, currBomb.Position, affectedPos))
 	}
 	return gameEvents
 }
@@ -418,10 +417,10 @@ func (gs *GameState) handleDelayedBatchDamage(
 		}
 
 		unit.HP -= 1
-		gameEvents = append(gameEvents, NewUnitDamagedEvent(unitID, unit.Position, unit.HP))
+		gameEvents = append(gameEvents, newUnitDamagedEvent(unitID, unit.Position, unit.HP))
 
 		if unit.HP <= 0 {
-			gs.ClearStageTile(unit.Position)
+			gs.clearStageTile(unit.Position)
 			gameEvents = append(gameEvents, NewUnitDiedEvent(unitID, unit.Position))
 		}
 	}
@@ -432,9 +431,9 @@ func (gs *GameState) handleDelayedBatchDamage(
 			continue
 		}
 
-		gs.ClearStageTile(softBlock.Position)
+		gs.clearStageTile(softBlock.Position)
 		delete(gs.SoftBlocks, softBlockID)
-		gameEvents = append(gameEvents, NewSoftBlockDestroyedEvent(softBlockID, softBlock.Position))
+		gameEvents = append(gameEvents, newSoftBlockDestroyedEvent(softBlockID, softBlock.Position))
 	}
 
 	return gameEvents
@@ -480,7 +479,7 @@ func (m *Match) evaluateVictoryConditions() int {
 	}
 
 	if p1.goal() && p2.goal() {
-		return MatchInProgress
+		return matchInProgress
 	}
 
 	p1Wins := p1.goal() || (p1.kingAlive && p2.wiped())
@@ -488,12 +487,12 @@ func (m *Match) evaluateVictoryConditions() int {
 
 	switch {
 	case p1Wins && p2Wins:
-		return MatchDrawn
+		return matchDrawn
 	case p1Wins:
 		return Team1
 	case p2Wins:
 		return Team2
 	default:
-		return MatchDrawn
+		return matchDrawn
 	}
 }

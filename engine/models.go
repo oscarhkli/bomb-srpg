@@ -100,8 +100,8 @@ type Tile struct {
 	OccupantID   int64        `json:"occupantId"` // UnitID, BombID or SoftBlockID, per OccupantType
 }
 
-// UnitID returns OccupantID as a UnitID, wrapping values wider than the type.
-func (t Tile) UnitID() UnitID {
+// unitID returns OccupantID as a UnitID, wrapping values wider than the type.
+func (t Tile) unitID() UnitID {
 	return UnitID(t.OccupantID & int64(math.MaxUint8))
 }
 
@@ -129,27 +129,26 @@ type StagePreset struct {
 	P2StartingPositions [5]Coordinate `json:"-"`
 }
 
-// SkillType is a bitmask for unit abilities (jump, fly, etc.).
-type SkillType uint32
+type skillType uint32
 
-const SkillNone SkillType = 0
+const skillNone skillType = 0
 const (
-	SkillCanJump SkillType = 1 << iota
-	SkillCanFly
+	skillCanJump skillType = 1 << iota
+	skillCanFly
 )
 
-func allSkills() []SkillType {
-	return []SkillType{SkillCanJump, SkillCanFly}
+func allSkills() []skillType {
+	return []skillType{skillCanJump, skillCanFly}
 }
 
 // String returns the name used in logs and JSON.
-func (s SkillType) String() string {
+func (s skillType) String() string {
 	switch s {
-	case SkillNone:
+	case skillNone:
 		return "None"
-	case SkillCanFly:
+	case skillCanFly:
 		return "Fly"
-	case SkillCanJump:
+	case skillCanJump:
 		return "Jump"
 	default:
 		return "Unknown"
@@ -157,7 +156,7 @@ func (s SkillType) String() string {
 }
 
 // MarshalJSON encodes the set as the names of its skills, never null.
-func (s SkillType) MarshalJSON() ([]byte, error) {
+func (s skillType) MarshalJSON() ([]byte, error) {
 	var names []string
 	for _, skill := range allSkills() {
 		if skill&s != 0 {
@@ -176,7 +175,7 @@ type Archetype struct {
 	BombPower    int       `json:"-"`
 	MaxBombCount int       `json:"-"`
 	BaseHP       int       `json:"-"`
-	PresetSkills SkillType `json:"skills"`
+	PresetSkills skillType `json:"skills"`
 	Selectable   bool      `json:"-"`
 }
 
@@ -211,7 +210,7 @@ func (r UnitRole) MarshalText() ([]byte, error) {
 func (r *UnitRole) UnmarshalText(text []byte) error {
 	i := slices.Index(roleNames(), string(text))
 	if i < 0 {
-		return fmt.Errorf("%w: %q", ErrInvalidUnitRole, text)
+		return fmt.Errorf("%w: %q", errInvalidUnitRole, text)
 	}
 	*r = UnitRole(i)
 	return nil
@@ -236,7 +235,7 @@ type Unit struct {
 	BombUsed     int
 	Team         int // 1 = P1, 2 = P2 / COM
 	HP           int // alive while above 0; every archetype currently has 1
-	Skills       SkillType
+	Skills       skillType
 	Role         UnitRole
 	HasMoved     bool
 	HasUsedSkill bool // set after placing a bomb or using a skill; reset each turn
@@ -255,7 +254,7 @@ func (u Unit) MarshalJSON() ([]byte, error) {
 		BombUsed     int        `json:"bombUsed"`
 		Team         int        `json:"team"`
 		HP           int        `json:"hp"`
-		Skills       SkillType  `json:"skills"`
+		Skills       skillType  `json:"skills"`
 		HasMoved     bool       `json:"hasMoved"`
 		HasUsedSkill bool       `json:"hasUsedSkill"`
 	}{
@@ -370,8 +369,7 @@ func (c CPUTurnPhase) MarshalText() ([]byte, error) {
 	return []byte(c.String()), nil
 }
 
-// CPUState manages the TurnPhase state and pending GameEvent for VS CPU.
-type CPUState struct {
+type cpuState struct {
 	Phase                 CPUTurnPhase
 	PlanGameEvents        []GameEvent
 	ResolveTurnGameEvents []GameEvent
@@ -383,20 +381,19 @@ type Match struct {
 	TrueState    *GameState  // Committed state
 	WorkingState *GameState  // Sandbox for mid-turn planning
 	PlaybackLog  []GameEvent // events since the last ResolveTurn
-	CPU          CPUState
+	CPU          cpuState
 	WinnerTeamID int // 0 = in progress, 1/2 = winner, -1 = draw
 }
 
 const (
-	MatchInProgress = 0
-	MatchDrawn      = -1
+	matchInProgress = 0
+	matchDrawn      = -1
 )
 
-// StepPattern defines the movement topology.
-type StepPattern int
+type stepPattern int
 
 const (
-	PatternCardinal StepPattern = iota
+	patternCardinal stepPattern = iota
 )
 
 // PassFlag is a bitmask for pathfinding passability rules.
@@ -413,7 +410,7 @@ const (
 // MovementRule configures pathfinding for a specific action (move, bomb placement, skill).
 type MovementRule struct {
 	MaxSteps              int // Max steps; -1 = unlimited
-	Pattern               StepPattern
+	Pattern               stepPattern
 	CanTurn               bool     // True = can change direction mid-path
 	PassPermissions       PassFlag // obstacle types the mover may walk through
 	StopOnNonUnitOccupant bool     // True = stop on first non-unit (bomb, block, item); False = stop before it

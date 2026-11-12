@@ -74,7 +74,7 @@ func TestGameState_IsWithinBounds(t *testing.T) {
 			gs := &GameState{
 				Grid: tt.grid,
 			}
-			result := gs.IsWithinBounds(tt.pos)
+			result := gs.isWithinBounds(tt.pos)
 			if result != tt.expected {
 				t.Errorf("Expected IsWithinBounds(%v) to be %v, got %v", tt.pos, tt.expected, result)
 			}
@@ -118,7 +118,7 @@ func TestGameState_ClearStageTile(t *testing.T) {
 				}},
 			}
 
-			state.ClearStageTile(tt.clearPos)
+			state.clearStageTile(tt.clearPos)
 
 			cell := state.Grid[tt.verifyPos.Y][tt.verifyPos.X]
 
@@ -199,7 +199,7 @@ func TestGameState_DeduceBombCountDown(t *testing.T) {
 	}
 
 	want := 5
-	if got := gs.DeduceBombCountDown(); got != want {
+	if got := gs.deduceBombCountDown(); got != want {
 		t.Errorf("DeduceBombCountDown() = %v, want %v", got, want)
 	}
 }

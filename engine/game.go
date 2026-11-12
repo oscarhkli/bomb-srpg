@@ -5,7 +5,7 @@ import (
 	"slices"
 )
 
-const NoUnit string = "NO_UNIT"
+const noUnit string = "NO_UNIT"
 
 const maxTurnsLimit = 100
 
@@ -39,7 +39,7 @@ func InitGame(gameCfg GameCfg) (*Match, error) {
 func teamSize(team []TeamSlot) int {
 	count := 0
 	for _, v := range team {
-		if v.Archetype != NoUnit {
+		if v.Archetype != noUnit {
 			count++
 		}
 	}
@@ -47,13 +47,13 @@ func teamSize(team []TeamSlot) int {
 }
 
 func initGameState(gameCfg GameCfg) (*GameState, error) {
-	stagePreset, exists := GetStagePreset(gameCfg.StagePreset)
+	stagePreset, exists := getStagePreset(gameCfg.StagePreset)
 	if !exists {
 		return nil, fmt.Errorf("%w: stage preset '%s' not found", ErrInvalidStagePreset, gameCfg.StagePreset)
 	}
 
 	if gameCfg.MaxTurns < 0 || gameCfg.MaxTurns > maxTurnsLimit {
-		return nil, fmt.Errorf("%w: %d not in 0..%d", ErrInvalidMaxTurns, gameCfg.MaxTurns, maxTurnsLimit)
+		return nil, fmt.Errorf("%w: %d not in 0..%d", errInvalidMaxTurns, gameCfg.MaxTurns, maxTurnsLimit)
 	}
 
 	if err := validateTeamComposition(gameCfg.P1Slots, "Player 1"); err != nil {
@@ -132,7 +132,7 @@ func compileGrid(preset StagePreset) ([][]Tile, error) {
 func validateTeamComposition(slots []TeamSlot, playerLabel string) error {
 	hasBoss := hasRole(slots, RoleBoss)
 	if hasBoss && hasRole(slots, RoleKing) {
-		return fmt.Errorf("%w: %s must have either Boss or King, got %v", ErrInvalidTeamFormation, playerLabel, slots)
+		return fmt.Errorf("%w: %s must have either Boss or King, got %v", errInvalidTeamFormation, playerLabel, slots)
 	}
 
 	minTeamSize := 2
@@ -150,7 +150,7 @@ func validateTeamComposition(slots []TeamSlot, playerLabel string) error {
 
 func hasRole(team []TeamSlot, role UnitRole) bool {
 	for _, t := range team {
-		if t.Archetype != NoUnit && t.Role == role {
+		if t.Archetype != noUnit && t.Role == role {
 			return true
 		}
 	}
@@ -158,12 +158,12 @@ func hasRole(team []TeamSlot, role UnitRole) bool {
 }
 
 func hasExactlyOneAndFirstIsKing(team []TeamSlot) bool {
-	if len(team) == 0 || team[0].Archetype == NoUnit || team[0].Role != RoleKing {
+	if len(team) == 0 || team[0].Archetype == noUnit || team[0].Role != RoleKing {
 		return false
 	}
 
 	for i := 1; i < len(team); i++ {
-		if team[i].Archetype != NoUnit && team[i].Role == RoleKing {
+		if team[i].Archetype != noUnit && team[i].Role == RoleKing {
 			return false
 		}
 	}
@@ -179,7 +179,7 @@ func createUnits(
 	gameCfg GameCfg,
 ) error {
 	for i, ts := range teams {
-		if ts.Archetype == NoUnit {
+		if ts.Archetype == noUnit {
 			continue
 		}
 		archetype, exists := GetArchetype(ts.Archetype)

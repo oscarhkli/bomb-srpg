@@ -47,7 +47,7 @@ func TestInitGameState_Suite(t *testing.T) {
 			name: "Success: With NO_UNIT",
 			cfg: GameCfg{
 				StagePreset: "Plain",
-				P1Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: NoUnit}, {Archetype: "Fighter", Role: RoleNormal}},
+				P1Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: noUnit}, {Archetype: "Fighter", Role: RoleNormal}},
 				P2Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
 			},
 			expectedTotalUnits: 4,
@@ -196,7 +196,7 @@ func TestInitGameState_Suite(t *testing.T) {
 			name: "Failure: Player 1 has 1 unit as NO_UNIT doesn't count",
 			cfg: GameCfg{
 				StagePreset: "Plain",
-				P1Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: NoUnit}},
+				P1Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: noUnit}},
 				P2Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
 			},
 			wantErr:    ErrInvalidTeamSize,
@@ -296,7 +296,7 @@ func TestInitGameState_Suite(t *testing.T) {
 				P1Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Prologue", Role: RoleBoss}, {Archetype: "Fighter", Role: RoleNormal}},
 				P2Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
 			},
-			wantErr:    ErrInvalidTeamFormation,
+			wantErr:    errInvalidTeamFormation,
 			wantPlayer: "Player 1",
 		},
 		{
@@ -306,7 +306,7 @@ func TestInitGameState_Suite(t *testing.T) {
 				P1Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
 				P2Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Prologue", Role: RoleBoss}, {Archetype: "Fighter", Role: RoleNormal}},
 			},
-			wantErr:    ErrInvalidTeamFormation,
+			wantErr:    errInvalidTeamFormation,
 			wantPlayer: "Player 2",
 		},
 		{
@@ -360,7 +360,7 @@ func TestInitGameState_Suite(t *testing.T) {
 			name: "Failure: Player 1 with only a NO_UNIT slot has no real Boss, falls back to King-mode size check",
 			cfg: GameCfg{
 				StagePreset: "Plain",
-				P1Slots:     []TeamSlot{{Archetype: NoUnit, Role: RoleBoss}},
+				P1Slots:     []TeamSlot{{Archetype: noUnit, Role: RoleBoss}},
 				P2Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
 			},
 			wantErr:    ErrInvalidTeamSize,
@@ -370,7 +370,7 @@ func TestInitGameState_Suite(t *testing.T) {
 			name: "Success: Player 1 has a NO_UNIT slot tagged RoleBoss alongside a real King",
 			cfg: GameCfg{
 				StagePreset: "Plain",
-				P1Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: NoUnit, Role: RoleBoss}, {Archetype: "Fighter", Role: RoleNormal}},
+				P1Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: noUnit, Role: RoleBoss}, {Archetype: "Fighter", Role: RoleNormal}},
 				P2Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
 			},
 			expectedTotalUnits: 4,
@@ -379,7 +379,7 @@ func TestInitGameState_Suite(t *testing.T) {
 			name: "Failure: Player 1's first slot is NO_UNIT tagged RoleKing, real King is elsewhere",
 			cfg: GameCfg{
 				StagePreset: "Plain",
-				P1Slots:     []TeamSlot{{Archetype: NoUnit, Role: RoleKing}, {Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
+				P1Slots:     []TeamSlot{{Archetype: noUnit, Role: RoleKing}, {Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
 				P2Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
 			},
 			wantErr:    ErrMissingKing,
@@ -420,7 +420,7 @@ func TestInitGameState_Suite(t *testing.T) {
 				t.Errorf("Expected %d total units, got %d", tt.expectedTotalUnits, len(gameState.Units))
 			}
 
-			preset, _ := GetStagePreset(tt.cfg.StagePreset)
+			preset, _ := getStagePreset(tt.cfg.StagePreset)
 			if len(gameState.Grid) != preset.Height {
 				t.Errorf("Expected grid height %d, got %d", preset.Height, len(gameState.Grid))
 			}
@@ -509,8 +509,8 @@ func TestInitGameState_MaxTurns(t *testing.T) {
 		{name: "zero is sudden death from turn 1", maxTurns: 0},
 		{name: "preset-sized value", maxTurns: 60},
 		{name: "upper bound", maxTurns: maxTurnsLimit},
-		{name: "negative", maxTurns: -1, wantErr: ErrInvalidMaxTurns},
-		{name: "above upper bound", maxTurns: maxTurnsLimit + 1, wantErr: ErrInvalidMaxTurns},
+		{name: "negative", maxTurns: -1, wantErr: errInvalidMaxTurns},
+		{name: "above upper bound", maxTurns: maxTurnsLimit + 1, wantErr: errInvalidMaxTurns},
 	}
 
 	for _, tt := range tests {
@@ -674,7 +674,7 @@ func TestGameStateDeepCopy_Isolation(t *testing.T) {
 	original.Bombs[1] = &Bomb{ID: 1, OwnerID: 1, Position: Coordinate{1, 1}, Range: 2, Countdown: 3}
 	original.SoftBlocks[1] = &SoftBlock{ID: 1, Position: Coordinate{2, 2}}
 	original.TurnCommands = []TurnCommand{NewMoveCommand(1, Coordinate{3, 3})}
-	original.TurnStartEvents = []GameEvent{NewBombPlacedEvent(1, 1, Coordinate{4, 4}, 2, 3), NewUnitMovedEvent(1, Coordinate{1, 1}, Coordinate{2, 2})}
+	original.TurnStartEvents = []GameEvent{newBombPlacedEvent(1, 1, Coordinate{4, 4}, 2, 3), NewUnitMovedEvent(1, Coordinate{1, 1}, Coordinate{2, 2})}
 	original.TurnStartEvents[1].AffectedPositions = []Coordinate{{5, 5}}
 
 	clone := original.DeepCopy()
@@ -749,7 +749,7 @@ func TestGameStateDeepCopy_Fidelity(t *testing.T) {
 				BombUsed:     1,
 				Team:         2,
 				HP:           2,
-				Skills:       SkillNone,
+				Skills:       skillNone,
 				Role:         RoleKing,
 				HasMoved:     true,
 				HasUsedSkill: true,

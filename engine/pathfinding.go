@@ -7,9 +7,9 @@ func (gs *GameState) FindReachableTiles(start Coordinate, rule MovementRule) map
 	return gs.findReachableTiles(start, rule, gs.Grid)
 }
 
-// FindReachableTilesOnSnapshot runs pathfinding using a frozen, read-only grid snapshot matrix.
+// findReachableTilesOnSnapshot runs pathfinding using a frozen, read-only grid snapshot matrix.
 // The frozen snapshot lets overlapping explosions evaluate line-of-sight blocks correctly.
-func (gs *GameState) FindReachableTilesOnSnapshot(start Coordinate, snapshot [][]Tile, rule MovementRule) map[Coordinate]int {
+func (gs *GameState) findReachableTilesOnSnapshot(start Coordinate, snapshot [][]Tile, rule MovementRule) map[Coordinate]int {
 	return gs.findReachableTiles(start, rule, snapshot)
 }
 
@@ -24,7 +24,7 @@ func (gs *GameState) stepTarget(node pathNode, dir Coordinate, rule MovementRule
 		return Coordinate{}, false
 	}
 	next := Coordinate{node.Pos.X + dir.X, node.Pos.Y + dir.Y}
-	return next, gs.IsWithinBounds(next)
+	return next, gs.isWithinBounds(next)
 }
 
 func (gs *GameState) findReachableTiles(startPos Coordinate, rule MovementRule, grid [][]Tile) map[Coordinate]int {
@@ -59,7 +59,7 @@ func (gs *GameState) expandNode(queue []pathNode, node pathNode, rule MovementRu
 			continue
 		}
 
-		canPass, canLand := rule.CheckPassability(grid[nextPos.Y][nextPos.X])
+		canPass, canLand := rule.checkPassability(grid[nextPos.Y][nextPos.X])
 		if !canPass && !canLand {
 			continue
 		}
@@ -78,10 +78,10 @@ func (gs *GameState) expandNode(queue []pathNode, node pathNode, rule MovementRu
 	return queue
 }
 
-// CheckPassability reports how the rule treats the tile: canPass = can walk through it;
+// checkPassability reports how the rule treats the tile: canPass = can walk through it;
 // canLand = can step on it but must stop; both false = blocked.
 // Both true never occurs.
-func (mr MovementRule) CheckPassability(tile Tile) (canPass bool, canLand bool) {
+func (mr MovementRule) checkPassability(tile Tile) (canPass bool, canLand bool) {
 	if tile.Type == TerrainBlock && (mr.PassPermissions&PassHardBlocks == 0) {
 		return false, false
 	}
@@ -117,23 +117,22 @@ func (mr MovementRule) CheckPassability(tile Tile) (canPass bool, canLand bool) 
 func (u Unit) NewMovementRule() MovementRule {
 	return MovementRule{
 		MaxSteps:        u.Speed,
-		Pattern:         PatternCardinal,
+		Pattern:         patternCardinal,
 		PassPermissions: PassItems,
 	}
 }
 
-// NewBombPlacementRule builds a snapshot configuration for a unit's bomb placement action.
-func (u Unit) NewBombPlacementRule() MovementRule {
+func (u Unit) newBombPlacementRule() MovementRule {
 	return MovementRule{
 		MaxSteps:        u.BombMaxRange,
-		Pattern:         PatternCardinal,
+		Pattern:         patternCardinal,
 		PassPermissions: PassUnits | PassSoftBlocks | PassHardBlocks | PassItems | PassBombs,
 	}
 }
 
-// FindAllowedTiles deduces the tiles that an occupant can reach and land on.
+// findAllowedTiles deduces the tiles that an occupant can reach and land on.
 // It returns coordinates with distance from the start.
-func (gs *GameState) FindAllowedTiles(start Coordinate, rule MovementRule, occupantType OccupantType) map[Coordinate]int {
+func (gs *GameState) findAllowedTiles(start Coordinate, rule MovementRule, occupantType OccupantType) map[Coordinate]int {
 	reachable := gs.FindReachableTiles(start, rule)
 	allowed := make(map[Coordinate]int)
 	for pos, steps := range reachable {
@@ -154,9 +153,9 @@ func (gs *GameState) FindAllowedTilesForCommand(unitID UnitID, turnCmdType TurnC
 
 	switch turnCmdType {
 	case TurnCmdMove:
-		return gs.FindAllowedTiles(unit.Position, unit.NewMovementRule(), OccupantUnit), nil
+		return gs.findAllowedTiles(unit.Position, unit.NewMovementRule(), OccupantUnit), nil
 	case TurnCmdPlaceBomb:
-		return gs.FindAllowedTiles(unit.Position, unit.NewBombPlacementRule(), OccupantBomb), nil
+		return gs.findAllowedTiles(unit.Position, unit.newBombPlacementRule(), OccupantBomb), nil
 	default:
 		return nil, fmt.Errorf("%w: %s", ErrUnsupportedCommand, turnCmdType)
 	}

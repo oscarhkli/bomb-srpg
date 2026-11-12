@@ -26,7 +26,7 @@ func TestGameState_FindReachableTiles_TerrainAndBoundaries(t *testing.T) {
 			name: "1 step, all impassable",
 			rule: MovementRule{
 				MaxSteps: 1,
-				Pattern:  PatternCardinal,
+				Pattern:  patternCardinal,
 			},
 			expected: map[Coordinate]int{
 				{1, 0}: 1,
@@ -37,7 +37,7 @@ func TestGameState_FindReachableTiles_TerrainAndBoundaries(t *testing.T) {
 			name: "large steps, all impassable",
 			rule: MovementRule{
 				MaxSteps: 2,
-				Pattern:  PatternCardinal,
+				Pattern:  patternCardinal,
 			},
 			expected: map[Coordinate]int{
 				{1, 0}: 1,
@@ -48,7 +48,7 @@ func TestGameState_FindReachableTiles_TerrainAndBoundaries(t *testing.T) {
 			name: "1 step, can pass hard blocks",
 			rule: MovementRule{
 				MaxSteps:        1,
-				Pattern:         PatternCardinal,
+				Pattern:         patternCardinal,
 				PassPermissions: PassHardBlocks,
 			},
 			expected: map[Coordinate]int{
@@ -61,7 +61,7 @@ func TestGameState_FindReachableTiles_TerrainAndBoundaries(t *testing.T) {
 			name: "2 steps, can pass hard blocks",
 			rule: MovementRule{
 				MaxSteps:        2,
-				Pattern:         PatternCardinal,
+				Pattern:         patternCardinal,
 				PassPermissions: PassHardBlocks,
 			},
 			expected: map[Coordinate]int{
@@ -75,7 +75,7 @@ func TestGameState_FindReachableTiles_TerrainAndBoundaries(t *testing.T) {
 			name: "2 steps, can pass all",
 			rule: MovementRule{
 				MaxSteps:        2,
-				Pattern:         PatternCardinal,
+				Pattern:         patternCardinal,
 				PassPermissions: PassUnits | PassSoftBlocks | PassHardBlocks | PassItems | PassBombs,
 			},
 			expected: map[Coordinate]int{
@@ -89,7 +89,7 @@ func TestGameState_FindReachableTiles_TerrainAndBoundaries(t *testing.T) {
 			name: "infinite steps, can turn, all impassable",
 			rule: MovementRule{
 				MaxSteps: -1,
-				Pattern:  PatternCardinal,
+				Pattern:  patternCardinal,
 				CanTurn:  true,
 			},
 			expected: map[Coordinate]int{
@@ -148,7 +148,7 @@ func TestGameState_FindReachableTiles_OccupiedTiles(t *testing.T) {
 			name: "all impassable",
 			rule: MovementRule{
 				MaxSteps: -1,
-				Pattern:  PatternCardinal,
+				Pattern:  patternCardinal,
 			},
 			expected: map[Coordinate]int{
 				{4, 1}: 0,
@@ -159,7 +159,7 @@ func TestGameState_FindReachableTiles_OccupiedTiles(t *testing.T) {
 			name: "can pass units",
 			rule: MovementRule{
 				MaxSteps:        -1,
-				Pattern:         PatternCardinal,
+				Pattern:         patternCardinal,
 				PassPermissions: PassUnits,
 			},
 			expected: map[Coordinate]int{
@@ -171,7 +171,7 @@ func TestGameState_FindReachableTiles_OccupiedTiles(t *testing.T) {
 			name: "can pass units, stops on non-unit occupant",
 			rule: MovementRule{
 				MaxSteps:              -1,
-				Pattern:               PatternCardinal,
+				Pattern:               patternCardinal,
 				PassPermissions:       PassUnits,
 				StopOnNonUnitOccupant: true,
 			},
@@ -186,7 +186,7 @@ func TestGameState_FindReachableTiles_OccupiedTiles(t *testing.T) {
 			name: "can pass bombs, stops on non-unit occupant",
 			rule: MovementRule{
 				MaxSteps:              -1,
-				Pattern:               PatternCardinal,
+				Pattern:               patternCardinal,
 				PassPermissions:       PassBombs,
 				StopOnNonUnitOccupant: true,
 			},
@@ -201,7 +201,7 @@ func TestGameState_FindReachableTiles_OccupiedTiles(t *testing.T) {
 			name: "can pass bombs, items and units, can turn",
 			rule: MovementRule{
 				MaxSteps:        -1,
-				Pattern:         PatternCardinal,
+				Pattern:         patternCardinal,
 				PassPermissions: PassBombs | PassItems | PassUnits,
 				CanTurn:         true,
 			},
@@ -303,7 +303,7 @@ func TestGameState_FindReachableTilesOnSnapshot(t *testing.T) {
 		MaxSteps: -1,
 	}
 
-	result := state.FindReachableTilesOnSnapshot(startPos, snapshot, rule)
+	result := state.findReachableTilesOnSnapshot(startPos, snapshot, rule)
 	resultWithRealtimeData := state.FindReachableTiles(startPos, rule)
 
 	if maps.Equal(result, resultWithRealtimeData) {
@@ -320,7 +320,7 @@ func TestUnit_NewMovementRule_BasicWalking(t *testing.T) {
 		t.Errorf("Expected MaxSteps to match unit speed (%d), got %d", unit.Speed, mr.MaxSteps)
 	}
 
-	if mr.Pattern != PatternCardinal {
+	if mr.Pattern != patternCardinal {
 		t.Errorf("Expected step pattern to be PatternCardinal, got %v", mr.Pattern)
 	}
 
@@ -346,13 +346,13 @@ func TestUnit_NewMovementRule_BasicWalking(t *testing.T) {
 func TestUnit_NewBombPlacementRule(t *testing.T) {
 	unit := Unit{Type: Archetype{Name: "King"}}
 
-	br := unit.NewBombPlacementRule()
+	br := unit.newBombPlacementRule()
 
 	if br.MaxSteps != unit.BombMaxRange {
 		t.Errorf("Expected MaxSteps to match unit BombMaxRange (%d), got %d", unit.BombMaxRange, br.MaxSteps)
 	}
 
-	if br.Pattern != PatternCardinal {
+	if br.Pattern != patternCardinal {
 		t.Errorf("Expected step pattern to be PatternCardinal, got %v", br.Pattern)
 	}
 
@@ -392,11 +392,11 @@ func TestGameState_FindAllowedTiles(t *testing.T) {
 
 	rule := MovementRule{
 		MaxSteps:        2,
-		Pattern:         PatternCardinal,
+		Pattern:         patternCardinal,
 		PassPermissions: PassUnits | PassSoftBlocks | PassHardBlocks | PassItems | PassBombs,
 	}
 
-	result := state.FindAllowedTiles(startPos, rule, OccupantBomb)
+	result := state.findAllowedTiles(startPos, rule, OccupantBomb)
 
 	expected := map[Coordinate]int{
 		{1, 0}: 1, {4, 0}: 2,
@@ -538,7 +538,7 @@ func TestMovementRule_CheckPassability(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotPass, gotLand := tt.rule.CheckPassability(tt.tile)
+			gotPass, gotLand := tt.rule.checkPassability(tt.tile)
 			if gotPass != tt.wantCanPass || gotLand != tt.wantCanLand {
 				t.Errorf("CheckPassability() = (%v, %v), want (%v, %v)", gotPass, gotLand, tt.wantCanPass, tt.wantCanLand)
 			}

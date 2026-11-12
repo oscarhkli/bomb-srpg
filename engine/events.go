@@ -45,8 +45,7 @@ func NewUnitMovedEvent(unitID UnitID, from, to Coordinate) GameEvent {
 	return GameEvent{Type: GameEvtUnitMoved, UnitID: unitID, From: &from, To: &to}
 }
 
-// NewUnitDamagedEvent creates a unit damaged event.
-func NewUnitDamagedEvent(unitID UnitID, pos Coordinate, newHP int) GameEvent {
+func newUnitDamagedEvent(unitID UnitID, pos Coordinate, newHP int) GameEvent {
 	return GameEvent{Type: GameEvtUnitDamaged, UnitID: unitID, Position: &pos, NewHP: newHP}
 }
 
@@ -55,23 +54,19 @@ func NewUnitDiedEvent(unitID UnitID, pos Coordinate) GameEvent {
 	return GameEvent{Type: GameEvtUnitDied, UnitID: unitID, Position: &pos}
 }
 
-// NewBombPlacedEvent creates a bomb placed event.
-func NewBombPlacedEvent(unitID UnitID, bombID BombID, pos Coordinate, rangeVal, countdown int) GameEvent {
+func newBombPlacedEvent(unitID UnitID, bombID BombID, pos Coordinate, rangeVal, countdown int) GameEvent {
 	return GameEvent{Type: GameEvtBombPlaced, UnitID: unitID, BombID: bombID, Position: &pos, Range: rangeVal, Countdown: countdown}
 }
 
-// NewBombCountdownUpdatedEvent creates a bomb countdown updated event.
-func NewBombCountdownUpdatedEvent(bombID BombID, pos Coordinate, countdown int) GameEvent {
+func newBombCountdownUpdatedEvent(bombID BombID, pos Coordinate, countdown int) GameEvent {
 	return GameEvent{Type: GameEvtBombCountdownUpdated, BombID: bombID, Position: &pos, Countdown: countdown}
 }
 
-// NewBombExplodedEvent creates a bomb exploded event.
-func NewBombExplodedEvent(bombID BombID, pos Coordinate, affected []Coordinate) GameEvent {
+func newBombExplodedEvent(bombID BombID, pos Coordinate, affected []Coordinate) GameEvent {
 	return GameEvent{Type: GameEvtBombExploded, BombID: bombID, Position: &pos, AffectedPositions: affected}
 }
 
-// NewSoftBlockDestroyedEvent creates a soft block destroyed event.
-func NewSoftBlockDestroyedEvent(id int, pos Coordinate) GameEvent {
+func newSoftBlockDestroyedEvent(id int, pos Coordinate) GameEvent {
 	return GameEvent{Type: GameEvtSoftBlockDestroyed, SoftBlockID: id, Position: &pos}
 }
 

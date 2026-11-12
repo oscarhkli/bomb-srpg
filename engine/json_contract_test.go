@@ -49,7 +49,7 @@ func TestEventAndCommandEncoding(t *testing.T) {
 		},
 		{
 			"unit damaged",
-			NewUnitDamagedEvent(17, pos, 0),
+			newUnitDamagedEvent(17, pos, 0),
 			`{
 				"type": "unitDamaged",
 				"unitId": 17,
@@ -60,7 +60,7 @@ func TestEventAndCommandEncoding(t *testing.T) {
 		},
 		{
 			"bomb placed",
-			NewBombPlacedEvent(17, 70000, pos, 2, 3),
+			newBombPlacedEvent(17, 70000, pos, 2, 3),
 			`{
 				"type": "bombPlaced",
 				"unitId": 17,
@@ -73,7 +73,7 @@ func TestEventAndCommandEncoding(t *testing.T) {
 		},
 		{
 			"bomb exploded",
-			NewBombExplodedEvent(70000, pos, []Coordinate{{X: 1, Y: 2}, {X: 1, Y: 3}}),
+			newBombExplodedEvent(70000, pos, []Coordinate{{X: 1, Y: 2}, {X: 1, Y: 3}}),
 			`{
 				"type": "bombExploded",
 				"unitId": 0,
@@ -89,7 +89,7 @@ func TestEventAndCommandEncoding(t *testing.T) {
 		},
 		{
 			"soft block destroyed",
-			NewSoftBlockDestroyedEvent(5, pos),
+			newSoftBlockDestroyedEvent(5, pos),
 			`{
 				"type": "softBlockDestroyed",
 				"unitId": 0,
@@ -128,7 +128,7 @@ func TestEntityEncoding(t *testing.T) {
 	checkEncoding(t, []encodingCase{
 		{
 			"archetype with skills",
-			Archetype{Name: "Witch", BaseSpeed: 3, BombMaxRange: 4, PresetSkills: SkillCanJump | SkillCanFly},
+			Archetype{Name: "Witch", BaseSpeed: 3, BombMaxRange: 4, PresetSkills: skillCanJump | skillCanFly},
 			`{
 				"name": "Witch",
 				"speed": 3,
@@ -161,7 +161,7 @@ func TestEntityEncoding(t *testing.T) {
 			Unit{
 				ID: 17, Type: Archetype{Name: "King"}, Position: pos,
 				Speed: 3, BombMaxRange: 4, BombPower: 1, MaxBombCount: 2,
-				Team: 1, HP: 1, Skills: SkillCanFly, HasMoved: true,
+				Team: 1, HP: 1, Skills: skillCanFly, HasMoved: true,
 			},
 			`{
 				"id": 17,
@@ -204,7 +204,7 @@ func TestGameStateEncoding(t *testing.T) {
 		Bombs:           map[BombID]*Bomb{70000: {ID: 70000, OwnerID: 17, Position: pos, Range: 2, Countdown: 3}},
 		SoftBlocks:      map[int]*SoftBlock{4: {ID: 4, Position: pos}},
 		TurnCommands:    []TurnCommand{NewMoveCommand(17, pos)},
-		TurnStartEvents: []GameEvent{NewBombPlacedEvent(17, 70000, pos, 2, 3)},
+		TurnStartEvents: []GameEvent{newBombPlacedEvent(17, 70000, pos, 2, 3)},
 	}
 	const wantFull = `{
 			"turn": 2,

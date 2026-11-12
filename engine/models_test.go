@@ -54,13 +54,13 @@ func TestOccupantTypeString(t *testing.T) {
 func TestSkillTypeString(t *testing.T) {
 	tests := []struct {
 		name  string
-		skill SkillType
+		skill skillType
 		want  string
 	}{
-		{"Skill None", SkillNone, "None"},
-		{"Skill Fly", SkillCanFly, "Fly"},
-		{"Skill Jump", SkillCanJump, "Jump"},
-		{"Invalid Value", SkillType(123), "Unknown"},
+		{"Skill None", skillNone, "None"},
+		{"Skill Fly", skillCanFly, "Fly"},
+		{"Skill Jump", skillCanJump, "Jump"},
+		{"Invalid Value", skillType(123), "Unknown"},
 	}
 
 	for _, tt := range tests {
@@ -161,7 +161,7 @@ func TestTile_UnitID(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := (Tile{OccupantID: tt.occupantID}).UnitID(); got != tt.want {
+			if got := (Tile{OccupantID: tt.occupantID}).unitID(); got != tt.want {
 				t.Errorf("UnitID() = %#x, want %#x", got, tt.want)
 			}
 		})

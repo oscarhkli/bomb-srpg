@@ -56,7 +56,7 @@ func TestMatch_SubmitAction_AllowResetTurn(t *testing.T) {
 
 	event := NewUnitMovedEvent(unitID, Coordinate{1, 0}, Coordinate{10, 100})
 
-	m.SubmitAction(event)
+	m.submitAction(event)
 
 	if len(m.PlaybackLog) == 0 {
 		t.Errorf("Expected PlaybackLog to capture and retain the submitted event payload successfully")
@@ -85,7 +85,7 @@ func TestMatch_SubmitAction_DisallowResetTurn(t *testing.T) {
 
 	event := NewUnitMovedEvent(unitID, Coordinate{1, 0}, Coordinate{10, 100})
 
-	m.SubmitAction(event)
+	m.submitAction(event)
 
 	if len(m.PlaybackLog) == 0 {
 		t.Errorf("Expected PlaybackLog to capture and retain the submitted event payload successfully")
@@ -155,7 +155,7 @@ func TestMatch_CommandMoveUnit(t *testing.T) {
 		}
 		m.WorkingState.Grid[origin.Y][origin.X] = Tile{OccupantType: OccupantUnit, OccupantID: int64(validUnitID)}
 
-		gameEvents, err := m.CommandMoveUnit(validUnitID, validTarget)
+		gameEvents, err := m.commandMoveUnit(validUnitID, validTarget)
 		if err != nil {
 			t.Fatalf("CommandMoveUnit() unexpected error: %v", err)
 		}
@@ -170,7 +170,7 @@ func TestMatch_CommandMoveUnit(t *testing.T) {
 	t.Run("Failure: MoveUnit error propagates unchanged", func(t *testing.T) {
 		m := newTestMatch(2, 2)
 
-		gameEvents, err := m.CommandMoveUnit(NewUnitID(3, 3), validTarget)
+		gameEvents, err := m.commandMoveUnit(NewUnitID(3, 3), validTarget)
 		if err == nil || !strings.Contains(err.Error(), "does not exist") {
 			t.Fatalf("expected propagated not-found error, got %v", err)
 		}
@@ -740,8 +740,8 @@ func TestGameState_PlaceBomb(t *testing.T) {
 				if !exists {
 					t.Fatalf("expected sudden-death bomb registered under ID %#X", expectedBombID)
 				}
-				if bomb.Range != BombDefaultPower {
-					t.Errorf("expected system bomb to use BombDefaultPower %d, got %d", BombDefaultPower, bomb.Range)
+				if bomb.Range != bombDefaultPower {
+					t.Errorf("expected system bomb to use BombDefaultPower %d, got %d", bombDefaultPower, bomb.Range)
 				}
 				if evt.Type != GameEvtBombPlaced || evt.UnitID != SystemUnitID {
 					t.Errorf("malformed system BombPlacedEvent: %+v", evt)
@@ -1128,7 +1128,7 @@ func TestMatch_ResolveTurn_SplitsPlanningFromResolution(t *testing.T) {
 	if _, err := m.CommandPlaceBomb(unitID, Coordinate{1, 0}); err != nil {
 		t.Fatalf("CommandPlaceBomb() error = %v", err)
 	}
-	if _, err := m.CommandMoveUnit(unitID, Coordinate{0, 1}); err != nil {
+	if _, err := m.commandMoveUnit(unitID, Coordinate{0, 1}); err != nil {
 		t.Fatalf("CommandMoveUnit() error = %v", err)
 	}
 	for _, bomb := range m.WorkingState.Bombs {
@@ -1476,7 +1476,7 @@ func TestMatch_ResolveTurn_TimelineSystemTransitions(t *testing.T) {
 	})
 }
 
-func (m *Match) AddUnit(team, idx int, archetype Archetype, role UnitRole, pos Coordinate, hp int) *Unit {
+func (m *Match) addUnit(team, idx int, archetype Archetype, role UnitRole, pos Coordinate, hp int) {
 	id := NewUnitID(team, idx)
 	u := &Unit{
 		ID:           id,
@@ -1499,12 +1499,11 @@ func (m *Match) AddUnit(team, idx int, archetype Archetype, role UnitRole, pos C
 		OccupantType: OccupantUnit,
 		OccupantID:   int64(id),
 	}
-	return u
 }
 
-func (m *Match) AddBomb(turn, counter int, owner UnitID, pos Coordinate, range_, cd int) *Bomb {
+func (m *Match) addBomb(counter int, owner UnitID, pos Coordinate, range_, cd int) {
 	b := &Bomb{
-		ID:        NewBombID(turn, counter, owner),
+		ID:        NewBombID(1, counter, owner),
 		OwnerID:   owner,
 		Position:  pos,
 		Range:     range_,
@@ -1516,10 +1515,9 @@ func (m *Match) AddBomb(turn, counter int, owner UnitID, pos Coordinate, range_,
 		OccupantType: OccupantBomb,
 		OccupantID:   int64(b.ID),
 	}
-	return b
 }
 
-func (m *Match) AddSoftBlock(id int, pos Coordinate) *SoftBlock {
+func (m *Match) addSoftBlock(id int, pos Coordinate) *SoftBlock {
 	sb := &SoftBlock{ID: id, Position: pos}
 	m.WorkingState.SoftBlocks[id] = sb
 	m.WorkingState.Grid[pos.Y][pos.X] = Tile{
@@ -1566,7 +1564,7 @@ func newTestMatchWithTeams(t *testing.T, p1, p2 teamFormation) *Match {
 			if *tf.King {
 				hp = 1
 			}
-			m.AddUnit(team, x, king, RoleKing, Coordinate{x, row}, hp)
+			m.addUnit(team, x, king, RoleKing, Coordinate{x, row}, hp)
 			x++
 		} else {
 			for _, alive := range tf.BossesAlive {
@@ -1574,7 +1572,7 @@ func newTestMatchWithTeams(t *testing.T, p1, p2 teamFormation) *Match {
 				if alive {
 					hp = 1
 				}
-				m.AddUnit(team, x, boss, RoleBoss, Coordinate{x, row}, hp)
+				m.addUnit(team, x, boss, RoleBoss, Coordinate{x, row}, hp)
 				x++
 			}
 		}
@@ -1583,7 +1581,7 @@ func newTestMatchWithTeams(t *testing.T, p1, p2 teamFormation) *Match {
 			if alive {
 				hp = 1
 			}
-			m.AddUnit(team, x, fighter, RoleNormal, Coordinate{x, row}, hp)
+			m.addUnit(team, x, fighter, RoleNormal, Coordinate{x, row}, hp)
 			x++
 		}
 	}
@@ -1613,7 +1611,7 @@ func TestMatch_Resolve_VictoryCondition_Suite(t *testing.T) {
 			name:                "Standard gameplay state",
 			p1:                  teamFormation{King: new(true), OrdinaryUnitsAlive: []bool{true, true, false, true}},
 			p2:                  teamFormation{King: new(true), OrdinaryUnitsAlive: []bool{true, true, false, false}},
-			expectedWinningTeam: MatchInProgress,
+			expectedWinningTeam: matchInProgress,
 		},
 		{
 			name:                "P1 Wins: P2 misses non-king",
@@ -1667,37 +1665,37 @@ func TestMatch_Resolve_VictoryCondition_Suite(t *testing.T) {
 			name:                "Draw: Both Kings dead",
 			p1:                  teamFormation{King: new(false), OrdinaryUnitsAlive: []bool{false, true, false, false}},
 			p2:                  teamFormation{King: new(false), OrdinaryUnitsAlive: []bool{false, false, true, false}},
-			expectedWinningTeam: MatchDrawn,
+			expectedWinningTeam: matchDrawn,
 		},
 		{
 			name:                "Draw: Both Kings dead, P2 wiped out",
 			p1:                  teamFormation{King: new(false), OrdinaryUnitsAlive: []bool{false, true, false, false}},
 			p2:                  teamFormation{King: new(false), OrdinaryUnitsAlive: []bool{false, false, false, false}},
-			expectedWinningTeam: MatchDrawn,
+			expectedWinningTeam: matchDrawn,
 		},
 		{
 			name:                "Draw: Both Kings dead, P1 wiped out",
 			p1:                  teamFormation{King: new(false), OrdinaryUnitsAlive: []bool{false, false, false, false}},
 			p2:                  teamFormation{King: new(false), OrdinaryUnitsAlive: []bool{false, false, true, false}},
-			expectedWinningTeam: MatchDrawn,
+			expectedWinningTeam: matchDrawn,
 		},
 		{
 			name:                "Draw: Everyone dead",
 			p1:                  teamFormation{King: new(false), OrdinaryUnitsAlive: []bool{false, false, false, false}},
 			p2:                  teamFormation{King: new(false), OrdinaryUnitsAlive: []bool{false, false, false, false}},
-			expectedWinningTeam: MatchDrawn,
+			expectedWinningTeam: matchDrawn,
 		},
 		{
 			name:                "Draw: Both Lone Kings dead",
 			p1:                  teamFormation{King: new(true), OrdinaryUnitsAlive: []bool{false, false, false, false}},
 			p2:                  teamFormation{King: new(true), OrdinaryUnitsAlive: []bool{false, false, false, false}},
-			expectedWinningTeam: MatchDrawn,
+			expectedWinningTeam: matchDrawn,
 		},
 		{
 			name:                "Standard: Both Boss teams alive",
 			p1:                  teamFormation{BossesAlive: []bool{true}},
 			p2:                  teamFormation{BossesAlive: []bool{true}},
-			expectedWinningTeam: MatchInProgress,
+			expectedWinningTeam: matchInProgress,
 		},
 		{
 			name:                "P2 Wins: P1 Boss dead",
@@ -1715,13 +1713,13 @@ func TestMatch_Resolve_VictoryCondition_Suite(t *testing.T) {
 			name:                "Draw: Both Bosses dead, regardless of ordinary units alive",
 			p1:                  teamFormation{BossesAlive: []bool{false}, OrdinaryUnitsAlive: []bool{true}},
 			p2:                  teamFormation{BossesAlive: []bool{false}, OrdinaryUnitsAlive: []bool{true, true}},
-			expectedWinningTeam: MatchDrawn,
+			expectedWinningTeam: matchDrawn,
 		},
 		{
 			name:                "Standard: P1 Boss alive vs P2 full team",
 			p1:                  teamFormation{BossesAlive: []bool{true}},
 			p2:                  teamFormation{King: new(true), OrdinaryUnitsAlive: []bool{true}},
-			expectedWinningTeam: MatchInProgress,
+			expectedWinningTeam: matchInProgress,
 		},
 		{
 			name:                "P1 Wins: P1 Boss alive vs P2 lone king",
@@ -1751,13 +1749,13 @@ func TestMatch_Resolve_VictoryCondition_Suite(t *testing.T) {
 			name:                "Draw: P1 Boss dead vs P2 King dead",
 			p1:                  teamFormation{BossesAlive: []bool{false}},
 			p2:                  teamFormation{King: new(false), OrdinaryUnitsAlive: []bool{true}},
-			expectedWinningTeam: MatchDrawn,
+			expectedWinningTeam: matchDrawn,
 		},
 		{
 			name:                "Standard: P2 Boss alive vs P1 full team",
 			p1:                  teamFormation{King: new(true), OrdinaryUnitsAlive: []bool{true}},
 			p2:                  teamFormation{BossesAlive: []bool{true}},
-			expectedWinningTeam: MatchInProgress,
+			expectedWinningTeam: matchInProgress,
 		},
 		{
 			name:                "P2 Wins: P2 Boss alive vs P1 lone king",
@@ -1787,13 +1785,13 @@ func TestMatch_Resolve_VictoryCondition_Suite(t *testing.T) {
 			name:                "Draw: P2 Boss dead vs P1 King dead",
 			p1:                  teamFormation{King: new(false), OrdinaryUnitsAlive: []bool{true}},
 			p2:                  teamFormation{BossesAlive: []bool{false}},
-			expectedWinningTeam: MatchDrawn,
+			expectedWinningTeam: matchDrawn,
 		},
 		{
 			name:                "Standard: P1 multi-Boss, one alive keeps team going",
 			p1:                  teamFormation{BossesAlive: []bool{false, true}},
 			p2:                  teamFormation{King: new(true), OrdinaryUnitsAlive: []bool{true}},
-			expectedWinningTeam: MatchInProgress,
+			expectedWinningTeam: matchInProgress,
 		},
 		{
 			name: "King and Boss on one team, Boss alive",
@@ -1840,7 +1838,7 @@ func TestMatch_Resolve_VictoryCondition_Suite(t *testing.T) {
 			setup: func(m *Match) {
 				addRoleUnit(m, 1, 5, RoleBoss, 0)
 			},
-			expectedWinningTeam: MatchDrawn,
+			expectedWinningTeam: matchDrawn,
 		},
 		{
 			name: "Unknown role counts as an ordinary unit",
@@ -1885,7 +1883,7 @@ func TestMatch_Resolve_VictoryCondition_Suite(t *testing.T) {
 				}
 			}
 
-			if tt.expectedWinningTeam == MatchInProgress {
+			if tt.expectedWinningTeam == matchInProgress {
 				if foundEndedEvent {
 					t.Errorf("MatchEndedEvent should not be captured, but got one")
 				}
@@ -1935,8 +1933,8 @@ func TestGameState_ProcessChain_Edges(t *testing.T) {
 			name: "tile holds an already-ignited bomb",
 			setup: func(m *Match) queued {
 				addOwner(m, 2)
-				m.AddBomb(1, 1, owner, Coordinate{0, 1}, 2, 0)
-				m.AddBomb(1, 2, owner, Coordinate{1, 1}, 2, 3)
+				m.addBomb(1, owner, Coordinate{0, 1}, 2, 0)
+				m.addBomb(2, owner, Coordinate{1, 1}, 2, 3)
 				q := fresh(bombA)
 				q.ignited[bombB] = true
 				return q
@@ -1950,7 +1948,7 @@ func TestGameState_ProcessChain_Edges(t *testing.T) {
 			name: "tile holds a bomb ID missing from Bombs",
 			setup: func(m *Match) queued {
 				addOwner(m, 2)
-				m.AddBomb(1, 1, owner, Coordinate{0, 1}, 2, 0)
+				m.addBomb(1, owner, Coordinate{0, 1}, 2, 0)
 				m.WorkingState.Grid[1][1] = Tile{Type: TerrainPlain, OccupantType: OccupantBomb, OccupantID: int64(ghost)}
 				return fresh(bombA)
 			},
@@ -1970,7 +1968,7 @@ func TestGameState_ProcessChain_Edges(t *testing.T) {
 		{
 			name: "bomb owner missing from Units",
 			setup: func(m *Match) queued {
-				m.AddBomb(1, 1, owner, Coordinate{0, 1}, 2, 0)
+				m.addBomb(1, owner, Coordinate{0, 1}, 2, 0)
 				return fresh(bombA)
 			},
 			wantExploded: []BombID{bombA},
@@ -1980,7 +1978,7 @@ func TestGameState_ProcessChain_Edges(t *testing.T) {
 			name: "BombUsed already 0",
 			setup: func(m *Match) queued {
 				addOwner(m, 0)
-				m.AddBomb(1, 1, owner, Coordinate{0, 1}, 2, 0)
+				m.addBomb(1, owner, Coordinate{0, 1}, 2, 0)
 				return fresh(bombA)
 			},
 			wantExploded: []BombID{bombA},
@@ -1991,7 +1989,7 @@ func TestGameState_ProcessChain_Edges(t *testing.T) {
 			name: "BombUsed decrements by one",
 			setup: func(m *Match) queued {
 				addOwner(m, 2)
-				m.AddBomb(1, 1, owner, Coordinate{0, 1}, 2, 0)
+				m.addBomb(1, owner, Coordinate{0, 1}, 2, 0)
 				return fresh(bombA)
 			},
 			wantExploded: []BombID{bombA},
@@ -2002,8 +2000,8 @@ func TestGameState_ProcessChain_Edges(t *testing.T) {
 			name: "blast hits a unit",
 			setup: func(m *Match) queued {
 				addOwner(m, 1)
-				m.AddBomb(1, 1, owner, Coordinate{0, 1}, 2, 0)
-				m.AddUnit(2, 0, Archetype{}, RoleNormal, Coordinate{1, 1}, 1)
+				m.addBomb(1, owner, Coordinate{0, 1}, 2, 0)
+				m.addUnit(2, 0, Archetype{}, RoleNormal, Coordinate{1, 1}, 1)
 				return fresh(bombA)
 			},
 			wantExploded: []BombID{bombA},
@@ -2014,8 +2012,8 @@ func TestGameState_ProcessChain_Edges(t *testing.T) {
 			name: "blast hits a soft block",
 			setup: func(m *Match) queued {
 				addOwner(m, 1)
-				m.AddBomb(1, 1, owner, Coordinate{0, 1}, 2, 0)
-				m.AddSoftBlock(7, Coordinate{1, 1})
+				m.addBomb(1, owner, Coordinate{0, 1}, 2, 0)
+				m.addSoftBlock(7, Coordinate{1, 1})
 				return fresh(bombA)
 			},
 			wantExploded: []BombID{bombA},
@@ -2026,7 +2024,7 @@ func TestGameState_ProcessChain_Edges(t *testing.T) {
 			name: "blast hits an item",
 			setup: func(m *Match) queued {
 				addOwner(m, 1)
-				m.AddBomb(1, 1, owner, Coordinate{0, 1}, 2, 0)
+				m.addBomb(1, owner, Coordinate{0, 1}, 2, 0)
 				m.WorkingState.Grid[1][1] = Tile{Type: TerrainPlain, OccupantType: OccupantItem, OccupantID: 5}
 				return fresh(bombA)
 			},
@@ -2038,8 +2036,8 @@ func TestGameState_ProcessChain_Edges(t *testing.T) {
 			name: "blast reaches a second bomb",
 			setup: func(m *Match) queued {
 				addOwner(m, 2)
-				m.AddBomb(1, 1, owner, Coordinate{0, 1}, 2, 0)
-				m.AddBomb(1, 2, owner, Coordinate{1, 1}, 1, 3)
+				m.addBomb(1, owner, Coordinate{0, 1}, 2, 0)
+				m.addBomb(2, owner, Coordinate{1, 1}, 1, 3)
 				return fresh(bombA)
 			},
 			wantExploded: []BombID{bombA, bombB},
@@ -2192,8 +2190,8 @@ func TestGameState_PlaceBomb_SystemUnit(t *testing.T) {
 			}
 			wantID := NewBombID(2, 1, SystemUnitID)
 			bomb, ok := gs.Bombs[wantID]
-			if !ok || bomb.Position != tt.target || bomb.Range != BombDefaultPower {
-				t.Fatalf("bomb %#X = %+v, want at %v with range %d", wantID, bomb, tt.target, BombDefaultPower)
+			if !ok || bomb.Position != tt.target || bomb.Range != bombDefaultPower {
+				t.Fatalf("bomb %#X = %+v, want at %v with range %d", wantID, bomb, tt.target, bombDefaultPower)
 			}
 			if evt.Type != GameEvtBombPlaced || evt.BombID != wantID {
 				t.Errorf("event = %+v, want BombPlaced for %#X", evt, wantID)
@@ -2324,7 +2322,7 @@ func TestMatch_BeginTurn(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			m := tt.build(t)
 			if !tt.wantEnded {
-				if got := m.evaluateVictoryConditions(); got != MatchInProgress {
+				if got := m.evaluateVictoryConditions(); got != matchInProgress {
 					t.Fatalf("evaluateVictoryConditions() = %d, want MatchInProgress", got)
 				}
 			}
