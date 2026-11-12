@@ -21,7 +21,7 @@ func TestMatchController_SystemCommands(t *testing.T) {
 			inputCommands: "\n\n   \n",
 			verify: func(t *testing.T, out string, match *engine.Match) {
 				t.Helper()
-				if strings.Contains(out, Green) || strings.Contains(out, Red) {
+				if strings.Contains(out, green) || strings.Contains(out, red) {
 					t.Errorf("Expected loop to ignore spaces, but feedback registered: %q", out)
 				}
 			},
@@ -41,7 +41,7 @@ func TestMatchController_SystemCommands(t *testing.T) {
 			inputCommands: "/reset\n",
 			verify: func(t *testing.T, out string, match *engine.Match) {
 				t.Helper()
-				if !strings.Contains(out, Green+"Turn reset successfully!") {
+				if !strings.Contains(out, green+"Turn reset successfully!") {
 					t.Errorf("Expected successful reset confirmation, got: %q", out)
 				}
 			},
@@ -51,7 +51,7 @@ func TestMatchController_SystemCommands(t *testing.T) {
 			inputCommands: "/commit\n",
 			verify: func(t *testing.T, out string, match *engine.Match) {
 				t.Helper()
-				if !strings.Contains(out, Green+"Turn committed and resolved!"+Reset+"\nengine.GameEvent{Type:\"matchEnded\"") {
+				if !strings.Contains(out, green+"Turn committed and resolved!"+reset+"\nengine.GameEvent{Type:\"matchEnded\"") {
 					t.Errorf("Expected /commit route to trigger a green status code notice, got: %q", out)
 				}
 			},
@@ -61,7 +61,7 @@ func TestMatchController_SystemCommands(t *testing.T) {
 			inputCommands: "/surrender\n",
 			verify: func(t *testing.T, out string, match *engine.Match) {
 				t.Helper()
-				if !strings.Contains(out, Green+"PLAYER 1 surrendered!"+Reset+"\nengine.GameEvent{Type:\"matchEnded\"") || !strings.Contains(out, Green+"Winner... PLAYER 2!") {
+				if !strings.Contains(out, green+"PLAYER 1 surrendered!"+reset+"\nengine.GameEvent{Type:\"matchEnded\"") || !strings.Contains(out, green+"Winner... PLAYER 2!") {
 					t.Errorf("Expected final victory status layout sheet, got: %q", out)
 				}
 				if match.WinnerTeamID != 2 {
@@ -74,7 +74,7 @@ func TestMatchController_SystemCommands(t *testing.T) {
 			inputCommands: "/unknown_action_command\n",
 			verify: func(t *testing.T, out string, match *engine.Match) {
 				t.Helper()
-				if !strings.Contains(out, Red+"Unknown meta command") {
+				if !strings.Contains(out, red+"Unknown meta command") {
 					t.Errorf("Expected unknown command failure warning, got: %q", out)
 				}
 			},
@@ -171,7 +171,7 @@ func TestMatchController_GameplayActions(t *testing.T) {
 			},
 			verify: func(t *testing.T, out string, match *engine.Match) {
 				t.Helper()
-				if !strings.Contains(out, Green+"GameEvents:") {
+				if !strings.Contains(out, green+"GameEvents:") {
 					t.Errorf("Expected gameplay router to parse verb, but got: %q", out)
 				}
 			},
@@ -197,10 +197,10 @@ func TestMatchController_GameplayActions(t *testing.T) {
 			},
 			verify: func(t *testing.T, out string, match *engine.Match) {
 				t.Helper()
-				if strings.Contains(out, Green+"GameEvents:") {
+				if strings.Contains(out, green+"GameEvents:") {
 					t.Error("Expected illegal move coordinates to return a failure status, but reported success")
 				}
-				if !strings.Contains(out, Red+"Invalid move") {
+				if !strings.Contains(out, red+"Invalid move") {
 					t.Errorf("Expected feedback warning parameters to mention 'Invalid move', got: %q", out)
 				}
 			},
@@ -211,7 +211,7 @@ func TestMatchController_GameplayActions(t *testing.T) {
 			setupMatch:    newTestMatch,
 			verify: func(t *testing.T, out string, match *engine.Match) {
 				t.Helper()
-				if !strings.Contains(out, Red+"Syntax error in move command") || !strings.Contains(out, "Expected: move") {
+				if !strings.Contains(out, red+"Syntax error in move command") || !strings.Contains(out, "Expected: move") {
 					t.Errorf("Expected short arguments length to trigger syntax warning, got: %q", out)
 				}
 			},
@@ -222,7 +222,7 @@ func TestMatchController_GameplayActions(t *testing.T) {
 			setupMatch:    newTestMatch,
 			verify: func(t *testing.T, out string, match *engine.Match) {
 				t.Helper()
-				if !strings.Contains(out, Red+"Argument Error") {
+				if !strings.Contains(out, red+"Argument Error") {
 					t.Errorf("Expected string parsing validation to capture character errors, got: %q", out)
 				}
 			},
@@ -248,7 +248,7 @@ func TestMatchController_GameplayActions(t *testing.T) {
 			},
 			verify: func(t *testing.T, out string, match *engine.Match) {
 				t.Helper()
-				if !strings.Contains(out, Green+"GameEvents:") {
+				if !strings.Contains(out, green+"GameEvents:") {
 					t.Errorf("Expected gameplay router to parse verb, but got: %q", out)
 				}
 			},
@@ -273,10 +273,10 @@ func TestMatchController_GameplayActions(t *testing.T) {
 			},
 			verify: func(t *testing.T, out string, match *engine.Match) {
 				t.Helper()
-				if strings.Contains(out, Green+"GameEvents:") {
+				if strings.Contains(out, green+"GameEvents:") {
 					t.Error("Expected illegal bomb coordinates to return a failure status, but reported success")
 				}
-				if !strings.Contains(out, Red+"Invalid bomb placement") || !strings.Contains(out, "unit 0x10 out of bombs") {
+				if !strings.Contains(out, red+"Invalid bomb placement") || !strings.Contains(out, "unit 0x10 out of bombs") {
 					t.Errorf("Expected feedback warning parameters to mention 'unit 0x10 out of bombs', got: %q", out)
 				}
 			},
@@ -287,7 +287,7 @@ func TestMatchController_GameplayActions(t *testing.T) {
 			setupMatch:    newTestMatch,
 			verify: func(t *testing.T, out string, match *engine.Match) {
 				t.Helper()
-				if !strings.Contains(out, Red+"Syntax error in bomb command") || !strings.Contains(out, "Expected: bomb") {
+				if !strings.Contains(out, red+"Syntax error in bomb command") || !strings.Contains(out, "Expected: bomb") {
 					t.Errorf("Expected short arguments length to trigger syntax warning, got: %q", out)
 				}
 			},
@@ -298,7 +298,7 @@ func TestMatchController_GameplayActions(t *testing.T) {
 			setupMatch:    newTestMatch,
 			verify: func(t *testing.T, out string, match *engine.Match) {
 				t.Helper()
-				if !strings.Contains(out, Red+"Argument Error") {
+				if !strings.Contains(out, red+"Argument Error") {
 					t.Errorf("Expected string parsing validation to capture character errors, got: %q", out)
 				}
 			},

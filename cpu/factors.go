@@ -10,18 +10,18 @@ type factorID int
 
 // King below also covers Boss - the two share the similar win/loss role.
 const (
-	FactorAdvanceOpponentKingReachability factorID = iota
-	FactorAdvanceOpponentKingDistance
-	FactorKillOpponentKing
-	FactorKillAllyKing
-	FactorKillOpponents
-	FactorKillAllies
-	FactorThreatOpponentKing
-	FactorRiskAllyKing
-	FactorThreatOpponents
-	FactorRiskAllies
-	FactorSuicideAllyKing
-	FactorSuicideAllies
+	factorAdvanceOpponentKingReachability factorID = iota
+	factorAdvanceOpponentKingDistance
+	factorKillOpponentKing
+	factorKillAllyKing
+	factorKillOpponents
+	factorKillAllies
+	factorThreatOpponentKing
+	factorRiskAllyKing
+	factorThreatOpponents
+	factorRiskAllies
+	factorSuicideAllyKing
+	factorSuicideAllies
 )
 
 // scoreFactorEntry pairs a scoreFactor with the identity used to look up its weight.
@@ -33,18 +33,18 @@ type scoreFactorEntry struct {
 // scoreFactorsRegistry stores the base of scoreFactors.
 func scoreFactorsRegistry() []scoreFactorEntry {
 	return []scoreFactorEntry{
-		{FactorAdvanceOpponentKingReachability, advanceOpponentKingReachability},
-		{FactorAdvanceOpponentKingDistance, advanceOpponentKingDistance},
-		{FactorKillOpponentKing, killOpponentKing},
-		{FactorKillAllyKing, killAllyKing},
-		{FactorKillOpponents, killOpponents},
-		{FactorKillAllies, killAllies},
-		{FactorThreatOpponentKing, threatOpponentKing},
-		{FactorRiskAllyKing, riskAllyKing},
-		{FactorThreatOpponents, threatOpponents},
-		{FactorRiskAllies, riskAllies},
-		{FactorSuicideAllyKing, suicideAllyKing},
-		{FactorSuicideAllies, suicideAllies},
+		{factorAdvanceOpponentKingReachability, advanceOpponentKingReachability},
+		{factorAdvanceOpponentKingDistance, advanceOpponentKingDistance},
+		{factorKillOpponentKing, killOpponentKing},
+		{factorKillAllyKing, killAllyKing},
+		{factorKillOpponents, killOpponents},
+		{factorKillAllies, killAllies},
+		{factorThreatOpponentKing, threatOpponentKing},
+		{factorRiskAllyKing, riskAllyKing},
+		{factorThreatOpponents, threatOpponents},
+		{factorRiskAllies, riskAllies},
+		{factorSuicideAllyKing, suicideAllyKing},
+		{factorSuicideAllies, suicideAllies},
 	}
 }
 
@@ -52,18 +52,18 @@ func scoreFactorsRegistry() []scoreFactorEntry {
 // threats count for the actor, risks count against it.
 func defaultWeightProfile() map[factorID]int {
 	return map[factorID]int{
-		FactorAdvanceOpponentKingReachability: 1,
-		FactorAdvanceOpponentKingDistance:     1,
-		FactorKillOpponentKing:                1,
-		FactorKillAllyKing:                    -1,
-		FactorKillOpponents:                   1,
-		FactorKillAllies:                      -1,
-		FactorThreatOpponentKing:              1,
-		FactorRiskAllyKing:                    -1,
-		FactorThreatOpponents:                 1,
-		FactorRiskAllies:                      -1,
-		FactorSuicideAllyKing:                 -1,
-		FactorSuicideAllies:                   -1,
+		factorAdvanceOpponentKingReachability: 1,
+		factorAdvanceOpponentKingDistance:     1,
+		factorKillOpponentKing:                1,
+		factorKillAllyKing:                    -1,
+		factorKillOpponents:                   1,
+		factorKillAllies:                      -1,
+		factorThreatOpponentKing:              1,
+		factorRiskAllyKing:                    -1,
+		factorThreatOpponents:                 1,
+		factorRiskAllies:                      -1,
+		factorSuicideAllyKing:                 -1,
+		factorSuicideAllies:                   -1,
 	}
 }
 

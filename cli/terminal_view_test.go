@@ -32,7 +32,7 @@ func TestTerminalView_RenderBoard(t *testing.T) {
 		gs.Grid[2][0].OccupantType = engine.OccupantSoftBlock
 		gs.Grid[2][2].OccupantType = engine.OccupantItem
 
-		err := view.RenderBoard(gs)
+		err := view.renderBoard(gs)
 
 		if err != nil {
 			t.Fatalf("Expected no error, but got: %v", err)
@@ -75,7 +75,7 @@ func TestTerminalView_RenderBoard_Errors(t *testing.T) {
 		var fakeScreen bytes.Buffer
 		view := NewTerminalView(&fakeScreen)
 
-		err := view.RenderBoard(nil)
+		err := view.renderBoard(nil)
 		if err == nil {
 			t.Error("Expected an error when passing a nil GameState pointer, but got nil")
 		}
@@ -89,7 +89,7 @@ func TestTerminalView_RenderBoard_Errors(t *testing.T) {
 			Grid: [][]engine.Tile{},
 		}
 
-		err := view.RenderBoard(gs)
+		err := view.renderBoard(gs)
 		if err == nil {
 			t.Error("Expected an error when passing an empty map grid structure, but got nil")
 		}
@@ -128,7 +128,7 @@ func TestTerminalView_RenderGameConfig(t *testing.T) {
 			MaxTurns:    50,
 		}
 
-		err := view.RenderGameConfig(cfg)
+		err := view.renderGameConfig(cfg)
 
 		if err != nil {
 			t.Fatalf("Expected no error, got: %v", err)
@@ -148,7 +148,7 @@ func TestTerminalView_RenderGameConfig(t *testing.T) {
 		var fakeScreen bytes.Buffer
 		view := NewTerminalView(&fakeScreen)
 
-		err := view.RenderGameConfig(nil)
+		err := view.renderGameConfig(nil)
 		if err == nil {
 			t.Error("Expected an error when passing a nil configuration pointer, but got nil")
 		}
@@ -160,7 +160,7 @@ func TestRenderMessage(t *testing.T) {
 		var fakeScreen bytes.Buffer
 		view := NewTerminalView(&fakeScreen)
 
-		view.RenderMessage("msg")
+		view.renderMessage("msg")
 
 		result := fakeScreen.String()
 		expected := "msg"
@@ -176,10 +176,10 @@ func TestRenderFeedback(t *testing.T) {
 		var fakeScreen bytes.Buffer
 		view := NewTerminalView(&fakeScreen)
 
-		view.RenderFeedback(true, "success msg")
+		view.renderFeedback(true, "success msg")
 
 		result := fakeScreen.String()
-		expected := Green + "success msg" + Reset + "\n"
+		expected := green + "success msg" + reset + "\n"
 
 		if result != expected {
 			t.Errorf("Expected exact ANSI output %q, got %q", expected, result)
@@ -190,10 +190,10 @@ func TestRenderFeedback(t *testing.T) {
 		var fakeScreen bytes.Buffer
 		view := NewTerminalView(&fakeScreen)
 
-		view.RenderFeedback(false, "failed msg")
+		view.renderFeedback(false, "failed msg")
 
 		result := fakeScreen.String()
-		expected := Red + "failed msg" + Reset + "\n"
+		expected := red + "failed msg" + reset + "\n"
 
 		if result != expected {
 			t.Errorf("Expected exact ANSI output %q, got %q", expected, result)
@@ -206,7 +206,7 @@ func TestTerminalView_RenderTurnHeader(t *testing.T) {
 		var fakeScreen bytes.Buffer
 		view := NewTerminalView(&fakeScreen)
 
-		view.RenderTurnHeader(101, 2)
+		view.renderTurnHeader(101, 2)
 
 		result := fakeScreen.String()
 
@@ -229,7 +229,7 @@ func TestTerminalView_RenderGameEvents(t *testing.T) {
 			engine.NewMatchEndedEvent(1),
 		}
 
-		view.RenderGameEvents(gameEvents)
+		view.renderGameEvents(gameEvents)
 
 		result := fakeScreen.String()
 
@@ -320,7 +320,7 @@ func TestTerminalView_RenderBoard_Cells(t *testing.T) {
 	for _, tt := range table {
 		t.Run(tt.name, func(t *testing.T) {
 			var screen bytes.Buffer
-			if err := NewTerminalView(&screen).RenderBoard(tt.build()); err != nil {
+			if err := NewTerminalView(&screen).renderBoard(tt.build()); err != nil {
 				t.Fatalf("RenderBoard() error = %v", err)
 			}
 
@@ -337,7 +337,7 @@ func TestTerminalView_RenderBoard_BombNotFound(t *testing.T) {
 	gs := newTestGameState(1, 1)
 	gs.Grid[0][0] = engine.Tile{OccupantType: engine.OccupantBomb, OccupantID: 0x1234}
 
-	err := NewTerminalView(&screen).RenderBoard(gs)
+	err := NewTerminalView(&screen).renderBoard(gs)
 	if err == nil || !strings.Contains(err.Error(), "bomb 0x1234 not found") {
 		t.Errorf("RenderBoard() error = %v, want bomb 0x1234 not found", err)
 	}
@@ -349,18 +349,18 @@ func TestTerminalView_RenderBoard_LegendAndHeader(t *testing.T) {
 	gs.Turn = 7
 	gs.ActiveTeam = 2
 
-	if err := NewTerminalView(&screen).RenderBoard(gs); err != nil {
+	if err := NewTerminalView(&screen).renderBoard(gs); err != nil {
 		t.Fatalf("RenderBoard() error = %v", err)
 	}
 
 	want := "============== Command Instruction ==============\n" +
-		"End Turn          : " + Yellow + "/commit" + Reset + "\n" +
-		"Reset Current Turn: " + Yellow + "/reset" + Reset + "\n" +
-		"Surrender         : " + Yellow + "/surrender" + Reset + "\n" +
+		"End Turn          : " + yellow + "/commit" + reset + "\n" +
+		"Reset Current Turn: " + yellow + "/reset" + reset + "\n" +
+		"Surrender         : " + yellow + "/surrender" + reset + "\n" +
 		"          ------- How to move -------\n" +
-		"Move      : " + Yellow + "move <unit-ID> <target-X> <target-Y>" + Reset + "\n" +
-		"Place Bomb: " + Yellow + "bomb <unit-ID> <target-X> <target-Y>" + Reset + "\n" +
-		"Example   : " + Yellow + "move 16 4 7" + Reset + "\n" +
+		"Move      : " + yellow + "move <unit-ID> <target-X> <target-Y>" + reset + "\n" +
+		"Place Bomb: " + yellow + "bomb <unit-ID> <target-X> <target-Y>" + reset + "\n" +
+		"Example   : " + yellow + "move 16 4 7" + reset + "\n" +
 		"=================================================\n" +
 		"\n--- TURN 7 PLAYER 2 ---\n\n"
 	if got := screen.String(); !strings.HasPrefix(got, want) {

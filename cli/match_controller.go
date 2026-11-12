@@ -36,21 +36,21 @@ func (c *MatchController) StartInputLoop() {
 
 	for {
 		if c.Match.WorkingState.Turn != startedTurn {
-			c.View.RenderGameEvents(c.Match.WorkingState.TurnStartEvents)
+			c.View.renderGameEvents(c.Match.WorkingState.TurnStartEvents)
 			startedTurn = c.Match.WorkingState.Turn
 		}
 
-		if err := c.View.RenderBoard(c.Match.WorkingState); err != nil {
+		if err := c.View.renderBoard(c.Match.WorkingState); err != nil {
 			log.Fatalf("Critical Interface Failure: %v", err)
 		}
 
 		if c.Match.WinnerTeamID != 0 {
-			c.View.RenderFeedback(true, winnerMessage(c.Match.WinnerTeamID))
+			c.View.renderFeedback(true, winnerMessage(c.Match.WinnerTeamID))
 
 			return
 		}
 
-		c.View.RenderMessage("\nEnter Command: ")
+		c.View.renderMessage("\nEnter Command: ")
 		if !scanner.Scan() {
 			break
 		}
@@ -76,25 +76,25 @@ func (c *MatchController) StartInputLoop() {
 func (c *MatchController) handleSystemCommand(cmd string) {
 	switch strings.ToLower(cmd) {
 	case "/config":
-		_ = c.View.RenderGameConfig(&c.Match.GameCfg)
+		_ = c.View.renderGameConfig(&c.Match.GameCfg)
 
 	case "/reset":
 		c.Match.ResetTurn()
-		c.View.RenderFeedback(true, "Turn reset successfully!")
+		c.View.renderFeedback(true, "Turn reset successfully!")
 
 	case "/commit":
 		planGameEvents, resolveTurnGameEvents := c.Match.ResolveTurn()
 		gameEvents := slices.Concat(planGameEvents, resolveTurnGameEvents)
-		c.View.RenderFeedback(true, "Turn committed and resolved!")
-		c.View.RenderGameEvents(gameEvents)
+		c.View.renderFeedback(true, "Turn committed and resolved!")
+		c.View.renderGameEvents(gameEvents)
 
 	case "/surrender":
 		gameEvents := c.Match.Surrender(c.Match.WorkingState.ActiveTeam)
-		c.View.RenderFeedback(true, fmt.Sprintf("PLAYER %d surrendered!", c.Match.WorkingState.ActiveTeam))
-		c.View.RenderGameEvents(gameEvents)
+		c.View.renderFeedback(true, fmt.Sprintf("PLAYER %d surrendered!", c.Match.WorkingState.ActiveTeam))
+		c.View.renderGameEvents(gameEvents)
 
 	default:
-		c.View.RenderFeedback(false, fmt.Sprintf("Unknown meta command: %s. Use /config, /reset, /commit, or /surrender\n", cmd))
+		c.View.renderFeedback(false, fmt.Sprintf("Unknown meta command: %s. Use /config, /reset, /commit, or /surrender\n", cmd))
 	}
 }
 
@@ -105,7 +105,7 @@ func (c *MatchController) routeGameAction(cmd string) {
 	token := strings.Fields(strings.ToLower(cmd))
 
 	if len(token) == 0 {
-		c.View.RenderFeedback(false, "Input is empty")
+		c.View.renderFeedback(false, "Input is empty")
 		return
 	}
 
@@ -114,44 +114,44 @@ func (c *MatchController) routeGameAction(cmd string) {
 	switch action {
 	case "move":
 		if len(token) < actionArgCount {
-			c.View.RenderFeedback(false, fmt.Sprintf("Syntax error in move command: %s. Syntax Error! Expected: move <unit_idx> <x> <y>", cmd))
+			c.View.renderFeedback(false, fmt.Sprintf("Syntax error in move command: %s. Syntax Error! Expected: move <unit_idx> <x> <y>", cmd))
 			return
 		}
 
 		unitID, target, err := c.parseActionCommand(token[1], token[2], token[3])
 		if err != nil {
-			c.View.RenderFeedback(false, "Argument Error: Unit index, X, and Y must be integers!")
+			c.View.renderFeedback(false, "Argument Error: Unit index, X, and Y must be integers!")
 			return
 		}
 
 		gameEvents, err := c.Match.ApplyTurnCommand(engine.NewMoveCommand(unitID, target))
 		if err != nil {
-			c.View.RenderFeedback(false, fmt.Sprintf("Invalid move: %v", err))
+			c.View.renderFeedback(false, fmt.Sprintf("Invalid move: %v", err))
 			return
 		}
-		c.View.RenderFeedback(true, fmt.Sprintf("GameEvents: %#v", gameEvents))
+		c.View.renderFeedback(true, fmt.Sprintf("GameEvents: %#v", gameEvents))
 
 	case "bomb":
 		if len(token) < actionArgCount {
-			c.View.RenderFeedback(false, fmt.Sprintf("Syntax error in bomb command: %s. Syntax Error! Expected: bomb <unit_idx> <x> <y>", cmd))
+			c.View.renderFeedback(false, fmt.Sprintf("Syntax error in bomb command: %s. Syntax Error! Expected: bomb <unit_idx> <x> <y>", cmd))
 			return
 		}
 
 		unitID, target, err := c.parseActionCommand(token[1], token[2], token[3])
 		if err != nil {
-			c.View.RenderFeedback(false, "Argument Error: Unit index, X, and Y must be integers!")
+			c.View.renderFeedback(false, "Argument Error: Unit index, X, and Y must be integers!")
 			return
 		}
 
 		gameEvents, err := c.Match.ApplyTurnCommand(engine.NewPlaceBombCommand(unitID, target))
 		if err != nil {
-			c.View.RenderFeedback(false, fmt.Sprintf("Invalid bomb placement: %v", err))
+			c.View.renderFeedback(false, fmt.Sprintf("Invalid bomb placement: %v", err))
 			return
 		}
-		c.View.RenderFeedback(true, fmt.Sprintf("GameEvents: %#v", gameEvents))
+		c.View.renderFeedback(true, fmt.Sprintf("GameEvents: %#v", gameEvents))
 
 	default:
-		c.View.RenderFeedback(false, fmt.Sprintf("Unknown meta command: %s\n", cmd))
+		c.View.renderFeedback(false, fmt.Sprintf("Unknown meta command: %s\n", cmd))
 		return
 	}
 }
