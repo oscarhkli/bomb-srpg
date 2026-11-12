@@ -3,9 +3,6 @@ version: "2"
 run:
   tests: true
 
-issues:
-  new-from-rev: origin/main
-
 linters:
   default: none
   enable:
