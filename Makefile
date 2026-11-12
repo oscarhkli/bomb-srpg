@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := test
-.PHONY: fmt vet test test-race bench lint lint-all pre-push install-hooks coverage build build-server run run-server web-dev web-format web-typecheck web-test web-lint web-build web-e2e web-coverage gen-spec-index
+.PHONY: fmt vet test test-race bench lint lint-all shell-lint pre-push install-hooks coverage build build-server run run-server web-dev web-format web-typecheck web-test web-lint web-build web-e2e image-smoke web-coverage gen-spec-index
 
 fmt:
 	go fmt ./...
@@ -21,6 +21,9 @@ lint:
 
 lint-all:
 	golangci-lint run --new-from-rev= ./cli/... ./cmd/... ./cpu/... ./engine/... ./server/...
+
+shell-lint:
+	shellcheck scripts/*.sh
 
 pre-push: lint test web-lint web-test
 
@@ -66,6 +69,9 @@ web-build: web/node_modules web-format web-typecheck
 
 web-e2e: build-server web/node_modules
 	cd web && npm run build:e2e && E2E_PORT=$$(node -e "const s=require('net').createServer().listen(0,()=>{console.log(s.address().port);s.close()})") npm run e2e -- $(if $(E2E_BROWSER),--project $(E2E_BROWSER))
+
+image-smoke:
+	./scripts/image-smoke.sh
 
 web-coverage: web/node_modules web-format web-typecheck
 	cd web && npm run test:run -- --coverage
