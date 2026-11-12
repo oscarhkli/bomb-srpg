@@ -37,7 +37,7 @@ func TestSurrenderRequestDecoding(t *testing.T) {
 			req := httptest.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/surrender", strings.NewReader(tt.body))
 			req.Header.Set("Authorization", "Bearer "+playerTokens[0])
 			rr := httptest.NewRecorder()
-			testMux("POST /api/match-rooms/{roomID}/match/surrender", h.HandleSurrender).ServeHTTP(rr, req)
+			testMux("POST /api/match-rooms/{roomID}/match/surrender", h.handleSurrender).ServeHTTP(rr, req)
 
 			if rr.Code != tt.wantStatus {
 				t.Fatalf("status = %d, want %d", rr.Code, tt.wantStatus)
@@ -60,7 +60,7 @@ func TestMatchStateWireShape(t *testing.T) {
 	roomID, _, _, h := createTestRoomWithMatch(t)
 	req := httptest.NewRequest("GET", "/api/match-rooms/"+roomID+"/match/state", nil)
 	rr := httptest.NewRecorder()
-	testMux("GET /api/match-rooms/{roomID}/match/state", h.HandleGetMatchState).ServeHTTP(rr, req)
+	testMux("GET /api/match-rooms/{roomID}/match/state", h.handleGetMatchState).ServeHTTP(rr, req)
 	if rr.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", rr.Code, http.StatusOK)
 	}

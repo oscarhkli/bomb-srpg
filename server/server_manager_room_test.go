@@ -45,7 +45,7 @@ func TestServerStateManager_CreateMatchRoom(t *testing.T) {
 			setup: func() *ServerStateManager {
 				s := NewServerStateManager()
 				existingID := "ABCDE"
-				s.Rooms.Store(existingID, &MatchRoom{ID: existingID})
+				s.Rooms.Store(existingID, &matchRoom{ID: existingID})
 				return s
 			},
 			wantErr: false,
@@ -72,7 +72,7 @@ func TestServerStateManager_CreateMatchRoom(t *testing.T) {
 				callCount := 0
 				roomIDs := []string{"ID001", "ID002", "ID003", "ID004", "ID005"}
 				for _, id := range roomIDs {
-					s.Rooms.Store(id, &MatchRoom{ID: id})
+					s.Rooms.Store(id, &matchRoom{ID: id})
 				}
 				s.generateRoomID = func(int) (string, error) {
 					if callCount < len(roomIDs) {
@@ -119,7 +119,7 @@ func TestServerStateManager_CreateMatchRoom(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := tt.setup()
-			id, err := s.CreateMatchRoom()
+			id, err := s.createMatchRoom()
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("CreateMatchRoom() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -140,12 +140,12 @@ func TestServerStateManager_LastActivityUpdated(t *testing.T) {
 			setup: func(t *testing.T) (string, *ServerStateManager, [2]string) {
 				t.Helper()
 				s := NewServerStateManager()
-				roomID, _ := s.CreateMatchRoom()
+				roomID, _ := s.createMatchRoom()
 				return roomID, s, [2]string{}
 			},
 			action: func(t *testing.T, s *ServerStateManager, roomID string, _ [2]string) {
 				t.Helper()
-				_, _ = s.CreateMatch(roomID, validGameCfg())
+				_, _ = s.createMatch(roomID, validGameCfg())
 			},
 		},
 		{
@@ -158,7 +158,7 @@ func TestServerStateManager_LastActivityUpdated(t *testing.T) {
 			action: func(t *testing.T, s *ServerStateManager, roomID string, tokens [2]string) {
 				t.Helper()
 				unitID := engine.NewUnitID(1, 0)
-				if _, err := s.SubmitTurnCommand(roomID, engine.NewMoveCommand(unitID, engine.Coordinate{X: 4, Y: 7}), tokens[0]); err != nil {
+				if _, err := s.submitTurnCommand(roomID, engine.NewMoveCommand(unitID, engine.Coordinate{X: 4, Y: 7}), tokens[0]); err != nil {
 					t.Fatalf("SubmitTurnCommand() error = %v", err)
 				}
 			},
@@ -172,7 +172,7 @@ func TestServerStateManager_LastActivityUpdated(t *testing.T) {
 			},
 			action: func(t *testing.T, s *ServerStateManager, roomID string, tokens [2]string) {
 				t.Helper()
-				if err := s.ResetTurn(roomID, tokens[0]); err != nil {
+				if err := s.resetTurn(roomID, tokens[0]); err != nil {
 					t.Fatalf("ResetTurn() error = %v", err)
 				}
 			},
@@ -182,14 +182,14 @@ func TestServerStateManager_LastActivityUpdated(t *testing.T) {
 			setup: func(t *testing.T) (string, *ServerStateManager, [2]string) {
 				t.Helper()
 				roomID, tokens, s := createTestRoom(t)
-				if _, err := s.SubmitTurnCommand(roomID, engine.NewPlaceBombCommand(16, engine.Coordinate{X: 4, Y: 7}), tokens[0]); err != nil {
+				if _, err := s.submitTurnCommand(roomID, engine.NewPlaceBombCommand(16, engine.Coordinate{X: 4, Y: 7}), tokens[0]); err != nil {
 					t.Fatalf("SubmitTurnCommand() error = %v", err)
 				}
 				return roomID, s, tokens
 			},
 			action: func(t *testing.T, s *ServerStateManager, roomID string, tokens [2]string) {
 				t.Helper()
-				if _, _, err := s.ResolveTurn(roomID, tokens[0]); err != nil {
+				if _, _, err := s.resolveTurn(roomID, tokens[0]); err != nil {
 					t.Fatalf("ResolveTurn() error = %v", err)
 				}
 			},
@@ -217,7 +217,7 @@ func TestServerStateManager_LastActivityUpdated(t *testing.T) {
 			},
 			action: func(t *testing.T, s *ServerStateManager, roomID string, tokens [2]string) {
 				t.Helper()
-				if _, err := s.Surrender(roomID, 1, tokens[0]); err != nil {
+				if _, err := s.surrender(roomID, 1, tokens[0]); err != nil {
 					t.Fatalf("Surrender() error = %v", err)
 				}
 			},
@@ -257,13 +257,13 @@ func TestServerStateManager_ReadOnlyMethodsDoNotUpdateLastActivity(t *testing.T)
 	before := time.Now()
 	time.Sleep(10 * time.Millisecond)
 
-	if _, err := s.GetMatchState(roomID); err != nil {
+	if _, err := s.getMatchState(roomID); err != nil {
 		t.Fatalf("GetMatchState() error = %v", err)
 	}
-	if _, err := s.GetMatchConfig(roomID); err != nil {
+	if _, err := s.getMatchConfig(roomID); err != nil {
 		t.Fatalf("GetMatchConfig() error = %v", err)
 	}
-	if _, err := s.GetAllowedTiles(roomID, engine.NewUnitID(1, 0), engine.TurnCmdPlaceBomb); err != nil {
+	if _, err := s.getAllowedTiles(roomID, engine.NewUnitID(1, 0), engine.TurnCmdPlaceBomb); err != nil {
 		t.Fatalf("GetAllowedTiles() error = %v", err)
 	}
 
@@ -278,17 +278,17 @@ func TestServerStateManager_ReadOnlyMethodsDoNotUpdateLastActivity(t *testing.T)
 func TestServerStateManager_cleanupInactiveRooms(t *testing.T) {
 	s := NewServerStateManager()
 
-	roomID1, _ := s.CreateMatchRoom()
+	roomID1, _ := s.createMatchRoom()
 	mustCreateMatch(t, s, roomID1, validGameCfg())
 
-	roomID2, _ := s.CreateMatchRoom()
+	roomID2, _ := s.createMatchRoom()
 	mustCreateMatch(t, s, roomID2, validGameCfg())
 	room := mustRoom(t, s, roomID2)
 	room.mu.Lock()
 	room.LastActivity = time.Now().Add(-120 * time.Minute)
 	room.mu.Unlock()
 
-	roomID3, _ := s.CreateMatchRoom()
+	roomID3, _ := s.createMatchRoom()
 	mustCreateMatch(t, s, roomID3, validGameCfg())
 	room = mustRoom(t, s, roomID3)
 	room.mu.Lock()
@@ -332,7 +332,7 @@ func TestServerStateManager_cleanupInactiveRooms_WrongType(t *testing.T) {
 
 func TestServerStateManager_RunCleanupLoop(t *testing.T) {
 	s := NewServerStateManager()
-	roomID, _ := s.CreateMatchRoom()
+	roomID, _ := s.createMatchRoom()
 	mustCreateMatch(t, s, roomID, validGameCfg())
 	room := mustRoom(t, s, roomID)
 	room.mu.Lock()
