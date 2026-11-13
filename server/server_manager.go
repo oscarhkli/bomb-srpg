@@ -75,7 +75,7 @@ type matchRoom struct {
 	Match        *engine.Match
 	GameCfg      *engine.GameCfg
 	LastActivity time.Time
-	PlayerTokens [2]string // [0]=Team1, [1]=Team2
+	PlayerTokens [2]string
 	Logger       *slog.Logger
 }
 
@@ -355,7 +355,6 @@ func (s *ServerStateManager) submitTurnCommand(roomID string, cmd engine.TurnCom
 
 const maxCPUReplanAttempts = 5
 
-// Phase Ready on team 2's turn is stale: the finished turn would have moved play to team 1 or set a winner.
 func (s *ServerStateManager) launchCPUTurnIfDueLocked(room *matchRoom) {
 	match := room.Match
 	if !match.GameCfg.VSCpu || match.WinnerTeamID != 0 || match.WorkingState.ActiveTeam != engine.Team2 ||
@@ -368,7 +367,6 @@ func (s *ServerStateManager) launchCPUTurnIfDueLocked(room *matchRoom) {
 	go s.runCPUTurn(room, match)
 }
 
-// runCPUTurn abandons if the match was replaced, deleted, or already won while the goroutine was queued.
 func (s *ServerStateManager) runCPUTurn(room *matchRoom, match *engine.Match) {
 	room.mu.Lock()
 	defer room.mu.Unlock()
