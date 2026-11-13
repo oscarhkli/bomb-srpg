@@ -372,11 +372,11 @@ const (
 type PassFlag uint8
 
 const (
-	PassUnits      PassFlag = 1 << iota // walk through other units
-	PassSoftBlocks                      // walk through soft blocks
-	PassHardBlocks                      // walk through hard blocks (TerrainBlock)
-	PassItems                           // walk through items
-	PassBombs                           // walk through bombs
+	PassUnits PassFlag = 1 << iota
+	PassSoftBlocks
+	PassHardBlocks
+	PassItems
+	PassBombs
 )
 
 type MovementRule struct {
