@@ -1,4 +1,3 @@
-// Pure, Phaser-free formation logic for UnitPage.
 import type { TeamSlot } from '../../api/types';
 
 export const NO_UNIT = 'NO_UNIT';

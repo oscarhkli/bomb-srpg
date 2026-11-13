@@ -36,7 +36,6 @@ export default class MatchSettingsScene extends Phaser.Scene {
   private pages: SettingsPage[] = [];
   private currentPageIndex = 0;
   private errorPanel!: ErrorPanel;
-  // Bumped on 'shutdown' so late-resolving async work can detect a torn-down scene.
   private generation = 0;
   private isTransitioning = false;
 

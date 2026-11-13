@@ -36,7 +36,6 @@ const STAGE_TEXTURE_KEYS: Record<string, string> = {
   Divided: 'stage_divided',
 };
 
-// Must run before renderStageBackground().
 export function establishBoardLayout(grid: Tile[][]): { cols: number; rows: number } {
   const cols = grid[0]?.length ?? 0;
   const rows = grid.length;
@@ -49,7 +48,6 @@ function trimmedContentOrigin(scene: Phaser.Scene, key: string, frame: string): 
   return [(f.x + f.width / 2) / f.realWidth, (f.y + f.height / 2) / f.realHeight];
 }
 
-// Requires establishBoardLayout() to have run for this grid.
 export function renderStageBackground(
   ctx: BoardRenderContext,
   grid: Tile[][],

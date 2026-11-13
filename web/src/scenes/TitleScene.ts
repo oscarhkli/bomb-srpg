@@ -34,7 +34,6 @@ function prologueGameCfg(): GameCfg {
 export default class TitleScene extends Phaser.Scene {
   private isTransitioning = false;
   private errorPanel!: ErrorPanel;
-  // Bumped on 'shutdown'; startMatch()'s async callback compares against this.
   private generation = 0;
   private rootOption!: Phaser.GameObjects.Text;
   private submenuOptions: Phaser.GameObjects.Text[] = [];

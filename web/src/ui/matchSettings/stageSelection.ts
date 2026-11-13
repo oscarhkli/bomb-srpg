@@ -1,4 +1,3 @@
-// Pure, Phaser-free selection logic for StagePage.
 import type { StagePreset } from '../../api/types';
 
 // 0 = instant sudden death (displayed as 💣).

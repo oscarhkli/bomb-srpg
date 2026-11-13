@@ -1,4 +1,3 @@
-// Pure-data domain builders with no Phaser or mockScene dependency.
 import type {
   Bomb,
   GameCfg,
