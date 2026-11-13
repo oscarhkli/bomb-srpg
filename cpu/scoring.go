@@ -20,7 +20,7 @@ type scoreContext struct {
 
 // turnResult holds one simulated turn's outcome.
 type turnResult struct {
-	turn                  int // the nth next turn, not the exact turn number.
+	turn                  int
 	affectedTiles         map[engine.Coordinate]struct{}
 	allyAffectedTiles     map[engine.Coordinate]struct{}
 	opponentAffectedTiles map[engine.Coordinate]struct{}

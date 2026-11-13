@@ -7,7 +7,6 @@ import (
 
 type factorID int
 
-// King also covers Boss: both play the win/loss role.
 const (
 	factorAdvanceOpponentKingReachability factorID = iota
 	factorAdvanceOpponentKingDistance
@@ -62,10 +61,9 @@ func defaultWeightProfile() map[factorID]int {
 	}
 }
 
-// Score magnitudes, tiered so a certain outcome always outranks a predicted one.
 const (
 	killKingScore         = 100000
-	killUnitScore         = 10000 // Lower than killKingScore: a predicted, not guaranteed, outcome.
+	killUnitScore         = 10000
 	riskOpponentKingScore = 5000
 	riskOpponentScore     = 1000
 	riskAllyKingScore     = 3000
@@ -104,7 +102,6 @@ func advanceOpponentKingReachability(gs *engine.GameState, sc scoreContext, tr t
 	return distanceDeltaScore(tr.distToKingBefore, tr.distToKingAfter, maxForecastTurn-tr.turn)
 }
 
-// advanceOpponentKingDistance counts only T+0, the only turn a move can occur before the forecast loop starts.
 func advanceOpponentKingDistance(gs *engine.GameState, sc scoreContext, tr turnResult) int {
 	if tr.turn > 0 {
 		return 0
@@ -133,7 +130,6 @@ func killOpponentKing(_ *engine.GameState, sc scoreContext, tr turnResult) int {
 	return 0
 }
 
-// killAllyKing counts T+0 and T+1 because the ally team cannot act at T+1.
 func killAllyKing(_ *engine.GameState, sc scoreContext, tr turnResult) int {
 	if tr.turn > 1 {
 		return 0
@@ -152,7 +148,6 @@ func killOpponents(_ *engine.GameState, _ scoreContext, tr turnResult) int {
 	return killUnitScore * killed / tr.aliveOpponentsBefore
 }
 
-// killAllies counts T+0 and T+1 because the ally team cannot act at T+1.
 func killAllies(_ *engine.GameState, _ scoreContext, tr turnResult) int {
 	if tr.turn > 1 || tr.aliveAlliesBefore == 0 {
 		return 0
@@ -161,8 +156,6 @@ func killAllies(_ *engine.GameState, _ scoreContext, tr turnResult) int {
 	return killUnitScore * killed / tr.aliveAlliesBefore
 }
 
-// suicideAllyKing fires only at tr.turn>1: killAllyKing already covers earlier turns for any cause of death.
-// This must not double-count the same death.
 func suicideAllyKing(_ *engine.GameState, sc scoreContext, tr turnResult) int {
 	if tr.turn <= 1 {
 		return 0
@@ -173,7 +166,6 @@ func suicideAllyKing(_ *engine.GameState, sc scoreContext, tr turnResult) int {
 	return 0
 }
 
-// suicideAllies fires only at tr.turn>1, for the same reason as suicideAllyKing.
 func suicideAllies(_ *engine.GameState, sc scoreContext, tr turnResult) int {
 	total := nonKingCount(sc.allyIDs, sc.allyKingID)
 	if tr.turn <= 1 || total == 0 {
@@ -194,7 +186,6 @@ func suicideAllies(_ *engine.GameState, sc scoreContext, tr turnResult) int {
 func escapable(gs *engine.GameState, unit *engine.Unit, affectedTiles map[engine.Coordinate]struct{}) bool {
 	tiles, err := gs.FindAllowedTilesForCommand(unit.ID, engine.TurnCmdMove)
 	if err != nil {
-		// exposureIndex guarantees a live unit, so treat an unexpected error as escapable.
 		return true
 	}
 
@@ -225,8 +216,6 @@ const (
 )
 
 // exposureIndex returns a unit's exposure to the nearest tile in affectedTiles, as a 0..1 ratio.
-// turnOffset is how many turns of this unit's certain-kill window have already elapsed.
-// k is the distance-axis decayRatio constant; offense and defense use different curves.
 func exposureIndex(gs *engine.GameState, unitID engine.UnitID, affectedTiles map[engine.Coordinate]struct{}, tr turnResult, turnOffset int, k float64) float64 {
 	if len(affectedTiles) == 0 {
 		return 0
@@ -259,8 +248,6 @@ func riskAllyKing(gs *engine.GameState, sc scoreContext, tr turnResult) int {
 	return int(float64(riskAllyKingScore) * exposureIndex(gs, sc.allyKingID, tr.opponentAffectedTiles, tr, 1, kDistRisk))
 }
 
-// nonKingCount returns how many of ids aren't kingID, alive or not.
-// It is the fixed group size to average over, so a wipeout still scores instead of dividing by zero.
 func nonKingCount(ids []engine.UnitID, kingID engine.UnitID) int {
 	count := 0
 	for _, id := range ids {

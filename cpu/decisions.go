@@ -16,7 +16,6 @@ type candidate struct {
 	tag          string
 }
 
-// priority breaks a score tie; move-then-bomb ranks lowest.
 func (c candidate) priority() int {
 	if len(c.turnCommands) == 2 && c.turnCommands[0].Type == engine.TurnCmdMove {
 		return 0
@@ -24,7 +23,6 @@ func (c candidate) priority() int {
 	return 1
 }
 
-// buildRoster reads positions from gs, so pass the original state, not a sandbox that plans move units in.
 func buildRoster(gs *engine.GameState) (allies []*engine.Unit, base scoreContext, ok bool) {
 	var allyKing, opponentKing *engine.Unit
 	for _, u := range gs.Units {

@@ -114,7 +114,6 @@ func TestPlansFor_OpenField(t *testing.T) {
 
 	plans := plansFor(unit, gs)
 
-	// A placed bomb blocks its own lane, so bomb->move isn't symmetric with move->bomb.
 	const wantTotal = 1 + 8 + 8 + 8*8 + (4*6 + 4*7)
 	if len(plans) != wantTotal {
 		t.Fatalf("plansFor() returned %d plans, want %d", len(plans), wantTotal)
