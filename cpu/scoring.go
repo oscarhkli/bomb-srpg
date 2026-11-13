@@ -9,7 +9,6 @@ const (
 	maxForecastTurn = 5
 )
 
-// scoreContext identifies the units a candidate's forecast scores against.
 type scoreContext struct {
 	actorID        engine.UnitID
 	allyIDs        []engine.UnitID
@@ -19,7 +18,7 @@ type scoreContext struct {
 	actorOrigin    engine.Coordinate
 }
 
-// turnResult holds one simulated turn's outcome, rebuilt fresh each forecast iteration.
+// turnResult holds one simulated turn's outcome, rebuilt each forecast iteration.
 type turnResult struct {
 	turn                  int // the nth next turn, not the exact turn number
 	affectedTiles         map[engine.Coordinate]struct{}
@@ -78,7 +77,6 @@ func (tr *turnResult) fold(sc scoreContext, evt engine.GameEvent) {
 	}
 }
 
-// evaluate scores the plan by forecasting maxForecastTurn turns of bomb resolution.
 func evaluate(sc scoreContext, gs *engine.GameState, cmds []engine.TurnCommand) (candidate, error) {
 	scratch := gs.DeepCopy()
 	if err := applyCandidate(scratch, candidate{turnCommands: cmds}); err != nil {

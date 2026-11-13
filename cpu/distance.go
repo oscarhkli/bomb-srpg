@@ -25,7 +25,6 @@ func reachDistToUnit(gs *engine.GameState, unit *engine.Unit, fromPos engine.Coo
 	return best + 1
 }
 
-// nearestAffectedDist returns the walking distance from unit to the nearest tile in affectedTiles.
 func nearestAffectedDist(gs *engine.GameState, unit *engine.Unit, affectedTiles map[engine.Coordinate]struct{}) int {
 	if len(affectedTiles) == 0 {
 		return -1

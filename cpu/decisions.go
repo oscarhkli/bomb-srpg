@@ -8,10 +8,8 @@ import (
 	"slices"
 )
 
-// maxAttempts caps candidate-selection rounds, defending against an infinite loop.
 const maxAttempts = 15
 
-// candidate represents a possible action a Unit can take and what it scores.
 type candidate struct {
 	turnCommands []engine.TurnCommand
 	score        int    // The higher the better.
