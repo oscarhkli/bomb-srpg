@@ -126,8 +126,6 @@ func compileGrid(preset StagePreset) ([][]Tile, error) {
 	return grid, nil
 }
 
-// validateTeamComposition enforces roster-shape rules for a single team:
-// a Boss-role team is 1-5 units with no King, a King-role team is 2-5 units led by King.
 func validateTeamComposition(slots []TeamSlot, playerLabel string) error {
 	hasBoss := hasRole(slots, RoleBoss)
 	if hasBoss && hasRole(slots, RoleKing) {
@@ -216,7 +214,6 @@ func applyGlobalOverride(orig, newVal int) int {
 }
 
 // DeepCopy returns a copy of gs that shares no memory with it.
-// Reference fields must be re-cloned here.
 func (gs *GameState) DeepCopy() *GameState {
 	if gs == nil {
 		return nil
@@ -260,7 +257,6 @@ func cloneGameEvents(src []GameEvent) []GameEvent {
 	return dst
 }
 
-// V must hold no reference fields.
 func cloneEntities[K comparable, V any](src map[K]*V) map[K]*V {
 	dst := make(map[K]*V, len(src))
 	for id, entity := range src {

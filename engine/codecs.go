@@ -1,7 +1,6 @@
 package engine
 
 const (
-	// SystemUnitID is the environmental actor, Team 0 Player 0.
 	SystemUnitID UnitID = 0
 
 	UnitLocalShift = 0

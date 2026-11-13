@@ -12,13 +12,9 @@ type TerrainType int
 
 const (
 	TerrainPlain TerrainType = iota
-	// TerrainBlock is a solid wall; not walkable, flyable, or jumpable.
 	TerrainBlock
-	// TerrainTower is a high wall; not walkable, not flyable, not jumpable.
 	TerrainTower
-	// TerrainWater is not walkable but flyable/jumpable; bombs disappear on contact.
 	TerrainWater
-	// TerrainLava is not walkable but flyable/jumpable; bomb countdown forced to 1.
 	TerrainLava
 )
 
@@ -199,10 +195,8 @@ func (r *UnitRole) UnmarshalText(text []byte) error {
 	return nil
 }
 
-// UnitID packs a team and a player index; see NewUnitID.
 type UnitID uint8
 
-// BombID packs owner, turn and counter; see NewBombID.
 type BombID uint32
 
 type Unit struct {

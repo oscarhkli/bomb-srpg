@@ -76,9 +76,6 @@ func (gs *GameState) expandNode(queue []pathNode, node pathNode, rule MovementRu
 	return queue
 }
 
-// checkPassability reports how the rule treats the tile: canPass = can walk through it;
-// canLand = can step on it but must stop; both false = blocked.
-// Both true never occurs.
 func (mr MovementRule) checkPassability(tile Tile) (canPass bool, canLand bool) {
 	if tile.Type == TerrainBlock && (mr.PassPermissions&PassHardBlocks == 0) {
 		return false, false

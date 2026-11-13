@@ -443,8 +443,6 @@ func (t *teamStatus) wiped() bool {
 }
 
 // evaluateVictoryConditions returns matchInProgress, 1, 2, or matchDrawn; any team other than Team1 counts as Team2.
-// Goal: a living Boss, or a living King plus a living Ordinary unit. Wiped: the Boss dead, or a Boss-less team with no living unit.
-// Both at Goal play on; a team wins on Goal or a living King against a Wiped opponent; both or neither is a draw.
 func (m *Match) evaluateVictoryConditions() int {
 	var p1, p2 teamStatus
 
