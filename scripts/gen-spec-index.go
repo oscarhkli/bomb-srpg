@@ -48,8 +48,6 @@ func main() {
 	fmt.Println("✓ Updated", readmeFile)
 }
 
-// parseTOC reads toc.yaml and returns spec entries in order.
-// It parses the simple YAML structure manually without an external library.
 func parseTOC(path string) ([]specEntry, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -65,7 +63,6 @@ func parseTOC(path string) ([]specEntry, error) {
 		line := scanner.Text()
 		trimmed := strings.TrimSpace(line)
 
-		// New list item
 		if strings.HasPrefix(trimmed, "- file:") {
 			if current != nil {
 				specs = append(specs, *current)
@@ -102,7 +99,6 @@ func parseTOC(path string) ([]specEntry, error) {
 	return specs, scanner.Err()
 }
 
-// extractTitle reads the YAML frontmatter title from a spec file.
 func extractTitle(path string) (string, error) {
 	f, err := os.Open(path)
 	if err != nil {

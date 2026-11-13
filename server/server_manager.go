@@ -30,7 +30,6 @@ var (
 	errCPUTurnInProgress = errors.New("cpu turn in progress")
 )
 
-// mapError converts an error to an HTTP status code and message.
 func mapError(err error) (int, string) {
 	switch {
 	case errors.Is(err, errRoomNotFound), errors.Is(err, errMatchNotFound):
@@ -87,17 +86,14 @@ type ServerStateManager struct {
 	Logger         *slog.Logger
 }
 
-// Option configures a ServerStateManager.
 type Option func(*ServerStateManager)
 
-// WithLogger sets the logger for the ServerStateManager.
 func WithLogger(logger *slog.Logger) Option {
 	return func(s *ServerStateManager) {
 		s.Logger = logger
 	}
 }
 
-// NewServerStateManager returns a ServerStateManager with no rooms.
 func NewServerStateManager(opts ...Option) *ServerStateManager {
 	manager := &ServerStateManager{
 		generateRoomID: randomHex,
@@ -137,8 +133,7 @@ func (s *ServerStateManager) createMatchRoom() (string, error) {
 	return "", fmt.Errorf("room unavailable: failed to generate a MatchRoom ID after %d times of retry", maxRetry)
 }
 
-// loadRoom looks up a matchRoom without locking it.
-// Callers must hold room.mu before touching room.Match, which a CPU goroutine may be mutating.
+// loadRoom does not lock. Callers must hold room.mu before touching room.Match, which a CPU goroutine may be mutating.
 func (s *ServerStateManager) loadRoom(roomID string) (*matchRoom, error) {
 	roomVal, ok := s.Rooms.Load(roomID)
 	if !ok {
@@ -373,8 +368,7 @@ func (s *ServerStateManager) launchCPUTurnIfDueLocked(room *matchRoom) {
 	go s.runCPUTurn(room, match)
 }
 
-// runCPUTurn plays the CPU's turn to completion, holding the room lock throughout.
-// It abandons if the match was replaced, deleted, or already won while the goroutine was queued.
+// runCPUTurn abandons if the match was replaced, deleted, or already won while the goroutine was queued.
 func (s *ServerStateManager) runCPUTurn(room *matchRoom, match *engine.Match) {
 	room.mu.Lock()
 	defer room.mu.Unlock()
@@ -593,7 +587,7 @@ func (s *ServerStateManager) getAllowedTiles(roomID string, unitID engine.UnitID
 	return slices.Collect(maps.Keys(allowedTiles)), nil
 }
 
-// RunCleanupLoop removes inactive rooms every interval and blocks until ctx is cancelled.
+// RunCleanupLoop blocks until ctx is cancelled.
 func (s *ServerStateManager) RunCleanupLoop(ctx context.Context, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
@@ -609,7 +603,6 @@ func (s *ServerStateManager) RunCleanupLoop(ctx context.Context, interval time.D
 
 const roomInactivityTimeout = 60 * time.Minute
 
-// cleanupInactiveRooms removes rooms inactive > roomInactivityTimeout.
 func (s *ServerStateManager) cleanupInactiveRooms() {
 	now := time.Now()
 	s.Rooms.Range(func(key, value any) bool {

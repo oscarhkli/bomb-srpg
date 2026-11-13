@@ -10,23 +10,19 @@ import (
 	"strings"
 )
 
-// Handler wraps HTTP handlers with a logger.
 type Handler struct {
 	Manager *ServerStateManager
 	Logger  *slog.Logger
 }
 
-// HandlerOption configures a Handler.
 type HandlerOption func(*Handler)
 
-// WithHandlerLogger sets the logger for the Handler.
 func WithHandlerLogger(logger *slog.Logger) HandlerOption {
 	return func(h *Handler) {
 		h.Logger = logger
 	}
 }
 
-// NewHandler creates a new Handler with the given ServerStateManager.
 func NewHandler(m *ServerStateManager, opts ...HandlerOption) *Handler {
 	h := &Handler{
 		Manager: m,
@@ -228,16 +224,13 @@ func (h *Handler) handleSubmitTurnCommand(w http.ResponseWriter, r *http.Request
 	h.writeJSON(w, http.StatusOK, gameEvents, "encode gameEvents failed")
 }
 
-// cpuStatusResponse wraps CPUTurnPhase and the CPU turn's gameEvents, split by phase so the
-// client can animate the CPU's actions and their resolution apart.
+// cpuStatusResponse splits the CPU turn's events by phase so the client can animate the CPU's actions and their resolution apart.
 type cpuStatusResponse struct {
 	TurnPhase             engine.CPUTurnPhase `json:"turnPhase"`
 	PlanGameEvents        []engine.GameEvent  `json:"planGameEvents"`
 	ResolveTurnGameEvents []engine.GameEvent  `json:"resolveTurnGameEvents"`
 }
 
-// handleConsumeCPUStatus returns the CPU turn phase and events, and resets a Ready phase to Idle.
-// It launches the CPU turn first if one is due.
 func (h *Handler) handleConsumeCPUStatus(w http.ResponseWriter, r *http.Request) {
 	roomID := r.PathValue("roomID")
 
