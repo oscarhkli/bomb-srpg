@@ -23,7 +23,9 @@ func (c candidate) priority() int {
 	return 1
 }
 
-func buildRoster(gs *engine.GameState) (allies []*engine.Unit, base scoreContext, ok bool) {
+var ErrNoKing = errors.New("no living king")
+
+func buildRoster(gs *engine.GameState) (allies []*engine.Unit, base scoreContext, err error) {
 	var allyKing, opponentKing *engine.Unit
 	for _, u := range gs.Units {
 		if u.HP <= 0 {
@@ -42,21 +44,24 @@ func buildRoster(gs *engine.GameState) (allies []*engine.Unit, base scoreContext
 			}
 		}
 	}
-	if allyKing == nil || opponentKing == nil {
-		return nil, scoreContext{}, false
+	if allyKing == nil {
+		return nil, scoreContext{}, fmt.Errorf("%w: CPU side", ErrNoKing)
+	}
+	if opponentKing == nil {
+		return nil, scoreContext{}, fmt.Errorf("%w: opponent side", ErrNoKing)
 	}
 	base.allyKingID = allyKing.ID
 	base.opponentKingID = opponentKing.ID
-	return allies, base, true
+	return allies, base, nil
 }
 
 // Decide returns the TurnCommands the CPU plays this turn, in order; empty means no action.
-// The commands are valid to apply even when the error is non-nil: it joins the failures of units
-// that were skipped, and the plans of the remaining units are still returned.
+// It returns ErrNoKing and no commands when either side has no living king. Otherwise the commands
+// are valid even when the error is non-nil: it joins the failures of skipped units.
 func Decide(gs *engine.GameState) ([]engine.TurnCommand, error) {
-	allies, base, ok := buildRoster(gs)
-	if !ok {
-		return nil, nil
+	allies, base, err := buildRoster(gs)
+	if err != nil {
+		return nil, err
 	}
 
 	sandbox := gs.DeepCopy()
