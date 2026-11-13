@@ -206,7 +206,7 @@ func TestBestCandidateFor(t *testing.T) {
 	})
 }
 
-func TestDecide_NoLeaderOnASide_ReturnsErr(t *testing.T) {
+func TestDecide_NoKingOnASide_ReturnsErr(t *testing.T) {
 	tests := []struct {
 		name  string
 		setup func(gs *engine.GameState)
@@ -225,8 +225,8 @@ func TestDecide_NoLeaderOnASide_ReturnsErr(t *testing.T) {
 
 			got, err := Decide(gs)
 
-			if !errors.Is(err, ErrNoLeaderUnit) {
-				t.Errorf("Decide() error = %v, want ErrNoLeaderUnit", err)
+			if !errors.Is(err, ErrNoKing) {
+				t.Errorf("Decide() error = %v, want ErrNoKing", err)
 			}
 			if len(got) != 0 {
 				t.Errorf("Decide() = %+v, want empty", got)
@@ -678,8 +678,8 @@ func TestDecide_Roster(t *testing.T) {
 			got, err := Decide(gs)
 
 			if tt.wantErr {
-				if !errors.Is(err, ErrNoLeaderUnit) {
-					t.Fatalf("Decide() error = %v, want ErrNoLeaderUnit", err)
+				if !errors.Is(err, ErrNoKing) {
+					t.Fatalf("Decide() error = %v, want ErrNoKing", err)
 				}
 				if len(got) != 0 {
 					t.Fatalf("Decide() = %+v, want empty", got)

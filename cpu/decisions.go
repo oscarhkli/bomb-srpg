@@ -26,7 +26,7 @@ func (c candidate) priority() int {
 	return 1
 }
 
-var ErrNoLeaderUnit = errors.New("no living leader unit")
+var ErrNoKing = errors.New("no living king")
 
 // buildRoster reads positions from gs, so pass the original state, not a sandbox that plans move units in.
 func buildRoster(gs *engine.GameState) (allies []*engine.Unit, base scoreContext, err error) {
@@ -49,10 +49,10 @@ func buildRoster(gs *engine.GameState) (allies []*engine.Unit, base scoreContext
 		}
 	}
 	if allyKing == nil {
-		return nil, scoreContext{}, fmt.Errorf("%w: CPU side", ErrNoLeaderUnit)
+		return nil, scoreContext{}, fmt.Errorf("%w: CPU side", ErrNoKing)
 	}
 	if opponentKing == nil {
-		return nil, scoreContext{}, fmt.Errorf("%w: opponent side", ErrNoLeaderUnit)
+		return nil, scoreContext{}, fmt.Errorf("%w: opponent side", ErrNoKing)
 	}
 	base.allyKingID = allyKing.ID
 	base.opponentKingID = opponentKing.ID
@@ -60,7 +60,7 @@ func buildRoster(gs *engine.GameState) (allies []*engine.Unit, base scoreContext
 }
 
 // Decide returns the TurnCommands the CPU plays this turn, in order; empty means no action.
-// When either side has no living leader it returns ErrNoLeaderUnit and no commands.
+// When either side has no living king (boss included, as in factors.go) it returns ErrNoKing and no commands.
 // Otherwise the commands are valid to apply even when the error is non-nil: it joins the failures
 // of units that were skipped, and the plans of the remaining units are still returned.
 func Decide(gs *engine.GameState) ([]engine.TurnCommand, error) {
