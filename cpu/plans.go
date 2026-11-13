@@ -7,7 +7,6 @@ import (
 	"strings"
 )
 
-// plansFor returns every plan for the unit: idle, move, bomb, move+bomb and bomb+move.
 func plansFor(unit *engine.Unit, gs *engine.GameState) [][]engine.TurnCommand {
 	movePlans := movePlansFor(unit, gs)
 	placeBombPlans := placeBombPlansFor(unit, gs)
@@ -21,7 +20,6 @@ func plansFor(unit *engine.Unit, gs *engine.GameState) [][]engine.TurnCommand {
 	return plans
 }
 
-// combinePlans pairs each of firstPlans with every plan second produces once firstPlans has been applied.
 func combinePlans(
 	unit *engine.Unit,
 	gs *engine.GameState,

@@ -81,7 +81,6 @@ func TestBombIDCodecs(t *testing.T) {
 	}
 }
 
-// TestCombinatorialExhaustive loops through every valid game asset combination.
 func TestCombinatorialExhaustive(t *testing.T) {
 	maxTeams := 2
 	maxPlayersPerTeam := 5
