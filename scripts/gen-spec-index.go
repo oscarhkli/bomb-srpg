@@ -119,7 +119,7 @@ func extractTitle(path string) (string, error) {
 				firstLine = false
 				continue
 			}
-			break // closing ---
+			break
 		}
 		firstLine = false
 

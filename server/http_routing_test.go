@@ -55,7 +55,7 @@ func TestHTTPRouting(t *testing.T) {
 			name:       "POST /api/match-rooms/{roomID}/match",
 			method:     "POST",
 			path:       "/api/match-rooms/DUMMY/match",
-			wantStatus: http.StatusNotFound, // Room doesn't exist yet
+			wantStatus: http.StatusNotFound,
 		},
 		{
 			name:       "GET /api/match-rooms/{roomID}/match (405)",

@@ -73,7 +73,7 @@ type matchRoom struct {
 	mu           sync.RWMutex
 	ID           string
 	Match        *engine.Match
-	GameCfg      *engine.GameCfg // record for rematch use
+	GameCfg      *engine.GameCfg
 	LastActivity time.Time
 	PlayerTokens [2]string // [0]=Team1, [1]=Team2
 	Logger       *slog.Logger
@@ -419,7 +419,6 @@ func (s *ServerStateManager) runCPUTurn(room *matchRoom, match *engine.Match) {
 	match.CPU.PlanGameEvents, match.CPU.ResolveTurnGameEvents = match.ResolveTurn()
 }
 
-// applyPlan applies the plan in order and returns the first rejection, if any.
 func applyPlan(match *engine.Match, plan []engine.TurnCommand) error {
 	for _, cmd := range plan {
 		if _, err := match.ApplyTurnCommand(cmd); err != nil {

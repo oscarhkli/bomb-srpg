@@ -224,7 +224,6 @@ func (h *Handler) handleSubmitTurnCommand(w http.ResponseWriter, r *http.Request
 	h.writeJSON(w, http.StatusOK, gameEvents, "encode gameEvents failed")
 }
 
-// cpuStatusResponse splits the CPU turn's events by phase so the client can animate the CPU's actions and their resolution apart.
 type cpuStatusResponse struct {
 	TurnPhase             engine.CPUTurnPhase `json:"turnPhase"`
 	PlanGameEvents        []engine.GameEvent  `json:"planGameEvents"`
@@ -266,7 +265,6 @@ func (h *Handler) handleResetTurn(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// resolveTurnResponse splits the turn's events by phase so the client can animate the resolution apart.
 type resolveTurnResponse struct {
 	PlanGameEvents        []engine.GameEvent `json:"planGameEvents"`
 	ResolveTurnGameEvents []engine.GameEvent `json:"resolveTurnGameEvents"`
