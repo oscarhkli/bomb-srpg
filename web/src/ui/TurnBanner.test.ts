@@ -8,7 +8,6 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-// tweens.add and time.delayedCall are inert mocks, so each scheduled callback is fired by hand.
 function completeBannerSequence(): void {
   const fadeInCall = mockScene.tweens.add.mock.calls[0]![0] as { onComplete?: () => void };
   fadeInCall.onComplete?.();

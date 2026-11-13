@@ -31,15 +31,12 @@ function defaultGameCfg(): GameCfg {
   };
 }
 
-// Configures a match through two UnitPages and a StagePage.
 export default class MatchSettingsScene extends Phaser.Scene {
   private gameCfg!: GameCfg;
   private pages: SettingsPage[] = [];
   private currentPageIndex = 0;
   private errorPanel!: ErrorPanel;
-  // Bumped on 'shutdown' so late-resolving async work can detect a torn-down scene.
   private generation = 0;
-  // Guards against a re-entrant page/match transition (double-click, rapid Back/Next).
   private isTransitioning = false;
 
   constructor() {
@@ -150,8 +147,6 @@ export default class MatchSettingsScene extends Phaser.Scene {
     this.renderActivePage();
   }
 
-  // Fades out, then runs onFadedOut, unless the scene was torn down or recreated mid-fade
-  // (generation check) or another transition is already in flight.
   private fadeOutThen(onFadedOut: () => void): void {
     if (this.isTransitioning) {
       return;

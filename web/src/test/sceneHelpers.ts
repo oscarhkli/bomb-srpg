@@ -1,7 +1,6 @@
 import { mockScene, createMockText, createMockContainer } from './setup';
 import type { BombGraphics } from '../rendering/resolveTurnPlayer';
 
-// Drains the microtask queue so chains of already-resolved mock promises settle.
 export async function flush(times = 15): Promise<void> {
   for (let i = 0; i < times; i++) {
     await Promise.resolve();
@@ -28,7 +27,6 @@ export function allGraphics(): ReturnType<typeof mockScene.add.graphics>[] {
   );
 }
 
-// Last `n` Graphics instances created so far, in creation order.
 export function lastGraphics(n: number): ReturnType<typeof mockScene.add.graphics>[] {
   return allGraphics().slice(-n);
 }
@@ -58,7 +56,6 @@ export function textByContent(content: string): ReturnType<typeof mockScene.add.
   return textAt(index);
 }
 
-// Finds and invokes a Text mock's listener for the given pointer event (e.g. 'pointerover').
 export function fireTextPointerEvent(
   text: ReturnType<typeof mockScene.add.text>,
   event: string
@@ -70,7 +67,6 @@ export function fireTextPointerEvent(
   (call[1] as () => void)();
 }
 
-// Accepts any mock with an `on` spy.
 export function pointerDownOf(g: { on: { mock: { calls: unknown[][] } } }): () => void {
   return g.on.mock.calls.find(call => call[0] === 'pointerdown')?.[1] as () => void;
 }
@@ -79,8 +75,6 @@ export function clickPointerdown(g: { on: { mock: { calls: unknown[][] } } }): v
   pointerDownOf(g)();
 }
 
-// Finds and invokes a mock's listener for an arbitrary pointer event (pointerover, pointerout,
-// pointerup, pointerupoutside, ...).
 export function firePointerEvent(g: { on: { mock: { calls: unknown[][] } } }, event: string): void {
   const call = g.on.mock.calls.find(c => c[0] === event);
   if (!call) {
@@ -101,7 +95,6 @@ export function allContainers(): ReturnType<typeof mockScene.add.container>[] {
   );
 }
 
-// Last `n` Container instances created so far, in creation order.
 export function lastContainers(n: number): ReturnType<typeof mockScene.add.container>[] {
   return allContainers().slice(-n);
 }
@@ -120,18 +113,15 @@ export function tweenConfigAt(index: number): unknown {
   return mockScene.tweens.add.mock.calls[index]![0];
 }
 
-// Returns the callback scheduled at delayMs (does not invoke it).
 export function delayedCallAt(delayMs: number): () => void {
   const call = mockScene.time.delayedCall.mock.calls.find(c => c[0] === delayMs);
   return call![1] as () => void;
 }
 
-// Finds and invokes the callback scheduled at delayMs.
 export function fireDelayedCall(delayMs: number): void {
   delayedCallAt(delayMs)();
 }
 
-// Fires every scheduled delayedCall in order, including ones scheduled while draining.
 export function drainDelayedCalls(): void {
   let i = 0;
   while (i < mockScene.time.delayedCall.mock.calls.length) {
@@ -141,21 +131,17 @@ export function drainDelayedCalls(): void {
   }
 }
 
-// Finds and invokes the scene's 'shutdown' listener registered via this.events.once(...),
-// simulating the scene being torn down mid-flight.
 export function fireShutdown(): void {
   const call = mockScene.events.once.mock.calls.find(c => c[0] === 'shutdown');
   (call?.[1] as (() => void) | undefined)?.();
 }
 
-// Fires only the most recently registered 'shutdown' listener.
 export function fireLastShutdownListener(): void {
   const calls = mockScene.events.once.mock.calls.filter(c => c[0] === 'shutdown');
   const call = calls[calls.length - 1];
   (call?.[1] as (() => void) | undefined)?.();
 }
 
-// Fires the most recently registered 'camerafadeoutcomplete' listener.
 export function fireCameraFadeOutComplete(): void {
   const calls = mockScene.cameras.main.once.mock.calls.filter(
     c => c[0] === 'camerafadeoutcomplete'

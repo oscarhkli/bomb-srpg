@@ -5,7 +5,6 @@ export function destroyAll(objects: { destroy(): void }[]): void {
   objects.length = 0;
 }
 
-// Left edge of a row of `itemCount` fixed-size items, centered within a container.
 export function centeredRowStartX(
   containerX: number,
   containerWidth: number,

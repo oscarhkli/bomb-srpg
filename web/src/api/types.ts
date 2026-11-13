@@ -30,13 +30,13 @@ export interface Coordinate {
 export interface Tile {
   type: TerrainType;
   occupantType: OccupantType;
-  occupantId: number; // UnitID | BombID | SoftBlockID
+  occupantId: number;
 }
 
 export interface SoftBlock {
   id: number;
   position: Coordinate;
-  hiddenItem?: string; // Reserved for future
+  hiddenItem?: string;
 }
 
 export interface Archetype {
@@ -60,7 +60,7 @@ export interface Catalog {
 }
 
 export interface Unit {
-  id: number; // UnitID (uint8)
+  id: number;
   type: string;
   position: Coordinate;
   speed: number;
@@ -77,8 +77,8 @@ export interface Unit {
 }
 
 export interface Bomb {
-  id: number; // BombID (uint32)
-  ownerId: number; // UnitID (0 = sudden death)
+  id: number;
+  ownerId: number;
   position: Coordinate;
   range: number;
   countdown: number;
@@ -102,15 +102,6 @@ export interface TurnCommand {
   target: Coordinate;
 }
 
-// Optional fields vary by event type:
-// unitMoved: from, to
-// unitDamaged: position, newHp
-// unitDied: position
-// bombPlaced: bombId, position, range, countdown
-// bombCountdownUpdated: bombId, position, countdown
-// bombExploded: bombId, position, affectedPositions
-// softBlockDestroyed: softBlockId, position
-// matchEnded: winnerTeamId, isDraw
 export interface GameEvent {
   type: GameEvtType;
   unitId?: number;
@@ -135,9 +126,9 @@ export interface TeamSlot {
 export interface GameCfg {
   vsCpu: boolean;
   stagePreset: string;
-  p1Slots: TeamSlot[]; // first usually = King
-  p2Slots: TeamSlot[]; // first usually = King
-  maxTurns: number; // 0 = instant sudden death
+  p1Slots: TeamSlot[];
+  p2Slots: TeamSlot[];
+  maxTurns: number;
   allowResetTurn: boolean;
 }
 

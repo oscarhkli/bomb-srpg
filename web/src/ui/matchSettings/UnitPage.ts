@@ -66,7 +66,6 @@ const NEXT_BUTTON_DISABLED_STYLE: PillButtonStyle = {
   borderWidth: PANEL_BUTTON_BORDER_WIDTH,
 };
 
-// Builds one Player's formation; mutates the scene's shared gameCfg in place.
 export default class UnitPage implements SettingsPage {
   private readonly slots: string[];
   private scene: Phaser.Scene | undefined;

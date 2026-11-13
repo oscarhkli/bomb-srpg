@@ -9,7 +9,6 @@ export interface PillButtonStyle {
   borderWidth: number;
 }
 
-// Wires the interactive hit area and click handling onto a Graphics rect.
 export function attachRectClickHandler(
   target: Phaser.GameObjects.Graphics,
   x: number,
@@ -25,7 +24,6 @@ export function attachRectClickHandler(
   target.on('pointerdown', onClick);
 }
 
-// Y position of the i-th button in a vertical stack of the given height and spacing.
 export function verticalButtonY(
   startY: number,
   index: number,
@@ -35,7 +33,6 @@ export function verticalButtonY(
   return startY + index * (buttonHeight + spacing);
 }
 
-// Draws a pill-shaped button (rounded rect, border, centered label); returns its GameObjects.
 export function drawPillButton(
   scene: Phaser.Scene,
   x: number,

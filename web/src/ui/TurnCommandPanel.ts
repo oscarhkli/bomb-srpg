@@ -41,7 +41,6 @@ type ActionStackEntry =
 
 const BUTTON_COUNT = 3;
 
-// Total stacked height of the panel's SpriteButtons.
 export function turnCommandPanelHeight(scene: Phaser.Scene): number {
   const { height } = buttonFrameSize(scene);
   return BUTTON_COUNT * height + (BUTTON_COUNT - 1) * SPRITE_BUTTON_ROW_SPACING;

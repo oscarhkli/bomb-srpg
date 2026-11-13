@@ -181,8 +181,7 @@ export const STAGE_CARD_SIZE = 80;
 export const STAGE_CARD_PADDING = 6;
 export const STAGE_CARD_SPACING = 6;
 export const STAGE_CARD_NAME_FONT_SIZE = 16;
-// Rounded up from 2 so it stays distinguishable from PANEL_BUTTON_BORDER_WIDTH.
-export const STAGE_CARD_SELECTED_BORDER_WIDTH = 3;
+export const STAGE_CARD_SELECTED_BORDER_WIDTH = PANEL_BUTTON_BORDER_WIDTH + 1;
 
 export const STAGE_DETAIL_INNER_PANEL_SIZE_RATIO = 0.8;
 export const STAGE_DETAIL_INNER_PANEL_PADDING = 6;
@@ -196,7 +195,6 @@ export const MAX_TURNS_ARROW_RIGHT_LABEL = '❱';
 export const MAX_TURNS_ARROW_INSET = 12;
 export const MAX_TURNS_RECOMMENDED_GLYPH = '🌟';
 export const MAX_TURNS_RECOMMENDED_FONT_SIZE = 12;
-// Fixed slot for the recommended glyph so toggling it never shifts the layout.
 export const MAX_TURNS_RECOMMENDED_GLYPH_GAP = 10;
 
 export const TITLE_TOP_MARGIN = 24;

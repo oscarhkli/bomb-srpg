@@ -10,7 +10,6 @@ import {
   ERROR_PANEL_Y,
 } from '../constants';
 
-// A camera-pinned panel that stacks error messages, each offset by the previous one's wrapped height.
 export default class ErrorPanel {
   private bg: Phaser.GameObjects.Graphics | undefined;
   private texts: Phaser.GameObjects.Text[] = [];

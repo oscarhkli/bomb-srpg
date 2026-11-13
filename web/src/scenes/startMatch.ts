@@ -24,8 +24,7 @@ export function startMatch(opts: StartMatchOptions): void {
   scene.cameras.main.fadeOut(FADE_MS, 0, 0, 0);
   const fadeDone = new Promise<void>(resolve => {
     scene.cameras.main.once('camerafadeoutcomplete', () => resolve());
-    // Scene may be torn down before the fade event fires; resolve anyway so this
-    // promise can't hang forever (the gen check below still guards the outcome).
+    // Scene may be torn down before the fade event fires; resolve anyway so this promise can't hang.
     scene.events.once('shutdown', () => resolve());
   });
   const matchResult = createMatchRoom()
