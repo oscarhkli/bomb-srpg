@@ -1,15 +1,12 @@
 package engine
 
-// bombDefaultCountDown is the countdown in turns of a newly placed bomb.
 const bombDefaultCountDown int = 5
 
-// bombDefaultPower is the default explosion range in tiles.
 const bombDefaultPower int = 2
 
 // SuddenDeathBombs is the maximum number of bombs dropped per Sudden Death turn.
 const SuddenDeathBombs int = 2
 
-// archetypeRegistry stores the base templates of Archetypes.
 func archetypesRegistry() []Archetype {
 	return []Archetype{
 		{
@@ -70,7 +67,6 @@ func archetypesRegistry() []Archetype {
 	}
 }
 
-// GetArchetype returns the archetype and whether it exists.
 func GetArchetype(name string) (Archetype, bool) {
 	for _, a := range archetypesRegistry() {
 		if a.Name == name {
@@ -80,7 +76,6 @@ func GetArchetype(name string) (Archetype, bool) {
 	return Archetype{}, false
 }
 
-// GetAllArchetypes gets all archetypes for game setup.
 func GetAllArchetypes() []Archetype {
 	results := []Archetype{}
 	for _, a := range archetypesRegistry() {
@@ -91,7 +86,6 @@ func GetAllArchetypes() []Archetype {
 	return results
 }
 
-// stagePresetsRegistry stores the base templates of stagePresets.
 func stagePresetsRegistry() []StagePreset {
 	return []StagePreset{
 		{
@@ -169,7 +163,6 @@ func getStagePreset(name string) (StagePreset, bool) {
 	return StagePreset{}, false
 }
 
-// GetAllStagePresets returns all stagePresets for game setup.
 func GetAllStagePresets() []StagePreset {
 	return stagePresetsRegistry()
 }

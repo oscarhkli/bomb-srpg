@@ -22,7 +22,7 @@
 
 - **Compile-Time Contract Safety**: To guarantee type safety and eliminate argument-swapping bugs, core entity lookups are wrapped in custom, power-of-2 byte-aligned semantic primitives.
 - **UnitID (uint8)**: Split internally into two equal 4-bit nibbles via `(TeamID << 4) | PlayerIndex`. This accommodates up to 15 unique teams and 15 players per team, mapping perfectly onto a single hexadecimal byte for clear log readability (e.g., `0x23` means Team 2, Player 3).
-- **BombID (uint32)**: Packed to represent absolute timeline metadata using clear byte boundaries: `(UnitID << 24) | (CurrentTurn << 16) | BombCounterShift`.
+- **BombID (uint32)**: Packed to represent absolute timeline metadata using clear byte boundaries: `(UnitID << 24) | (CurrentTurn << 16) | BombCounter`.
 - **TurnBombCounter Invariant**: A state-bound tracking sequence index that advances on the active sandbox frame. Because it is bound directly to the sandbox container, it resets on a turn-reset request, preventing ID collisions or frontend asset desynchronization.
 - **SystemUnitID Contract**: The identifier `UnitID(0)` (Team 0, Player 0) is explicitly reserved as the authoritative environmental actor. It is utilized to log and process automated environmental events, such as sudden-death hazards, without creating phantom player models.
 

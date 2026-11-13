@@ -19,7 +19,7 @@ func terrainToken() map[rune]TerrainType {
 	}
 }
 
-// InitGame validates the config, builds the initial GameState, and returns a Match with turn 1 already begun.
+// InitGame returns a Match with turn 1 already begun.
 func InitGame(gameCfg GameCfg) (*Match, error) {
 	gameState, err := initGameState(gameCfg)
 	if err != nil {
@@ -100,7 +100,6 @@ func initGameState(gameCfg GameCfg) (*GameState, error) {
 	}, nil
 }
 
-// compileGrid parses a preset's LayoutGrid into a Tile matrix, checking it against the declared size.
 func compileGrid(preset StagePreset) ([][]Tile, error) {
 	if len(preset.LayoutGrid) != preset.Height {
 		return nil, fmt.Errorf("%w: stage preset layout grid row count %d does not match specified height %d", ErrInvalidStageLayout, len(preset.LayoutGrid), preset.Height)
@@ -127,8 +126,6 @@ func compileGrid(preset StagePreset) ([][]Tile, error) {
 	return grid, nil
 }
 
-// validateTeamComposition enforces roster-shape rules for a single team:
-// a Boss-role team is 1-5 units with no King, a King-role team is 2-5 units led by King.
 func validateTeamComposition(slots []TeamSlot, playerLabel string) error {
 	hasBoss := hasRole(slots, RoleBoss)
 	if hasBoss && hasRole(slots, RoleKing) {
@@ -217,7 +214,6 @@ func applyGlobalOverride(orig, newVal int) int {
 }
 
 // DeepCopy returns a copy of gs that shares no memory with it.
-// Reference fields must be re-cloned here.
 func (gs *GameState) DeepCopy() *GameState {
 	if gs == nil {
 		return nil
@@ -261,7 +257,6 @@ func cloneGameEvents(src []GameEvent) []GameEvent {
 	return dst
 }
 
-// V must hold no reference fields.
 func cloneEntities[K comparable, V any](src map[K]*V) map[K]*V {
 	dst := make(map[K]*V, len(src))
 	for id, entity := range src {
