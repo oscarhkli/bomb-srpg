@@ -117,9 +117,21 @@ async function expectActionStackClearedBy(
   expect(moveButtonContainer!.destroy).toHaveBeenCalled();
 }
 
+const MOVE_BUTTON = 0;
+const BOMB_BUTTON = 1;
+
+function finishMockMoveTween(
+  unitGraphics: ReturnType<typeof mockScene.add.sprite>,
+  x: number,
+  y: number
+): void {
+  unitGraphics.x = x;
+  unitGraphics.y = y;
+}
+
 async function submitViaUI(
   unitGraphics: ReturnType<typeof mockScene.add.sprite>,
-  buttonIndex: 0 | 1 // 0 = Move, 1 = Bomb
+  buttonIndex: typeof MOVE_BUTTON | typeof BOMB_BUTTON
 ): Promise<void> {
   pointerDownOf(unitGraphics)();
   const actionButtonContainer = lastContainers(3)[buttonIndex];
@@ -131,9 +143,7 @@ async function submitViaUI(
   pointerDownOf(yesButtonContainer!)();
 }
 
-// vi.spyOn(Class.prototype, 'method') avoids referencing `Class.prototype.method` as a bare
-// value (which trips @typescript-eslint/unbound-method) while still giving a MockInstance for
-// assertions/call-order checks on the automocked TurnBanner/SuddenDeathCutscene/VictoryCutscene.
+// vi.spyOn on the prototype avoids @typescript-eslint/unbound-method.
 let turnBannerPlay: MockInstance<TurnBanner['play']>;
 let suddenDeathCutscenePlay: MockInstance<SuddenDeathCutscene['play']>;
 let victoryCutscenePlay: MockInstance<VictoryCutscene['play']>;
@@ -325,7 +335,7 @@ describe('MatchScene', () => {
     await bootScene();
 
     const unitGraphics = occupantSprite(0);
-    await submitViaUI(unitGraphics, 0);
+    await submitViaUI(unitGraphics, MOVE_BUTTON);
     await flush();
 
     expect(submitTurnCommand).toHaveBeenCalledWith({ type: 'move', unitId: 7, target });
@@ -363,7 +373,7 @@ describe('MatchScene', () => {
     await bootScene();
 
     const unitGraphics = occupantSprite(0);
-    await submitViaUI(unitGraphics, 1);
+    await submitViaUI(unitGraphics, BOMB_BUTTON);
     await flush();
 
     expect(submitTurnCommand).toHaveBeenCalledWith({ type: 'placeBomb', unitId: 7, target });
@@ -407,7 +417,7 @@ describe('MatchScene', () => {
     await bootScene();
 
     const unitGraphics = occupantSprite(0);
-    await submitViaUI(unitGraphics, 1);
+    await submitViaUI(unitGraphics, BOMB_BUTTON);
     await flush();
 
     pointerDownOf(unitGraphics)();
@@ -429,7 +439,7 @@ describe('MatchScene', () => {
 
     const gridGraphics = stageBackgroundImage();
     const unitGraphics = occupantSprite(0);
-    await submitViaUI(unitGraphics, 0);
+    await submitViaUI(unitGraphics, MOVE_BUTTON);
     await flush();
 
     expect(mockScene.add.text).toHaveBeenCalledWith(
@@ -457,7 +467,7 @@ describe('MatchScene', () => {
     await bootScene();
 
     const unitGraphics = occupantSprite(0);
-    await submitViaUI(unitGraphics, 0);
+    await submitViaUI(unitGraphics, MOVE_BUTTON);
     await flush();
 
     expect(mockScene.add.text).toHaveBeenCalledWith(
@@ -490,7 +500,7 @@ describe('MatchScene', () => {
     await bootScene();
 
     const unitGraphics = occupantSprite(0);
-    await submitViaUI(unitGraphics, 0);
+    await submitViaUI(unitGraphics, MOVE_BUTTON);
     await flush();
 
     expect(mockScene.tweens.add).toHaveBeenCalledWith(
@@ -524,7 +534,7 @@ describe('MatchScene', () => {
     await bootScene();
 
     const unitGraphics = occupantSprite(0);
-    await submitViaUI(unitGraphics, 0);
+    await submitViaUI(unitGraphics, MOVE_BUTTON);
     await flush();
 
     expect(mockScene.tweens.add).toHaveBeenCalledWith(
@@ -559,7 +569,7 @@ describe('MatchScene', () => {
     const unitGraphics = occupantSprite(0);
     const refetchesBefore = vi.mocked(getMatchState).mock.calls.length;
 
-    await submitViaUI(unitGraphics, 0);
+    await submitViaUI(unitGraphics, MOVE_BUTTON);
     await flush();
 
     expect(unitGraphics.destroy).not.toHaveBeenCalled();
@@ -679,12 +689,10 @@ describe('MatchScene', () => {
     await bootScene();
 
     const unitGraphics = occupantSprite(0);
-    await submitViaUI(unitGraphics, 0);
+    await submitViaUI(unitGraphics, MOVE_BUTTON);
     await flush();
 
-    // The mock tween never animates, so advance the sprite to where the first move left it.
-    unitGraphics.x = 48;
-    unitGraphics.y = 48;
+    finishMockMoveTween(unitGraphics, 48, 48);
 
     pointerDownOf(unitGraphics)();
     const [moveButtonContainer] = lastContainers(3);
@@ -936,7 +944,7 @@ describe('MatchScene', () => {
     vi.mocked(submitTurnCommand).mockResolvedValue([
       { type: 'unitMoved', unitId: 7, from: { x: 0, y: 0 }, to: target },
     ]);
-    await submitViaUI(occupantSprite(0), 0);
+    await submitViaUI(occupantSprite(0), MOVE_BUTTON);
     await flush();
 
     expect(staleErrorText.destroy).toHaveBeenCalled();
@@ -1380,10 +1388,10 @@ describe('MatchScene', () => {
 
     it('does not animate the CPU turn until its own TurnBanner has finished, even when polling resolves instantly (AC 6, 7)', async () => {
       queueMatchStates(makeState({ grid: [[plainTile()]], activeTeam: 2, turn: 1 }));
-      // Ends the match so the CPU turn terminates instead of recursing into another beginTurn().
-      vi.mocked(consumeCpuStatus).mockResolvedValue(
-        readyStatus({ resolveTurnGameEvents: [{ type: 'matchEnded', winnerTeamId: 2 }] })
-      );
+      const cpuTurnEndingMatch = readyStatus({
+        resolveTurnGameEvents: [{ type: 'matchEnded', winnerTeamId: 2 }],
+      });
+      vi.mocked(consumeCpuStatus).mockResolvedValue(cpuTurnEndingMatch);
       let resolveCpuBanner: () => void = () => undefined;
       turnBannerPlay.mockReturnValue(
         new Promise<void>(resolve => {

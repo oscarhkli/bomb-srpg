@@ -181,8 +181,7 @@ export const STAGE_CARD_SIZE = 80;
 export const STAGE_CARD_PADDING = 6;
 export const STAGE_CARD_SPACING = 6;
 export const STAGE_CARD_NAME_FONT_SIZE = 16;
-// Rounded up from 2 so it stays distinguishable from PANEL_BUTTON_BORDER_WIDTH.
-export const STAGE_CARD_SELECTED_BORDER_WIDTH = 3;
+export const STAGE_CARD_SELECTED_BORDER_WIDTH = PANEL_BUTTON_BORDER_WIDTH + 1;
 
 export const STAGE_DETAIL_INNER_PANEL_SIZE_RATIO = 0.8;
 export const STAGE_DETAIL_INNER_PANEL_PADDING = 6;

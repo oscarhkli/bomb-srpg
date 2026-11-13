@@ -128,7 +128,7 @@ export interface GameCfg {
   stagePreset: string;
   p1Slots: TeamSlot[];
   p2Slots: TeamSlot[];
-  maxTurns: number; // 0 = instant sudden death
+  maxTurns: number;
   allowResetTurn: boolean;
 }
 
