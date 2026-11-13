@@ -5,7 +5,6 @@ import (
 	"net/http"
 )
 
-// SecurityHeaders sets baseline hardening headers on every response.
 func SecurityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
@@ -18,7 +17,6 @@ func SecurityHeaders(next http.Handler) http.Handler {
 	})
 }
 
-// RecoverPanic turns a handler panic into a logged 500.
 func RecoverPanic(logger *slog.Logger, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {

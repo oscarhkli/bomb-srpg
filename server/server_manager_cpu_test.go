@@ -742,9 +742,8 @@ func TestServerStateManager_CPUTurnGate(t *testing.T) {
 	cpuMove := engine.NewMoveCommand(engine.NewUnitID(2, 0), engine.Coordinate{X: 4, Y: 1})
 
 	calls := []struct {
-		name string
-		call func(s *ServerStateManager, roomID, token string) error
-		// resolved is true when a successful call advances the turn.
+		name     string
+		call     func(s *ServerStateManager, roomID, token string) error
 		resolved bool
 	}{
 		{
