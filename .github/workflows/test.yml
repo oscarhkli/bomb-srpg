@@ -29,7 +29,7 @@ jobs:
           cache: false
 
       - name: Run Tests with Coverage
-        run: go test -race -cover -coverprofile=coverage.txt ./cli/... ./cmd/srpg-web/... ./cpu/... ./engine/... ./server/...
+        run: go test -race -cover -coverprofile=coverage.txt ./cli/... ./cmd/srpg-web/... ./cpu/... ./engine/... ./scripts/... ./server/...
 
       - name: Archive code coverage results
         uses: actions/upload-artifact@v7

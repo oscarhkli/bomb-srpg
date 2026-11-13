@@ -78,7 +78,8 @@ func checkFile(path string) ([]string, error) {
 			flush()
 			cur = &block{start, end}
 		}
-		if strings.HasPrefix(strings.TrimLeft(strings.TrimPrefix(c.Text, "//"), " "), "nolint") {
+		body := strings.TrimLeft(strings.TrimPrefix(strings.TrimPrefix(c.Text, "//"), "/*"), " \t")
+		if strings.HasPrefix(body, "nolint") {
 			msgs = append(msgs, fmt.Sprintf("%s:%d: //nolint is banned", path, start))
 		}
 	}

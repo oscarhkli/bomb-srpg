@@ -46,14 +46,54 @@ func TestLintComments(t *testing.T) {
 			want: []string{"x.go:3"},
 		},
 		{
-			name: "go directive passes",
-			src:  "//go:build ignore\n\npackage x\n",
-			want: nil,
-		},
-		{
 			name: "directive does not count towards the block",
 			src:  "package x\n\n//go:generate echo\n// a\n// b\n// c\nfunc f() {}\n",
 			want: nil,
+		},
+		{
+			name: "directive among three comment lines passes",
+			src:  "package x\n\n// a\n// b\n//go:generate echo\n// c\nfunc f() {}\n",
+			want: nil,
+		},
+		{
+			name: "directive splits a block in two",
+			src:  "package x\n\n// a\n// b\n//go:generate echo\n// c\n// d\nfunc f() {}\n",
+			want: nil,
+		},
+		{
+			name: "three lines then directive then one passes",
+			src:  "package x\n\n// a\n// b\n// c\n//go:generate echo\n// d\nfunc f() {}\n",
+			want: nil,
+		},
+		{
+			name: "four-line block with CRLF fails",
+			src:  "package x\r\n\r\n// a\r\n// b\r\n// c\r\n// d\r\nfunc f() {}\r\n",
+			want: []string{"x.go:3"},
+		},
+		{
+			name: "blank line splits a block in two",
+			src:  "package x\n\n// a\n// b\n\n// c\n// d\nfunc f() {}\n",
+			want: nil,
+		},
+		{
+			name: "inline block comment between code fails",
+			src:  "package x\n\nvar v = /* why */ 1\n",
+			want: []string{"x.go:3"},
+		},
+		{
+			name: "trailing nolint fails twice",
+			src:  "package x\n\nvar v = 1 //nolint\n",
+			want: []string{"x.go:3", "x.go:3"},
+		},
+		{
+			name: "block comment nolint fails",
+			src:  "package x\n\n/* nolint */\nfunc f() {}\n",
+			want: []string{"x.go:3"},
+		},
+		{
+			name: "block comment nolint with linter fails",
+			src:  "package x\n\n/*nolint:gosec*/\nfunc f() {}\n",
+			want: []string{"x.go:3"},
 		},
 		{
 			name: "nolint with a reason fails",
