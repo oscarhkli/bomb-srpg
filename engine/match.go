@@ -229,7 +229,7 @@ func (m *Match) injectSuddenDeathHazards() {
 	}
 }
 
-// ResolveTurn commits WorkingState to TrueState, then begins the next turn, so sudden-death hazards are already in both states on return.
+// ResolveTurn commits the turn and begins the next, so hazards are already placed on return.
 // Returns the events logged during planning and those produced by resolution; MatchEndedEvent lands in the latter.
 func (m *Match) ResolveTurn() (planGameEvents, resolveTurnGameEvents []GameEvent) {
 	planGameEvents = make([]GameEvent, len(m.PlaybackLog))

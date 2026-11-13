@@ -88,7 +88,7 @@ const (
 type Tile struct {
 	Type         TerrainType  `json:"type"`
 	OccupantType OccupantType `json:"occupantType"`
-	OccupantID   int64        `json:"occupantId"` // UnitID, BombID or SoftBlockID, per OccupantType
+	OccupantID   int64        `json:"occupantId"`
 }
 
 // unitID returns OccupantID as a UnitID, wrapping values wider than the type.
@@ -257,9 +257,9 @@ func (u Unit) MarshalJSON() ([]byte, error) {
 
 type Bomb struct {
 	ID        BombID     `json:"id"`
-	OwnerID   UnitID     `json:"ownerId"` // unit that placed the bomb
+	OwnerID   UnitID     `json:"ownerId"`
 	Position  Coordinate `json:"position"`
-	Range     int        `json:"range"`     // Explosion radius in tiles
+	Range     int        `json:"range"`
 	Countdown int        `json:"countdown"` // Turns remaining until detonation; <0 for non-countdown bombs
 }
 
@@ -269,28 +269,28 @@ type TeamSlot struct {
 }
 
 type GameCfg struct {
-	VSCpu                       bool       `json:"vsCpu"`       // true = the second team is CPU-controlled
-	StagePreset                 string     `json:"stagePreset"` // stage preset name, e.g. "Plain"
+	VSCpu                       bool       `json:"vsCpu"`
+	StagePreset                 string     `json:"stagePreset"`
 	P1Slots                     []TeamSlot `json:"p1Slots"`
 	P2Slots                     []TeamSlot `json:"p2Slots"`
-	MaxTurns                    int        `json:"maxTurns"`       // Turn limit; 0 = instant sudden death
-	AllowResetTurn              bool       `json:"allowResetTurn"` // true = players can undo planned actions before commit
-	GlobalSpeedOverride         int        `json:"-"`              // Test override for all unit speeds (0 = disabled)
-	GlobalBombCountdownOverride int        `json:"-"`              // Test override for bomb countdown (0 = disabled)
-	GlobalBombMaxRangeOverride  int        `json:"-"`              // Test override for bomb max range (0 = disabled)
+	MaxTurns                    int        `json:"maxTurns"` // Turn limit; 0 = instant sudden death
+	AllowResetTurn              bool       `json:"allowResetTurn"`
+	GlobalSpeedOverride         int        `json:"-"`
+	GlobalBombCountdownOverride int        `json:"-"`
+	GlobalBombMaxRangeOverride  int        `json:"-"` // Test override for bomb max range (0 = disabled)
 }
 
 type GameState struct {
-	Turn            int                // Current turn number (starts at 1)
-	InSuddenDeath   bool               // Indicate if the current turn is in Sudden Death
-	ActiveTeam      int                // Team whose turn it is (1 or 2)
-	TurnBombCounter int                // Bombs placed this turn (for BombID generation)
-	Grid            [][]Tile           // Board matrix [Y][X]
-	Units           map[UnitID]*Unit   // All units by ID
-	Bombs           map[BombID]*Bomb   // Active bombs by ID
-	SoftBlocks      map[int]*SoftBlock // Soft blocks by ID
-	TurnCommands    []TurnCommand      // Pending commands for current turn
-	TurnStartEvents []GameEvent        // Hazard events of the current turn start
+	Turn            int // Current turn number (starts at 1)
+	InSuddenDeath   bool
+	ActiveTeam      int      // Team whose turn it is (1 or 2)
+	TurnBombCounter int      // Bombs placed this turn (for BombID generation)
+	Grid            [][]Tile // Board matrix [Y][X]
+	Units           map[UnitID]*Unit
+	Bombs           map[BombID]*Bomb
+	SoftBlocks      map[int]*SoftBlock
+	TurnCommands    []TurnCommand
+	TurnStartEvents []GameEvent // Hazard events of the current turn start
 }
 
 // MarshalJSON emits the client-facing shape, with the entity maps flattened to arrays.
@@ -351,7 +351,7 @@ type cpuState struct {
 
 type Match struct {
 	GameCfg      GameCfg
-	TrueState    *GameState  // Committed state
+	TrueState    *GameState
 	WorkingState *GameState  // Sandbox for mid-turn planning
 	PlaybackLog  []GameEvent // events since the last ResolveTurn
 	CPU          cpuState
