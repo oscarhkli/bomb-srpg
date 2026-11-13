@@ -819,6 +819,26 @@ func TestDecide_IdleAllyDoesNotEndRound(t *testing.T) {
 	}
 }
 
+func TestDecide_SkippedUnitFailureKeepsOtherUnitsCommands(t *testing.T) {
+	gs := newTestGameState(9, 2)
+	corridorWithBreakthrough(gs)
+	addFighter(gs, engine.NewUnitID(2, 3), engine.Coordinate{X: 0, Y: 1})
+	broken := addFighter(gs, engine.NewUnitID(2, 4), engine.Coordinate{X: 7, Y: 0})
+	broken.Team = 2
+
+	cmds, err := Decide(gs)
+
+	if !errors.Is(err, engine.ErrNotActiveTeam) {
+		t.Fatalf("Decide() error = %v, want %v", err, engine.ErrNotActiveTeam)
+	}
+	if len(cmds) == 0 {
+		t.Errorf("Decide() = no commands, want the commands of the units that did not fail")
+	}
+	if want := fmt.Sprintf("%#x", broken.ID); !strings.Contains(err.Error(), want) {
+		t.Errorf("Decide() error = %q, want it to name unit %s", err, want)
+	}
+}
+
 func TestDecide_ReturnsErrorWhenActiveTeamIsNotCPU(t *testing.T) {
 	gs := newTestGameState(9, 5)
 	fighter1, fighter2 := twinCorridorWithBreakthrough(gs, false)

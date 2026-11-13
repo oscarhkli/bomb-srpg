@@ -55,9 +55,6 @@ func buildRoster(gs *engine.GameState) (allies []*engine.Unit, base scoreContext
 	return allies, base, nil
 }
 
-// Decide returns the TurnCommands the CPU plays this turn, in order; empty means no action.
-// It returns ErrNoKing and no commands when either side has no living king. Otherwise the commands
-// are valid even when the error is non-nil: it joins the failures of skipped units.
 func Decide(gs *engine.GameState) ([]engine.TurnCommand, error) {
 	allies, base, err := buildRoster(gs)
 	if err != nil {
