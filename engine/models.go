@@ -8,11 +8,9 @@ import (
 	"slices"
 )
 
-// TerrainType represents the base terrain of a tile.
 type TerrainType int
 
 const (
-	// TerrainPlain is walkable by all units.
 	TerrainPlain TerrainType = iota
 	// TerrainBlock is a solid wall; not walkable, flyable, or jumpable.
 	TerrainBlock
@@ -24,7 +22,6 @@ const (
 	TerrainLava
 )
 
-// String returns the name used in logs and JSON.
 func (t TerrainType) String() string {
 	switch t {
 	case TerrainPlain:
@@ -42,18 +39,16 @@ func (t TerrainType) String() string {
 	}
 }
 
-// MarshalText encodes the terrain as its String name.
 func (t TerrainType) MarshalText() ([]byte, error) {
 	return []byte(t.String()), nil
 }
 
-// Coordinate represents a grid position using (X, Y) where (0,0) is top-left.
+// Coordinate is a grid position; (0,0) is the top-left tile.
 type Coordinate struct {
 	X int `json:"x"`
 	Y int `json:"y"`
 }
 
-// OccupantType represents what occupies a tile (if anything).
 type OccupantType int
 
 const (
@@ -64,7 +59,6 @@ const (
 	OccupantItem
 )
 
-// String returns the name used in logs and JSON.
 func (o OccupantType) String() string {
 	switch o {
 	case OccupantNone:
@@ -82,18 +76,15 @@ func (o OccupantType) String() string {
 	}
 }
 
-// MarshalText encodes the occupant type as its String name.
 func (o OccupantType) MarshalText() ([]byte, error) {
 	return []byte(o.String()), nil
 }
 
-// Team1 and Team2 are the two team numbers.
 const (
 	Team1 = 1
 	Team2 = 2
 )
 
-// Tile represents a single cell on the game board combining terrain and occupant.
 type Tile struct {
 	Type         TerrainType  `json:"type"`
 	OccupantType OccupantType `json:"occupantType"`
@@ -110,13 +101,11 @@ func (t Tile) BombID() BombID {
 	return BombID(t.OccupantID & int64(math.MaxUint32))
 }
 
-// SoftBlock represents a destructible block that may hide an item.
 type SoftBlock struct {
 	ID       int        `json:"id"`
 	Position Coordinate `json:"position"`
 }
 
-// StagePreset defines a complete map layout including terrain, soft blocks, and starting positions.
 type StagePreset struct {
 	Name                string        `json:"name"`
 	Description         string        `json:"description"`
@@ -141,7 +130,6 @@ func allSkills() []skillType {
 	return []skillType{skillCanJump, skillCanFly}
 }
 
-// String returns the name used in logs and JSON.
 func (s skillType) String() string {
 	switch s {
 	case skillNone:
@@ -166,7 +154,6 @@ func (s skillType) MarshalJSON() ([]byte, error) {
 	return json.Marshal(names)
 }
 
-// Archetype defines the base template for a unit class (King, Fighter, Witch, etc.).
 type Archetype struct {
 	Name         string    `json:"name"`
 	BaseSpeed    int       `json:"speed"`
@@ -179,7 +166,6 @@ type Archetype struct {
 	Selectable   bool      `json:"-"`
 }
 
-// UnitRole defines if the Unit is King, Boss, or just a Normal Unit.
 type UnitRole int
 
 const (
@@ -192,7 +178,6 @@ func roleNames() []string {
 	return []string{RoleNormal: "Normal", RoleKing: "King", RoleBoss: "Boss"}
 }
 
-// String returns the name used in logs and JSON.
 func (r UnitRole) String() string {
 	names := roleNames()
 	if r < 0 || int(r) >= len(names) {
@@ -201,12 +186,10 @@ func (r UnitRole) String() string {
 	return names[r]
 }
 
-// MarshalText encodes the role as its String name.
 func (r UnitRole) MarshalText() ([]byte, error) {
 	return []byte(r.String()), nil
 }
 
-// UnmarshalText decodes a role from its String name.
 func (r *UnitRole) UnmarshalText(text []byte) error {
 	i := slices.Index(roleNames(), string(text))
 	if i < 0 {
@@ -222,7 +205,6 @@ type UnitID uint8
 // BombID packs owner, turn and counter; see NewBombID.
 type BombID uint32
 
-// Unit represents a single controllable character on the board.
 type Unit struct {
 	ID           UnitID
 	Type         Archetype
@@ -241,7 +223,6 @@ type Unit struct {
 	HasUsedSkill bool // set after placing a bomb or using a skill; reset each turn
 }
 
-// MarshalJSON emits the client-facing shape.
 func (u Unit) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		ID           UnitID     `json:"id"`
@@ -274,7 +255,6 @@ func (u Unit) MarshalJSON() ([]byte, error) {
 	})
 }
 
-// Bomb represents an active explosive on the board.
 type Bomb struct {
 	ID        BombID     `json:"id"`
 	OwnerID   UnitID     `json:"ownerId"` // unit that placed the bomb
@@ -283,13 +263,11 @@ type Bomb struct {
 	Countdown int        `json:"countdown"` // Turns remaining until detonation; <0 for non-countdown bombs
 }
 
-// TeamSlot pairs an archetype name with the role it fills in a team.
 type TeamSlot struct {
 	Archetype string   `json:"archetype"`
 	Role      UnitRole `json:"role"`
 }
 
-// GameCfg holds all configuration for a match.
 type GameCfg struct {
 	VSCpu                       bool       `json:"vsCpu"`       // true = the second team is CPU-controlled
 	StagePreset                 string     `json:"stagePreset"` // stage preset name, e.g. "Plain"
@@ -302,7 +280,6 @@ type GameCfg struct {
 	GlobalBombMaxRangeOverride  int        `json:"-"`              // Test override for bomb max range (0 = disabled)
 }
 
-// GameState is the complete snapshot of a match at a point in time.
 type GameState struct {
 	Turn            int                // Current turn number (starts at 1)
 	InSuddenDeath   bool               // Indicate if the current turn is in Sudden Death
@@ -341,7 +318,6 @@ func (gs *GameState) MarshalJSON() ([]byte, error) {
 	})
 }
 
-// CPUTurnPhase represents what CPU is operating in a Match. VS CPU only.
 type CPUTurnPhase int
 
 const (
@@ -350,7 +326,6 @@ const (
 	TurnPhaseReady
 )
 
-// String returns the name used in logs and JSON.
 func (c CPUTurnPhase) String() string {
 	switch c {
 	case TurnPhaseIdle:
@@ -364,7 +339,6 @@ func (c CPUTurnPhase) String() string {
 	}
 }
 
-// MarshalText encodes the phase as its String name.
 func (c CPUTurnPhase) MarshalText() ([]byte, error) {
 	return []byte(c.String()), nil
 }
@@ -375,7 +349,6 @@ type cpuState struct {
 	ResolveTurnGameEvents []GameEvent
 }
 
-// Match orchestrates a full game session: state, config, and event log.
 type Match struct {
 	GameCfg      GameCfg
 	TrueState    *GameState  // Committed state
@@ -396,7 +369,6 @@ const (
 	patternCardinal stepPattern = iota
 )
 
-// PassFlag is a bitmask for pathfinding passability rules.
 type PassFlag uint8
 
 const (
@@ -407,7 +379,6 @@ const (
 	PassBombs                           // walk through bombs
 )
 
-// MovementRule configures pathfinding for a specific action (move, bomb placement, skill).
 type MovementRule struct {
 	MaxSteps              int // Max steps; -1 = unlimited
 	Pattern               stepPattern

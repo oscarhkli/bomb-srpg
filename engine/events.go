@@ -1,29 +1,19 @@
 package engine
 
-// GameEvtType represents a game event type emitted during turn resolution.
 type GameEvtType string
 
 const (
-	// GameEvtUnitMoved signals a unit relocated.
-	GameEvtUnitMoved GameEvtType = "unitMoved"
-	// GameEvtUnitDamaged signals a unit took damage.
-	GameEvtUnitDamaged GameEvtType = "unitDamaged"
-	// GameEvtUnitDied signals a unit was eliminated.
-	GameEvtUnitDied GameEvtType = "unitDied"
-	// GameEvtBombPlaced signals a new bomb was deployed.
-	GameEvtBombPlaced GameEvtType = "bombPlaced"
-	// GameEvtBombCountdownUpdated signals a bomb updated its countdown.
+	GameEvtUnitMoved            GameEvtType = "unitMoved"
+	GameEvtUnitDamaged          GameEvtType = "unitDamaged"
+	GameEvtUnitDied             GameEvtType = "unitDied"
+	GameEvtBombPlaced           GameEvtType = "bombPlaced"
 	GameEvtBombCountdownUpdated GameEvtType = "bombCountdownUpdated"
-	// GameEvtBombExploded signals a bomb detonated and lists affected tiles.
-	GameEvtBombExploded GameEvtType = "bombExploded"
-	// GameEvtSoftBlockDestroyed signals a soft block was destroyed.
-	GameEvtSoftBlockDestroyed GameEvtType = "softBlockDestroyed"
-	// GameEvtMatchEnded signals the match concluded.
-	GameEvtMatchEnded GameEvtType = "matchEnded"
+	GameEvtBombExploded         GameEvtType = "bombExploded"
+	GameEvtSoftBlockDestroyed   GameEvtType = "softBlockDestroyed"
+	GameEvtMatchEnded           GameEvtType = "matchEnded"
 )
 
-// GameEvent is a turn resolution event emitted during commit.
-// Type determines the event variant; optional fields are omitted when zero.
+// GameEvent's Type selects the event variant; optional fields are omitted when zero.
 type GameEvent struct {
 	Type              GameEvtType  `json:"type"`
 	UnitID            UnitID       `json:"unitId"`
@@ -40,7 +30,6 @@ type GameEvent struct {
 	WinnerTeamID      int          `json:"winnerTeamId,omitzero"`
 }
 
-// NewUnitMovedEvent creates a unit moved event.
 func NewUnitMovedEvent(unitID UnitID, from, to Coordinate) GameEvent {
 	return GameEvent{Type: GameEvtUnitMoved, UnitID: unitID, From: &from, To: &to}
 }
@@ -49,7 +38,6 @@ func newUnitDamagedEvent(unitID UnitID, pos Coordinate, newHP int) GameEvent {
 	return GameEvent{Type: GameEvtUnitDamaged, UnitID: unitID, Position: &pos, NewHP: newHP}
 }
 
-// NewUnitDiedEvent creates a unit died event.
 func NewUnitDiedEvent(unitID UnitID, pos Coordinate) GameEvent {
 	return GameEvent{Type: GameEvtUnitDied, UnitID: unitID, Position: &pos}
 }
@@ -70,7 +58,6 @@ func newSoftBlockDestroyedEvent(id int, pos Coordinate) GameEvent {
 	return GameEvent{Type: GameEvtSoftBlockDestroyed, SoftBlockID: id, Position: &pos}
 }
 
-// NewMatchEndedEvent creates a match ended event.
 func NewMatchEndedEvent(winnerTeamID int) GameEvent {
 	return GameEvent{Type: GameEvtMatchEnded, WinnerTeamID: winnerTeamID}
 }
