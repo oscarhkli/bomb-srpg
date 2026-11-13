@@ -20,7 +20,6 @@ func plansFor(unit *engine.Unit, gs *engine.GameState) [][]engine.TurnCommand {
 	return plans
 }
 
-// combinePlans pairs each of firstPlans with every plan second produces once firstPlans has been applied.
 func combinePlans(
 	unit *engine.Unit,
 	gs *engine.GameState,

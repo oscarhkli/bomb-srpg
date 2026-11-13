@@ -64,8 +64,8 @@ func defaultWeightProfile() map[factorID]int {
 
 // Score magnitudes, tiered so a certain outcome always outranks a predicted one.
 const (
-	killKingScore         = 100000 // Very high score to make a result guaranteed.
-	killUnitScore         = 10000  // Lower than killKingScore: a predicted, not guaranteed, outcome.
+	killKingScore         = 100000
+	killUnitScore         = 10000 // Lower than killKingScore: a predicted, not guaranteed, outcome.
 	riskOpponentKingScore = 5000
 	riskOpponentScore     = 1000
 	riskAllyKingScore     = 3000
@@ -207,7 +207,7 @@ func escapable(gs *engine.GameState, unit *engine.Unit, affectedTiles map[engine
 	return false
 }
 
-// decayRatio returns 1 at x = 0, decaying to 0 at x = t. k > 0 shapes the plateau-then-cliff curve.
+// decayRatio: k > 0 gives a plateau-then-cliff curve.
 func decayRatio(x, t int, k float64) float64 {
 	if x >= t {
 		return 0
@@ -217,10 +217,10 @@ func decayRatio(x, t int, k float64) float64 {
 }
 
 const (
-	riskFreeDist = 6 // distance beyond which threat is considered negligible
+	riskFreeDist = 6
 	kDistThreat  = 4.0 / riskFreeDist
 	kDistRisk    = 1.0 / riskFreeDist
-	riskFreeTurn = 5 // turns beyond which a bomb's fuse is considered escapable
+	riskFreeTurn = 5
 	kTurn        = 1.0 / riskFreeTurn
 )
 

@@ -12,8 +12,8 @@ const maxAttempts = 15
 
 type candidate struct {
 	turnCommands []engine.TurnCommand
-	score        int    // The higher the better.
-	tag          string // Debug/log label.
+	score        int
+	tag          string
 }
 
 // priority breaks a score tie; move-then-bomb ranks lowest.
