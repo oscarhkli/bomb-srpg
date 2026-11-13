@@ -19,6 +19,5 @@ export interface SettingsPage {
   renderBody(scene: Phaser.Scene, bounds: PageBounds): void;
   renderNav(scene: Phaser.Scene, bounds: PageBounds): void;
   handleBack(): void;
-  // Destroys every GameObject this Page created.
   destroy(): void;
 }

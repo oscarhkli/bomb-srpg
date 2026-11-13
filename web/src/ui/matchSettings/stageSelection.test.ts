@@ -27,8 +27,8 @@ describe('cycleMaxTurns', () => {
   it.each<[number, 1 | -1, number]>([
     [15, 1, 20],
     [20, -1, 15],
-    [60, 1, 0], // wraps forward past the last option back to 💣 (0)
-    [0, -1, 60], // wraps backward past 💣 (0) to the last option
+    [60, 1, 0],
+    [0, -1, 60],
   ])('cycling %i by %i yields %i', (current, delta, expected) => {
     expect(cycleMaxTurns(current, delta)).toBe(expected);
   });

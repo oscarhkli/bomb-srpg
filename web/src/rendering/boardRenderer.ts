@@ -36,7 +36,6 @@ const STAGE_TEXTURE_KEYS: Record<string, string> = {
   Divided: 'stage_divided',
 };
 
-// Sets boardOffset from the grid and returns its dimensions.
 // Must run before renderStageBackground().
 export function establishBoardLayout(grid: Tile[][]): { cols: number; rows: number } {
   const cols = grid[0]?.length ?? 0;
@@ -50,7 +49,6 @@ function trimmedContentOrigin(scene: Phaser.Scene, key: string, frame: string): 
   return [(f.x + f.width / 2) / f.realWidth, (f.y + f.height / 2) / f.realHeight];
 }
 
-// Paints the stage background centered on the grid, replacing any previous one.
 // Requires establishBoardLayout() to have run for this grid.
 export function renderStageBackground(
   ctx: BoardRenderContext,

@@ -209,7 +209,6 @@ describe('MatchSummaryPanel.open', () => {
 
     panel.open(makeState(), makeCfg({ allowResetTurn: false }));
 
-    // Last 4 graphics are [Resolve, Reset, Surrender, Back].
     const [, resetButtonGraphics] = allGraphics().slice(-4);
     expect(resetButtonGraphics!.fillStyle).toHaveBeenCalledWith(
       DISABLED_BUTTON_COLOR,
