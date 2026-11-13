@@ -213,11 +213,10 @@ type Unit struct {
 	// 1 = P1, 2 = P2 / COM
 	Team int
 	// alive while above 0; every archetype currently has 1
-	HP       int
-	Skills   skillType
-	Role     UnitRole
-	HasMoved bool
-	// set after placing a bomb or using a skill; reset each turn
+	HP           int
+	Skills       skillType
+	Role         UnitRole
+	HasMoved     bool
 	HasUsedSkill bool
 }
 
@@ -277,25 +276,20 @@ type GameCfg struct {
 	AllowResetTurn              bool `json:"allowResetTurn"`
 	GlobalSpeedOverride         int  `json:"-"`
 	GlobalBombCountdownOverride int  `json:"-"`
-	// Test override for bomb max range (0 = disabled)
-	GlobalBombMaxRangeOverride int `json:"-"`
+	GlobalBombMaxRangeOverride  int  `json:"-"`
 }
 
 type GameState struct {
-	// Current turn number (starts at 1)
-	Turn          int
-	InSuddenDeath bool
-	// Team whose turn it is (1 or 2)
-	ActiveTeam int
-	// Bombs placed this turn (for BombID generation)
+	Turn            int
+	InSuddenDeath   bool
+	ActiveTeam      int
 	TurnBombCounter int
 	// Board matrix [Y][X]
-	Grid         [][]Tile
-	Units        map[UnitID]*Unit
-	Bombs        map[BombID]*Bomb
-	SoftBlocks   map[int]*SoftBlock
-	TurnCommands []TurnCommand
-	// Hazard events of the current turn start
+	Grid            [][]Tile
+	Units           map[UnitID]*Unit
+	Bombs           map[BombID]*Bomb
+	SoftBlocks      map[int]*SoftBlock
+	TurnCommands    []TurnCommand
 	TurnStartEvents []GameEvent
 }
 
@@ -356,9 +350,8 @@ type cpuState struct {
 }
 
 type Match struct {
-	GameCfg   GameCfg
-	TrueState *GameState
-	// Sandbox for mid-turn planning
+	GameCfg      GameCfg
+	TrueState    *GameState
 	WorkingState *GameState
 	// events since the last ResolveTurn
 	PlaybackLog []GameEvent
@@ -390,11 +383,9 @@ const (
 
 type MovementRule struct {
 	// Max steps; -1 = unlimited
-	MaxSteps int
-	Pattern  stepPattern
-	// True = can change direction mid-path
-	CanTurn bool
-	// obstacle types the mover may walk through
+	MaxSteps        int
+	Pattern         stepPattern
+	CanTurn         bool
 	PassPermissions PassFlag
 	// True = stop on first non-unit (bomb, block, item); False = stop before it
 	StopOnNonUnitOccupant bool
