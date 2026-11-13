@@ -18,6 +18,7 @@ bench: vet
 
 lint:
 	golangci-lint run ./cli/... ./cmd/... ./cpu/... ./engine/... ./server/...
+	go run scripts/lint-comments.go ./cli ./cmd ./cpu ./engine ./server
 
 shell-lint:
 	shellcheck scripts/*.sh

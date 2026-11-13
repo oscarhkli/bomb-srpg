@@ -56,6 +56,9 @@ jobs:
           version: v2.15.0
           args: ./cli/... ./cmd/... ./cpu/... ./engine/... ./server/...
 
+      - name: Lint comments
+        run: go run scripts/lint-comments.go ./cli ./cmd ./cpu ./engine ./server
+
   shell_lint:
     name: "Lint Shell"
     runs-on: ubuntu-24.04

@@ -103,12 +103,13 @@ type SoftBlock struct {
 }
 
 type StagePreset struct {
-	Name                string        `json:"name"`
-	Description         string        `json:"description"`
-	Width               int           `json:"width"`
-	Height              int           `json:"height"`
-	MaxTurns            int           `json:"maxTurns"`
-	LayoutGrid          []string      `json:"-"` // Visual layout matrix; each string is a row (Y), each char a column (X)
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Width       int    `json:"width"`
+	Height      int    `json:"height"`
+	MaxTurns    int    `json:"maxTurns"`
+	// Visual layout matrix; each string is a row (Y), each char a column (X)
+	LayoutGrid          []string      `json:"-"`
 	SoftBlocks          []Coordinate  `json:"-"`
 	P1StartingPositions [5]Coordinate `json:"-"`
 	P2StartingPositions [5]Coordinate `json:"-"`
@@ -209,12 +210,15 @@ type Unit struct {
 	BombPower    int
 	MaxBombCount int
 	BombUsed     int
-	Team         int // 1 = P1, 2 = P2 / COM
-	HP           int // alive while above 0; every archetype currently has 1
-	Skills       skillType
-	Role         UnitRole
-	HasMoved     bool
-	HasUsedSkill bool // set after placing a bomb or using a skill; reset each turn
+	// 1 = P1, 2 = P2 / COM
+	Team int
+	// alive while above 0; every archetype currently has 1
+	HP       int
+	Skills   skillType
+	Role     UnitRole
+	HasMoved bool
+	// set after placing a bomb or using a skill; reset each turn
+	HasUsedSkill bool
 }
 
 func (u Unit) MarshalJSON() ([]byte, error) {
@@ -250,11 +254,12 @@ func (u Unit) MarshalJSON() ([]byte, error) {
 }
 
 type Bomb struct {
-	ID        BombID     `json:"id"`
-	OwnerID   UnitID     `json:"ownerId"`
-	Position  Coordinate `json:"position"`
-	Range     int        `json:"range"`
-	Countdown int        `json:"countdown"` // Turns remaining until detonation; <0 for non-countdown bombs
+	ID       BombID     `json:"id"`
+	OwnerID  UnitID     `json:"ownerId"`
+	Position Coordinate `json:"position"`
+	Range    int        `json:"range"`
+	// Turns remaining until detonation; <0 for non-countdown bombs
+	Countdown int `json:"countdown"`
 }
 
 type TeamSlot struct {
@@ -263,28 +268,35 @@ type TeamSlot struct {
 }
 
 type GameCfg struct {
-	VSCpu                       bool       `json:"vsCpu"`
-	StagePreset                 string     `json:"stagePreset"`
-	P1Slots                     []TeamSlot `json:"p1Slots"`
-	P2Slots                     []TeamSlot `json:"p2Slots"`
-	MaxTurns                    int        `json:"maxTurns"` // Turn limit; 0 = instant sudden death
-	AllowResetTurn              bool       `json:"allowResetTurn"`
-	GlobalSpeedOverride         int        `json:"-"`
-	GlobalBombCountdownOverride int        `json:"-"`
-	GlobalBombMaxRangeOverride  int        `json:"-"` // Test override for bomb max range (0 = disabled)
+	VSCpu       bool       `json:"vsCpu"`
+	StagePreset string     `json:"stagePreset"`
+	P1Slots     []TeamSlot `json:"p1Slots"`
+	P2Slots     []TeamSlot `json:"p2Slots"`
+	// Turn limit; 0 = instant sudden death
+	MaxTurns                    int  `json:"maxTurns"`
+	AllowResetTurn              bool `json:"allowResetTurn"`
+	GlobalSpeedOverride         int  `json:"-"`
+	GlobalBombCountdownOverride int  `json:"-"`
+	// Test override for bomb max range (0 = disabled)
+	GlobalBombMaxRangeOverride int `json:"-"`
 }
 
 type GameState struct {
-	Turn            int // Current turn number (starts at 1)
-	InSuddenDeath   bool
-	ActiveTeam      int      // Team whose turn it is (1 or 2)
-	TurnBombCounter int      // Bombs placed this turn (for BombID generation)
-	Grid            [][]Tile // Board matrix [Y][X]
-	Units           map[UnitID]*Unit
-	Bombs           map[BombID]*Bomb
-	SoftBlocks      map[int]*SoftBlock
-	TurnCommands    []TurnCommand
-	TurnStartEvents []GameEvent // Hazard events of the current turn start
+	// Current turn number (starts at 1)
+	Turn          int
+	InSuddenDeath bool
+	// Team whose turn it is (1 or 2)
+	ActiveTeam int
+	// Bombs placed this turn (for BombID generation)
+	TurnBombCounter int
+	// Board matrix [Y][X]
+	Grid         [][]Tile
+	Units        map[UnitID]*Unit
+	Bombs        map[BombID]*Bomb
+	SoftBlocks   map[int]*SoftBlock
+	TurnCommands []TurnCommand
+	// Hazard events of the current turn start
+	TurnStartEvents []GameEvent
 }
 
 // MarshalJSON emits the client-facing shape, with the entity maps flattened to arrays.
@@ -315,7 +327,7 @@ func (gs *GameState) MarshalJSON() ([]byte, error) {
 type CPUTurnPhase int
 
 const (
-	TurnPhaseIdle CPUTurnPhase = iota // CPU is idling, or no CPU involved at all
+	TurnPhaseIdle CPUTurnPhase = iota
 	TurnPhasePlanning
 	TurnPhaseReady
 )
@@ -344,12 +356,15 @@ type cpuState struct {
 }
 
 type Match struct {
-	GameCfg      GameCfg
-	TrueState    *GameState
-	WorkingState *GameState  // Sandbox for mid-turn planning
-	PlaybackLog  []GameEvent // events since the last ResolveTurn
-	CPU          cpuState
-	WinnerTeamID int // 0 = in progress, 1/2 = winner, -1 = draw
+	GameCfg   GameCfg
+	TrueState *GameState
+	// Sandbox for mid-turn planning
+	WorkingState *GameState
+	// events since the last ResolveTurn
+	PlaybackLog []GameEvent
+	CPU         cpuState
+	// 0 = in progress, 1/2 = winner, -1 = draw
+	WinnerTeamID int
 }
 
 const (
@@ -374,9 +389,13 @@ const (
 )
 
 type MovementRule struct {
-	MaxSteps              int // Max steps; -1 = unlimited
-	Pattern               stepPattern
-	CanTurn               bool     // True = can change direction mid-path
-	PassPermissions       PassFlag // obstacle types the mover may walk through
-	StopOnNonUnitOccupant bool     // True = stop on first non-unit (bomb, block, item); False = stop before it
+	// Max steps; -1 = unlimited
+	MaxSteps int
+	Pattern  stepPattern
+	// True = can change direction mid-path
+	CanTurn bool
+	// obstacle types the mover may walk through
+	PassPermissions PassFlag
+	// True = stop on first non-unit (bomb, block, item); False = stop before it
+	StopOnNonUnitOccupant bool
 }
