@@ -266,8 +266,8 @@ describe('StagePage — MaxTurnsSelector', () => {
     clickPointerdown(allGraphics()[2]!);
     expect(cfg.maxTurns).toBe(45);
 
-    // Re-select Plain: index 0 is still the original Plain card.
-    clickPointerdown(allGraphics()[0]!);
+    const plainCardGraphics = allGraphics()[0]!;
+    clickPointerdown(plainCardGraphics);
 
     expect(cfg.maxTurns).toBe(60);
   });

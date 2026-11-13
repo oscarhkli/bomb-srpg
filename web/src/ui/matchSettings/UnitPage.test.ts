@@ -142,7 +142,6 @@ describe('UnitPage — FormationPanel', () => {
     const p = page(2, cfg);
     p.renderBody(mockScene as never, bodyBounds());
 
-    // P2 displayPos 1 renders slotIndex 2 (Witch), unlike P1.
     clickPointerdown(allGraphics()[1]!);
 
     expect(cfg.p2Slots).toEqual(serializeTeams(['King', 'Fighter']));

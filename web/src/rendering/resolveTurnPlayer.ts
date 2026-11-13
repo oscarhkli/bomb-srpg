@@ -136,7 +136,6 @@ interface ExplodedInfo {
   offset: number;
 }
 
-// The soonest offset at which any earlier explosion's blast reaches `position`.
 function causerOffsetFor(position: Coordinate, exploded: ExplodedInfo[]): number {
   let best: number | undefined;
   for (const e of exploded) {

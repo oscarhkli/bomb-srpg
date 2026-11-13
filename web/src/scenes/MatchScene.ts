@@ -97,7 +97,6 @@ export default class MatchScene extends Phaser.Scene {
   private summaryPanelOpen = false;
   private lifecycleConfirmOpen = false;
   private victoryActionTaken = false;
-  // Bumped on 'shutdown'; async callbacks compare against this to detect a torn-down scene.
   private generation = 0;
 
   constructor() {
@@ -202,7 +201,6 @@ export default class MatchScene extends Phaser.Scene {
   private async beginTurn(): Promise<void> {
     const gen = this.generation;
     this.interactionsEnabled = false;
-    // Flipped by the detached gameCfgPromise continuation below; read only by the finally.
     let isCpuTurn = false;
     let resolveBannerDone: () => void = () => undefined;
     const bannerDone = new Promise<void>(resolve => {

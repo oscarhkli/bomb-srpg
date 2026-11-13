@@ -77,7 +77,6 @@ function drawSegmentRect(
   }
 }
 
-// Renders one cardinal blast ray as a beam that grows outward over durationMs.
 export function drawGrowingBeam(
   scene: Phaser.Scene,
   origin: Coordinate,
