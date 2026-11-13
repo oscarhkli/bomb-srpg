@@ -98,7 +98,6 @@ func (c *MatchController) handleSystemCommand(cmd string) {
 	}
 }
 
-// actionArgCount is the token count of "<verb> <unit> <x> <y>".
 const actionArgCount = 4
 
 func (c *MatchController) routeGameAction(cmd string) {

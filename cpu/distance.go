@@ -3,7 +3,6 @@ package cpu
 import "bomb-srpg/engine"
 
 // reachDistToUnit returns the walking distance from fromPos to target's tile, or -1 if unreachable.
-// target's own tile is never reachable, so it is the nearest neighbor's distance plus 1.
 func reachDistToUnit(gs *engine.GameState, unit *engine.Unit, fromPos engine.Coordinate, target *engine.Unit) int {
 	rule := unit.NewMovementRule()
 	rule.MaxSteps = -1
@@ -25,7 +24,6 @@ func reachDistToUnit(gs *engine.GameState, unit *engine.Unit, fromPos engine.Coo
 	return best + 1
 }
 
-// nearestAffectedDist returns the walking distance from unit to the nearest tile in affectedTiles.
 func nearestAffectedDist(gs *engine.GameState, unit *engine.Unit, affectedTiles map[engine.Coordinate]struct{}) int {
 	if len(affectedTiles) == 0 {
 		return -1
