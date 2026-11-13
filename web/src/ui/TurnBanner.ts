@@ -12,8 +12,6 @@ import {
 } from '../constants';
 import { colorToCss, createFilledRect, fadeInTargets } from './gameObjectUtils';
 
-// Full-width turn-transition banner: fades in, holds, fades out, then destroys itself.
-// play() resolves once the sequence and the destroy are complete.
 export default class TurnBanner {
   constructor(private readonly scene: Phaser.Scene) {}
 

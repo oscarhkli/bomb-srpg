@@ -14,7 +14,6 @@ export function deserializeTeams(teams: TeamSlot[]): string[] {
   return slots;
 }
 
-// Inverse of deserializeTeams: drops trailing NO_UNIT slots, keeping interior gaps.
 export function serializeTeams(slots: string[]): TeamSlot[] {
   const result = [...slots];
   while (result.length > 1 && result[result.length - 1] === NO_UNIT) {
@@ -23,7 +22,6 @@ export function serializeTeams(slots: string[]): TeamSlot[] {
   return result.map((archetype, i) => ({ archetype, role: i === 0 ? 'King' : 'Normal' }));
 }
 
-// Lowest non-King slot index that's NO_UNIT, or null if the formation is full.
 export function lowestFreeSlot(slots: string[]): number | null {
   for (let i = 1; i < slots.length; i++) {
     if (slots[i] === NO_UNIT) {
@@ -33,7 +31,6 @@ export function lowestFreeSlot(slots: string[]): number | null {
   return null;
 }
 
-// Count of occupied (non-NO_UNIT) slots, King included.
 export function occupiedCount(slots: string[]): number {
   return slots.filter(s => s !== NO_UNIT).length;
 }

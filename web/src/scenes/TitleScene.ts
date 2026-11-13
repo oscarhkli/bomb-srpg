@@ -32,7 +32,6 @@ function prologueGameCfg(): GameCfg {
 }
 
 export default class TitleScene extends Phaser.Scene {
-  // Guards against re-entrant option clicks once a transition has started.
   private isTransitioning = false;
   private errorPanel!: ErrorPanel;
   // Bumped on 'shutdown'; startMatch()'s async callback compares against this.
@@ -71,7 +70,6 @@ export default class TitleScene extends Phaser.Scene {
     });
     line1.setOrigin(0.5, 0);
 
-    // Line 2's "T" starts at the x of line 1's "m", measured via a throwaway "Bo" text.
     const prefix = this.add.text(0, 0, 'Bo', {
       fontFamily: GAME_FONT_FAMILY,
       fontSize: `${TITLE_FONT_SIZE}px`,

@@ -16,14 +16,12 @@ export interface SpriteButtonConfig {
   onClick: () => void;
 }
 
-// Neutral's trimmed frame size, shared by every SpriteButton's hit area.
 export function buttonFrameSize(scene: Phaser.Scene): { width: number; height: number } {
   const frame = firstNonBaseFrame(scene, BUTTON_TEXTURE_NEUTRAL);
   const { width, height } = scene.textures.getFrame(BUTTON_TEXTURE_NEUTRAL, frame);
   return { width, height };
 }
 
-// A button/label sprite pair that swaps between Neutral, Selected, Clicked, and Disabled states.
 export default class SpriteButton {
   readonly container: Phaser.GameObjects.Container;
   private readonly buttonImage: Phaser.GameObjects.Image;

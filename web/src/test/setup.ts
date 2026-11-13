@@ -1,6 +1,5 @@
 import { boardOffset } from '../rendering/boardOffset';
 
-// Reset the shared boardOffset singleton so one test's grid size can't leak into the next.
 beforeEach(() => {
   boardOffset.x = 0;
   boardOffset.y = 0;
@@ -328,7 +327,6 @@ HTMLCanvasElement.prototype.getContext = vi.fn((contextId: string) => {
   return null;
 }) as unknown as HTMLCanvasElement['getContext'];
 
-// Redirects scenes' `import Phaser from 'phaser'` to the mocked global.Phaser above.
 vi.mock('phaser', () => ({
   default: (globalThis as Record<string, unknown>).Phaser,
 }));

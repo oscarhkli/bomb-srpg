@@ -36,7 +36,7 @@ export interface Tile {
 export interface SoftBlock {
   id: number;
   position: Coordinate;
-  hiddenItem?: string; // Reserved for future
+  hiddenItem?: string;
 }
 
 export interface Archetype {

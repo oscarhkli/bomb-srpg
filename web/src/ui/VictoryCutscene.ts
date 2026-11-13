@@ -38,7 +38,6 @@ const BUTTON_STYLE = {
   borderWidth: PANEL_BUTTON_BORDER_WIDTH,
 };
 
-// Terminal overlay shown when a match ends; never destroys itself.
 export default class VictoryCutscene {
   constructor(private readonly scene: Phaser.Scene) {}
 

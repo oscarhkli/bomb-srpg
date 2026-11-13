@@ -117,7 +117,6 @@ async function expectActionStackClearedBy(
   expect(moveButtonContainer!.destroy).toHaveBeenCalled();
 }
 
-// Drives click unit -> Move/Bomb -> allowed tile -> Yes, with getAllowedTiles mocked to one tile.
 async function submitViaUI(
   unitGraphics: ReturnType<typeof mockScene.add.sprite>,
   buttonIndex: 0 | 1 // 0 = Move, 1 = Bomb

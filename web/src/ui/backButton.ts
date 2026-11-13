@@ -10,7 +10,6 @@ import {
 import { colorToCss } from './gameObjectUtils';
 import { attachRectClickHandler } from './pillButton';
 
-// Shared back-navigation control: a rounded-square button with a centered ⮐ glyph.
 export function drawBackButton(
   scene: Phaser.Scene,
   x: number,

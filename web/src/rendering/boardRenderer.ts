@@ -12,8 +12,6 @@ import {
 } from '../constants';
 import type { Bomb, Coordinate, GameState, SoftBlock, Tile, Unit } from '../api/types';
 
-// Shared state for board rendering. terrainObjects and occupantObjects have separate lifetimes,
-// so an occupant swap never touches the terrain layer.
 export interface BoardRenderContext {
   scene: Phaser.Scene;
   terrainObjects: Phaser.GameObjects.GameObject[];
@@ -47,7 +45,6 @@ export function establishBoardLayout(grid: Tile[][]): { cols: number; rows: numb
   return { cols, rows };
 }
 
-// Origin at the trimmed content's own center; a trimmed export may crop asymmetrically.
 function trimmedContentOrigin(scene: Phaser.Scene, key: string, frame: string): [number, number] {
   const f = scene.textures.getFrame(key, frame);
   return [(f.x + f.width / 2) / f.realWidth, (f.y + f.height / 2) / f.realHeight];
@@ -81,8 +78,6 @@ export function hazardsUnplayed(turn: number, hazardsPlayedTurn: number): boolea
   return turn > hazardsPlayedTurn;
 }
 
-// Hides only bombs named by bombPlaced events in turnStartEvents, and only while
-// hazardsUnplayed; every other bomb is returned.
 export function bombsToDraw(state: GameState, hazardsPlayedTurn: number): Bomb[] {
   if (!hazardsUnplayed(state.turn, hazardsPlayedTurn)) {
     return state.bombs;
@@ -93,7 +88,6 @@ export function bombsToDraw(state: GameState, hazardsPlayedTurn: number): Bomb[]
   return state.bombs.filter(bomb => !hidden.has(bomb.id));
 }
 
-// Rebuilds units, soft blocks, and bombs from state; terrain is untouched.
 export function renderOccupants(ctx: BoardRenderContext, state: GameState): void {
   destroyAll(ctx.occupantObjects);
   ctx.unitSpritesById.clear();
@@ -109,12 +103,10 @@ function groundY(position: Coordinate): number {
   return (position.y + 1) * TILE_SIZE + SPRITE_GROUND_MARGIN + boardOffset.y;
 }
 
-// Returns the occupant depth for a tile; lower rows draw over higher ones.
 export function occupantDepth(position: Coordinate): number {
   return DEPTH_OCCUPANT + position.y * 0.01;
 }
 
-// Maps archetype and team to a texture key, falling back to the archetype's blue variant.
 export function resolveUnitTextureKey(archetype: string, team: number, context = ''): string {
   const textureKey = UNIT_TEXTURE_KEYS[archetype]?.[team];
   if (!textureKey) {
@@ -163,7 +155,6 @@ function renderSoftBlocks(ctx: BoardRenderContext, softBlocks: SoftBlock[]): voi
   });
 }
 
-// Renders one bomb into the occupant layer.
 export function renderBomb(ctx: BoardRenderContext, bomb: Bomb): void {
   const { cx, cy } = tileCenter(bomb.position);
   const frame = firstNonBaseFrame(ctx.scene, 'bomb');

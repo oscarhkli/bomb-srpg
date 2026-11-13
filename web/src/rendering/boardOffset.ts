@@ -1,6 +1,5 @@
 import { GAME_BOARD_REGION_WIDTH, GAME_BOARD_REGION_HEIGHT, TILE_SIZE } from '../constants';
 
-// Top-left of the grid centered in GameBoardRegion; recomputed per match by setBoardOffset().
 export const boardOffset = { x: 0, y: 0 };
 
 export function setBoardOffset(cols: number, rows: number): void {

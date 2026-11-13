@@ -196,7 +196,6 @@ export const MAX_TURNS_ARROW_RIGHT_LABEL = '❱';
 export const MAX_TURNS_ARROW_INSET = 12;
 export const MAX_TURNS_RECOMMENDED_GLYPH = '🌟';
 export const MAX_TURNS_RECOMMENDED_FONT_SIZE = 12;
-// Fixed slot for the recommended glyph so toggling it never shifts the layout.
 export const MAX_TURNS_RECOMMENDED_GLYPH_GAP = 10;
 
 export const TITLE_TOP_MARGIN = 24;

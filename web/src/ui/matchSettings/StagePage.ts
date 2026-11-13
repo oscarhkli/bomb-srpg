@@ -46,7 +46,6 @@ const START_MATCH_BUTTON_STYLE: PillButtonStyle = {
   borderWidth: PANEL_BUTTON_BORDER_WIDTH,
 };
 
-// Stage selection (left) and the selected stage's details (right).
 export default class StagePage implements SettingsPage {
   private selectedIndex: number;
   private currentMaxTurns: number;
