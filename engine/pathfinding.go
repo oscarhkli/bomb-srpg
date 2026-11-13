@@ -2,13 +2,11 @@ package engine
 
 import "fmt"
 
-// FindReachableTiles runs standard pathfinding using the live, active game grid state.
 func (gs *GameState) FindReachableTiles(start Coordinate, rule MovementRule) map[Coordinate]int {
 	return gs.findReachableTiles(start, rule, gs.Grid)
 }
 
-// findReachableTilesOnSnapshot runs pathfinding using a frozen, read-only grid snapshot matrix.
-// The frozen snapshot lets overlapping explosions evaluate line-of-sight blocks correctly.
+// findReachableTilesOnSnapshot searches a frozen grid, which lets overlapping explosions evaluate line-of-sight blocks correctly.
 func (gs *GameState) findReachableTilesOnSnapshot(start Coordinate, snapshot [][]Tile, rule MovementRule) map[Coordinate]int {
 	return gs.findReachableTiles(start, rule, snapshot)
 }
@@ -113,7 +111,6 @@ func (mr MovementRule) checkPassability(tile Tile) (canPass bool, canLand bool) 
 	return false, false
 }
 
-// NewMovementRule builds a snapshot configuration for a unit's movement action.
 func (u Unit) NewMovementRule() MovementRule {
 	return MovementRule{
 		MaxSteps:        u.Speed,
@@ -130,7 +127,6 @@ func (u Unit) newBombPlacementRule() MovementRule {
 	}
 }
 
-// findAllowedTiles returns coordinates with distance from the start.
 func (gs *GameState) findAllowedTiles(start Coordinate, rule MovementRule, occupantType OccupantType) map[Coordinate]int {
 	reachable := gs.FindReachableTiles(start, rule)
 	allowed := make(map[Coordinate]int)
@@ -143,7 +139,6 @@ func (gs *GameState) findAllowedTiles(start Coordinate, rule MovementRule, occup
 	return allowed
 }
 
-// FindAllowedTilesForCommand returns the tiles a unit can use for the given command type.
 func (gs *GameState) FindAllowedTilesForCommand(unitID UnitID, turnCmdType TurnCmdType) (map[Coordinate]int, error) {
 	unit, err := gs.findUnit(unitID, true)
 	if err != nil {

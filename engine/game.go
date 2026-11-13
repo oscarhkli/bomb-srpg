@@ -19,7 +19,7 @@ func terrainToken() map[rune]TerrainType {
 	}
 }
 
-// InitGame validates the config, builds the initial GameState, and returns a Match with turn 1 already begun.
+// InitGame returns a Match with turn 1 already begun.
 func InitGame(gameCfg GameCfg) (*Match, error) {
 	gameState, err := initGameState(gameCfg)
 	if err != nil {
@@ -100,7 +100,6 @@ func initGameState(gameCfg GameCfg) (*GameState, error) {
 	}, nil
 }
 
-// compileGrid parses a preset's LayoutGrid into a Tile matrix, checking it against the declared size.
 func compileGrid(preset StagePreset) ([][]Tile, error) {
 	if len(preset.LayoutGrid) != preset.Height {
 		return nil, fmt.Errorf("%w: stage preset layout grid row count %d does not match specified height %d", ErrInvalidStageLayout, len(preset.LayoutGrid), preset.Height)

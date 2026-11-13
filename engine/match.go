@@ -5,13 +5,11 @@ import (
 	"math/rand"
 )
 
-// ResetTurn discards WorkingState and PlaybackLog, restoring a copy of TrueState.
 func (m *Match) ResetTurn() {
 	m.WorkingState = m.TrueState.DeepCopy()
 	m.PlaybackLog = nil
 }
 
-// submitAction logs gameEvent; without AllowResetTurn it also commits WorkingState to TrueState.
 func (m *Match) submitAction(gameEvent GameEvent) {
 	m.PlaybackLog = append(m.PlaybackLog, gameEvent)
 
@@ -20,7 +18,6 @@ func (m *Match) submitAction(gameEvent GameEvent) {
 	}
 }
 
-// Surrender ends the match by setting the winner and sending MatchEndedEvent.
 func (m *Match) Surrender(teamID int) []GameEvent {
 	if teamID == 1 {
 		m.WinnerTeamID = 2
@@ -37,7 +34,6 @@ func (m *Match) Surrender(teamID int) []GameEvent {
 	}
 }
 
-// ApplyTurnCommand accepts any packaged action and forwards it to the true match logic.
 func (m *Match) ApplyTurnCommand(cmd TurnCommand) ([]GameEvent, error) {
 	switch cmd.Type {
 	case TurnCmdMove:
@@ -58,7 +54,6 @@ func (m *Match) commandMoveUnit(unitID UnitID, target Coordinate) ([]GameEvent, 
 	return []GameEvent{gameEvent}, nil
 }
 
-// MoveUnit relocates a unit within its move range and returns the UnitMovedEvent.
 func (gs *GameState) MoveUnit(unitID UnitID, target Coordinate) (GameEvent, error) {
 	unit, err := gs.validateActiveUnit(unitID)
 	if err != nil {
@@ -109,7 +104,6 @@ func (gs *GameState) validateActiveUnit(unitID UnitID) (*Unit, error) {
 	return unit, nil
 }
 
-// CommandPlaceBomb applies PlaceBomb to WorkingState and logs the resulting event.
 func (m *Match) CommandPlaceBomb(unitID UnitID, target Coordinate) ([]GameEvent, error) {
 	gameEvent, err := m.WorkingState.PlaceBomb(unitID, target)
 	if err != nil {
@@ -119,9 +113,7 @@ func (m *Match) CommandPlaceBomb(unitID UnitID, target Coordinate) ([]GameEvent,
 	return []GameEvent{gameEvent}, nil
 }
 
-// PlaceBomb drops a bomb for the unit and returns the BombPlacedEvent. SystemUnitID skips validation.
-// Otherwise it returns an error if the unit has no bombs or skill use left, the target is out of
-// bomb range, or the cell is not landable.
+// PlaceBomb skips validation for SystemUnitID.
 func (gs *GameState) PlaceBomb(unitID UnitID, target Coordinate) (GameEvent, error) {
 	if unitID == SystemUnitID {
 		return gs.dropBomb(unitID, target, bombDefaultPower), nil
@@ -180,7 +172,6 @@ func (gs *GameState) dropBomb(ownerID UnitID, target Coordinate, power int) Game
 	return newBombPlacedEvent(ownerID, bomb.ID, target, bomb.Range, bomb.Countdown)
 }
 
-// IsLandingLegal checks if the target is legal to be landed by a certain occupantType.
 func (gs *GameState) IsLandingLegal(target Coordinate, _ OccupantType) error {
 	if !gs.isWithinBounds(target) {
 		return fmt.Errorf("%w: coordinate %v out of bounds", ErrOutOfBounds, target)
@@ -217,7 +208,6 @@ func (m *Match) beginTurn() {
 	m.TrueState = m.WorkingState.DeepCopy()
 }
 
-// injectSuddenDeathHazards drops up to SuddenDeathBombs bombs on random empty tiles.
 func (m *Match) injectSuddenDeathHazards() {
 	var emptyTilePos []Coordinate
 	for y, row := range m.WorkingState.Grid {
@@ -239,8 +229,7 @@ func (m *Match) injectSuddenDeathHazards() {
 	}
 }
 
-// ResolveTurn detonates due bombs, then advances the turn or ends the match, and commits WorkingState to TrueState.
-// It then begins the next turn, so sudden-death hazards are already in both states on return.
+// ResolveTurn commits WorkingState to TrueState, then begins the next turn, so sudden-death hazards are already in both states on return.
 // Returns the events logged during planning and those produced by resolution; MatchEndedEvent lands in the latter.
 func (m *Match) ResolveTurn() (planGameEvents, resolveTurnGameEvents []GameEvent) {
 	planGameEvents = make([]GameEvent, len(m.PlaybackLog))
@@ -282,8 +271,6 @@ func (m *Match) resolveBombExplosionAndDamage() {
 	m.PlaybackLog = append(m.PlaybackLog, m.WorkingState.ResolveBombExplosionAndDamage()...)
 }
 
-// ResolveBombExplosionAndDamage ticks bomb countdowns, detonates due bombs with their chain reactions, and applies the damage.
-// Returns the resulting GameEvents.
 func (gs *GameState) ResolveBombExplosionAndDamage() []GameEvent {
 	var gameEvents []GameEvent
 
@@ -324,8 +311,6 @@ func (gs *GameState) tickCountdownsAndQueueFuses() ([]BombID, map[BombID]bool, [
 	return queue, ignited, gameEvents
 }
 
-// processChainDetonations detonates the queued bombs and any bombs their blasts reach, recording hits into the given sets.
-// Returns the BombExplodedEvents.
 func (gs *GameState) processChainDetonations(
 	explosionQueue []BombID,
 	ignitedBombs map[BombID]bool,
@@ -393,7 +378,6 @@ func (gs *GameState) igniteBomb(id BombID, ignitedBombs map[BombID]bool) bool {
 	return true
 }
 
-// cloneGridSnapshot returns a copy of the grid for casting blast rays against the pre-explosion board.
 func (gs *GameState) cloneGridSnapshot() [][]Tile {
 	frozenGrid := make([][]Tile, len(gs.Grid))
 	for y := range gs.Grid {
@@ -403,8 +387,6 @@ func (gs *GameState) cloneGridSnapshot() [][]Tile {
 	return frozenGrid
 }
 
-// handleDelayedBatchDamage handles delayed batch damage after all ignited bombs detonated.
-// Returns GameEvents related to damaging.
 func (gs *GameState) handleDelayedBatchDamage(
 	damagedUnits map[UnitID]bool,
 	destroyedSoftBlocks map[int]bool,
@@ -460,7 +442,7 @@ func (t *teamStatus) wiped() bool {
 	return (t.hasBoss && !t.bossAlive) || (!t.hasBoss && !t.kingAlive && !t.ordinaryAlive)
 }
 
-// evaluateVictoryConditions returns MatchInProgress, 1, 2, or MatchDrawn; any team other than Team1 counts as Team2.
+// evaluateVictoryConditions returns matchInProgress, 1, 2, or matchDrawn; any team other than Team1 counts as Team2.
 // Goal: a living Boss, or a living King plus a living Ordinary unit. Wiped: the Boss dead, or a Boss-less team with no living unit.
 // Both at Goal play on; a team wins on Goal or a living King against a Wiped opponent; both or neither is a draw.
 func (m *Match) evaluateVictoryConditions() int {
