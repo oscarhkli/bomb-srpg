@@ -206,14 +206,32 @@ func TestBestCandidateFor(t *testing.T) {
 	})
 }
 
-func TestDecide_NoKingOnASide_ReturnsEmpty(t *testing.T) {
-	gs := newTestGameState(5, 5)
-	addFighter(gs, engine.NewUnitID(2, 1), engine.Coordinate{X: 0, Y: 0})
-	addKing(gs, engine.NewUnitID(1, 1), engine.Coordinate{X: 4, Y: 4})
-	addFighter(gs, engine.NewUnitID(1, 2), engine.Coordinate{X: 4, Y: 0})
+func TestDecide_NoLeaderOnASide_ReturnsErr(t *testing.T) {
+	tests := []struct {
+		name  string
+		setup func(gs *engine.GameState)
+	}{
+		{"CPU side has no units", func(gs *engine.GameState) {
+			addKing(gs, engine.NewUnitID(1, 1), engine.Coordinate{X: 4, Y: 4})
+		}},
+		{"opponent side has no units", func(gs *engine.GameState) {
+			addKing(gs, engine.NewUnitID(2, 1), engine.Coordinate{X: 0, Y: 0})
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gs := newTestGameState(5, 5)
+			tt.setup(gs)
 
-	if got := mustDecide(t, gs); len(got) != 0 {
-		t.Errorf("Decide() = %+v, want empty", got)
+			got, err := Decide(gs)
+
+			if !errors.Is(err, ErrNoLeaderUnit) {
+				t.Errorf("Decide() error = %v, want ErrNoLeaderUnit", err)
+			}
+			if len(got) != 0 {
+				t.Errorf("Decide() = %+v, want empty", got)
+			}
+		})
 	}
 }
 
@@ -452,11 +470,6 @@ func TestDecide(t *testing.T) {
 		want  []engine.TurnCommand
 	}{
 		{
-			name:  "No units at all",
-			setup: func() *engine.GameState { return newTestGameState(5, 5) },
-			want:  nil,
-		},
-		{
 			name: "Both allies fully boxed in: no positive option",
 			setup: func() *engine.GameState {
 				gs := newTestGameState(9, 9)
@@ -576,10 +589,10 @@ func TestDecide_Roster(t *testing.T) {
 	ally := func(n int) engine.UnitID { return engine.NewUnitID(2, n) }
 	opp := func(n int) engine.UnitID { return engine.NewUnitID(1, n) }
 	tests := []struct {
-		name      string
-		setup     func(gs *engine.GameState)
-		wantEmpty bool
-		wantNone  []engine.UnitID
+		name     string
+		setup    func(gs *engine.GameState)
+		wantErr  bool
+		wantNone []engine.UnitID
 	}{
 		{
 			name: "team 1 unit never planned",
@@ -596,7 +609,7 @@ func TestDecide_Roster(t *testing.T) {
 				addFighter(gs, ally(1), engine.Coordinate{X: 0, Y: 0})
 				addKing(gs, opp(1), engine.Coordinate{X: 8, Y: 8})
 			},
-			wantEmpty: true,
+			wantErr: true,
 		},
 		{
 			name: "no opponent King",
@@ -604,7 +617,7 @@ func TestDecide_Roster(t *testing.T) {
 				addKing(gs, ally(1), engine.Coordinate{X: 0, Y: 0})
 				addFighter(gs, opp(1), engine.Coordinate{X: 8, Y: 8})
 			},
-			wantEmpty: true,
+			wantErr: true,
 		},
 		{
 			name: "Boss counts as the ally king",
@@ -623,13 +636,30 @@ func TestDecide_Roster(t *testing.T) {
 			wantNone: []engine.UnitID{opp(1)},
 		},
 		{
+			name: "dead ally Boss",
+			setup: func(gs *engine.GameState) {
+				addUnit(gs, ally(1), engine.Coordinate{X: 0, Y: 0}, "King", engine.RoleBoss).HP = 0
+				addFighter(gs, ally(2), engine.Coordinate{X: 0, Y: 4})
+				addKing(gs, opp(1), engine.Coordinate{X: 8, Y: 8})
+			},
+			wantErr: true,
+		},
+		{
+			name: "dead opponent Boss",
+			setup: func(gs *engine.GameState) {
+				addKing(gs, ally(1), engine.Coordinate{X: 0, Y: 0})
+				addUnit(gs, opp(1), engine.Coordinate{X: 8, Y: 8}, "King", engine.RoleBoss).HP = 0
+			},
+			wantErr: true,
+		},
+		{
 			name: "dead ally King ignored",
 			setup: func(gs *engine.GameState) {
 				addKing(gs, ally(1), engine.Coordinate{X: 0, Y: 0}).HP = 0
 				addFighter(gs, ally(2), engine.Coordinate{X: 0, Y: 4})
 				addKing(gs, opp(1), engine.Coordinate{X: 8, Y: 8})
 			},
-			wantEmpty: true,
+			wantErr: true,
 		},
 		{
 			name: "dead opponent King ignored",
@@ -637,7 +667,7 @@ func TestDecide_Roster(t *testing.T) {
 				addKing(gs, ally(1), engine.Coordinate{X: 0, Y: 0})
 				addKing(gs, opp(1), engine.Coordinate{X: 8, Y: 8}).HP = 0
 			},
-			wantEmpty: true,
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
@@ -645,10 +675,19 @@ func TestDecide_Roster(t *testing.T) {
 			gs := newTestGameState(9, 9)
 			tt.setup(gs)
 
-			got := mustDecide(t, gs)
+			got, err := Decide(gs)
 
-			if tt.wantEmpty != (len(got) == 0) {
-				t.Fatalf("Decide() = %+v, want empty = %v", got, tt.wantEmpty)
+			if tt.wantErr {
+				if !errors.Is(err, ErrNoLeaderUnit) {
+					t.Fatalf("Decide() error = %v, want ErrNoLeaderUnit", err)
+				}
+				if len(got) != 0 {
+					t.Fatalf("Decide() = %+v, want empty", got)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Decide() error = %v", err)
 			}
 			for _, cmd := range got {
 				if slices.Contains(tt.wantNone, cmd.UnitID) {
@@ -741,10 +780,10 @@ func TestBuildRoster_PositionsFromInput(t *testing.T) {
 		t.Fatalf("applyCandidate() unexpected err = %v", err)
 	}
 
-	allies, _, ok := buildRoster(gs)
+	allies, _, err := buildRoster(gs)
 
-	if !ok || len(allies) != 1 || allies[0].Position != origin {
-		t.Errorf("buildRoster() = %+v, %v, want the ally King at %+v", allies, ok, origin)
+	if err != nil || len(allies) != 1 || allies[0].Position != origin {
+		t.Errorf("buildRoster() = %+v, %v, want the ally King at %+v", allies, err, origin)
 	}
 }
 
