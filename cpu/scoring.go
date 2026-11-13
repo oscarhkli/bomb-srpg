@@ -26,13 +26,14 @@ type turnResult struct {
 	opponentAffectedTiles map[engine.Coordinate]struct{}
 	destroyedSoftBlocks   int
 	diedUnits             map[engine.UnitID]struct{}
-	suicides              map[engine.UnitID]struct{} // this turn's dead allies killed by an ally-owned bomb.
-	distToKingBefore      int
-	distToKingAfter       int
-	aliveOpponentsBefore  int
-	aliveOpponentsAfter   int
-	aliveAlliesBefore     int
-	aliveAlliesAfter      int
+	// this turn's dead allies killed by an ally-owned bomb.
+	suicides             map[engine.UnitID]struct{}
+	distToKingBefore     int
+	distToKingAfter      int
+	aliveOpponentsBefore int
+	aliveOpponentsAfter  int
+	aliveAlliesBefore    int
+	aliveAlliesAfter     int
 }
 
 type scoreFactor func(gs *engine.GameState, sc scoreContext, tr turnResult) int
