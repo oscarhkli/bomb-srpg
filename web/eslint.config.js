@@ -3,8 +3,10 @@ import tsParser from '@typescript-eslint/parser'
 import tsPlugin from '@typescript-eslint/eslint-plugin'
 import prettier from 'eslint-config-prettier'
 import sonarjs from 'eslint-plugin-sonarjs'
+import maxCommentLines from './eslint-rules/max-comment-lines.js'
 
 export default [
+  { linterOptions: { noInlineConfig: true } },
   js.configs.recommended,
   ...tsPlugin.configs['flat/recommended-type-checked'],
   ...tsPlugin.configs['flat/stylistic-type-checked'],
@@ -19,7 +21,8 @@ export default [
     },
     plugins: {
       '@typescript-eslint': tsPlugin,
-      sonarjs
+      sonarjs,
+      local: { rules: { 'max-comment-lines': maxCommentLines } }
     },
     rules: {
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
@@ -28,7 +31,9 @@ export default [
       '@typescript-eslint/no-non-null-assertion': 'error',
       '@typescript-eslint/restrict-template-expressions': ['error', { allowNumber: true }],
       '@typescript-eslint/switch-exhaustiveness-check': 'error',
-      'sonarjs/cognitive-complexity': ['error', 15]
+      'sonarjs/cognitive-complexity': ['error', 15],
+      'no-inline-comments': 'error',
+      'local/max-comment-lines': 'error'
     }
   },
   {
