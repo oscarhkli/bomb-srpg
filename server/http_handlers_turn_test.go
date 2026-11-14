@@ -171,9 +171,7 @@ func TestHandleConsumeCPUStatus(t *testing.T) {
 	readyCPUTurn := func(t *testing.T) (string, [2]string, *Handler) {
 		t.Helper()
 		roomID, tokens, s, h := newCPUTurnHandlerRoom(t)
-		s.decide = (&recordingDecider{plan: func(*engine.GameState, int) []engine.TurnCommand {
-			return []engine.TurnCommand{engine.NewMoveCommand(cpuUnitID, engine.Coordinate{X: 4, Y: 1})}
-		}}).decide
+		s.decide = (&recordingDecider{plan: moveThenBombPlan(t, cpuUnitID, engine.Coordinate{X: 4, Y: 1})}).decide
 		held := holdCPUTurn(t, s)
 		consume(t, h, roomID, tokens[0])
 		held.runOutsideRoomLock()
@@ -315,9 +313,15 @@ func TestHandleConsumeCPUStatus(t *testing.T) {
 					t.Fatalf("planGameEvents[0] is not an object: %#v", events[0])
 				}
 				assertKeys(t, evt, []string{"type", "unitId", "from", "to"}, "Contract Broken: planGameEvents[0] missing key '%s'")
-				if _, ok := raw["resolveTurnGameEvents"].([]any); !ok {
-					t.Errorf("Expected resolveTurnGameEvents array, got %#v", raw["resolveTurnGameEvents"])
+				resolved, ok := raw["resolveTurnGameEvents"].([]any)
+				if !ok || len(resolved) == 0 {
+					t.Fatalf("Expected non-empty resolveTurnGameEvents, got %#v", raw["resolveTurnGameEvents"])
 				}
+				resolvedEvt, ok := resolved[0].(map[string]any)
+				if !ok {
+					t.Fatalf("resolveTurnGameEvents[0] is not an object: %#v", resolved[0])
+				}
+				assertKeys(t, resolvedEvt, []string{"type", "bombId", "countdown", "position"}, "Contract Broken: resolveTurnGameEvents[0] missing key '%s'")
 			})
 	})
 }
@@ -488,9 +492,15 @@ func TestHandleResolveTurn(t *testing.T) {
 					t.Fatalf("planGameEvents[0] is not an object: %#v", events[0])
 				}
 				assertKeys(t, evt, []string{"type", "unitId", "bombId", "position", "range", "countdown"}, "Contract Broken: planGameEvents[0] missing key '%s'")
-				if _, ok := raw["resolveTurnGameEvents"].([]any); !ok {
-					t.Errorf("Expected resolveTurnGameEvents array, got %#v", raw["resolveTurnGameEvents"])
+				resolved, ok := raw["resolveTurnGameEvents"].([]any)
+				if !ok || len(resolved) == 0 {
+					t.Fatalf("Expected non-empty resolveTurnGameEvents, got %#v", raw["resolveTurnGameEvents"])
 				}
+				resolvedEvt, ok := resolved[0].(map[string]any)
+				if !ok {
+					t.Fatalf("resolveTurnGameEvents[0] is not an object: %#v", resolved[0])
+				}
+				assertKeys(t, resolvedEvt, []string{"type", "bombId", "countdown", "position"}, "Contract Broken: resolveTurnGameEvents[0] missing key '%s'")
 			})
 
 	})
