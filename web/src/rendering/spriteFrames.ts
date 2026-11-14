@@ -2,9 +2,8 @@ import type Phaser from 'phaser';
 
 const resolvedFrameCache = new Map<string, string>();
 
-// Aseprite atlases auto-register a '__BASE' frame (the raw untrimmed source). Sprite creation
-// must reference the atlas's real frame name instead, since its export filename isn't
-// derivable from the texture key (e.g. "Fighter #Blue.aseprite").
+// Atlases auto-register a '__BASE' frame; the real frame name is not derivable
+// from the texture key (e.g. "Fighter #Blue.aseprite").
 export function firstNonBaseFrame(scene: Phaser.Scene, textureKey: string): string {
   const cached = resolvedFrameCache.get(textureKey);
   if (cached) {

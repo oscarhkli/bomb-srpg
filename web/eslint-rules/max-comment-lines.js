@@ -1,14 +1,19 @@
-const MAX = 3
-
 export default {
   meta: {
     type: 'suggestion',
-    schema: [],
+    schema: [
+      {
+        type: 'object',
+        properties: { max: { type: 'integer', minimum: 1 } },
+        additionalProperties: false
+      }
+    ],
     messages: {
-      tooLong: `A comment is at most ${MAX} lines. Shorten it or delete it.`
+      tooLong: 'A comment is at most {{max}} lines. Shorten it or delete it.'
     }
   },
   create(context) {
+    const max = context.options[0]?.max ?? 2
     return {
       Program() {
         const blocks = []
@@ -26,8 +31,8 @@ export default {
           prev = comment
         }
         for (const { node, end } of blocks) {
-          if (end - node.loc.start.line + 1 > MAX) {
-            context.report({ node, messageId: 'tooLong' })
+          if (end - node.loc.start.line + 1 > max) {
+            context.report({ node, messageId: 'tooLong', data: { max } })
           }
         }
       }

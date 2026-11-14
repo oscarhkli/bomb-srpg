@@ -33,7 +33,7 @@ export default [
       '@typescript-eslint/switch-exhaustiveness-check': 'error',
       'sonarjs/cognitive-complexity': ['error', 15],
       'no-inline-comments': 'error',
-      'local/max-comment-lines': 'error'
+      'local/max-comment-lines': ['error', { max: 2 }]
     }
   },
   {
