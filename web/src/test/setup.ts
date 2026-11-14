@@ -202,9 +202,7 @@ export const mockScene = {
   game: { config: { width: 640, height: 360 } },
 };
 
-// @ts-expect-error - global mock for tests
-// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-global.Phaser = {
+(globalThis as Record<string, unknown>).Phaser = {
   Game: vi.fn(),
   Scene: class {
     constructor() {
