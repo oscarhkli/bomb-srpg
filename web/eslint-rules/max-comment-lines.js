@@ -1,6 +1,9 @@
 export default {
   meta: {
     type: 'suggestion',
+    docs: {
+      description: 'Limit the number of lines in a comment block'
+    },
     schema: [
       {
         type: 'object',
@@ -8,31 +11,37 @@ export default {
         additionalProperties: false
       }
     ],
+    defaultOptions: [{ max: 2 }],
     messages: {
       tooLong: 'A comment is at most {{max}} lines. Shorten it or delete it.'
     }
   },
   create(context) {
-    const max = context.options[0]?.max ?? 2
+    const [{ max }] = context.options
+    const { sourceCode } = context
     return {
       Program() {
         const blocks = []
         let prev
-        for (const comment of context.sourceCode.getAllComments()) {
+        for (const comment of sourceCode.getAllComments()) {
+          const { start, end } = comment.loc
+          const before = sourceCode.lines[start.line - 1].slice(0, start.column)
+          if (before.trim() !== '') {
+            prev = undefined
+            continue
+          }
           const adjacent =
-            prev?.type === 'Line' &&
-            comment.type === 'Line' &&
-            comment.loc.start.line === prev.loc.end.line + 1
+            prev?.type === 'Line' && comment.type === 'Line' && start.line === prev.loc.end.line + 1
           if (adjacent) {
-            blocks[blocks.length - 1].end = comment.loc.end.line
+            blocks[blocks.length - 1].end = end
           } else {
-            blocks.push({ node: comment, end: comment.loc.end.line })
+            blocks.push({ start, end })
           }
           prev = comment
         }
-        for (const { node, end } of blocks) {
-          if (end - node.loc.start.line + 1 > max) {
-            context.report({ node, messageId: 'tooLong', data: { max } })
+        for (const { start, end } of blocks) {
+          if (end.line - start.line + 1 > max) {
+            context.report({ loc: { start, end }, messageId: 'tooLong', data: { max } })
           }
         }
       }

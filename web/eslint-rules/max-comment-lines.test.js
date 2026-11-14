@@ -10,7 +10,9 @@ ruleTester.run('max-comment-lines', rule, {
     { code: '// a\n// b\n\n// c\n// d\nconst a = 1', options: max2 },
     { code: '/* a\n b */\nconst a = 1', options: max2 },
     { code: '// a\n// b\nconst a = 1\n// c\nconst b = 2', options: max2 },
-    { code: '// a\n// b\n// c\nconst a = 1', options: [{ max: 3 }] }
+    { code: '// a\n// b\n// c\nconst a = 1', options: [{ max: 3 }] },
+    { code: '// a\n// b\nconst a = 1', options: [] },
+    { code: 'const a = 1 // x\n// b\n// c\nconst b = 2', options: max2 }
   ],
   invalid: [
     {
@@ -32,6 +34,16 @@ ruleTester.run('max-comment-lines', rule, {
       code: '// a\n// b\n// c\n// d\nconst a = 1',
       options: [{ max: 3 }],
       errors: [{ messageId: 'tooLong', data: { max: 3 } }]
+    },
+    {
+      code: '// a\n// b\n// c\nconst a = 1',
+      options: [],
+      errors: [{ messageId: 'tooLong', data: { max: 2 } }]
+    },
+    {
+      code: 'const a = 1 // x\n// b\n// c\n// d\nconst b = 2',
+      options: max2,
+      errors: [{ messageId: 'tooLong', line: 2, endLine: 4 }]
     }
   ]
 })
