@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"reflect"
 	"slices"
 	"sync"
 	"testing"
@@ -582,6 +583,8 @@ func TestServerStateManager_runCPUTurn_Abandons(t *testing.T) {
 			swap: func(t *testing.T, room *matchRoom) {
 				t.Helper()
 				room.Match.WinnerTeamID = 1
+				room.Match.TrueState.Units[engine.NewUnitID(1, 0)].HasMoved = true
+				room.Match.WorkingState.Units[engine.NewUnitID(1, 0)].HasMoved = true
 			},
 			wantPhase: engine.TurnPhaseReady,
 		},
@@ -608,13 +611,14 @@ func TestServerStateManager_runCPUTurn_Abandons(t *testing.T) {
 				t.Fatalf("launching consume phase = %v, want %v", phase, engine.TurnPhasePlanning)
 			}
 			tt.swap(t, room)
+			wantTrueState := captured.TrueState.DeepCopy()
 			held.runOutsideRoomLock()
 
 			if got := decider.calls; got != 0 {
 				t.Errorf("Expected the abandoned turn to skip planning, got %d decide calls", got)
 			}
-			if got, want := captured.TrueState.Turn, 2; got != want {
-				t.Errorf("Expected turn %d on the abandoned match, got %d", want, got)
+			if got := captured.TrueState; !reflect.DeepEqual(got, wantTrueState) {
+				t.Errorf("Expected the abandoned match's committed state to stay unchanged, got %#v, want %#v", got, wantTrueState)
 			}
 
 			phase, planGameEvents, resolveTurnGameEvents, err := s.consumeCPUStatus(roomID, tokens[0])
