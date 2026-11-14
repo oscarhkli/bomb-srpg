@@ -176,7 +176,7 @@ func TestHandleConsumeCPUStatus(t *testing.T) {
 		}}).decide
 		held := holdCPUTurn(t, s)
 		consume(t, h, roomID, tokens[0])
-		held.run()
+		held.runOutsideRoomLock()
 		return roomID, tokens, h
 	}
 

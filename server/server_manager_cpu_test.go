@@ -66,8 +66,7 @@ func holdCPUTurn(t *testing.T, s *ServerStateManager) *heldCPUTurn {
 
 func (h *heldCPUTurn) count() int { return len(h.fns) }
 
-// run executes the next held turn on the caller's goroutine. The caller must not hold room.mu.
-func (h *heldCPUTurn) run() {
+func (h *heldCPUTurn) runOutsideRoomLock() {
 	h.t.Helper()
 	if h.next >= len(h.fns) {
 		h.t.Fatal("no held CPU turn to run")
@@ -75,6 +74,21 @@ func (h *heldCPUTurn) run() {
 	f := h.fns[h.next]
 	h.next++
 	f()
+}
+
+func setTeam2DueTurn(gs *engine.GameState) {
+	gs.ActiveTeam, gs.Turn = 2, 4
+}
+
+func moveThenBombPlan(t *testing.T, unitID engine.UnitID, dest engine.Coordinate) func(*engine.GameState, int) []engine.TurnCommand {
+	t.Helper()
+	return func(gs *engine.GameState, _ int) []engine.TurnCommand {
+		t.Helper()
+		return []engine.TurnCommand{
+			engine.NewMoveCommand(unitID, dest),
+			engine.NewPlaceBombCommand(unitID, freeNeighbour(t, gs, dest)),
+		}
+	}
 }
 
 func newCPUTurnHandlerRoom(t *testing.T) (string, [2]string, *ServerStateManager, *Handler) {
@@ -265,7 +279,7 @@ func TestServerStateManager_ConsumeCPUStatus_LaunchesCPUTurn(t *testing.T) {
 				return rejectedPlan
 			},
 			wantCPUTurn:    true,
-			wantCalls:      maxCPUReplanAttempts,
+			wantCalls:      5,
 			wantActiveTeam: 1,
 			validate: func(t *testing.T, planGameEvents []engine.GameEvent, d *recordingDecider) {
 				t.Helper()
@@ -361,7 +375,7 @@ func TestServerStateManager_ConsumeCPUStatus_LaunchesCPUTurn(t *testing.T) {
 			}
 
 			if tt.wantCPUTurn {
-				held.run()
+				held.runOutsideRoomLock()
 				phase, planGameEvents, _ = consumeCPUPhase(t, s, roomID, tokens[tokenIdx])
 				if phase != engine.TurnPhaseReady {
 					t.Errorf("consumeCPUStatus() after the turn phase = %v, want %v", phase, engine.TurnPhaseReady)
@@ -383,13 +397,14 @@ func TestServerStateManager_ConsumeCPUStatus_LaunchesCPUTurn(t *testing.T) {
 
 func TestServerStateManager_ConsumeCPUStatus_StaleReadyDropped(t *testing.T) {
 	cpuUnitID := engine.NewUnitID(2, 0)
-	posA, posB := engine.Coordinate{X: 4, Y: 1}, engine.Coordinate{X: 4, Y: 2}
+	posA, posB := engine.Coordinate{X: 4, Y: 1}, engine.Coordinate{X: 3, Y: 1}
 
 	roomID, tokens, s := newCPUTurnRoom(t)
 	room := mustRoom(t, s, roomID)
+	planA := moveThenBombPlan(t, cpuUnitID, posA)
 	decider := &recordingDecider{plan: func(gs *engine.GameState, call int) []engine.TurnCommand {
 		if call == 0 {
-			return []engine.TurnCommand{engine.NewMoveCommand(cpuUnitID, posA)}
+			return planA(gs, call)
 		}
 		return []engine.TurnCommand{engine.NewMoveCommand(cpuUnitID, posB)}
 	}}
@@ -397,12 +412,10 @@ func TestServerStateManager_ConsumeCPUStatus_StaleReadyDropped(t *testing.T) {
 	held := holdCPUTurn(t, s)
 
 	consumeCPUPhase(t, s, roomID, tokens[0])
-	held.run()
+	held.runOutsideRoomLock()
 
-	// The next team follows Turn parity, so Turn must be even for Team 2 to be due again.
-	for _, gs := range []*engine.GameState{room.Match.TrueState, room.Match.WorkingState} {
-		gs.ActiveTeam, gs.Turn = 2, 4
-	}
+	setTeam2DueTurn(room.Match.TrueState)
+	setTeam2DueTurn(room.Match.WorkingState)
 
 	phase, planGameEvents, resolveTurnGameEvents := consumeCPUPhase(t, s, roomID, tokens[0])
 	if phase != engine.TurnPhasePlanning {
@@ -415,7 +428,7 @@ func TestServerStateManager_ConsumeCPUStatus_StaleReadyDropped(t *testing.T) {
 		t.Fatalf("held CPU turns = %d, want %d", got, want)
 	}
 
-	held.run()
+	held.runOutsideRoomLock()
 	phase, planGameEvents, _ = consumeCPUPhase(t, s, roomID, tokens[0])
 	if phase != engine.TurnPhaseReady {
 		t.Fatalf("phase after the second turn = %v, want %v", phase, engine.TurnPhaseReady)
@@ -432,6 +445,32 @@ func TestServerStateManager_ConsumeCPUStatus_StaleReadyDropped(t *testing.T) {
 	}
 	if !found {
 		t.Errorf("Expected plan B's move event, got %#v", planGameEvents)
+	}
+}
+
+func TestServerStateManager_ConsumeCPUStatus_ClearsResolveEvents(t *testing.T) {
+	cpuUnitID := engine.NewUnitID(2, 0)
+	roomID, tokens, s := newCPUTurnRoom(t)
+	s.decide = (&recordingDecider{plan: moveThenBombPlan(t, cpuUnitID, engine.Coordinate{X: 4, Y: 1})}).decide
+	held := holdCPUTurn(t, s)
+
+	consumeCPUPhase(t, s, roomID, tokens[0])
+	held.runOutsideRoomLock()
+
+	phase, _, resolveTurnGameEvents := consumeCPUPhase(t, s, roomID, tokens[0])
+	if phase != engine.TurnPhaseReady {
+		t.Fatalf("phase after the turn = %v, want %v", phase, engine.TurnPhaseReady)
+	}
+	if len(resolveTurnGameEvents) == 0 {
+		t.Fatal("Expected the placed bomb to tick in the resolve events, got none")
+	}
+
+	phase, planAgain, resolveAgain := consumeCPUPhase(t, s, roomID, tokens[0])
+	if phase != engine.TurnPhaseIdle {
+		t.Errorf("second consume phase = %v, want %v", phase, engine.TurnPhaseIdle)
+	}
+	if len(planAgain) != 0 || len(resolveAgain) != 0 {
+		t.Errorf("second consume events = %#v and %#v, want none", planAgain, resolveAgain)
 	}
 }
 
@@ -468,7 +507,7 @@ func TestServerStateManager_ConsumeCPUStatus_LaunchesOnce(t *testing.T) {
 		t.Fatalf("held CPU turns = %d, want %d", got, want)
 	}
 
-	held.run()
+	held.runOutsideRoomLock()
 	if got, want := decider.calls, 1; got != want {
 		t.Errorf("decide calls = %d, want %d", got, want)
 	}
@@ -495,7 +534,6 @@ func TestServerStateManager_ConsumeCPUStatus_DefaultSpawn(t *testing.T) {
 		t.Fatal("Timed out waiting for the CPU goroutine to invoke decide")
 	}
 
-	// Blocks until runCPUTurn releases the write lock.
 	room.mu.RLock()
 	activeTeam := room.Match.TrueState.ActiveTeam
 	room.mu.RUnlock()
@@ -570,7 +608,7 @@ func TestServerStateManager_runCPUTurn_Abandons(t *testing.T) {
 				t.Fatalf("launching consume phase = %v, want %v", phase, engine.TurnPhasePlanning)
 			}
 			tt.swap(t, room)
-			held.run()
+			held.runOutsideRoomLock()
 
 			if got := decider.calls; got != 0 {
 				t.Errorf("Expected the abandoned turn to skip planning, got %d decide calls", got)
@@ -648,7 +686,6 @@ func TestServerStateManager_ReadsDuringCPUTurn(t *testing.T) {
 	}
 
 	close(release)
-	// Blocks until runCPUTurn releases the write lock.
 	room.mu.Lock()
 	activeTeam := room.Match.TrueState.ActiveTeam
 	room.mu.Unlock()
@@ -666,20 +703,29 @@ func TestServerStateManager_ReadsDuringCPUTurn(t *testing.T) {
 func TestServerStateManager_runCPUTurn_Panic(t *testing.T) {
 	roomID, tokens, s := newCPUTurnRoom(t)
 	room := mustRoom(t, s, roomID)
+	kingID := engine.NewUnitID(2, 0)
+	target := freeNeighbour(t, room.Match.WorkingState, room.Match.WorkingState.Units[kingID].Position)
+	if _, err := room.Match.CommandPlaceBomb(kingID, target); err != nil {
+		t.Fatalf("CommandPlaceBomb() error = %v", err)
+	}
+	room.Match.TrueState = room.Match.WorkingState.DeepCopy()
 	s.decide = func(*engine.GameState) ([]engine.TurnCommand, error) { panic("decide exploded") }
 	held := holdCPUTurn(t, s)
 
 	consumeCPUPhase(t, s, roomID, tokens[0])
-	held.run()
+	held.runOutsideRoomLock()
 
 	if got, want := room.Match.TrueState.Turn, 3; got != want {
 		t.Errorf("Expected the forfeited turn to still advance to %d, got %d", want, got)
 	}
 
 	// Proves the room mutex was released rather than left held by the unwinding goroutine.
-	turnPhase, _, _ := consumeCPUPhase(t, s, roomID, tokens[0])
+	turnPhase, _, resolveTurnGameEvents := consumeCPUPhase(t, s, roomID, tokens[0])
 	if got, want := turnPhase, engine.TurnPhaseReady; got != want {
 		t.Errorf("Expected %v turnPhase return, got %v", want, got)
+	}
+	if len(resolveTurnGameEvents) == 0 {
+		t.Error("Expected the forfeited turn to report the ticking bomb in the resolve events, got none")
 	}
 }
 
@@ -701,7 +747,7 @@ func TestServerStateManager_ConsumeCPUStatus(t *testing.T) {
 				}}).decide
 				held := holdCPUTurn(t, s)
 				consumeCPUPhase(t, s, roomID, tokens[0])
-				held.run()
+				held.runOutsideRoomLock()
 				return roomID, s, tokens[0]
 			},
 			wantErr: nil,
@@ -848,7 +894,7 @@ func TestServerStateManager_CPUTurnGate(t *testing.T) {
 					s.decide = (&recordingDecider{}).decide
 					held := holdCPUTurn(t, s)
 					consumeCPUPhase(t, s, roomID, tokens[0])
-					held.run()
+					held.runOutsideRoomLock()
 					callToken = tokens[0]
 					turn, team = 3, 1
 				}
@@ -898,7 +944,7 @@ func TestServerStateManager_CPUTurnGate_NotGated(t *testing.T) {
 		t.Errorf("WinnerTeamID = %d, want %d", got, want)
 	}
 
-	held.run()
+	held.runOutsideRoomLock()
 	phase, planGameEvents, resolveTurnGameEvents := consumeCPUPhase(t, s, roomID, tokens[0])
 	if want := engine.TurnPhaseReady; phase != want {
 		t.Errorf("ConsumeCPUStatus phase after the abandoned turn = %v, want %v", phase, want)
@@ -942,7 +988,7 @@ func TestServerStateManager_runCPUTurn_DecideError(t *testing.T) {
 			held := holdCPUTurn(t, s)
 
 			consumeCPUPhase(t, s, roomID, tokens[0])
-			held.run()
+			held.runOutsideRoomLock()
 			phase, planGameEvents, _ := consumeCPUPhase(t, s, roomID, tokens[0])
 
 			if got, want := decider.calls, 1; got != want {
@@ -1021,7 +1067,7 @@ func TestServerStateManager_runCPUTurn_EndsMatch(t *testing.T) {
 	if phase, _, _ := consumeCPUPhase(t, s, roomID, tokens[0]); phase != engine.TurnPhasePlanning {
 		t.Fatalf("launching consume phase = %v, want %v", phase, engine.TurnPhasePlanning)
 	}
-	held.run()
+	held.runOutsideRoomLock()
 
 	if got, want := room.Match.WinnerTeamID, 1; got != want {
 		t.Errorf("Expected winner %d, got %d", want, got)
@@ -1056,9 +1102,12 @@ func TestServerStateManager_runCPUTurn_EndsMatch(t *testing.T) {
 		}
 	}
 	for consume := 2; consume <= 3; consume++ {
-		phase, _, _ := consumeCPUPhase(t, s, roomID, tokens[0])
+		phase, planAgain, resolveAgain := consumeCPUPhase(t, s, roomID, tokens[0])
 		if got, want := phase, engine.TurnPhaseIdle; got != want {
 			t.Errorf("Expected consume %d to be %v, got %v", consume, want, got)
+		}
+		if len(planAgain) != 0 || len(resolveAgain) != 0 {
+			t.Errorf("Expected consume %d to return no events, got %+v and %+v", consume, planAgain, resolveAgain)
 		}
 	}
 	if got, want := decider.calls, 1; got != want {
