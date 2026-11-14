@@ -25,12 +25,12 @@ export default {
         let prev
         for (const comment of sourceCode.getAllComments()) {
           const { start, end } = comment.loc
-          const before = sourceCode.lines[start.line - 1].slice(0, start.column)
-          if (before.trim() !== '') {
+          const token = sourceCode.getTokenBefore(comment)
+          if (token && token.loc.end.line === start.line) {
             prev = undefined
             continue
           }
-          if (prev && start.line === prev.loc.end.line + 1) {
+          if (prev && start.line - prev.loc.end.line <= 1) {
             blocks[blocks.length - 1].end = end
           } else {
             blocks.push({ start, end })
