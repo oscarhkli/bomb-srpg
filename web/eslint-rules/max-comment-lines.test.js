@@ -44,6 +44,26 @@ ruleTester.run('max-comment-lines', rule, {
       code: 'const a = 1 // x\n// b\n// c\n// d\nconst b = 2',
       options: max2,
       errors: [{ messageId: 'tooLong', line: 2, endLine: 4 }]
+    },
+    {
+      code: '// a\n/* b */\n// c\nconst a = 1',
+      options: max2,
+      errors: [{ messageId: 'tooLong', line: 1, endLine: 3 }]
+    },
+    {
+      code: '/* a\n b */\n// c\n// d\nconst a = 1',
+      options: max2,
+      errors: [{ messageId: 'tooLong', line: 1, endLine: 4 }]
+    },
+    {
+      code: '// a\r\n// b\r\n// c\r\nconst a = 1',
+      options: max2,
+      errors: [{ messageId: 'tooLong', line: 1, endLine: 3 }]
+    },
+    {
+      code: 'function f() {\n    // a\n    // b\n    // c\n    return 1\n}',
+      options: max2,
+      errors: [{ messageId: 'tooLong', line: 2, endLine: 4 }]
     }
   ]
 })

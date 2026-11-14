@@ -30,9 +30,7 @@ export default {
             prev = undefined
             continue
           }
-          const adjacent =
-            prev?.type === 'Line' && comment.type === 'Line' && start.line === prev.loc.end.line + 1
-          if (adjacent) {
+          if (prev && start.line === prev.loc.end.line + 1) {
             blocks[blocks.length - 1].end = end
           } else {
             blocks.push({ start, end })
