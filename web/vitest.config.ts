@@ -17,11 +17,11 @@ export default defineConfig({
       reporter: ['text', 'html', 'json-summary', 'json'],
       reportsDirectory: './coverage',
       exclude: [
-        'src/main.ts',    // Phaser bootstrap — requires real DOM + WebGL, not jsdom
-        'src/counter.ts', // Vite scaffold leftover
-        'src/test/**',    // test infrastructure
-        'src/assets/**',  // static files
-        'src/types/**',   // pure TS interfaces, no runtime logic
+        'src/main.ts',
+        'src/counter.ts',
+        'src/test/**',
+        'src/assets/**',
+        'src/types/**',
         'src/style.css',
       ]
     }
