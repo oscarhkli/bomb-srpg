@@ -83,6 +83,7 @@ type ServerStateManager struct {
 	Rooms          sync.Map
 	generateRoomID func(int) (string, error)
 	decide         func(*engine.GameState) ([]engine.TurnCommand, error)
+	spawn          func(func())
 	Logger         *slog.Logger
 }
 
@@ -98,6 +99,7 @@ func NewServerStateManager(opts ...Option) *ServerStateManager {
 	manager := &ServerStateManager{
 		generateRoomID: randomHex,
 		decide:         cpu.Decide,
+		spawn:          func(f func()) { go f() },
 		Logger:         slog.Default(),
 	}
 	for _, opt := range opts {
@@ -364,7 +366,7 @@ func (s *ServerStateManager) launchCPUTurnIfDueLocked(room *matchRoom) {
 	match.CPU.Phase = engine.TurnPhasePlanning
 	match.CPU.PlanGameEvents = nil
 	match.CPU.ResolveTurnGameEvents = nil
-	go s.runCPUTurn(room, match)
+	s.spawn(func() { s.runCPUTurn(room, match) })
 }
 
 func (s *ServerStateManager) runCPUTurn(room *matchRoom, match *engine.Match) {

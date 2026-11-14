@@ -160,20 +160,34 @@ func createSuddenDeathRoom(t *testing.T) (string, [2]string, *ServerStateManager
 }
 
 func TestHandleConsumeCPUStatus(t *testing.T) {
-	unitID := engine.NewUnitID(1, 0)
+	const consumePattern = "POST /api/match-rooms/{roomID}/match/cpu-status/consume"
+	cpuUnitID := engine.NewUnitID(2, 0)
+
+	consume := func(t *testing.T, h *Handler, roomID, token string) *httptest.ResponseRecorder {
+		t.Helper()
+		return doRequest(t, h.handleConsumeCPUStatus, consumePattern, "POST", "/api/match-rooms/"+roomID+"/match/cpu-status/consume", "", token)
+	}
+
+	readyCPUTurn := func(t *testing.T) (string, [2]string, *Handler) {
+		t.Helper()
+		roomID, tokens, s, h := newCPUTurnHandlerRoom(t)
+		s.decide = (&recordingDecider{plan: moveThenBombPlan(t, cpuUnitID, engine.Coordinate{X: 4, Y: 1})}).decide
+		held := holdCPUTurn(t, s)
+		consume(t, h, roomID, tokens[0])
+		held.runOutsideRoomLock()
+		return roomID, tokens, h
+	}
+
+	type consumeResponse struct {
+		TurnPhase             string             `json:"turnPhase"`
+		PlanGameEvents        []engine.GameEvent `json:"planGameEvents"`
+		ResolveTurnGameEvents []engine.GameEvent `json:"resolveTurnGameEvents"`
+	}
 
 	t.Run("Success: TurnPhaseReady returns and clears pending events", func(t *testing.T) {
-		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
-		room := mustRoom(t, s, roomID)
-		room.Match.CPU.Phase = engine.TurnPhaseReady
-		room.Match.CPU.PlanGameEvents = []engine.GameEvent{
-			engine.NewUnitMovedEvent(unitID, engine.Coordinate{X: 1, Y: 2}, engine.Coordinate{X: 2, Y: 2}),
-		}
-		room.Match.CPU.ResolveTurnGameEvents = []engine.GameEvent{
-			engine.NewUnitDiedEvent(unitID, engine.Coordinate{X: 2, Y: 2}),
-		}
+		roomID, playerTokens, h := readyCPUTurn(t)
 
-		rr := doRequest(t, h.handleConsumeCPUStatus, "POST /api/match-rooms/{roomID}/match/cpu-status/consume", "POST", "/api/match-rooms/"+roomID+"/match/cpu-status/consume", "", playerTokens[0])
+		rr := consume(t, h, roomID, playerTokens[0])
 
 		if status := rr.Code; status != http.StatusOK {
 			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusOK)
@@ -184,11 +198,7 @@ func TestHandleConsumeCPUStatus(t *testing.T) {
 			t.Errorf("Handler returned wrong content type: got %v want %v", contentType, expectedHeader)
 		}
 
-		var response struct {
-			TurnPhase             string             `json:"turnPhase"`
-			PlanGameEvents        []engine.GameEvent `json:"planGameEvents"`
-			ResolveTurnGameEvents []engine.GameEvent `json:"resolveTurnGameEvents"`
-		}
+		var response consumeResponse
 		if err := json.UnmarshalRead(rr.Body, &response); err != nil {
 			t.Fatalf("Failed to decode response JSON payload: %v", err)
 		}
@@ -196,30 +206,28 @@ func TestHandleConsumeCPUStatus(t *testing.T) {
 		if got, want := response.TurnPhase, engine.TurnPhaseReady.String(); got != want {
 			t.Errorf("Expected turnPhase %v, got %v", want, got)
 		}
-		if got, want := len(response.PlanGameEvents), 1; got != want {
-			t.Errorf("Expected %d planGameEvents returned, got %#v", want, response.PlanGameEvents)
-		}
-		if got, want := len(response.ResolveTurnGameEvents), 1; got != want {
-			t.Errorf("Expected %d resolveTurnGameEvents returned, got %#v", want, response.ResolveTurnGameEvents)
+		if !hasGameEvent(response.PlanGameEvents, engine.GameEvtUnitMoved, cpuUnitID) {
+			t.Errorf("Expected the CPU unit's move in planGameEvents, got %#v", response.PlanGameEvents)
 		}
 
-		if got, want := room.Match.CPU.Phase, engine.TurnPhaseIdle; got != want {
-			t.Errorf("Expected CPU.Phase reset to %v, got %v", want, got)
+		var again consumeResponse
+		if err := json.UnmarshalRead(consume(t, h, roomID, playerTokens[0]).Body, &again); err != nil {
+			t.Fatalf("Failed to decode response JSON payload: %v", err)
 		}
-		if got, want := len(room.Match.CPU.PlanGameEvents), 0; got != want {
-			t.Errorf("Expected CPU.PlanGameEvents cleared, got %#v", room.Match.CPU.PlanGameEvents)
+		if got, want := again.TurnPhase, engine.TurnPhaseIdle.String(); got != want {
+			t.Errorf("Expected turnPhase reset to %v, got %v", want, got)
 		}
-		if got, want := len(room.Match.CPU.ResolveTurnGameEvents), 0; got != want {
-			t.Errorf("Expected CPU.ResolveTurnGameEvents cleared, got %#v", room.Match.CPU.ResolveTurnGameEvents)
+		if len(again.PlanGameEvents) != 0 || len(again.ResolveTurnGameEvents) != 0 {
+			t.Errorf("Expected events cleared, got %#v and %#v", again.PlanGameEvents, again.ResolveTurnGameEvents)
 		}
 	})
 
 	t.Run("Success: TurnPhasePlanning leaves state untouched", func(t *testing.T) {
-		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
-		room := mustRoom(t, s, roomID)
-		room.Match.CPU.Phase = engine.TurnPhasePlanning
+		roomID, playerTokens, s, h := newCPUTurnHandlerRoom(t)
+		holdCPUTurn(t, s)
+		consume(t, h, roomID, playerTokens[0])
 
-		rr := doRequest(t, h.handleConsumeCPUStatus, "POST /api/match-rooms/{roomID}/match/cpu-status/consume", "POST", "/api/match-rooms/"+roomID+"/match/cpu-status/consume", "", playerTokens[0])
+		rr := consume(t, h, roomID, playerTokens[0])
 
 		if status := rr.Code; status != http.StatusOK {
 			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusOK)
@@ -227,11 +235,7 @@ func TestHandleConsumeCPUStatus(t *testing.T) {
 
 		body := rr.Body.Bytes()
 
-		var response struct {
-			TurnPhase             string             `json:"turnPhase"`
-			PlanGameEvents        []engine.GameEvent `json:"planGameEvents"`
-			ResolveTurnGameEvents []engine.GameEvent `json:"resolveTurnGameEvents"`
-		}
+		var response consumeResponse
 		if err := json.Unmarshal(body, &response); err != nil {
 			t.Fatalf("Failed to decode response JSON payload: %v", err)
 		}
@@ -244,9 +248,6 @@ func TestHandleConsumeCPUStatus(t *testing.T) {
 		}
 		if got, want := len(response.ResolveTurnGameEvents), 0; got != want {
 			t.Errorf("Expected no resolveTurnGameEvents, got %#v", response.ResolveTurnGameEvents)
-		}
-		if got, want := room.Match.CPU.Phase, engine.TurnPhasePlanning; got != want {
-			t.Errorf("Expected CPU.Phase to stay at %v, got %v", want, got)
 		}
 
 		var raw map[string]any
@@ -261,27 +262,32 @@ func TestHandleConsumeCPUStatus(t *testing.T) {
 	})
 
 	t.Run("Success: either player's token is accepted", func(t *testing.T) {
-		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
-		room := mustRoom(t, s, roomID)
-		room.Match.CPU.Phase = engine.TurnPhaseReady
+		roomID, playerTokens, _, h := createTestRoomWithMatch(t)
 
-		rr := doRequest(t, h.handleConsumeCPUStatus, "POST /api/match-rooms/{roomID}/match/cpu-status/consume", "POST", "/api/match-rooms/"+roomID+"/match/cpu-status/consume", "", playerTokens[1])
+		rr := consume(t, h, roomID, playerTokens[1])
 
 		if status := rr.Code; status != http.StatusOK {
 			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusOK)
+		}
+		var response consumeResponse
+		if err := json.UnmarshalRead(rr.Body, &response); err != nil {
+			t.Fatalf("Failed to decode response JSON payload: %v", err)
+		}
+		if got, want := response.TurnPhase, engine.TurnPhaseIdle.String(); got != want {
+			t.Errorf("Expected turnPhase %v, got %v", want, got)
 		}
 	})
 
 	testRouteFailures(t, failureRoute{
 		handler: (*Handler).handleConsumeCPUStatus,
-		pattern: "POST /api/match-rooms/{roomID}/match/cpu-status/consume",
+		pattern: consumePattern,
 		cases:   failRoom | failMatch | failMissingAuth | failInvalidToken,
 	})
 
 	t.Run("Failure: failed to Encode", func(t *testing.T) {
 		roomID, playerTokens, _, h := createTestRoomWithMatch(t)
 
-		testEncodeFailure(t, testMux("POST /api/match-rooms/{roomID}/match/cpu-status/consume", h.handleConsumeCPUStatus),
+		testEncodeFailure(t, testMux(consumePattern, h.handleConsumeCPUStatus),
 			func() *http.Request {
 				req, _ := http.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/cpu-status/consume", nil)
 				req.Header.Set("Content-Type", "application/json")
@@ -291,17 +297,9 @@ func TestHandleConsumeCPUStatus(t *testing.T) {
 	})
 
 	t.Run("Test Contract", func(t *testing.T) {
-		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
-		room := mustRoom(t, s, roomID)
-		room.Match.CPU.Phase = engine.TurnPhaseReady
-		room.Match.CPU.PlanGameEvents = []engine.GameEvent{
-			engine.NewUnitMovedEvent(unitID, engine.Coordinate{X: 1, Y: 2}, engine.Coordinate{X: 2, Y: 2}),
-		}
-		room.Match.CPU.ResolveTurnGameEvents = []engine.GameEvent{
-			engine.NewUnitDiedEvent(unitID, engine.Coordinate{X: 2, Y: 2}),
-		}
+		roomID, playerTokens, h := readyCPUTurn(t)
 
-		rr := doRequest(t, h.handleConsumeCPUStatus, "POST /api/match-rooms/{roomID}/match/cpu-status/consume", "POST", "/api/match-rooms/"+roomID+"/match/cpu-status/consume", "", playerTokens[0])
+		rr := consume(t, h, roomID, playerTokens[0])
 
 		assertObjectContract(t, rr.Body.Bytes(), []string{"turnPhase", "planGameEvents", "resolveTurnGameEvents"},
 			func(t *testing.T, raw map[string]any) {
@@ -315,11 +313,31 @@ func TestHandleConsumeCPUStatus(t *testing.T) {
 					t.Fatalf("planGameEvents[0] is not an object: %#v", events[0])
 				}
 				assertKeys(t, evt, []string{"type", "unitId", "from", "to"}, "Contract Broken: planGameEvents[0] missing key '%s'")
-				if _, ok := raw["resolveTurnGameEvents"].([]any); !ok {
-					t.Errorf("Expected resolveTurnGameEvents array, got %#v", raw["resolveTurnGameEvents"])
+				resolved, ok := raw["resolveTurnGameEvents"].([]any)
+				if !ok || len(resolved) == 0 {
+					t.Fatalf("Expected non-empty resolveTurnGameEvents, got %#v", raw["resolveTurnGameEvents"])
 				}
+				resolvedEvt, ok := resolved[0].(map[string]any)
+				if !ok {
+					t.Fatalf("resolveTurnGameEvents[0] is not an object: %#v", resolved[0])
+				}
+				assertKeys(t, resolvedEvt, []string{"type", "bombId", "countdown", "position"}, "Contract Broken: resolveTurnGameEvents[0] missing key '%s'")
 			})
 	})
+}
+
+func TestHandleResolveTurn_DuringCPUTurn(t *testing.T) {
+	roomID, playerTokens, s, h := newCPUTurnHandlerRoom(t)
+	holdCPUTurn(t, s)
+	if _, _, _, err := s.consumeCPUStatus(roomID, playerTokens[0]); err != nil {
+		t.Fatalf("ConsumeCPUStatus() error = %v", err)
+	}
+
+	rr := doRequest(t, h.handleResolveTurn, "POST /api/match-rooms/{roomID}/match/resolve", "POST", "/api/match-rooms/"+roomID+"/match/resolve", "", playerTokens[1])
+
+	if got, want := rr.Code, http.StatusConflict; got != want {
+		t.Errorf("Handler returned wrong status code: got %v want %v", got, want)
+	}
 }
 
 func TestHandleResetTurn(t *testing.T) {
@@ -474,9 +492,15 @@ func TestHandleResolveTurn(t *testing.T) {
 					t.Fatalf("planGameEvents[0] is not an object: %#v", events[0])
 				}
 				assertKeys(t, evt, []string{"type", "unitId", "bombId", "position", "range", "countdown"}, "Contract Broken: planGameEvents[0] missing key '%s'")
-				if _, ok := raw["resolveTurnGameEvents"].([]any); !ok {
-					t.Errorf("Expected resolveTurnGameEvents array, got %#v", raw["resolveTurnGameEvents"])
+				resolved, ok := raw["resolveTurnGameEvents"].([]any)
+				if !ok || len(resolved) == 0 {
+					t.Fatalf("Expected non-empty resolveTurnGameEvents, got %#v", raw["resolveTurnGameEvents"])
 				}
+				resolvedEvt, ok := resolved[0].(map[string]any)
+				if !ok {
+					t.Fatalf("resolveTurnGameEvents[0] is not an object: %#v", resolved[0])
+				}
+				assertKeys(t, resolvedEvt, []string{"type", "bombId", "countdown", "position"}, "Contract Broken: resolveTurnGameEvents[0] missing key '%s'")
 			})
 
 	})
