@@ -198,6 +198,9 @@ func (s *ServerStateManager) createMatch(roomID string, gameCfg engine.GameCfg) 
 		return [2]string{}, err
 	}
 
+	gameCfg.P1Slots = slices.Clone(gameCfg.P1Slots)
+	gameCfg.P2Slots = slices.Clone(gameCfg.P2Slots)
+
 	room.mu.Lock()
 	defer room.mu.Unlock()
 
@@ -580,6 +583,8 @@ func (s *ServerStateManager) getMatchConfig(roomID string) (*engine.GameCfg, err
 	}
 
 	gameCfg := room.Match.GameCfg
+	gameCfg.P1Slots = slices.Clone(gameCfg.P1Slots)
+	gameCfg.P2Slots = slices.Clone(gameCfg.P2Slots)
 	return &gameCfg, nil
 }
 
