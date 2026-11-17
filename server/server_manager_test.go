@@ -26,9 +26,9 @@ func assertGameCfgSynced(t *testing.T, room *matchRoom) {
 	}
 }
 
-func createTestRoomWithCfg(t *testing.T, gameCfg engine.GameCfg) (string, [2]string, *ServerStateManager) {
+func createTestRoomWithCfg(t *testing.T, gameCfg engine.GameCfg, opts ...Option) (string, [2]string, *ServerStateManager) {
 	t.Helper()
-	s := NewServerStateManager()
+	s := NewServerStateManager(opts...)
 	roomID, _ := s.createMatchRoom()
 	tokens, _ := s.createMatch(roomID, gameCfg)
 	return roomID, tokens, s

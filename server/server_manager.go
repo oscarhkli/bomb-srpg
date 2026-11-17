@@ -84,6 +84,7 @@ type ServerStateManager struct {
 	generateRoomID func(int) (string, error)
 	decide         func(*engine.GameState) ([]engine.TurnCommand, error)
 	spawn          func(func())
+	newMatch       func(engine.GameCfg) (*engine.Match, error)
 	Logger         *slog.Logger
 }
 
@@ -95,11 +96,30 @@ func WithLogger(logger *slog.Logger) Option {
 	}
 }
 
+func WithDecider(decide func(*engine.GameState) ([]engine.TurnCommand, error)) Option {
+	return func(s *ServerStateManager) {
+		s.decide = decide
+	}
+}
+
+func WithSpawner(spawn func(func())) Option {
+	return func(s *ServerStateManager) {
+		s.spawn = spawn
+	}
+}
+
+func WithMatchFactory(newMatch func(engine.GameCfg) (*engine.Match, error)) Option {
+	return func(s *ServerStateManager) {
+		s.newMatch = newMatch
+	}
+}
+
 func NewServerStateManager(opts ...Option) *ServerStateManager {
 	manager := &ServerStateManager{
 		generateRoomID: randomHex,
 		decide:         cpu.Decide,
 		spawn:          func(f func()) { go f() },
+		newMatch:       engine.InitGame,
 		Logger:         slog.Default(),
 	}
 	for _, opt := range opts {
@@ -237,7 +257,7 @@ func (s *ServerStateManager) createMatchLocked(room *matchRoom, gameCfg engine.G
 		return nil, fmt.Errorf("%w: roomID=%s", errMatchExists, roomID)
 	}
 
-	match, err := engine.InitGame(gameCfg)
+	match, err := s.newMatch(gameCfg)
 	if err != nil {
 		room.Logger.Error("invalid game config", "gameCfg", gameCfg, "error", err)
 		return nil, fmt.Errorf("%w: %w", errInvalidConfig, err)
