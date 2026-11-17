@@ -166,7 +166,9 @@ func TestHandleGetMatchState(t *testing.T) {
 	})
 
 	t.Run("Test Contract", func(t *testing.T) {
-		roomID, s, h := newTestRoom(t)
+		unitID := engine.NewUnitID(1, 0)
+		pos := engine.Coordinate{X: 4, Y: 7}
+		roomID, s, h := newTestRoom(t, arrangedMatch(turnCommandsQueued(engine.NewMoveCommand(unitID, pos))))
 
 		gameCfg := engine.GameCfg{
 			StagePreset: "Divided",
@@ -175,18 +177,12 @@ func TestHandleGetMatchState(t *testing.T) {
 			MaxTurns:    10,
 		}
 		tokens := mustCreateMatch(t, s, roomID, gameCfg)
-		unitID := engine.NewUnitID(1, 0)
-		pos := engine.Coordinate{X: 4, Y: 7}
 		if _, err := s.submitTurnCommand(roomID, engine.NewPlaceBombCommand(unitID, pos), tokens[0]); err != nil {
 			t.Fatalf("SubmitTurnCommand(place bomb) error = %v", err)
 		}
 		if _, _, err := s.resolveTurn(roomID, tokens[0]); err != nil {
 			t.Fatalf("ResolveTurn() error = %v", err)
 		}
-		room := mustRoom(t, s, roomID)
-		room.mu.Lock()
-		room.Match.WorkingState.TurnCommands = []engine.TurnCommand{engine.NewMoveCommand(unitID, pos)}
-		room.mu.Unlock()
 
 		rr := doRequest(t, h.handleGetMatchState, "GET /api/match-rooms/{roomID}/match/state", "GET", "/api/match-rooms/"+roomID+"/match/state", "", "")
 
@@ -312,14 +308,10 @@ func TestHandleGetAllowedTiles(t *testing.T) {
 	})
 
 	t.Run("Success: a boxed-in unit encodes an empty array, not null", func(t *testing.T) {
-		roomID, s, h := newTestRoom(t)
-		mustCreateMatch(t, s, roomID, validGameCfg())
-
 		// Unit 0x10 spawns at {4,8} with an ally on {3,8}; soft blocks on {5,8} and {4,7}
 		// plus the stage edge below leave it no legal landing tile.
-		gs := mustRoom(t, s, roomID).Match.WorkingState
-		gs.UpdateStageOccupant(engine.Coordinate{X: 5, Y: 8}, engine.OccupantSoftBlock, 1)
-		gs.UpdateStageOccupant(engine.Coordinate{X: 4, Y: 7}, engine.OccupantSoftBlock, 2)
+		roomID, s, h := newTestRoom(t, arrangedMatch(softBlocksAt(engine.Coordinate{X: 5, Y: 8}, engine.Coordinate{X: 4, Y: 7})))
+		mustCreateMatch(t, s, roomID, validGameCfg())
 
 		rr := doRequest(t, h.handleGetAllowedTiles, "GET /api/match-rooms/{roomID}/match/allowed-tiles", "GET", "/api/match-rooms/"+roomID+"/match/allowed-tiles?unitId=16&turnCmdType=move", "", "")
 

@@ -16,13 +16,18 @@ func validGameCfg() engine.GameCfg {
 	}
 }
 
-func assertGameCfgSynced(t *testing.T, room *matchRoom) {
+func assertGameCfgSynced(t *testing.T, s *ServerStateManager, roomID string) {
 	t.Helper()
+	room := mustRoom(t, s, roomID)
 	if room.GameCfg == nil {
 		t.Fatal("Expected room.GameCfg to be set")
 	}
-	if !reflect.DeepEqual(*room.GameCfg, room.Match.GameCfg) {
-		t.Errorf("Expected MatchRoom and Match to have equal GameCfg values, MatchRoom %+v vs Match %+v", *room.GameCfg, room.Match.GameCfg)
+	matchCfg, err := s.getMatchConfig(roomID)
+	if err != nil {
+		t.Fatalf("getMatchConfig() error = %v", err)
+	}
+	if !reflect.DeepEqual(*room.GameCfg, *matchCfg) {
+		t.Errorf("Expected MatchRoom and Match to have equal GameCfg values, MatchRoom %+v vs Match %+v", *room.GameCfg, *matchCfg)
 	}
 }
 
@@ -63,14 +68,11 @@ func mustCreateMatch(t *testing.T, s *ServerStateManager, roomID string, gameCfg
 
 func freeNeighbour(t *testing.T, gs *engine.GameState, pos engine.Coordinate) engine.Coordinate {
 	t.Helper()
-	for _, step := range []engine.Coordinate{{X: 0, Y: -1}, {X: 0, Y: 1}, {X: -1, Y: 0}, {X: 1, Y: 0}} {
-		target := engine.Coordinate{X: pos.X + step.X, Y: pos.Y + step.Y}
-		if gs.IsLandingLegal(target, engine.OccupantBomb) == nil {
-			return target
-		}
+	target, ok := findFreeNeighbour(gs, pos)
+	if !ok {
+		t.Fatalf("no free neighbour next to %v", pos)
 	}
-	t.Fatalf("no free neighbour next to %v", pos)
-	return engine.Coordinate{}
+	return target
 }
 
 func TestMapError(t *testing.T) {

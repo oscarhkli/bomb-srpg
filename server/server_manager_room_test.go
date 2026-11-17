@@ -32,8 +32,8 @@ func TestServerStateManager_CreateMatchRoom(t *testing.T) {
 					t.Errorf("Expected ID length 10, got %d: %s", len(id), id)
 				}
 				room := mustRoom(t, s, id)
-				if room.Match != nil {
-					t.Errorf("Expected Match=nil, got %v", room.Match)
+				if _, err := s.getMatchState(id); !errors.Is(err, errMatchNotFound) {
+					t.Errorf("getMatchState() error = %v, want %v", err, errMatchNotFound)
 				}
 				if room.ID != id {
 					t.Errorf("Room.ID mismatch: got %s want %s", room.ID, id)
@@ -129,6 +129,7 @@ func TestServerStateManager_CreateMatchRoom(t *testing.T) {
 }
 
 func TestServerStateManager_LastActivityUpdated(t *testing.T) {
+	var cpuMatch *engine.Match
 	tests := []struct {
 		name     string
 		setup    func(t *testing.T) (string, *ServerStateManager, [2]string)
@@ -198,14 +199,12 @@ func TestServerStateManager_LastActivityUpdated(t *testing.T) {
 			name: "runCPUTurn updates LastActivity",
 			setup: func(t *testing.T) (string, *ServerStateManager, [2]string) {
 				t.Helper()
-				roomID, tokens, s := createTestRoomWithCfg(t, vsCpuGameCfg())
+				roomID, tokens, s := createTestRoomWithCfg(t, vsCpuGameCfg(), arrangedMatch(cpuTurnPending, matchCaptured(&cpuMatch)))
 				return roomID, s, tokens
 			},
 			action: func(t *testing.T, s *ServerStateManager, roomID string, tokens [2]string) {
 				t.Helper()
-				room := mustRoom(t, s, roomID)
-				room.Match.WorkingState.ActiveTeam = 2
-				s.runCPUTurn(room, room.Match)
+				s.runCPUTurn(mustRoom(t, s, roomID), cpuMatch)
 			},
 		},
 		{
@@ -289,11 +288,10 @@ func TestServerStateManager_cleanupInactiveRooms(t *testing.T) {
 	room.mu.Unlock()
 
 	roomID3, _ := s.createMatchRoom()
-	mustCreateMatch(t, s, roomID3, validGameCfg())
-	room = mustRoom(t, s, roomID3)
-	room.mu.Lock()
-	room.Match.WinnerTeamID = 1
-	room.mu.Unlock()
+	tokens3 := mustCreateMatch(t, s, roomID3, validGameCfg())
+	if _, err := s.surrender(roomID3, 1, tokens3[0]); err != nil {
+		t.Fatalf("surrender() error = %v", err)
+	}
 
 	s.cleanupInactiveRooms()
 

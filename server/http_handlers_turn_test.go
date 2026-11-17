@@ -44,8 +44,7 @@ func TestHandleSubmitTurnCommand(t *testing.T) {
 			t.Errorf("malformed UnitMoveEvent returned: %+v", resEvt)
 		}
 
-		room := mustRoom(t, s, roomID)
-		u := room.Match.WorkingState.Units[unitID]
+		u := mustMatchState(t, s, roomID).Units[unitID]
 
 		if u.Position != newPos {
 			t.Errorf("Expected Unit %#X new position %#v, got %#v", unitID, newPos, u.Position)
@@ -148,9 +147,9 @@ func TestHandleSubmitTurnCommand(t *testing.T) {
 	})
 }
 
-func createSuddenDeathRoom(t *testing.T) (string, [2]string, *ServerStateManager, *Handler) {
+func createSuddenDeathRoom(t *testing.T, opts ...Option) (string, [2]string, *ServerStateManager, *Handler) {
 	t.Helper()
-	roomID, s, h := newTestRoom(t)
+	roomID, s, h := newTestRoom(t, opts...)
 	gameCfg := validGameCfg()
 	gameCfg.MaxTurns = 0
 	gameCfg.AllowResetTurn = true
@@ -340,10 +339,11 @@ func TestHandleResolveTurn_DuringCPUTurn(t *testing.T) {
 
 func TestHandleResetTurn(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
-		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
 		unitID := engine.NewUnitID(1, 0)
-		room := mustRoom(t, s, roomID)
-		room.Match.WorkingState.Units[unitID].HasMoved = true
+		roomID, playerTokens, s, h := createTestRoomWithMatch(t, arrangedMatch(unitAlreadyMoved(unitID)))
+		if !mustMatchState(t, s, roomID).Units[unitID].HasMoved {
+			t.Fatal("arranged unit has not moved")
+		}
 
 		rr := doRequest(t, h.handleResetTurn, "POST /api/match-rooms/{roomID}/match/reset", "POST", "/api/match-rooms/"+roomID+"/match/reset", "", playerTokens[0])
 
@@ -359,14 +359,14 @@ func TestHandleResetTurn(t *testing.T) {
 			t.Errorf("Expect empty body, got %q", rr.Body.String())
 		}
 
-		if got, want := room.Match.WorkingState.Units[unitID].HasMoved, false; got != want {
+		if got, want := mustMatchState(t, s, roomID).Units[unitID].HasMoved, false; got != want {
 			t.Errorf("Expected Unit %#X HasMoved reset to %v, got %v", unitID, want, got)
 		}
 	})
 
 	t.Run("GET state keeps the turn start events after a reset", func(t *testing.T) {
-		roomID, playerTokens, s, h := createSuddenDeathRoom(t)
-		room := mustRoom(t, s, roomID)
+		unitID := engine.NewUnitID(1, 0)
+		roomID, playerTokens, s, h := createSuddenDeathRoom(t, arrangedMatch(unitAlreadyMoved(unitID)))
 
 		getState := func() clientMatchStateResponse {
 			t.Helper()
@@ -387,11 +387,12 @@ func TestHandleResetTurn(t *testing.T) {
 		bombsBefore := getState().Bombs
 		slices.SortFunc(bombsBefore, byID)
 
-		unitID := engine.NewUnitID(1, 0)
-		room.Match.WorkingState.Units[unitID].HasMoved = true
+		if !mustMatchState(t, s, roomID).Units[unitID].HasMoved {
+			t.Fatal("arranged unit has not moved")
+		}
 		doRequest(t, h.handleResetTurn, "POST /api/match-rooms/{roomID}/match/reset", "POST", "/api/match-rooms/"+roomID+"/match/reset", "", playerTokens[0])
 
-		if room.Match.WorkingState.Units[unitID].HasMoved {
+		if mustMatchState(t, s, roomID).Units[unitID].HasMoved {
 			t.Fatal("reset did not discard the planned action")
 		}
 		state := getState()
@@ -413,13 +414,8 @@ func TestHandleResetTurn(t *testing.T) {
 
 func TestHandleResolveTurn(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
-		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
 		unitID := engine.NewUnitID(1, 0)
-		if _, err := s.submitTurnCommand(roomID, engine.NewPlaceBombCommand(unitID, engine.Coordinate{X: 4, Y: 7}), playerTokens[0]); err != nil {
-			t.Fatalf("SubmitTurnCommand() error = %v", err)
-		}
-		room := mustRoom(t, s, roomID)
-		room.Match.WorkingState.Bombs[engine.NewBombID(1, 1, unitID)].Countdown = 1
+		roomID, playerTokens, s, h := createTestRoomWithMatch(t, arrangedMatch(bombAboutToExplode(unitID)))
 
 		rr := doRequest(t, h.handleResolveTurn, "POST /api/match-rooms/{roomID}/match/resolve", "POST", "/api/match-rooms/"+roomID+"/match/resolve", "", playerTokens[0])
 
@@ -443,11 +439,13 @@ func TestHandleResolveTurn(t *testing.T) {
 		if got, want := response.ResolveTurnGameEvents, 5; len(got) != want {
 			t.Errorf("Expected %d ResolveTurnGameEvents returned, got %#v", want, got)
 		}
-		if got, want := room.Match.WorkingState.Units[unitID].HP, 0; got != want {
+		if got, want := mustMatchState(t, s, roomID).Units[unitID].HP, 0; got != want {
 			t.Errorf("Expected Unit %#X HP %v, got %v", 16, want, got)
 		}
-		if got, want := room.Match.WinnerTeamID, 2; got != want {
-			t.Errorf("Expected match winner = %v, got %v", want, got)
+		if !slices.ContainsFunc(response.ResolveTurnGameEvents, func(evt engine.GameEvent) bool {
+			return evt.Type == engine.GameEvtMatchEnded && evt.WinnerTeamID == 2
+		}) {
+			t.Errorf("Expected a matchEnded event with winner 2, got %+v", response.ResolveTurnGameEvents)
 		}
 	})
 
@@ -600,32 +598,20 @@ func TestHandleSurrender(t *testing.T) {
 }
 
 func TestHandleResolveTurn_SuddenDeathMatchEnd(t *testing.T) {
-	roomID, s, h := newTestRoom(t)
+	kingID := engine.NewUnitID(1, 0)
+	roomID, s, h := newTestRoom(t, arrangedMatch(bombAboutToExplode(kingID)))
 	gameCfg := validGameCfg()
 	gameCfg.MaxTurns = 0
 	tokens := mustCreateMatch(t, s, roomID, gameCfg)
 
-	room := mustRoom(t, s, roomID)
 	hazardCountdowns := make(map[engine.BombID]int)
-	for id, bomb := range room.Match.WorkingState.Bombs {
+	for id, bomb := range mustMatchState(t, s, roomID).Bombs {
 		if bomb.OwnerID == engine.SystemUnitID {
 			hazardCountdowns[id] = bomb.Countdown
 		}
 	}
 	if got, want := len(hazardCountdowns), 2; got != want {
 		t.Fatalf("Expected exactly %d hazards after starting the turn, found %d", want, got)
-	}
-
-	kingID := engine.NewUnitID(1, 0)
-	kingPos := room.Match.WorkingState.Units[kingID].Position
-	target := freeNeighbour(t, room.Match.WorkingState, kingPos)
-	if _, err := s.submitTurnCommand(roomID, engine.NewPlaceBombCommand(kingID, target), tokens[0]); err != nil {
-		t.Fatalf("SubmitTurnCommand() error = %v", err)
-	}
-	for _, bomb := range room.Match.WorkingState.Bombs {
-		if bomb.OwnerID == kingID {
-			bomb.Countdown = 1
-		}
 	}
 
 	rr := doRequest(t, h.handleResolveTurn, "POST /api/match-rooms/{roomID}/match/resolve", "POST", "/api/match-rooms/"+roomID+"/match/resolve", "", tokens[0])
@@ -641,9 +627,6 @@ func TestHandleResolveTurn_SuddenDeathMatchEnd(t *testing.T) {
 		return evt.Type == engine.GameEvtMatchEnded && evt.WinnerTeamID == 2
 	}) {
 		t.Errorf("Expected a matchEnded event with winner 2, got %+v", response.ResolveTurnGameEvents)
-	}
-	if got, want := room.Match.WinnerTeamID, 2; got != want {
-		t.Errorf("Expected winner %v, got %v", want, got)
 	}
 	for name, gameEvents := range map[string][]engine.GameEvent{
 		"plan":    response.PlanGameEvents,
