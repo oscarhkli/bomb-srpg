@@ -10,8 +10,8 @@ func (m *Match) ResetTurn() {
 	m.PlaybackLog = nil
 }
 
-func (m *Match) submitAction(gameEvent GameEvent) {
-	m.PlaybackLog = append(m.PlaybackLog, cloneGameEvent(gameEvent))
+func (m *Match) submitAction(evt GameEvent) {
+	m.PlaybackLog = append(m.PlaybackLog, cloneGameEvent(evt))
 
 	if !m.GameCfg.AllowResetTurn {
 		m.TrueState = m.WorkingState.DeepCopy()
