@@ -238,23 +238,27 @@ func cloneGameEvents(src []GameEvent) []GameEvent {
 
 	dst := make([]GameEvent, len(src))
 	for i, evt := range src {
-		dst[i] = evt
-		if evt.Position != nil {
-			pos := *evt.Position
-			dst[i].Position = &pos
-		}
-		if evt.From != nil {
-			from := *evt.From
-			dst[i].From = &from
-		}
-		if evt.To != nil {
-			to := *evt.To
-			dst[i].To = &to
-		}
-		dst[i].AffectedPositions = slices.Clone(evt.AffectedPositions)
+		dst[i] = cloneGameEvent(evt)
 	}
 
 	return dst
+}
+
+func cloneGameEvent(evt GameEvent) GameEvent {
+	if evt.Position != nil {
+		pos := *evt.Position
+		evt.Position = &pos
+	}
+	if evt.From != nil {
+		from := *evt.From
+		evt.From = &from
+	}
+	if evt.To != nil {
+		to := *evt.To
+		evt.To = &to
+	}
+	evt.AffectedPositions = slices.Clone(evt.AffectedPositions)
+	return evt
 }
 
 func cloneEntities[K comparable, V any](src map[K]*V) map[K]*V {

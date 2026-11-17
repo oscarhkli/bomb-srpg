@@ -957,3 +957,39 @@ func TestServerStateManager_GetAllowedTiles(t *testing.T) {
 		})
 	}
 }
+
+func TestServerStateManager_GetMatchConfig_DoesNotAliasMatch(t *testing.T) {
+	roomID, _, s := createTestRoom(t)
+	cfg, err := s.getMatchConfig(roomID)
+	if err != nil {
+		t.Fatalf("getMatchConfig() error = %v", err)
+	}
+	wantP1, wantP2 := cfg.P1Slots[0].Archetype, cfg.P2Slots[0].Archetype
+
+	cfg.P1Slots[0].Archetype = "MUTATED"
+	cfg.P2Slots[0].Archetype = "MUTATED"
+
+	got, err := s.getMatchConfig(roomID)
+	if err != nil {
+		t.Fatalf("getMatchConfig() error = %v", err)
+	}
+	if got.P1Slots[0].Archetype != wantP1 || got.P2Slots[0].Archetype != wantP2 {
+		t.Errorf("slots = %q, %q, want %q, %q", got.P1Slots[0].Archetype, got.P2Slots[0].Archetype, wantP1, wantP2)
+	}
+}
+
+func TestServerStateManager_CreateMatch_DoesNotAliasInput(t *testing.T) {
+	cfg := validGameCfg()
+	want := cfg.P1Slots[0].Archetype
+	roomID, _, s := createTestRoomWithCfg(t, cfg)
+
+	cfg.P1Slots[0].Archetype = "MUTATED"
+
+	got, err := s.getMatchConfig(roomID)
+	if err != nil {
+		t.Fatalf("getMatchConfig() error = %v", err)
+	}
+	if got.P1Slots[0].Archetype != want {
+		t.Errorf("P1Slots[0].Archetype = %q, want %q", got.P1Slots[0].Archetype, want)
+	}
+}

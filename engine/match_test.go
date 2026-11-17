@@ -2355,3 +2355,77 @@ func TestMatch_BeginTurn(t *testing.T) {
 		})
 	}
 }
+
+func TestMatch_ApplyTurnCommand_ReturnedEventsDoNotAliasLog(t *testing.T) {
+	unitID := NewUnitID(1, 0)
+	origin := Coordinate{1, 1}
+	target := Coordinate{1, 2}
+
+	arrange := func(turn int) *Match {
+		m := newTestMatch(3, 3)
+		m.WorkingState.Turn = turn
+		m.WorkingState.ActiveTeam = 1
+		m.WorkingState.Units[unitID] = &Unit{
+			ID:           unitID,
+			HP:           1,
+			Team:         1,
+			Position:     origin,
+			Speed:        3,
+			BombPower:    3,
+			BombMaxRange: 3,
+			MaxBombCount: 2,
+		}
+		m.WorkingState.Grid[origin.Y][origin.X] = Tile{OccupantType: OccupantUnit, OccupantID: int64(unitID)}
+		return m
+	}
+
+	t.Run("move", func(t *testing.T) {
+		m := arrange(1)
+
+		gameEvents, err := m.ApplyTurnCommand(NewMoveCommand(unitID, target))
+		if err != nil {
+			t.Fatalf("ApplyTurnCommand() unexpected error: %v", err)
+		}
+		if !reflect.DeepEqual(gameEvents[0], m.PlaybackLog[0]) {
+			t.Fatalf("returned event %+v differs from logged event %+v", gameEvents[0], m.PlaybackLog[0])
+		}
+		wantFrom, wantTo := *m.PlaybackLog[0].From, *m.PlaybackLog[0].To
+
+		gameEvents[0].From.X += 100
+		gameEvents[0].To.X += 100
+
+		if got := *m.PlaybackLog[0].From; got != wantFrom {
+			t.Errorf("PlaybackLog From = %v, want %v", got, wantFrom)
+		}
+		if got := *m.PlaybackLog[0].To; got != wantTo {
+			t.Errorf("PlaybackLog To = %v, want %v", got, wantTo)
+		}
+	})
+
+	t.Run("bomb", func(t *testing.T) {
+		m := arrange(3)
+
+		gameEvents, err := m.ApplyTurnCommand(NewPlaceBombCommand(unitID, target))
+		if err != nil {
+			t.Fatalf("ApplyTurnCommand() unexpected error: %v", err)
+		}
+		want := *m.PlaybackLog[0].Position
+
+		gameEvents[0].Position.X += 100
+
+		if got := *m.PlaybackLog[0].Position; got != want {
+			t.Errorf("PlaybackLog Position = %v, want %v", got, want)
+		}
+	})
+}
+
+func TestMatch_Surrender_ReturnedEventsDoNotAliasMatch(t *testing.T) {
+	m := newTestMatch(3, 3)
+
+	gameEvents := m.Surrender(1)
+	gameEvents[0] = GameEvent{}
+
+	if m.WinnerTeamID != 2 {
+		t.Errorf("WinnerTeamID = %d, want 2", m.WinnerTeamID)
+	}
+}

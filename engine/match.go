@@ -11,7 +11,7 @@ func (m *Match) ResetTurn() {
 }
 
 func (m *Match) submitAction(gameEvent GameEvent) {
-	m.PlaybackLog = append(m.PlaybackLog, gameEvent)
+	m.PlaybackLog = append(m.PlaybackLog, cloneGameEvent(gameEvent))
 
 	if !m.GameCfg.AllowResetTurn {
 		m.TrueState = m.WorkingState.DeepCopy()
