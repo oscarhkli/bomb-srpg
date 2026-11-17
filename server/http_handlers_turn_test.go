@@ -170,9 +170,9 @@ func TestHandleConsumeCPUStatus(t *testing.T) {
 
 	readyCPUTurn := func(t *testing.T) (string, [2]string, *Handler) {
 		t.Helper()
-		roomID, tokens, s, h := newCPUTurnHandlerRoom(t)
-		s.decide = (&recordingDecider{plan: moveThenBombPlan(t, cpuUnitID, engine.Coordinate{X: 4, Y: 1})}).decide
-		held := holdCPUTurn(t, s)
+		decider := &recordingDecider{plan: moveThenBombPlan(t, cpuUnitID, engine.Coordinate{X: 4, Y: 1})}
+		held := holdCPUTurn(t)
+		roomID, tokens, _, h := newCPUTurnHandlerRoom(t, WithDecider(decider.decide), WithSpawner(held.spawn))
 		consume(t, h, roomID, tokens[0])
 		held.runOutsideRoomLock()
 		return roomID, tokens, h
@@ -223,8 +223,7 @@ func TestHandleConsumeCPUStatus(t *testing.T) {
 	})
 
 	t.Run("Success: TurnPhasePlanning leaves state untouched", func(t *testing.T) {
-		roomID, playerTokens, s, h := newCPUTurnHandlerRoom(t)
-		holdCPUTurn(t, s)
+		roomID, playerTokens, _, h := newCPUTurnHandlerRoom(t, WithSpawner(holdCPUTurn(t).spawn))
 		consume(t, h, roomID, playerTokens[0])
 
 		rr := consume(t, h, roomID, playerTokens[0])
@@ -327,8 +326,7 @@ func TestHandleConsumeCPUStatus(t *testing.T) {
 }
 
 func TestHandleResolveTurn_DuringCPUTurn(t *testing.T) {
-	roomID, playerTokens, s, h := newCPUTurnHandlerRoom(t)
-	holdCPUTurn(t, s)
+	roomID, playerTokens, s, h := newCPUTurnHandlerRoom(t, WithSpawner(holdCPUTurn(t).spawn))
 	if _, _, _, err := s.consumeCPUStatus(roomID, playerTokens[0]); err != nil {
 		t.Fatalf("ConsumeCPUStatus() error = %v", err)
 	}

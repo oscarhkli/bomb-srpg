@@ -58,12 +58,12 @@ type heldCPUTurn struct {
 	next int
 }
 
-func holdCPUTurn(t *testing.T, s *ServerStateManager) *heldCPUTurn {
+func holdCPUTurn(t *testing.T) *heldCPUTurn {
 	t.Helper()
-	h := &heldCPUTurn{t: t}
-	s.spawn = func(f func()) { h.fns = append(h.fns, f) }
-	return h
+	return &heldCPUTurn{t: t}
 }
+
+func (h *heldCPUTurn) spawn(f func()) { h.fns = append(h.fns, f) }
 
 func (h *heldCPUTurn) count() int { return len(h.fns) }
 
@@ -92,9 +92,9 @@ func moveThenBombPlan(t *testing.T, unitID engine.UnitID, dest engine.Coordinate
 	}
 }
 
-func newCPUTurnHandlerRoom(t *testing.T) (string, [2]string, *ServerStateManager, *Handler) {
+func newCPUTurnHandlerRoom(t *testing.T, opts ...Option) (string, [2]string, *ServerStateManager, *Handler) {
 	t.Helper()
-	roomID, tokens, s := newCPUTurnRoom(t)
+	roomID, tokens, s := newCPUTurnRoom(t, opts...)
 	return roomID, tokens, s, NewHandler(s)
 }
 
@@ -348,17 +348,15 @@ func TestServerStateManager_ConsumeCPUStatus_LaunchesCPUTurn(t *testing.T) {
 			if tt.maxTurns != 0 {
 				gameCfg.MaxTurns = tt.maxTurns
 			}
-			roomID, tokens, s := createTestRoomWithCfg(t, gameCfg)
+			decider := &recordingDecider{plan: tt.plan}
+			held := holdCPUTurn(t)
+			roomID, tokens, s := createTestRoomWithCfg(t, gameCfg, WithDecider(decider.decide), WithSpawner(held.spawn))
 			room := mustRoom(t, s, roomID)
 
 			tokenIdx := 0
 			if tt.setup != nil {
 				tokenIdx = tt.setup(t, room)
 			}
-
-			decider := &recordingDecider{plan: tt.plan}
-			s.decide = decider.decide
-			held := holdCPUTurn(t, s)
 
 			wantPhase, wantHeld := engine.TurnPhaseIdle, 0
 			if tt.wantCPUTurn {
@@ -400,8 +398,6 @@ func TestServerStateManager_ConsumeCPUStatus_StaleReadyDropped(t *testing.T) {
 	cpuUnitID := engine.NewUnitID(2, 0)
 	posA, posB := engine.Coordinate{X: 4, Y: 1}, engine.Coordinate{X: 3, Y: 1}
 
-	roomID, tokens, s := newCPUTurnRoom(t)
-	room := mustRoom(t, s, roomID)
 	planA := moveThenBombPlan(t, cpuUnitID, posA)
 	decider := &recordingDecider{plan: func(gs *engine.GameState, call int) []engine.TurnCommand {
 		if call == 0 {
@@ -409,8 +405,9 @@ func TestServerStateManager_ConsumeCPUStatus_StaleReadyDropped(t *testing.T) {
 		}
 		return []engine.TurnCommand{engine.NewMoveCommand(cpuUnitID, posB)}
 	}}
-	s.decide = decider.decide
-	held := holdCPUTurn(t, s)
+	held := holdCPUTurn(t)
+	roomID, tokens, s := newCPUTurnRoom(t, WithDecider(decider.decide), WithSpawner(held.spawn))
+	room := mustRoom(t, s, roomID)
 
 	consumeCPUPhase(t, s, roomID, tokens[0])
 	held.runOutsideRoomLock()
@@ -451,9 +448,9 @@ func TestServerStateManager_ConsumeCPUStatus_StaleReadyDropped(t *testing.T) {
 
 func TestServerStateManager_ConsumeCPUStatus_ClearsResolveEvents(t *testing.T) {
 	cpuUnitID := engine.NewUnitID(2, 0)
-	roomID, tokens, s := newCPUTurnRoom(t)
-	s.decide = (&recordingDecider{plan: moveThenBombPlan(t, cpuUnitID, engine.Coordinate{X: 4, Y: 1})}).decide
-	held := holdCPUTurn(t, s)
+	held := holdCPUTurn(t)
+	decider := &recordingDecider{plan: moveThenBombPlan(t, cpuUnitID, engine.Coordinate{X: 4, Y: 1})}
+	roomID, tokens, s := newCPUTurnRoom(t, WithDecider(decider.decide), WithSpawner(held.spawn))
 
 	consumeCPUPhase(t, s, roomID, tokens[0])
 	held.runOutsideRoomLock()
@@ -476,10 +473,9 @@ func TestServerStateManager_ConsumeCPUStatus_ClearsResolveEvents(t *testing.T) {
 }
 
 func TestServerStateManager_ConsumeCPUStatus_InvalidToken(t *testing.T) {
-	roomID, _, s := newCPUTurnRoom(t)
 	decider := &recordingDecider{}
-	s.decide = decider.decide
-	held := holdCPUTurn(t, s)
+	held := holdCPUTurn(t)
+	roomID, _, s := newCPUTurnRoom(t, WithDecider(decider.decide), WithSpawner(held.spawn))
 
 	if _, _, _, err := s.consumeCPUStatus(roomID, "wrong"); !errors.Is(err, errInvalidToken) {
 		t.Fatalf("ConsumeCPUStatus() error = %v, want %v", err, errInvalidToken)
@@ -494,10 +490,9 @@ func TestServerStateManager_ConsumeCPUStatus_InvalidToken(t *testing.T) {
 }
 
 func TestServerStateManager_ConsumeCPUStatus_LaunchesOnce(t *testing.T) {
-	roomID, tokens, s := newCPUTurnRoom(t)
 	decider := &recordingDecider{}
-	s.decide = decider.decide
-	held := holdCPUTurn(t, s)
+	held := holdCPUTurn(t)
+	roomID, tokens, s := newCPUTurnRoom(t, WithDecider(decider.decide), WithSpawner(held.spawn))
 
 	for range 2 {
 		if phase, _, _ := consumeCPUPhase(t, s, roomID, tokens[0]); phase != engine.TurnPhasePlanning {
@@ -516,15 +511,14 @@ func TestServerStateManager_ConsumeCPUStatus_LaunchesOnce(t *testing.T) {
 
 func TestServerStateManager_ConsumeCPUStatus_DefaultSpawn(t *testing.T) {
 	cpuUnitID := engine.NewUnitID(2, 0)
-	roomID, tokens, s := newCPUTurnRoom(t)
-	room := mustRoom(t, s, roomID)
 	decider := &recordingDecider{
 		plan: func(*engine.GameState, int) []engine.TurnCommand {
 			return []engine.TurnCommand{engine.NewMoveCommand(cpuUnitID, engine.Coordinate{X: 4, Y: 1})}
 		},
 		called: make(chan struct{}, 1),
 	}
-	s.decide = decider.decide
+	roomID, tokens, s := newCPUTurnRoom(t, WithDecider(decider.decide))
+	room := mustRoom(t, s, roomID)
 
 	if phase, _, _ := consumeCPUPhase(t, s, roomID, tokens[0]); phase != engine.TurnPhasePlanning {
 		t.Fatalf("phase = %v, want %v", phase, engine.TurnPhasePlanning)
@@ -600,12 +594,11 @@ func TestServerStateManager_runCPUTurn_Abandons(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			roomID, tokens, s := newCPUTurnRoom(t)
+			decider := &recordingDecider{}
+			held := holdCPUTurn(t)
+			roomID, tokens, s := newCPUTurnRoom(t, WithDecider(decider.decide), WithSpawner(held.spawn))
 			room := mustRoom(t, s, roomID)
 			captured := room.Match
-			decider := &recordingDecider{}
-			s.decide = decider.decide
-			held := holdCPUTurn(t, s)
 
 			if phase, _, _ := consumeCPUPhase(t, s, roomID, tokens[0]); phase != engine.TurnPhasePlanning {
 				t.Fatalf("launching consume phase = %v, want %v", phase, engine.TurnPhasePlanning)
@@ -639,15 +632,14 @@ func TestServerStateManager_runCPUTurn_Abandons(t *testing.T) {
 func TestServerStateManager_ReadsDuringCPUTurn(t *testing.T) {
 	cpuUnitID := engine.NewUnitID(2, 0)
 
-	roomID, tokens, s := newCPUTurnRoom(t)
-	room := mustRoom(t, s, roomID)
-
 	planning, release := make(chan struct{}), make(chan struct{})
-	s.decide = func(*engine.GameState) ([]engine.TurnCommand, error) {
+	decide := func(*engine.GameState) ([]engine.TurnCommand, error) {
 		close(planning)
 		<-release
 		return nil, nil
 	}
+	roomID, tokens, s := newCPUTurnRoom(t, WithDecider(decide))
+	room := mustRoom(t, s, roomID)
 
 	if phase, _, _ := consumeCPUPhase(t, s, roomID, tokens[0]); phase != engine.TurnPhasePlanning {
 		t.Fatalf("phase = %v, want %v", phase, engine.TurnPhasePlanning)
@@ -705,7 +697,10 @@ func TestServerStateManager_ReadsDuringCPUTurn(t *testing.T) {
 }
 
 func TestServerStateManager_runCPUTurn_Panic(t *testing.T) {
-	roomID, tokens, s := newCPUTurnRoom(t)
+	held := holdCPUTurn(t)
+	roomID, tokens, s := newCPUTurnRoom(t,
+		WithDecider(func(*engine.GameState) ([]engine.TurnCommand, error) { panic("decide exploded") }),
+		WithSpawner(held.spawn))
 	room := mustRoom(t, s, roomID)
 	kingID := engine.NewUnitID(2, 0)
 	target := freeNeighbour(t, room.Match.WorkingState, room.Match.WorkingState.Units[kingID].Position)
@@ -713,8 +708,6 @@ func TestServerStateManager_runCPUTurn_Panic(t *testing.T) {
 		t.Fatalf("CommandPlaceBomb() error = %v", err)
 	}
 	room.Match.TrueState = room.Match.WorkingState.DeepCopy()
-	s.decide = func(*engine.GameState) ([]engine.TurnCommand, error) { panic("decide exploded") }
-	held := holdCPUTurn(t, s)
 
 	consumeCPUPhase(t, s, roomID, tokens[0])
 	held.runOutsideRoomLock()
@@ -745,11 +738,11 @@ func TestServerStateManager_ConsumeCPUStatus(t *testing.T) {
 			name: "Success - TurnPhaseReady and clear status",
 			setup: func(t *testing.T) (string, *ServerStateManager, string) {
 				t.Helper()
-				roomID, tokens, s := newCPUTurnRoom(t)
-				s.decide = (&recordingDecider{plan: func(*engine.GameState, int) []engine.TurnCommand {
+				decider := &recordingDecider{plan: func(*engine.GameState, int) []engine.TurnCommand {
 					return []engine.TurnCommand{engine.NewMoveCommand(unitID, engine.Coordinate{X: 4, Y: 1})}
-				}}).decide
-				held := holdCPUTurn(t, s)
+				}}
+				held := holdCPUTurn(t)
+				roomID, tokens, s := newCPUTurnRoom(t, WithDecider(decider.decide), WithSpawner(held.spawn))
 				consumeCPUPhase(t, s, roomID, tokens[0])
 				held.runOutsideRoomLock()
 				return roomID, s, tokens[0]
@@ -778,8 +771,7 @@ func TestServerStateManager_ConsumeCPUStatus(t *testing.T) {
 			name: "Success - non-TurnPhaseReady and do nothing",
 			setup: func(t *testing.T) (string, *ServerStateManager, string) {
 				t.Helper()
-				roomID, tokens, s := newCPUTurnRoom(t)
-				holdCPUTurn(t, s)
+				roomID, tokens, s := newCPUTurnRoom(t, WithSpawner(holdCPUTurn(t).spawn))
 				return roomID, s, tokens[0]
 			},
 			wantErr: nil,
@@ -835,9 +827,9 @@ func TestServerStateManager_ConsumeCPUStatus(t *testing.T) {
 	}
 }
 
-func newCPUTurnRoom(t *testing.T) (string, [2]string, *ServerStateManager) {
+func newCPUTurnRoom(t *testing.T, opts ...Option) (string, [2]string, *ServerStateManager) {
 	t.Helper()
-	roomID, tokens, s := createTestRoomWithCfg(t, vsCpuGameCfg())
+	roomID, tokens, s := createTestRoomWithCfg(t, vsCpuGameCfg(), opts...)
 	room := mustRoom(t, s, roomID)
 	room.Match.WorkingState.Turn = 2
 	room.Match.WorkingState.ActiveTeam = 2
@@ -884,19 +876,17 @@ func TestServerStateManager_CPUTurnGate(t *testing.T) {
 				continue
 			}
 			t.Run(c.name+"/"+phase, func(t *testing.T) {
-				roomID, tokens, s := newCPUTurnRoom(t)
+				held := holdCPUTurn(t)
+				roomID, tokens, s := newCPUTurnRoom(t, WithDecider((&recordingDecider{}).decide), WithSpawner(held.spawn))
 				room := mustRoom(t, s, roomID)
 
 				callToken, wantErr := tokens[1], error(nil)
 				turn, team := 2, 2
 				switch phase {
 				case "Planning":
-					holdCPUTurn(t, s)
 					consumeCPUPhase(t, s, roomID, tokens[0])
 					wantErr = errCPUTurnInProgress
 				case "Ready":
-					s.decide = (&recordingDecider{}).decide
-					held := holdCPUTurn(t, s)
 					consumeCPUPhase(t, s, roomID, tokens[0])
 					held.runOutsideRoomLock()
 					callToken = tokens[0]
@@ -922,8 +912,7 @@ func TestServerStateManager_CPUTurnGate(t *testing.T) {
 	}
 
 	t.Run("Bad token still gets 401", func(t *testing.T) {
-		roomID, tokens, s := newCPUTurnRoom(t)
-		holdCPUTurn(t, s)
+		roomID, tokens, s := newCPUTurnRoom(t, WithSpawner(holdCPUTurn(t).spawn))
 		consumeCPUPhase(t, s, roomID, tokens[0])
 		if _, _, err := s.resolveTurn(roomID, "wrong"); !errors.Is(err, errInvalidToken) {
 			t.Errorf("error = %v, want %v", err, errInvalidToken)
@@ -932,9 +921,9 @@ func TestServerStateManager_CPUTurnGate(t *testing.T) {
 }
 
 func TestServerStateManager_CPUTurnGate_NotGated(t *testing.T) {
-	roomID, tokens, s := newCPUTurnRoom(t)
+	held := holdCPUTurn(t)
+	roomID, tokens, s := newCPUTurnRoom(t, WithSpawner(held.spawn))
 	room := mustRoom(t, s, roomID)
-	held := holdCPUTurn(t, s)
 
 	phase, _, _ := consumeCPUPhase(t, s, roomID, tokens[0])
 	if want := engine.TurnPhasePlanning; phase != want {
@@ -979,17 +968,15 @@ func TestServerStateManager_runCPUTurn_DecideError(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			roomID, tokens, s := newCPUTurnRoom(t)
-			room := mustRoom(t, s, roomID)
-			h := &captureHandler{}
-			room.Logger = slog.New(h)
-
 			decider := &recordingDecider{
 				plan: func(*engine.GameState, int) []engine.TurnCommand { return tt.cmds },
 				err:  decideErr,
 			}
-			s.decide = decider.decide
-			held := holdCPUTurn(t, s)
+			held := holdCPUTurn(t)
+			roomID, tokens, s := newCPUTurnRoom(t, WithDecider(decider.decide), WithSpawner(held.spawn))
+			room := mustRoom(t, s, roomID)
+			h := &captureHandler{}
+			room.Logger = slog.New(h)
 
 			consumeCPUPhase(t, s, roomID, tokens[0])
 			held.runOutsideRoomLock()
@@ -1034,7 +1021,9 @@ func TestServerStateManager_runCPUTurn_DecideError(t *testing.T) {
 func TestServerStateManager_runCPUTurn_EndsMatch(t *testing.T) {
 	gameCfg := vsCpuGameCfg()
 	gameCfg.MaxTurns = 0
-	roomID, tokens, s := createTestRoomWithCfg(t, gameCfg)
+	decider := &recordingDecider{}
+	held := holdCPUTurn(t)
+	roomID, tokens, s := createTestRoomWithCfg(t, gameCfg, WithDecider(decider.decide), WithSpawner(held.spawn))
 	room := mustRoom(t, s, roomID)
 	room.Match.WorkingState.Turn = 2
 	room.Match.WorkingState.ActiveTeam = 2
@@ -1065,9 +1054,6 @@ func TestServerStateManager_runCPUTurn_EndsMatch(t *testing.T) {
 		t.Fatal("Expected hazards at creation with MaxTurns 0")
 	}
 
-	decider := &recordingDecider{}
-	s.decide = decider.decide
-	held := holdCPUTurn(t, s)
 	if phase, _, _ := consumeCPUPhase(t, s, roomID, tokens[0]); phase != engine.TurnPhasePlanning {
 		t.Fatalf("launching consume phase = %v, want %v", phase, engine.TurnPhasePlanning)
 	}
