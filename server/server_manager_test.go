@@ -119,3 +119,20 @@ func TestMapError(t *testing.T) {
 		})
 	}
 }
+
+func TestRoomRegistry_RangeSkipsForeignValues(t *testing.T) {
+	var reg roomRegistry
+	want := room.New("ok", room.Deps{Logger: discardLogger()})
+	reg.Store("ok", want)
+	reg.rooms.Store("bad", "not a room")
+
+	var got []*room.Room
+	reg.Range(func(_ string, rm *room.Room) bool {
+		got = append(got, rm)
+		return true
+	})
+
+	if len(got) != 1 || got[0] != want {
+		t.Errorf("Range() yielded %v, want only %v", got, want)
+	}
+}

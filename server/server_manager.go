@@ -83,7 +83,10 @@ func (r *roomRegistry) Delete(id string) { r.rooms.Delete(id) }
 func (r *roomRegistry) Range(f func(id string, rm *room.Room) bool) {
 	r.rooms.Range(func(key, val any) bool {
 		id, _ := key.(string)
-		rm, _ := val.(*room.Room)
+		rm, ok := val.(*room.Room)
+		if !ok {
+			return true
+		}
 		return f(id, rm)
 	})
 }

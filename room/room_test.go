@@ -146,3 +146,27 @@ func TestApplyPlan(t *testing.T) {
 		})
 	}
 }
+
+func TestRoom_Rematch_ReplacesMatchAndKeepsTokens(t *testing.T) {
+	r := New("room", Deps{Logger: slog.New(slog.DiscardHandler), NewMatch: engine.InitGame})
+	tokens, err := r.Start(validGameCfg())
+	if err != nil {
+		t.Fatalf("Start() error = %v", err)
+	}
+	first := r.Match
+
+	got, err := r.Rematch(tokens[0])
+	if err != nil {
+		t.Fatalf("Rematch() error = %v", err)
+	}
+
+	if got != tokens {
+		t.Errorf("Rematch() tokens = %v, want %v", got, tokens)
+	}
+	if r.Match == nil || r.Match == first {
+		t.Errorf("Match after Rematch = %p, want a new match distinct from %p", r.Match, first)
+	}
+	if _, err := r.State(); err != nil {
+		t.Errorf("State() after Rematch error = %v", err)
+	}
+}
