@@ -2,6 +2,7 @@ package server
 
 import (
 	"bomb-srpg/engine"
+	"bomb-srpg/room"
 	"encoding/json/v2"
 	"errors"
 	"net/http"
@@ -66,7 +67,7 @@ func TestHandleCreateMatchRoom(t *testing.T) {
 
 		roomIDs := []string{"ID001", "ID002", "ID003", "ID004", "ID005"}
 		for _, id := range roomIDs {
-			s.Rooms.Store(id, &matchRoom{ID: id})
+			s.Rooms.Store(id, room.New(id, room.Deps{Logger: discardLogger()}))
 		}
 		callCount := 0
 		s.generateRoomID = func(int) (string, error) {
@@ -117,7 +118,7 @@ func TestHandleCreateNewMatch(t *testing.T) {
 			t.Error("Expected success=true in response, got false")
 		}
 
-		room := mustRoom(t, s, roomID)
+		rm := mustRoom(t, s, roomID)
 		if _, err := s.getMatchState(roomID); err != nil {
 			t.Errorf("Match was not created in the server state manager: %v", err)
 		}
@@ -125,8 +126,8 @@ func TestHandleCreateNewMatch(t *testing.T) {
 		if len(response.PlayerTokens) != 2 || response.PlayerTokens[0] == "" || response.PlayerTokens[1] == "" || response.PlayerTokens[0] == response.PlayerTokens[1] {
 			t.Errorf("Expected 2 unique non-empty PlayerToken, got %v", response.PlayerTokens)
 		}
-		if response.PlayerTokens != room.PlayerTokens {
-			t.Errorf("Expected response and MatchRoom shareTokens, response %v vs MatchRoom %v", response.PlayerTokens, room.PlayerTokens)
+		if response.PlayerTokens != rm.PlayerTokens {
+			t.Errorf("Expected response and MatchRoom shareTokens, response %v vs MatchRoom %v", response.PlayerTokens, rm.PlayerTokens)
 		}
 	})
 
@@ -262,7 +263,7 @@ func TestHandleRematch(t *testing.T) {
 			t.Error("Expected success=true in response, got false")
 		}
 
-		room := mustRoom(t, s, roomID)
+		rm := mustRoom(t, s, roomID)
 		if _, err := s.getMatchState(roomID); err != nil {
 			t.Errorf("Match was not created in the server state manager: %v", err)
 		}
@@ -270,8 +271,8 @@ func TestHandleRematch(t *testing.T) {
 		if len(response.PlayerTokens) != 2 || response.PlayerTokens[0] == "" || response.PlayerTokens[1] == "" || response.PlayerTokens[0] == response.PlayerTokens[1] {
 			t.Errorf("Expected 2 unique non-empty PlayerToken, got %v", response.PlayerTokens)
 		}
-		if response.PlayerTokens != room.PlayerTokens {
-			t.Errorf("Expected response and MatchRoom shareTokens, response %v vs MatchRoom %v", response.PlayerTokens, room.PlayerTokens)
+		if response.PlayerTokens != rm.PlayerTokens {
+			t.Errorf("Expected response and MatchRoom shareTokens, response %v vs MatchRoom %v", response.PlayerTokens, rm.PlayerTokens)
 		}
 		if response.PlayerTokens != playerTokens {
 			t.Errorf("Expected Rematch to reuse existing PlayerTokens, got %v want %v", response.PlayerTokens, playerTokens)
@@ -282,7 +283,7 @@ func TestHandleRematch(t *testing.T) {
 		handler:   (*Handler).handleRematch,
 		pattern:   "POST /api/match-rooms/{roomID}/rematch",
 		cases:     failRoom | failMatch | failMissingAuth | failInvalidToken,
-		matchGone: func(room *matchRoom) { room.GameCfg = nil },
+		matchGone: func(rm *room.Room) { rm.GameCfg = nil },
 	})
 
 	t.Run("Failure: failed to Encode response", func(t *testing.T) {
@@ -317,8 +318,8 @@ func TestHandleDeleteMatch(t *testing.T) {
 		if status := rr.Code; status != http.StatusNoContent {
 			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusNoContent)
 		}
-		if _, err := s.getMatchState(roomID); !errors.Is(err, errMatchNotFound) {
-			t.Errorf("getMatchState() error = %v, want %v", err, errMatchNotFound)
+		if _, err := s.getMatchState(roomID); !errors.Is(err, room.ErrMatchNotFound) {
+			t.Errorf("getMatchState() error = %v, want %v", err, room.ErrMatchNotFound)
 		}
 	})
 

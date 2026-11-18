@@ -118,13 +118,6 @@ func softBlocksAt(positions ...engine.Coordinate) matchArrangement {
 	}
 }
 
-func matchCaptured(dst **engine.Match) matchArrangement {
-	return func(match *engine.Match) error {
-		*dst = match
-		return nil
-	}
-}
-
 func turnCommandsQueued(cmds ...engine.TurnCommand) matchArrangement {
 	return func(match *engine.Match) error {
 		match.WorkingState.TurnCommands = cmds

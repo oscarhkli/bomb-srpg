@@ -2,6 +2,7 @@ package server
 
 import (
 	"bomb-srpg/engine"
+	"bomb-srpg/room"
 	"encoding/json/v2"
 	"fmt"
 	"log/slog"
@@ -62,11 +63,11 @@ func (h *Handler) writeJSON(w http.ResponseWriter, status int, res any, logMsg s
 func (h *Handler) extractBearerToken(r *http.Request) (string, error) {
 	auth := r.Header.Get("Authorization")
 	if auth == "" {
-		return "", errInvalidToken
+		return "", room.ErrInvalidToken
 	}
 	token := strings.TrimPrefix(auth, "Bearer ")
 	if token == auth {
-		return "", errInvalidToken
+		return "", room.ErrInvalidToken
 	}
 	return token, nil
 }

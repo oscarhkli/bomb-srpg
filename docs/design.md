@@ -70,7 +70,7 @@ flowchart TB
 - **Data-Isolated Presentation Boundary**: Decouples rendering from the core transaction state machine. To enforce turn secrecy and prevent sandbox memory leaks across boundaries, UI layouts receive an isolated pointer to `engine.GameState` (`WorkingState`) instead of the parent `engine.Match` orchestrator.
 - **Single Terminal Renderer**: `TerminalView` is the only renderer. It synchronously maps the 2D grid matrix into single-byte ASCII tokens (`█`, `B`, `U`) for raw terminal streaming, and tests read its output from a `bytes.Buffer`. The server has no `WebView`: one JSON payload per request does not fit an imperative render API.
 - **Direct Serialization on the Web Boundary**: `server/http_handlers.go` serializes the active `WorkingState` struct straight to JSON on HTTP response targets, calling `*engine.Match` directly rather than going through a rendering contract.
-- **Flat Package Web Architecture**: Unlike the highly segregated `/engine` domain package, the `/server` package utilizes a cohesive flat file structure. This structure prevents circular dependencies during protocol handling and organizes network translation files by their specific communication protocol layer.
+- **Flat Package Web Architecture**: Unlike the highly segregated `/engine` domain package, the `/server` package utilizes a cohesive flat file structure; `/room` is a sibling package like `/engine` and `/cpu`. This structure prevents circular dependencies during protocol handling and organizes network translation files by their specific communication protocol layer.
 - **Pointer-Driven Memory Persistence (`*engine.Match`)**: Both the CLI's `MatchController` and the server's HTTP handlers execute actions exclusively via `*engine.Match` references. This guarantees user interactions mutate master allocation frames natively, eliminating the memory duplication overhead of dynamic matrix slices.
 - **Unified Service Entry Gate (`ApplyTurnCommand`)**: The engine exposes a single `ApplyTurnCommand` method. The MatchController (Phase 1) or HTTP handlers (Phase 2+) construct `TurnCommand` structs with a `Type` discriminator (`TurnCmdMove`, `TurnCmdPlaceBomb`), allowing the engine to function as a stateless, decoupled command processor.
 
@@ -111,7 +111,7 @@ Surrender: `POST /surrender` (either team, any time).
 
 - **State exposure**: `WorkingState` only (sandbox), never `TrueState`
 - **Surrender**: Either team, validated as 1 or 2
-- **Locking**: Per-room `sync.RWMutex` on each `MatchRoom`; the room table itself is a `sync.Map` (no global manager mutex)
+- **Locking**: Per-room `sync.RWMutex` on each `room.Room`; the room table itself is a `sync.Map` (no global manager mutex)
 - **Stale cleanup**: 60min timeout, 60min interval, `LastActivity` updated on every request
 - **CreateMatch**: Full GameCfg required (Phase 2); partial/join deferred to Phase 4
 - **Player authorization with anonymous tokens**: Room IDs and UnitIDs are guessable. Any client with a room ID can impersonate any player. The solution is to adopt per-team cryptographically random tokens generated and stored in a new Match, returned once in `CreateMatchResponse`. Token will be validated in mutation endpoints via constant-time comparison (`crypto/subtle.ConstantTimeCompare`). No restriction to read-only enpoints at the moment.
@@ -134,7 +134,7 @@ Surrender: `POST /surrender` (either team, any time).
 
 - **VS-CPU Turn Handoff**: The CPU's turn runs in a goroutine kicked off by the first `POST /cpu-status/consume` of the CPU's turn, buffering events on `Match.CPU` until the frontend polls them. See [VS-CPU Turn Sequence](diagrams/vs-cpu-turn-sequence.md).
 - **Boss Prologue over Full VS-COM**: the first CPU opponent is a single `RoleBoss` unit against a 5-unit human team. This is a narrower rules surface that ships single-player sooner and acs a future Tutorial/Story Mode.
-- **CPU Decision Boundary**: `cpu.Decide()` is a pure function. `server.runCPUTurn` is the sole caller, applying returned commands to the real `WorkingState` via `ApplyTurnCommand` under the room mutex.
+- **CPU Decision Boundary**: `cpu.Decide()` is a pure function. `room.Room` is the sole caller (through `runCPUTurn`), applying returned commands to the real `WorkingState` via `ApplyTurnCommand` under the room mutex.
 - **Propose-Then-Validate, Bounded Replan**: `cpu` never pre-validates a plan. `ApplyTurnCommand`'s legality checks are the sole authority, and a failed apply mid-plan triggers a re-`Decide()` for the remaining scope, bounded by `maxCPUReplanAttempts`, rather than being treated as a contract violation. A `Decide` error is logged and its commands are still applied.
 
 ## 11. CPU Decision Making

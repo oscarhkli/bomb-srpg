@@ -102,6 +102,21 @@ linters:
               desc: cli and server are independent
             - pkg: bomb-srpg/cmd
               desc: only cmd composes packages
+        room:
+          files:
+            - "**/*.go"
+            - "!**/server/*.go"
+            - "!**/room/*.go"
+          deny:
+            - pkg: bomb-srpg/room
+              desc: only server imports room
+        roomdeps:
+          list-mode: strict
+          files:
+            - "**/room/*.go"
+          allow:
+            - $gostd
+            - bomb-srpg/engine
         server:
           files:
             - "**/server/*.go"
