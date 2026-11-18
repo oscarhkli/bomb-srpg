@@ -3,6 +3,7 @@ package server
 import (
 	"bomb-srpg/engine"
 	"encoding/json/v2"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -117,8 +118,8 @@ func TestHandleCreateNewMatch(t *testing.T) {
 		}
 
 		room := mustRoom(t, s, roomID)
-		if room.Match == nil {
-			t.Error("Match was not created in the server state manager")
+		if _, err := s.getMatchState(roomID); err != nil {
+			t.Errorf("Match was not created in the server state manager: %v", err)
 		}
 
 		if len(response.PlayerTokens) != 2 || response.PlayerTokens[0] == "" || response.PlayerTokens[1] == "" || response.PlayerTokens[0] == response.PlayerTokens[1] {
@@ -138,8 +139,7 @@ func TestHandleCreateNewMatch(t *testing.T) {
 
 	t.Run("Failure: match already exists", func(t *testing.T) {
 		roomID, s, h := newTestRoom(t)
-		room := mustRoom(t, s, roomID)
-		room.Match = &engine.Match{}
+		mustCreateMatch(t, s, roomID, validGameCfg())
 
 		gameCfg := validGameCfg()
 		jsonBody, _ := json.Marshal(createMatchRequest{GameCfg: gameCfg})
@@ -263,8 +263,8 @@ func TestHandleRematch(t *testing.T) {
 		}
 
 		room := mustRoom(t, s, roomID)
-		if room.Match == nil {
-			t.Error("Match was not created in the server state manager")
+		if _, err := s.getMatchState(roomID); err != nil {
+			t.Errorf("Match was not created in the server state manager: %v", err)
 		}
 
 		if len(response.PlayerTokens) != 2 || response.PlayerTokens[0] == "" || response.PlayerTokens[1] == "" || response.PlayerTokens[0] == response.PlayerTokens[1] {
@@ -308,23 +308,23 @@ func TestHandleRematch(t *testing.T) {
 func TestHandleDeleteMatch(t *testing.T) {
 	t.Run("Success: deletes an existing concluded Match", func(t *testing.T) {
 		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
-		room := mustRoom(t, s, roomID)
-		room.Match.WinnerTeamID = 1
+		if _, err := s.surrender(roomID, 1, playerTokens[0]); err != nil {
+			t.Fatalf("surrender() error = %v", err)
+		}
 
 		rr := doRequest(t, h.handleDeleteMatch, "DELETE /api/match-rooms/{roomID}/match", "DELETE", "/api/match-rooms/"+roomID+"/match", "", playerTokens[0])
 
 		if status := rr.Code; status != http.StatusNoContent {
 			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusNoContent)
 		}
-		if room.Match != nil {
-			t.Errorf("Expected Match to be deleted, got %p", room.Match)
+		if _, err := s.getMatchState(roomID); !errors.Is(err, errMatchNotFound) {
+			t.Errorf("getMatchState() error = %v, want %v", err, errMatchNotFound)
 		}
 	})
 
 	t.Run("Success: no-op when Match already cleared", func(t *testing.T) {
 		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
-		room := mustRoom(t, s, roomID)
-		room.Match = nil
+		mustEndAndDeleteMatch(t, s, roomID, playerTokens[0])
 
 		rr := doRequest(t, h.handleDeleteMatch, "DELETE /api/match-rooms/{roomID}/match", "DELETE", "/api/match-rooms/"+roomID+"/match", "", playerTokens[0])
 

@@ -162,10 +162,10 @@ func testEncodeFailure(t *testing.T, handler http.Handler, setup func() *http.Re
 	}
 }
 
-func createTestRoomWithMatch(t *testing.T) (string, [2]string, *ServerStateManager, *Handler) {
+func createTestRoomWithMatch(t *testing.T, opts ...Option) (string, [2]string, *ServerStateManager, *Handler) {
 	t.Helper()
 
-	roomID, s, h := newTestRoom(t)
+	roomID, s, h := newTestRoom(t, opts...)
 
 	playerTokens := mustCreateMatch(t, s, roomID, validGameCfg())
 
@@ -187,9 +187,9 @@ func doRequest(t *testing.T, handler http.HandlerFunc, pattern, method, path, bo
 	return rr
 }
 
-func newTestRoom(t *testing.T) (string, *ServerStateManager, *Handler) {
+func newTestRoom(t *testing.T, opts ...Option) (string, *ServerStateManager, *Handler) {
 	t.Helper()
-	s := NewServerStateManager()
+	s := NewServerStateManager(opts...)
 	h := NewHandler(s)
 	roomID, err := s.createMatchRoom()
 	if err != nil {
@@ -270,11 +270,10 @@ func testRouteFailures(t *testing.T, route failureRoute) {
 				return
 			}
 			roomID, tokens, s, h := createTestRoomWithMatch(t)
-			room := mustRoom(t, s, roomID)
 			if route.matchGone != nil {
-				route.matchGone(room)
+				route.matchGone(mustRoom(t, s, roomID))
 			} else {
-				room.Match = nil
+				mustEndAndDeleteMatch(t, s, roomID, tokens[0])
 			}
 			assertFailure(t, call(t, h, roomID, tokens[0]), http.StatusNotFound, "match not found")
 		})

@@ -29,15 +29,12 @@ func TestServerStateManager_CreateMatch(t *testing.T) {
 			wantErr: nil,
 			validate: func(t *testing.T, s *ServerStateManager, roomID string) {
 				t.Helper()
-				room := mustRoom(t, s, roomID)
-				if room.Match == nil {
-					t.Fatal("Expected Match to be created, got nil")
+				gameCfg := mustMatchConfig(t, s, roomID)
+				if gameCfg.StagePreset != "Plain" {
+					t.Errorf("Expected StagePreset 'Plain', got '%s'", gameCfg.StagePreset)
 				}
-				if room.Match.GameCfg.StagePreset != "Plain" {
-					t.Errorf("Expected StagePreset 'Plain', got '%s'", room.Match.GameCfg.StagePreset)
-				}
-				if room.Match.GameCfg.MaxTurns != 10 {
-					t.Errorf("Expected MaxTurns 10, got %d", room.Match.GameCfg.MaxTurns)
+				if gameCfg.MaxTurns != 10 {
+					t.Errorf("Expected MaxTurns 10, got %d", gameCfg.MaxTurns)
 				}
 			},
 		},
@@ -94,7 +91,7 @@ func TestServerStateManager_CreateMatch(t *testing.T) {
 					t.Errorf("Expected 2 unique non-empty PlayerToken, got %v", playerTokens)
 				}
 				room := mustRoom(t, s, roomID)
-				assertGameCfgSynced(t, room)
+				assertGameCfgSynced(t, s, roomID)
 				if playerTokens != room.PlayerTokens {
 					t.Errorf("Expected response and MatchRoom share the same PlayerTokens, response %v vs MatchRoom %v", playerTokens, room.PlayerTokens)
 				}
@@ -117,10 +114,7 @@ func TestServerStateManager_Rematch(t *testing.T) {
 				s := NewServerStateManager()
 				roomID, _ := s.createMatchRoom()
 				tokens, _ := s.createMatch(roomID, validGameCfg())
-				room := mustRoom(t, s, roomID)
-				room.Match = nil
-				gameCfg := validGameCfg()
-				room.GameCfg = &gameCfg
+				mustEndAndDeleteMatch(t, s, roomID, tokens[0])
 				return roomID, s, tokens
 			},
 			wantErr: nil,
@@ -183,16 +177,14 @@ func TestServerStateManager_Rematch(t *testing.T) {
 			}
 			if err == nil {
 				room := mustRoom(t, s, roomID)
-				if room.Match == nil {
-					t.Fatal("Expected Match to be created, got nil")
-				}
-				if room.Match.GameCfg.StagePreset != "Plain" {
-					t.Errorf("Expected StagePreset 'Plain', got '%s'", room.Match.GameCfg.StagePreset)
+				gameCfg := mustMatchConfig(t, s, roomID)
+				if gameCfg.StagePreset != "Plain" {
+					t.Errorf("Expected StagePreset 'Plain', got '%s'", gameCfg.StagePreset)
 				}
 				if len(playerTokens) != 2 || playerTokens[0] == "" || playerTokens[1] == "" || playerTokens[0] == playerTokens[1] {
 					t.Errorf("Expected 2 unique non-empty PlayerToken, got %v", playerTokens)
 				}
-				assertGameCfgSynced(t, room)
+				assertGameCfgSynced(t, s, roomID)
 				if playerTokens != room.PlayerTokens {
 					t.Errorf("Expected response and MatchRoom share the same PlayerTokens, response %v vs MatchRoom %v", playerTokens, room.PlayerTokens)
 				}
@@ -215,8 +207,7 @@ func TestServerStateManager_DeleteMatch(t *testing.T) {
 				s := NewServerStateManager()
 				roomID, _ := s.createMatchRoom()
 				tokens, _ := s.createMatch(roomID, validGameCfg())
-				room := mustRoom(t, s, roomID)
-				room.Match = nil
+				mustEndAndDeleteMatch(t, s, roomID, tokens[0])
 				return roomID, s, tokens
 			},
 			wantErr: nil,
@@ -228,8 +219,9 @@ func TestServerStateManager_DeleteMatch(t *testing.T) {
 				s := NewServerStateManager()
 				roomID, _ := s.createMatchRoom()
 				tokens, _ := s.createMatch(roomID, validGameCfg())
-				room := mustRoom(t, s, roomID)
-				room.Match.WinnerTeamID = 1
+				if _, err := s.surrender(roomID, 1, tokens[0]); err != nil {
+					t.Fatalf("surrender() error = %v", err)
+				}
 				return roomID, s, tokens
 			},
 			wantErr: nil,
@@ -278,9 +270,8 @@ func TestServerStateManager_DeleteMatch(t *testing.T) {
 				t.Fatalf("Rematch() error = %v, want %v", err, tt.wantErr)
 			}
 			if err == nil {
-				room := mustRoom(t, s, roomID)
-				if room.Match != nil {
-					t.Fatalf("Expected Match to be deleted, got %p", room.Match)
+				if _, err := s.getMatchState(roomID); !errors.Is(err, errMatchNotFound) {
+					t.Fatalf("getMatchState() error = %v, want %v", err, errMatchNotFound)
 				}
 			}
 		})
@@ -306,8 +297,7 @@ func TestServerStateManager_GetMatchState(t *testing.T) {
 			wantErr: nil,
 			validate: func(t *testing.T, gs *engine.GameState, s *ServerStateManager, roomID string) {
 				t.Helper()
-				room := mustRoom(t, s, roomID)
-				live := room.Match.WorkingState
+				live := mustRoom(t, s, roomID).Match.WorkingState
 				if gs == live {
 					t.Error("Expected a copy of the WorkingState, got the live pointer")
 				}
@@ -326,15 +316,9 @@ func TestServerStateManager_GetMatchState(t *testing.T) {
 			name: "Mid-Turn Progress Survives The Copy",
 			setup: func(t *testing.T) (string, *ServerStateManager) {
 				t.Helper()
-				s := NewServerStateManager()
+				s := NewServerStateManager(arrangedMatch(suddenDeathMidTurn))
 				roomID, _ := s.createMatchRoom()
 				mustCreateMatch(t, s, roomID, validGameCfg())
-				room := mustRoom(t, s, roomID)
-				room.Match.WorkingState.InSuddenDeath = true
-				for _, u := range room.Match.WorkingState.Units {
-					u.HasMoved = true
-					u.HasUsedSkill = true
-				}
 				return roomID, s
 			},
 			wantErr: nil,
@@ -404,10 +388,9 @@ func TestServerStateManager_SubmitTurnCommand(t *testing.T) {
 			wantErr: nil,
 			validate: func(t *testing.T, gameEvents []engine.GameEvent, s *ServerStateManager, roomID string, cmd engine.TurnCommand) {
 				t.Helper()
-				room := mustRoom(t, s, roomID)
 				unitID := engine.NewUnitID(1, 0)
 				newPos := engine.Coordinate{X: 4, Y: 7}
-				if gotPos := room.Match.WorkingState.Units[unitID].Position; gotPos != newPos {
+				if gotPos := mustMatchState(t, s, roomID).Units[unitID].Position; gotPos != newPos {
 					t.Errorf("Expected Unit %#X new position %#v, got %#v", unitID, newPos, gotPos)
 				}
 				if len(gameEvents) != 1 {
@@ -433,9 +416,8 @@ func TestServerStateManager_SubmitTurnCommand(t *testing.T) {
 			wantErr: errInvalidTurnCmd,
 			validate: func(t *testing.T, gameEvents []engine.GameEvent, s *ServerStateManager, roomID string, cmd engine.TurnCommand) {
 				t.Helper()
-				room := mustRoom(t, s, roomID)
 				unitID := engine.NewUnitID(1, 0)
-				if gotPos := room.Match.WorkingState.Units[unitID].Position; gotPos.X == 4 && gotPos.Y == 7777 {
+				if gotPos := mustMatchState(t, s, roomID).Units[unitID].Position; gotPos.X == 4 && gotPos.Y == 7777 {
 					t.Errorf("Expected Unit %#X didn't move", unitID)
 				}
 				if len(gameEvents) > 0 {
@@ -579,17 +561,16 @@ func TestServerStateManager_ResetTurn(t *testing.T) {
 			name: "Success",
 			setup: func(t *testing.T) (string, *ServerStateManager, string) {
 				t.Helper()
-				roomID, tokens, s := createTestRoom(t)
-				room := mustRoom(t, s, roomID)
-				room.Match.WorkingState.Units[16].HasMoved = true
+				roomID, tokens, s := createTestRoomWithCfg(t, validGameCfg(), arrangedMatch(unitAlreadyMoved(16)))
+				if !mustMatchState(t, s, roomID).Units[16].HasMoved {
+					t.Fatal("arranged unit has not moved")
+				}
 				return roomID, s, tokens[0]
 			},
 			wantErr: nil,
 			validate: func(t *testing.T, s *ServerStateManager, roomID string) {
 				t.Helper()
-				room := mustRoom(t, s, roomID)
-
-				if got, want := room.Match.WorkingState.Units[16].HasMoved, false; got != want {
+				if got, want := mustMatchState(t, s, roomID).Units[16].HasMoved, false; got != want {
 					t.Errorf("Expected Unit %#X HasMoved reset to %v, got %v", 16, want, got)
 				}
 			},
@@ -640,19 +621,12 @@ func TestServerStateManager_ResolveTurn(t *testing.T) {
 			name: "Success",
 			setup: func(t *testing.T) (string, *ServerStateManager, string) {
 				t.Helper()
-				roomID, tokens, s := createTestRoom(t)
-				if _, err := s.submitTurnCommand(roomID, engine.NewPlaceBombCommand(16, engine.Coordinate{X: 4, Y: 7}), tokens[0]); err != nil {
-					t.Fatalf("SubmitTurnCommand() error = %v", err)
-				}
-				room := mustRoom(t, s, roomID)
-				room.Match.WorkingState.Bombs[engine.NewBombID(1, 1, 16)].Countdown = 1
+				roomID, tokens, s := createTestRoomWithCfg(t, validGameCfg(), arrangedMatch(bombAboutToExplode(16)))
 				return roomID, s, tokens[0]
 			},
 			wantErr: nil,
 			validate: func(t *testing.T, planGameEvents, resolveTurnGameEvents []engine.GameEvent, s *ServerStateManager, roomID string) {
 				t.Helper()
-				room := mustRoom(t, s, roomID)
-
 				if got, want := planGameEvents, 1; len(got) != want {
 					t.Errorf("Expected %d planGameEvents returned, got %#v", want, got)
 				}
@@ -665,11 +639,13 @@ func TestServerStateManager_ResolveTurn(t *testing.T) {
 				if hasGameEvent(resolveTurnGameEvents, engine.GameEvtBombPlaced, 16) {
 					t.Errorf("Expected no planning event in resolveTurnGameEvents, got %#v", resolveTurnGameEvents)
 				}
-				if got, want := room.Match.WorkingState.Units[16].HP, 0; got != want {
+				if got, want := mustMatchState(t, s, roomID).Units[16].HP, 0; got != want {
 					t.Errorf("Expected Unit %#X HP %v, got %v", 16, want, got)
 				}
-				if got, want := room.Match.WinnerTeamID, 2; got != want {
-					t.Errorf("Expected match winner = %v, got %v", want, got)
+				if !slices.ContainsFunc(resolveTurnGameEvents, func(evt engine.GameEvent) bool {
+					return evt.Type == engine.GameEvtMatchEnded && evt.WinnerTeamID == 2
+				}) {
+					t.Errorf("Expected a matchEnded event with winner 2, got %+v", resolveTurnGameEvents)
 				}
 			},
 		},
@@ -716,7 +692,7 @@ func TestServerStateManager_Surrender(t *testing.T) {
 		setup    func(t *testing.T) (string, *ServerStateManager, [2]string)
 		req      surrenderRequest
 		wantErr  error
-		validate func(t *testing.T, gameEvents []engine.GameEvent, s *ServerStateManager, roomID string)
+		validate func(t *testing.T, gameEvents []engine.GameEvent, s *ServerStateManager, roomID string, tokens [2]string)
 	}{
 		{
 			name: "Success",
@@ -727,7 +703,7 @@ func TestServerStateManager_Surrender(t *testing.T) {
 			},
 			req:     surrenderRequest{TeamID: 1},
 			wantErr: nil,
-			validate: func(t *testing.T, gameEvents []engine.GameEvent, s *ServerStateManager, roomID string) {
+			validate: func(t *testing.T, gameEvents []engine.GameEvent, s *ServerStateManager, roomID string, tokens [2]string) {
 				t.Helper()
 				if got, want := gameEvents, 1; len(got) != want {
 					t.Errorf("Expected %d gameEvents returned, got %#v", want, got)
@@ -749,15 +725,13 @@ func TestServerStateManager_Surrender(t *testing.T) {
 			},
 			req:     surrenderRequest{TeamID: 3},
 			wantErr: errInvalidConfig,
-			validate: func(t *testing.T, gameEvents []engine.GameEvent, s *ServerStateManager, roomID string) {
+			validate: func(t *testing.T, gameEvents []engine.GameEvent, s *ServerStateManager, roomID string, tokens [2]string) {
 				t.Helper()
-				room := mustRoom(t, s, roomID)
-
 				if len(gameEvents) != 0 {
 					t.Errorf("Expected gameEvents to be empty, got %#v", gameEvents)
 				}
-				if got, want := room.Match.WinnerTeamID, 0; got != want {
-					t.Errorf("Expect match WinnerTeamID %v, got %v", want, got)
+				if err := s.deleteMatch(roomID, tokens[0]); !errors.Is(err, errMatchInProgress) {
+					t.Errorf("deleteMatch() error = %v, want %v", err, errMatchInProgress)
 				}
 			},
 		},
@@ -798,7 +772,7 @@ func TestServerStateManager_Surrender(t *testing.T) {
 				t.Fatalf("Surrender() error = %v, want %v", err, tt.wantErr)
 			}
 			if tt.validate != nil {
-				tt.validate(t, gameEvents, s, roomID)
+				tt.validate(t, gameEvents, s, roomID, tokens)
 			} else if len(gameEvents) != 0 {
 				t.Errorf("Expected gameEvents to be empty, got %#v", gameEvents)
 			}
@@ -825,12 +799,17 @@ func TestServerStateManager_GetMatchConfig(t *testing.T) {
 			wantErr: nil,
 			validate: func(t *testing.T, gameCfg *engine.GameCfg, s *ServerStateManager, roomID string) {
 				t.Helper()
-				room := mustRoom(t, s, roomID)
-				if gameCfg == &room.Match.GameCfg {
-					t.Error("Expected a copy of the GameCfg, got the live pointer")
-				}
-				if got, want := *gameCfg, room.Match.GameCfg; !reflect.DeepEqual(got, want) {
+				if got, want := *gameCfg, validGameCfg(); !reflect.DeepEqual(got, want) {
 					t.Errorf("Expected GameCfg %+v, got %+v", want, got)
+				}
+				gameCfg.MaxTurns = 99
+				gameCfg.P1Slots[0].Archetype = "Mutated"
+				again, err := s.getMatchConfig(roomID)
+				if err != nil {
+					t.Fatalf("getMatchConfig() error = %v", err)
+				}
+				if got, want := *again, validGameCfg(); !reflect.DeepEqual(got, want) {
+					t.Errorf("Expected a write to the returned GameCfg not to reach the match, got %+v, want %+v", got, want)
 				}
 			},
 		},
