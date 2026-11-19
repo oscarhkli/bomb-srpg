@@ -48,8 +48,8 @@ func (r *Room) runCPUTurn(match *engine.Match) {
 		return
 	}
 
-	// RecoverPanic does not span goroutines. Forfeit the turn from a clean sandbox;
-	// a panic from the forfeit itself stays fatal.
+	// A recover only catches panics in its own goroutine, so this one needs its own. Forfeit
+	// the turn from a clean sandbox; a panic from the forfeit itself stays fatal.
 	defer func() {
 		if rec := recover(); rec != nil {
 			r.Logger.Error("CPU turn panicked, forfeiting", "panic", rec)
