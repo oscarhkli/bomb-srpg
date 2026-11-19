@@ -49,36 +49,17 @@
 
 ## 6. Monolithic Architectural Separation & Presentation Boundaries
 
-```mermaid
-flowchart TB
-    subgraph phase1["Phase 1 — CLI"]
-        MC["cli.MatchController<br/>(UI Handler)"]
-        TV["cli.TerminalView<br/>(ASCII Text)"]
-        MC -- "Calls" --> TV
-    end
-
-    subgraph phase2["Phase 2+ — Web Server"]
-        HH["server/http_handlers.go<br/>(REST handlers)"]
-    end
-
-    EM["engine.Match<br/>(Authoritative Core)"]
-
-    MC -- "Uses Pointer (*)" --> EM
-    HH -- "Uses Pointer (*), no interface" --> EM
-```
-
 - **Data-Isolated Presentation Boundary**: Decouples rendering from the core transaction state machine. To enforce turn secrecy and prevent sandbox memory leaks across boundaries, UI layouts receive an isolated pointer to `engine.GameState` (`WorkingState`) instead of the parent `engine.Match` orchestrator.
-- **Single Terminal Renderer**: `TerminalView` is the only renderer. It synchronously maps the 2D grid matrix into single-byte ASCII tokens (`█`, `B`, `U`) for raw terminal streaming, and tests read its output from a `bytes.Buffer`. The server has no `WebView`: one JSON payload per request does not fit an imperative render API.
 - **Direct Serialization on the Web Boundary**: `server/http_handlers.go` serializes the active `WorkingState` struct straight to JSON on HTTP response targets, calling `*engine.Match` directly rather than going through a rendering contract.
 - **Flat Package Web Architecture**: Unlike the highly segregated `/engine` domain package, the `/server` package utilizes a cohesive flat file structure; `/room` is a sibling package like `/engine` and `/cpu`. This structure prevents circular dependencies during protocol handling and organizes network translation files by their specific communication protocol layer.
-- **Pointer-Driven Memory Persistence (`*engine.Match`)**: Both the CLI's `MatchController` and the server's HTTP handlers execute actions exclusively via `*engine.Match` references. This guarantees user interactions mutate master allocation frames natively, eliminating the memory duplication overhead of dynamic matrix slices.
-- **Unified Service Entry Gate (`ApplyTurnCommand`)**: The engine exposes a single `ApplyTurnCommand` method. The MatchController (Phase 1) or HTTP handlers (Phase 2+) construct `TurnCommand` structs with a `Type` discriminator (`TurnCmdMove`, `TurnCmdPlaceBomb`), allowing the engine to function as a stateless, decoupled command processor.
+- **Pointer-Driven Memory Persistence (`*engine.Match`)**: HTTP handlers act on the match through a `*engine.Match` reference, so user actions mutate the match in place and no copy of the grid is made.
+- **Service Entry Gate (`ApplyTurnCommand`)**: HTTP handlers build `TurnCommand` structs with a `Type` discriminator (`TurnCmdMove`, `TurnCmdPlaceBomb`) and pass them to `ApplyTurnCommand`, so the engine works as a decoupled command processor.
 
 ## 7. Network Sync, Transaction Pipeline & Idempotency Invariants
 
-- **Localized Client-Side State Machine**: UI sub-phases—including tile discovery, reachability shading, and trajectory selection—execute strictly inside the client container to hit zero network overhead. Phase 1 leverages the local CLI controller; Phase 2 mirrors this via decoupled canvas logic utilizing static memory snapshots of the movement grid.
+- **Localized Client-Side State Machine**: UI sub-phases—including tile discovery, reachability shading, and trajectory selection—execute strictly inside the client container to hit zero network overhead. The canvas client does this with decoupled logic over static memory snapshots of the movement grid.
 - **Atomic Command Transaction Execution**: Turn commitment passes actions through a single atomic `POST /api/match/actions` transaction. The backend parses the payload packet, pushes it into the master engine loop, applies verification rules, and drops a consolidated state bundle containing the evaluation snapshot and resolution log vectors.
-- **Retained Playback Logs**: The sequence remains preserved throughout the turn resolution pass to drive localized client actions (raw terminal text traces in Phase 1; canvas animation frames and audio triggers in Phase 2). The array is wiped clean on the initialization boundary of a new turn sequence.
+- **Retained Playback Logs**: The sequence remains preserved throughout the turn resolution pass to drive localized client actions (canvas animation frames and audio triggers). The array is wiped clean on the initialization boundary of a new turn sequence.
 - **Idempotency and Self-Healing Synchronization**: Network drops and state desynchronizations drop down to zero-overhead overwriting loops. Because the engine treats every network interaction as an absolute state delivery event, the client handles incoming engine payloads as immutable truth, instantly wiping and rewriting local memory allocations without complex rolling diff checks.
 
 ## 8. Phase 2 HTTP API Design (REST)
@@ -86,7 +67,7 @@ flowchart TB
 ### 8.1 Architecture Boundary
 
 ```
-Client (Phaser.js / CLI)          Server (net/http)           Engine (pure Go)
+Client (Phaser.js)                Server (net/http)           Engine (pure Go)
 ────────────────────────────────────────────────────────────────────────────
 Controls flow                     Mediates                    Pure calc
 Renders/animates                  Validates requests          Rules, math

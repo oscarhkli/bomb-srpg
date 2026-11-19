@@ -68,8 +68,6 @@ linters:
           deny:
             - pkg: bomb-srpg/cpu
               desc: engine is the domain core and imports no sibling package
-            - pkg: bomb-srpg/cli
-              desc: engine is the domain core and imports no sibling package
             - pkg: bomb-srpg/server
               desc: engine is the domain core and imports no sibling package
             - pkg: bomb-srpg/cmd
@@ -82,8 +80,6 @@ linters:
           files:
             - "**/cpu/*.go"
           deny:
-            - pkg: bomb-srpg/cli
-              desc: cpu depends on engine only
             - pkg: bomb-srpg/server
               desc: cpu depends on engine only
             - pkg: bomb-srpg/cmd
@@ -92,16 +88,6 @@ linters:
               desc: cpu decides, it does no I/O
             - pkg: os
               desc: cpu decides, it does no I/O
-        cli:
-          files:
-            - "**/cli/*.go"
-          deny:
-            - pkg: bomb-srpg/cpu
-              desc: cli and cpu are independent
-            - pkg: bomb-srpg/server
-              desc: cli and server are independent
-            - pkg: bomb-srpg/cmd
-              desc: only cmd composes packages
         room:
           files:
             - "**/*.go"
@@ -121,8 +107,6 @@ linters:
           files:
             - "**/server/*.go"
           deny:
-            - pkg: bomb-srpg/cli
-              desc: cli and server are independent
             - pkg: bomb-srpg/cmd
               desc: only cmd composes packages
     errcheck:
