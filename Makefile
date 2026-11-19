@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := test
-.PHONY: fmt vet test test-race bench lint shell-lint pre-push install-hooks coverage build build-server run run-server web-dev web-format web-typecheck web-test web-lint web-build web-e2e image-smoke web-coverage gen-spec-index
+.PHONY: fmt vet test test-race bench lint shell-lint pre-push install-hooks coverage build-server run-server web-dev web-format web-typecheck web-test web-lint web-build web-e2e image-smoke web-coverage gen-spec-index
 
 fmt:
 	go fmt ./...
@@ -8,16 +8,16 @@ vet: fmt
 	go vet ./...
 
 test: vet
-	go test -cover -coverprofile=coverage.txt ./cli/... ./cmd/srpg-web/... ./cpu/... ./engine/... ./room/... ./server/...
+	go test -cover -coverprofile=coverage.txt ./cmd/srpg-web/... ./cpu/... ./engine/... ./room/... ./server/...
 
 test-race: vet
-	go test -race ./cli/... ./cmd/srpg-web/... ./cpu/... ./engine/... ./room/... ./server/...
+	go test -race ./cmd/srpg-web/... ./cpu/... ./engine/... ./room/... ./server/...
 
 bench: vet
-	go test -run '^$$' -bench=. -benchmem -count=3 ./cli/... ./cmd/srpg-web/... ./cpu/... ./engine/... ./room/... ./server/...
+	go test -run '^$$' -bench=. -benchmem -count=3 ./cmd/srpg-web/... ./cpu/... ./engine/... ./room/... ./server/...
 
 lint:
-	golangci-lint run ./cli/... ./cmd/... ./cpu/... ./engine/... ./room/... ./server/...
+	golangci-lint run ./cmd/... ./cpu/... ./engine/... ./room/... ./server/...
 
 shell-lint:
 	shellcheck scripts/*.sh
@@ -31,14 +31,8 @@ install-hooks:
 coverage: test
 	go tool cover -html=coverage.txt
 
-build: vet
-	go build -o bin/srpg-cli ./cmd/srpg-cli
-
 build-server: vet
 	go build -o bin/srpg-web ./cmd/srpg-web
-
-run: build
-	./bin/srpg-cli
 
 run-server: build-server
 	./bin/srpg-web
