@@ -35,6 +35,9 @@ func roomVar(fn *ast.FuncDecl) (name string, ok bool) {
 	}
 	if fn.Recv != nil {
 		field := fn.Recv.List[0]
+		if len(field.Names) == 0 {
+			return "", false
+		}
 		return field.Names[0].Name, isRoomReceiver(field.Type)
 	}
 	for _, field := range fn.Type.Params.List {
