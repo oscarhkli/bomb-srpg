@@ -11,9 +11,45 @@ import (
 )
 
 type methodFacts struct {
-	touchesMatch bool
-	locks        bool
-	callers      []string
+	firstTouch token.Pos
+	firstLock  token.Pos
+	callers    []string
+}
+
+func (f *methodFacts) touches() bool { return f.firstTouch.IsValid() }
+
+func (f *methodFacts) locks() bool {
+	return f.firstLock.IsValid() && (!f.touches() || f.firstLock < f.firstTouch)
+}
+
+func earliest(cur, pos token.Pos) token.Pos {
+	if !cur.IsValid() || pos < cur {
+		return pos
+	}
+	return cur
+}
+
+func roomVar(fn *ast.FuncDecl) (name string, ok bool) {
+	if fn.Body == nil {
+		return "", false
+	}
+	if fn.Recv != nil {
+		field := fn.Recv.List[0]
+		return field.Names[0].Name, isRoomReceiver(field.Type)
+	}
+	for _, field := range fn.Type.Params.List {
+		if isRoomReceiver(field.Type) && len(field.Names) > 0 {
+			return field.Names[0].Name, true
+		}
+	}
+	return "", false
+}
+
+func factKey(fn *ast.FuncDecl) string {
+	if fn.Recv == nil {
+		return "func " + fn.Name.Name
+	}
+	return fn.Name.Name
 }
 
 func roomMethodFacts(t *testing.T) map[string]*methodFacts {
@@ -36,33 +72,36 @@ func roomMethodFacts(t *testing.T) map[string]*methodFacts {
 		}
 		for _, decl := range file.Decls {
 			fn, ok := decl.(*ast.FuncDecl)
-			if !ok || fn.Recv == nil || fn.Body == nil || !isRoomReceiver(fn.Recv.List[0].Type) {
+			if !ok {
 				continue
 			}
-			facts[fn.Name.Name] = &methodFacts{}
+			if _, ok := roomVar(fn); !ok {
+				continue
+			}
+			facts[factKey(fn)] = &methodFacts{}
 			decls = append(decls, fn)
 		}
 	}
 	for _, fn := range decls {
-		recv := fn.Recv.List[0].Names[0].Name
-		self := facts[fn.Name.Name]
+		recv, _ := roomVar(fn)
+		self := facts[factKey(fn)]
 		ast.Inspect(fn.Body, func(n ast.Node) bool {
 			sel, ok := n.(*ast.SelectorExpr)
 			if !ok {
 				return true
 			}
 			if isIdent(sel.X, recv) && (sel.Sel.Name == "match" || sel.Sel.Name == "lastActivity") {
-				self.touchesMatch = true
+				self.firstTouch = earliest(self.firstTouch, sel.Pos())
 			}
 			if inner, ok := sel.X.(*ast.SelectorExpr); ok && isIdent(inner.X, recv) && inner.Sel.Name == "mu" &&
 				(sel.Sel.Name == "Lock" || sel.Sel.Name == "RLock") {
-				self.locks = true
+				self.firstLock = earliest(self.firstLock, sel.Pos())
 			}
-			if isIdent(sel.X, recv) {
+			if fn.Recv != nil && isIdent(sel.X, recv) {
 				if callee, ok := facts[sel.Sel.Name]; ok {
 					callee.callers = append(callee.callers, fn.Name.Name)
 					if sel.Sel.Name == "read" || sel.Sel.Name == "command" {
-						self.locks = true
+						self.firstLock = earliest(self.firstLock, sel.Pos())
 					}
 				}
 			}
@@ -87,7 +126,7 @@ func isIdent(expr ast.Expr, name string) bool {
 func lockViolations(facts map[string]*methodFacts) []string {
 	var bad []string
 	for name, f := range facts {
-		if !f.touchesMatch || f.locks {
+		if !f.touches() || f.locks() {
 			continue
 		}
 		if !strings.HasSuffix(name, "Locked") {
@@ -95,7 +134,7 @@ func lockViolations(facts map[string]*methodFacts) []string {
 			continue
 		}
 		for _, caller := range f.callers {
-			if c := facts[caller]; !c.locks && !strings.HasSuffix(caller, "Locked") {
+			if c := facts[caller]; !c.locks() && !strings.HasSuffix(caller, "Locked") {
 				bad = append(bad, name+" is called by "+caller+", which does not hold the lock")
 			}
 		}

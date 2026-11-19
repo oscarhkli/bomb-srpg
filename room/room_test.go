@@ -197,6 +197,9 @@ func TestRoom_CPUTurnAbandons_NotCPUsTurn(t *testing.T) {
 
 	f.held.runAll()
 
+	if got := *f.decides; got != 0 {
+		t.Errorf("Decide calls = %d, want 0", got)
+	}
 	status, err := f.r.ConsumeCPU(f.tokens[0])
 	if err != nil {
 		t.Fatalf("ConsumeCPU() error = %v", err)

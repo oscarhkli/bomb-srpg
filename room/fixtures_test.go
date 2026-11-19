@@ -26,10 +26,11 @@ func cpuTurnPending(match *engine.Match) error {
 }
 
 type fixture struct {
-	r      *Room
-	tokens [2]string
-	clock  *fakeClock
-	held   *heldSpawn
+	r       *Room
+	tokens  [2]string
+	clock   *fakeClock
+	held    *heldSpawn
+	decides *int
 }
 
 var cpuPlan = []engine.TurnCommand{
@@ -40,9 +41,11 @@ var cpuPlan = []engine.TurnCommand{
 func newFixture(arrange ...func(*engine.Match) error) fixture {
 	clock := newFakeClock()
 	held := &heldSpawn{}
+	decides := new(int)
 	r := New("room", Deps{
 		Logger: slog.New(slog.DiscardHandler),
 		Decide: func(*engine.GameState) ([]engine.TurnCommand, error) {
+			*decides++
 			return cpuPlan, nil
 		},
 		Spawn: held.spawn,
@@ -60,7 +63,7 @@ func newFixture(arrange ...func(*engine.Match) error) fixture {
 		},
 		Now: clock.now,
 	})
-	return fixture{r: r, clock: clock, held: held}
+	return fixture{r: r, clock: clock, held: held, decides: decides}
 }
 
 func humanTurnCfg() engine.GameCfg {
