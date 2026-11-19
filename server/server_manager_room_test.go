@@ -69,19 +69,19 @@ func TestServerStateManager_CreateMatchRoom(t *testing.T) {
 		{
 			name: "Max retries exhausted",
 			setup: func() *ServerStateManager {
-				s := NewServerStateManager()
 				callCount := 0
 				roomIDs := []string{"ID001", "ID002", "ID003", "ID004", "ID005"}
-				for _, id := range roomIDs {
-					s.Rooms.Store(id, room.New(id, room.Deps{Logger: discardLogger()}))
-				}
-				s.generateRoomID = func(int) (string, error) {
+				gen := func(int) (string, error) {
 					if callCount < len(roomIDs) {
 						id := roomIDs[callCount]
 						callCount++
 						return id, nil
 					}
 					return "SHOULD_NOT_REACH", nil
+				}
+				s := NewServerStateManager(WithRoomIDGenerator(gen))
+				for _, id := range roomIDs {
+					s.Rooms.Store(id, room.New(id, room.Deps{Logger: discardLogger()}))
 				}
 				return s
 			},
@@ -101,11 +101,9 @@ func TestServerStateManager_CreateMatchRoom(t *testing.T) {
 		{
 			name: "Error thrown during generateRoomID",
 			setup: func() *ServerStateManager {
-				s := NewServerStateManager()
-				s.generateRoomID = func(int) (string, error) {
+				return NewServerStateManager(WithRoomIDGenerator(func(int) (string, error) {
 					return "", errors.New("bad things happened")
-				}
-				return s
+				}))
 			},
 			wantErr: true,
 			validate: func(t *testing.T, s *ServerStateManager, id string, err error) {

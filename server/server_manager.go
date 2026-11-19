@@ -126,6 +126,12 @@ func WithMatchFactory(newMatch func(engine.GameCfg) (*engine.Match, error)) Opti
 	}
 }
 
+func WithRoomIDGenerator(generate func(int) (string, error)) Option {
+	return func(s *ServerStateManager) {
+		s.generateRoomID = generate
+	}
+}
+
 func NewServerStateManager(opts ...Option) *ServerStateManager {
 	manager := &ServerStateManager{
 		generateRoomID: randomHex,

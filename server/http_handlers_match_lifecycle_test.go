@@ -62,21 +62,20 @@ func TestHandleCreateMatchRoom(t *testing.T) {
 	})
 
 	t.Run("Failure: CreateMatchRoom exhausted retries", func(t *testing.T) {
-		s := NewServerStateManager()
-		h := NewHandler(s)
-
 		roomIDs := []string{"ID001", "ID002", "ID003", "ID004", "ID005"}
-		for _, id := range roomIDs {
-			s.Rooms.Store(id, room.New(id, room.Deps{Logger: discardLogger()}))
-		}
 		callCount := 0
-		s.generateRoomID = func(int) (string, error) {
+		gen := func(int) (string, error) {
 			if callCount < len(roomIDs) {
 				id := roomIDs[callCount]
 				callCount++
 				return id, nil
 			}
 			return "SHOULD_NOT_REACH", nil
+		}
+		s := NewServerStateManager(WithRoomIDGenerator(gen))
+		h := NewHandler(s)
+		for _, id := range roomIDs {
+			s.Rooms.Store(id, room.New(id, room.Deps{Logger: discardLogger()}))
 		}
 
 		req, _ := http.NewRequest("POST", "/api/match-rooms", nil)
