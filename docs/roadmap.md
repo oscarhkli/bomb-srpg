@@ -23,9 +23,9 @@
 - [x] Starting turns
   - [x] Environment setup
   - [x] Sudden death
-  - [x] Command
-  - [x] Surrender
-  - [x] TurnCommand
+- [x] Command
+- [x] Surrender
+- [x] TurnCommand
 - [x] Victory Condition
 - [x] In-turn movement restriction
 
