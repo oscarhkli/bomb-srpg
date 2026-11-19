@@ -29,6 +29,7 @@ type Deps struct {
 	Decide   func(*engine.GameState) ([]engine.TurnCommand, error)
 	Spawn    func(func())
 	NewMatch func(engine.GameCfg) (*engine.Match, error)
+	Now      func() time.Time
 }
 
 type Room struct {
@@ -43,9 +44,12 @@ type Room struct {
 }
 
 func New(id string, deps Deps) *Room {
+	if deps.Now == nil {
+		deps.Now = time.Now
+	}
 	return &Room{
 		ID:           id,
-		LastActivity: time.Now(),
+		LastActivity: deps.Now(),
 		Logger:       deps.Logger.With("roomID", id),
 		deps:         deps,
 	}
@@ -138,7 +142,7 @@ func (r *Room) Start(cfg engine.GameCfg) ([2]string, error) {
 	r.Match = match
 	r.GameCfg = &cfg
 	r.PlayerTokens = tokens
-	r.LastActivity = time.Now()
+	r.LastActivity = r.deps.Now()
 
 	return tokens, nil
 }
@@ -162,7 +166,7 @@ func (r *Room) Rematch(token string) ([2]string, error) {
 	}
 
 	r.Match = match
-	r.LastActivity = time.Now()
+	r.LastActivity = r.deps.Now()
 
 	return r.PlayerTokens, nil
 }
@@ -258,7 +262,7 @@ func (r *Room) Submit(cmd engine.TurnCommand, token string) ([]engine.GameEvent,
 		return nil, fmt.Errorf("%w: %w", ErrInvalidTurnCmd, err)
 	}
 
-	r.LastActivity = time.Now()
+	r.LastActivity = r.deps.Now()
 	return gameEvents, nil
 }
 
@@ -281,7 +285,7 @@ func (r *Room) Reset(token string) error {
 
 	r.Match.ResetTurn()
 
-	r.LastActivity = time.Now()
+	r.LastActivity = r.deps.Now()
 	return nil
 }
 
@@ -303,7 +307,7 @@ func (r *Room) Resolve(token string) (plan, resolved []engine.GameEvent, err err
 	}
 
 	plan, resolved = r.Match.ResolveTurn()
-	r.LastActivity = time.Now()
+	r.LastActivity = r.deps.Now()
 
 	return plan, resolved, nil
 }
@@ -326,7 +330,14 @@ func (r *Room) Surrender(teamID int, token string) ([]engine.GameEvent, error) {
 	}
 
 	gameEvents := r.Match.Surrender(teamID)
-	r.LastActivity = time.Now()
+	r.LastActivity = r.deps.Now()
 
 	return gameEvents, nil
+}
+
+func (r *Room) Expired(now time.Time, idle time.Duration) bool {
+	r.Mu.RLock()
+	defer r.Mu.RUnlock()
+
+	return now.Sub(r.LastActivity) > idle
 }

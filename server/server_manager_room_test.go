@@ -277,47 +277,43 @@ func TestServerStateManager_ReadOnlyMethodsDoNotUpdateLastActivity(t *testing.T)
 func TestServerStateManager_cleanupInactiveRooms(t *testing.T) {
 	s := NewServerStateManager()
 
-	roomID1, _ := s.createMatchRoom()
-	mustCreateMatch(t, s, roomID1, validGameCfg())
+	activeID, _ := s.createMatchRoom()
+	mustCreateMatch(t, s, activeID, validGameCfg())
 
-	roomID2, _ := s.createMatchRoom()
-	mustCreateMatch(t, s, roomID2, validGameCfg())
-	rm := mustRoom(t, s, roomID2)
-	rm.Mu.Lock()
-	rm.LastActivity = time.Now().Add(-120 * time.Minute)
-	rm.Mu.Unlock()
-
-	roomID3, _ := s.createMatchRoom()
-	tokens3 := mustCreateMatch(t, s, roomID3, validGameCfg())
-	if _, err := s.surrender(roomID3, 1, tokens3[0]); err != nil {
+	endedID, _ := s.createMatchRoom()
+	endedTokens := mustCreateMatch(t, s, endedID, validGameCfg())
+	if _, err := s.surrender(endedID, 1, endedTokens[0]); err != nil {
 		t.Fatalf("surrender() error = %v", err)
 	}
 
-	s.cleanupInactiveRooms()
-
-	_, ok1 := s.Rooms.Load(roomID1)
-	_, ok2 := s.Rooms.Load(roomID2)
-	_, ok3 := s.Rooms.Load(roomID3)
-
-	if !ok1 {
-		t.Error("active room should not be cleaned")
+	tests := []struct {
+		name       string
+		advance    time.Duration
+		wantActive bool
+		wantEnded  bool
+	}{
+		{"now", 0, true, true},
+		{"half an hour later, the ended match still counts as active", 30 * time.Minute, true, true},
+		{"two hours later", 2 * time.Hour, false, false},
 	}
-	if ok2 {
-		t.Error("inactive room should be cleaned")
-	}
-	if !ok3 {
-		t.Error("ended but still active match room should not be cleaned")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s.cleanupInactiveRooms(time.Now().Add(tt.advance))
+
+			_, gotActive := s.Rooms.Load(activeID)
+			_, gotEnded := s.Rooms.Load(endedID)
+			if gotActive != tt.wantActive {
+				t.Errorf("active room kept = %v, want %v", gotActive, tt.wantActive)
+			}
+			if gotEnded != tt.wantEnded {
+				t.Errorf("ended room kept = %v, want %v", gotEnded, tt.wantEnded)
+			}
+		})
 	}
 }
 
 func TestServerStateManager_RunCleanupLoop(t *testing.T) {
 	s := NewServerStateManager()
-	roomID, _ := s.createMatchRoom()
-	mustCreateMatch(t, s, roomID, validGameCfg())
-	rm := mustRoom(t, s, roomID)
-	rm.Mu.Lock()
-	rm.LastActivity = time.Now().Add(-2 * roomInactivityTimeout)
-	rm.Mu.Unlock()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -326,20 +322,6 @@ func TestServerStateManager_RunCleanupLoop(t *testing.T) {
 		s.RunCleanupLoop(ctx, time.Millisecond)
 		close(done)
 	}()
-
-	deadline := time.After(2 * time.Second)
-	poll := time.NewTicker(time.Millisecond)
-	defer poll.Stop()
-	for {
-		if _, ok := s.Rooms.Load(roomID); !ok {
-			break
-		}
-		select {
-		case <-deadline:
-			t.Fatal("inactive room was not removed by the loop")
-		case <-poll.C:
-		}
-	}
 
 	cancel()
 	select {

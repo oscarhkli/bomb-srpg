@@ -296,23 +296,18 @@ func (s *ServerStateManager) RunCleanupLoop(ctx context.Context, interval time.D
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			s.cleanupInactiveRooms()
+			s.cleanupInactiveRooms(time.Now())
 		}
 	}
 }
 
 const roomInactivityTimeout = 60 * time.Minute
 
-func (s *ServerStateManager) cleanupInactiveRooms() {
-	now := time.Now()
+func (s *ServerStateManager) cleanupInactiveRooms(now time.Time) {
 	s.Rooms.Range(func(id string, rm *room.Room) bool {
-		rm.Mu.Lock()
-		inactive := now.Sub(rm.LastActivity) > roomInactivityTimeout
-		rm.Mu.Unlock()
-
-		if inactive {
+		if rm.Expired(now, roomInactivityTimeout) {
 			s.Rooms.Delete(id)
-			s.Logger.Info("removed room", "roomID", id, "inactive", inactive)
+			s.Logger.Info("removed room", "roomID", id, "inactive", true)
 		}
 		return true
 	})

@@ -3,7 +3,6 @@ package room
 import (
 	"bomb-srpg/engine"
 	"fmt"
-	"time"
 )
 
 const maxCPUReplanAttempts = 5
@@ -36,7 +35,7 @@ func (r *Room) runCPUTurn(match *engine.Match) {
 	}
 	defer func() {
 		match.CPU.Phase = engine.TurnPhaseReady
-		r.LastActivity = time.Now()
+		r.LastActivity = r.deps.Now()
 	}()
 
 	if match.WinnerTeamID != 0 {
