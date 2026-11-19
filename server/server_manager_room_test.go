@@ -2,6 +2,7 @@ package server
 
 import (
 	"bomb-srpg/engine"
+	"bomb-srpg/room"
 	"bytes"
 	"context"
 	"errors"
@@ -31,12 +32,12 @@ func TestServerStateManager_CreateMatchRoom(t *testing.T) {
 				if len(id) != 10 {
 					t.Errorf("Expected ID length 10, got %d: %s", len(id), id)
 				}
-				room := mustRoom(t, s, id)
-				if _, err := s.getMatchState(id); !errors.Is(err, errMatchNotFound) {
-					t.Errorf("getMatchState() error = %v, want %v", err, errMatchNotFound)
+				rm := mustRoom(t, s, id)
+				if _, err := s.getMatchState(id); !errors.Is(err, room.ErrMatchNotFound) {
+					t.Errorf("getMatchState() error = %v, want %v", err, room.ErrMatchNotFound)
 				}
-				if room.ID != id {
-					t.Errorf("Room.ID mismatch: got %s want %s", room.ID, id)
+				if rm.ID != id {
+					t.Errorf("Room.ID mismatch: got %s want %s", rm.ID, id)
 				}
 			},
 		},
@@ -45,7 +46,7 @@ func TestServerStateManager_CreateMatchRoom(t *testing.T) {
 			setup: func() *ServerStateManager {
 				s := NewServerStateManager()
 				existingID := "ABCDE"
-				s.Rooms.Store(existingID, &matchRoom{ID: existingID})
+				s.Rooms.Store(existingID, room.New(existingID, room.Deps{Logger: discardLogger()}))
 				return s
 			},
 			wantErr: false,
@@ -68,19 +69,19 @@ func TestServerStateManager_CreateMatchRoom(t *testing.T) {
 		{
 			name: "Max retries exhausted",
 			setup: func() *ServerStateManager {
-				s := NewServerStateManager()
 				callCount := 0
 				roomIDs := []string{"ID001", "ID002", "ID003", "ID004", "ID005"}
-				for _, id := range roomIDs {
-					s.Rooms.Store(id, &matchRoom{ID: id})
-				}
-				s.generateRoomID = func(int) (string, error) {
+				gen := func(int) (string, error) {
 					if callCount < len(roomIDs) {
 						id := roomIDs[callCount]
 						callCount++
 						return id, nil
 					}
 					return "SHOULD_NOT_REACH", nil
+				}
+				s := NewServerStateManager(WithRoomIDGenerator(gen))
+				for _, id := range roomIDs {
+					s.Rooms.Store(id, room.New(id, room.Deps{Logger: discardLogger()}))
 				}
 				return s
 			},
@@ -100,11 +101,9 @@ func TestServerStateManager_CreateMatchRoom(t *testing.T) {
 		{
 			name: "Error thrown during generateRoomID",
 			setup: func() *ServerStateManager {
-				s := NewServerStateManager()
-				s.generateRoomID = func(int) (string, error) {
+				return NewServerStateManager(WithRoomIDGenerator(func(int) (string, error) {
 					return "", errors.New("bad things happened")
-				}
-				return s
+				}))
 			},
 			wantErr: true,
 			validate: func(t *testing.T, s *ServerStateManager, id string, err error) {
@@ -129,7 +128,7 @@ func TestServerStateManager_CreateMatchRoom(t *testing.T) {
 }
 
 func TestServerStateManager_LastActivityUpdated(t *testing.T) {
-	var cpuMatch *engine.Match
+	held := holdCPUTurn(t)
 	tests := []struct {
 		name     string
 		setup    func(t *testing.T) (string, *ServerStateManager, [2]string)
@@ -199,12 +198,13 @@ func TestServerStateManager_LastActivityUpdated(t *testing.T) {
 			name: "runCPUTurn updates LastActivity",
 			setup: func(t *testing.T) (string, *ServerStateManager, [2]string) {
 				t.Helper()
-				roomID, tokens, s := createTestRoomWithCfg(t, vsCpuGameCfg(), arrangedMatch(cpuTurnPending, matchCaptured(&cpuMatch)))
+				roomID, tokens, s := createTestRoomWithCfg(t, vsCpuGameCfg(), WithSpawner(held.spawn), arrangedMatch(cpuTurnPending))
 				return roomID, s, tokens
 			},
 			action: func(t *testing.T, s *ServerStateManager, roomID string, tokens [2]string) {
 				t.Helper()
-				s.runCPUTurn(mustRoom(t, s, roomID), cpuMatch)
+				consumeCPUPhase(t, s, roomID, tokens[0])
+				held.runOutsideRoomLock()
 			},
 		},
 		{
@@ -241,11 +241,11 @@ func TestServerStateManager_LastActivityUpdated(t *testing.T) {
 				return
 			}
 
-			room := mustRoom(t, s, roomID)
-			room.mu.RLock()
-			defer room.mu.RUnlock()
-			if !room.LastActivity.After(before) {
-				t.Errorf("LastActivity not updated: before=%v, after=%v", before, room.LastActivity)
+			rm := mustRoom(t, s, roomID)
+			rm.Mu.RLock()
+			defer rm.Mu.RUnlock()
+			if !rm.LastActivity.After(before) {
+				t.Errorf("LastActivity not updated: before=%v, after=%v", before, rm.LastActivity)
 			}
 		})
 	}
@@ -266,11 +266,11 @@ func TestServerStateManager_ReadOnlyMethodsDoNotUpdateLastActivity(t *testing.T)
 		t.Fatalf("GetAllowedTiles() error = %v", err)
 	}
 
-	room := mustRoom(t, s, roomID)
-	room.mu.RLock()
-	defer room.mu.RUnlock()
-	if !room.LastActivity.Equal(before) && !room.LastActivity.Before(before) {
-		t.Errorf("LastActivity should not be updated by read-only methods: before=%v, after=%v", before, room.LastActivity)
+	rm := mustRoom(t, s, roomID)
+	rm.Mu.RLock()
+	defer rm.Mu.RUnlock()
+	if !rm.LastActivity.Equal(before) && !rm.LastActivity.Before(before) {
+		t.Errorf("LastActivity should not be updated by read-only methods: before=%v, after=%v", before, rm.LastActivity)
 	}
 }
 
@@ -282,10 +282,10 @@ func TestServerStateManager_cleanupInactiveRooms(t *testing.T) {
 
 	roomID2, _ := s.createMatchRoom()
 	mustCreateMatch(t, s, roomID2, validGameCfg())
-	room := mustRoom(t, s, roomID2)
-	room.mu.Lock()
-	room.LastActivity = time.Now().Add(-120 * time.Minute)
-	room.mu.Unlock()
+	rm := mustRoom(t, s, roomID2)
+	rm.Mu.Lock()
+	rm.LastActivity = time.Now().Add(-120 * time.Minute)
+	rm.Mu.Unlock()
 
 	roomID3, _ := s.createMatchRoom()
 	tokens3 := mustCreateMatch(t, s, roomID3, validGameCfg())
@@ -310,32 +310,14 @@ func TestServerStateManager_cleanupInactiveRooms(t *testing.T) {
 	}
 }
 
-func TestServerStateManager_loadRoom_WrongType(t *testing.T) {
-	s := NewServerStateManager()
-	s.Rooms.Store("bad", "not a room")
-	room, err := s.loadRoom("bad")
-	if err == nil || room != nil {
-		t.Errorf("loadRoom() = (%v, %v), want nil room and an error", room, err)
-	}
-}
-
-func TestServerStateManager_cleanupInactiveRooms_WrongType(t *testing.T) {
-	s := NewServerStateManager()
-	s.Rooms.Store("bad", "not a room")
-	s.cleanupInactiveRooms()
-	if _, ok := s.Rooms.Load("bad"); ok {
-		t.Error("wrong-typed entry should be removed")
-	}
-}
-
 func TestServerStateManager_RunCleanupLoop(t *testing.T) {
 	s := NewServerStateManager()
 	roomID, _ := s.createMatchRoom()
 	mustCreateMatch(t, s, roomID, validGameCfg())
-	room := mustRoom(t, s, roomID)
-	room.mu.Lock()
-	room.LastActivity = time.Now().Add(-2 * roomInactivityTimeout)
-	room.mu.Unlock()
+	rm := mustRoom(t, s, roomID)
+	rm.Mu.Lock()
+	rm.LastActivity = time.Now().Add(-2 * roomInactivityTimeout)
+	rm.Mu.Unlock()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

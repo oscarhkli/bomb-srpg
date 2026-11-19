@@ -2,6 +2,7 @@ package server
 
 import (
 	"bomb-srpg/engine"
+	"bomb-srpg/room"
 	"encoding/json/jsontext"
 	"encoding/json/v2"
 	"errors"
@@ -214,7 +215,7 @@ type failureRoute struct {
 	query     string
 	body      any
 	cases     failureSet
-	matchGone func(room *matchRoom)
+	matchGone func(rm *room.Room)
 	bareRoom  bool
 }
 
@@ -303,8 +304,8 @@ func TestHandler_extractBearerToken(t *testing.T) {
 		wantToken string
 		wantErr   error
 	}{
-		{"Missing header", "", true, "", errInvalidToken},
-		{"Missing Bearer prefix", "abc123", false, "", errInvalidToken},
+		{"Missing header", "", true, "", room.ErrInvalidToken},
+		{"Missing Bearer prefix", "abc123", false, "", room.ErrInvalidToken},
 		{"Valid Bearer token", "Bearer abc123", false, "abc123", nil},
 	}
 

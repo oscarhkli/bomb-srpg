@@ -2,6 +2,7 @@ package server
 
 import (
 	"bomb-srpg/engine"
+	"bomb-srpg/room"
 	"context"
 	"encoding/json/v2"
 	"errors"
@@ -105,93 +106,6 @@ func consumeCPUPhase(t *testing.T, s *ServerStateManager, roomID, token string) 
 		t.Fatalf("consumeCPUStatus() error = %v", err)
 	}
 	return phase, planGameEvents, resolveTurnGameEvents
-}
-
-func TestApplyPlan(t *testing.T) {
-	moverUnitID := engine.NewUnitID(1, 0)
-	bomberUnitID := engine.NewUnitID(1, 1)
-
-	tests := []struct {
-		name     string
-		plan     func(t *testing.T, m *engine.Match) []engine.TurnCommand
-		wantErr  error
-		validate func(t *testing.T, m *engine.Match)
-	}{
-		{
-			name: "Empty Plan",
-			plan: func(t *testing.T, m *engine.Match) []engine.TurnCommand {
-				t.Helper()
-				return nil
-			},
-			validate: func(t *testing.T, m *engine.Match) {
-				t.Helper()
-				if got := len(m.PlaybackLog); got != 0 {
-					t.Errorf("Expected no events logged, got %d", got)
-				}
-			},
-		},
-		{
-			name: "Full Plan Applied",
-			plan: func(t *testing.T, m *engine.Match) []engine.TurnCommand {
-				t.Helper()
-				return []engine.TurnCommand{
-					engine.NewMoveCommand(moverUnitID, engine.Coordinate{X: 4, Y: 7}),
-					engine.NewPlaceBombCommand(bomberUnitID, engine.Coordinate{X: 3, Y: 7}),
-				}
-			},
-			validate: func(t *testing.T, m *engine.Match) {
-				t.Helper()
-				if !hasGameEvent(m.PlaybackLog, engine.GameEvtUnitMoved, moverUnitID) {
-					t.Errorf("Expected unit %#x to have moved, got %#v", moverUnitID, m.PlaybackLog)
-				}
-				if !hasGameEvent(m.PlaybackLog, engine.GameEvtBombPlaced, bomberUnitID) {
-					t.Errorf("Expected unit %#x to have placed a bomb, got %#v", bomberUnitID, m.PlaybackLog)
-				}
-			},
-		},
-		{
-			name: "Stops At First Rejection",
-			plan: func(t *testing.T, m *engine.Match) []engine.TurnCommand {
-				t.Helper()
-				return []engine.TurnCommand{
-					engine.NewMoveCommand(moverUnitID, engine.Coordinate{X: 99, Y: 99}),
-					engine.NewPlaceBombCommand(bomberUnitID, engine.Coordinate{X: 3, Y: 7}),
-				}
-			},
-			wantErr: engine.ErrOutOfMoveRange,
-			validate: func(t *testing.T, m *engine.Match) {
-				t.Helper()
-				if hasGameEvent(m.PlaybackLog, engine.GameEvtBombPlaced, bomberUnitID) {
-					t.Errorf("Expected command after the rejected one to be skipped, got %#v", m.PlaybackLog)
-				}
-			},
-		},
-		{
-			name: "Unsupported Command",
-			plan: func(t *testing.T, m *engine.Match) []engine.TurnCommand {
-				t.Helper()
-				return []engine.TurnCommand{{UnitID: moverUnitID, Target: engine.Coordinate{X: 1, Y: 1}}}
-			},
-			wantErr: engine.ErrUnsupportedCommand,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			match, err := engine.InitGame(validGameCfg())
-			if err != nil {
-				t.Fatalf("InitGame() error = %v", err)
-			}
-
-			err = applyPlan(match, tt.plan(t, match))
-			if !errors.Is(err, tt.wantErr) {
-				t.Fatalf("applyPlan() error = %v, want %v", err, tt.wantErr)
-			}
-			if tt.validate != nil {
-				tt.validate(t, match)
-			}
-		})
-	}
 }
 
 func TestServerStateManager_ConsumeCPUStatus_LaunchesCPUTurn(t *testing.T) {
@@ -394,13 +308,13 @@ func TestServerStateManager_ConsumeCPUStatus_StaleReadyDropped(t *testing.T) {
 	}}
 	held := holdCPUTurn(t)
 	roomID, tokens, s := newCPUTurnRoom(t, WithDecider(decider.decide), WithSpawner(held.spawn))
-	room := mustRoom(t, s, roomID)
+	rm := mustRoom(t, s, roomID)
 
 	consumeCPUPhase(t, s, roomID, tokens[0])
 	held.runOutsideRoomLock()
 
-	setTeam2DueTurn(room.Match.TrueState)
-	setTeam2DueTurn(room.Match.WorkingState)
+	setTeam2DueTurn(rm.Match.TrueState)
+	setTeam2DueTurn(rm.Match.WorkingState)
 
 	phase, planGameEvents, resolveTurnGameEvents := consumeCPUPhase(t, s, roomID, tokens[0])
 	if phase != engine.TurnPhasePlanning {
@@ -464,8 +378,8 @@ func TestServerStateManager_ConsumeCPUStatus_InvalidToken(t *testing.T) {
 	held := holdCPUTurn(t)
 	roomID, _, s := newCPUTurnRoom(t, WithDecider(decider.decide), WithSpawner(held.spawn))
 
-	if _, _, _, err := s.consumeCPUStatus(roomID, "wrong"); !errors.Is(err, errInvalidToken) {
-		t.Fatalf("ConsumeCPUStatus() error = %v, want %v", err, errInvalidToken)
+	if _, _, _, err := s.consumeCPUStatus(roomID, "wrong"); !errors.Is(err, room.ErrInvalidToken) {
+		t.Fatalf("ConsumeCPUStatus() error = %v, want %v", err, room.ErrInvalidToken)
 	}
 
 	if got := held.count(); got != 0 {
@@ -551,7 +465,7 @@ func TestServerStateManager_runCPUTurn_Abandons(t *testing.T) {
 				t.Helper()
 				mustEndAndDeleteMatch(t, s, roomID, tokens[0])
 			},
-			wantErr: errMatchNotFound,
+			wantErr: room.ErrMatchNotFound,
 		},
 		{
 			name: "Match Already Ended",
@@ -627,7 +541,7 @@ func TestServerStateManager_ReadsDuringCPUTurn(t *testing.T) {
 		return nil, nil
 	}
 	roomID, tokens, s := newCPUTurnRoom(t, WithDecider(decide))
-	room := mustRoom(t, s, roomID)
+	rm := mustRoom(t, s, roomID)
 
 	if phase, _, _ := consumeCPUPhase(t, s, roomID, tokens[0]); phase != engine.TurnPhasePlanning {
 		t.Fatalf("phase = %v, want %v", phase, engine.TurnPhasePlanning)
@@ -670,9 +584,9 @@ func TestServerStateManager_ReadsDuringCPUTurn(t *testing.T) {
 	}
 
 	close(release)
-	room.mu.Lock()
-	activeTeam := room.Match.TrueState.ActiveTeam
-	room.mu.Unlock()
+	rm.Mu.Lock()
+	activeTeam := rm.Match.TrueState.ActiveTeam
+	rm.Mu.Unlock()
 	close(stop)
 	readers.Wait()
 
@@ -789,7 +703,7 @@ func TestServerStateManager_ConsumeCPUStatus(t *testing.T) {
 				roomID, _ := s.createMatchRoom()
 				return roomID, s, "dummy-token"
 			},
-			wantErr: errMatchNotFound,
+			wantErr: room.ErrMatchNotFound,
 		},
 	}
 
@@ -862,7 +776,7 @@ func TestServerStateManager_CPUTurnGate(t *testing.T) {
 				switch phase {
 				case "Planning":
 					consumeCPUPhase(t, s, roomID, tokens[0])
-					wantErr = errCPUTurnInProgress
+					wantErr = room.ErrCPUTurnInProgress
 				case "Ready":
 					consumeCPUPhase(t, s, roomID, tokens[0])
 					held.runOutsideRoomLock()
@@ -892,8 +806,8 @@ func TestServerStateManager_CPUTurnGate(t *testing.T) {
 	t.Run("Bad token still gets 401", func(t *testing.T) {
 		roomID, tokens, s := newCPUTurnRoom(t, WithSpawner(holdCPUTurn(t).spawn))
 		consumeCPUPhase(t, s, roomID, tokens[0])
-		if _, _, err := s.resolveTurn(roomID, "wrong"); !errors.Is(err, errInvalidToken) {
-			t.Errorf("error = %v, want %v", err, errInvalidToken)
+		if _, _, err := s.resolveTurn(roomID, "wrong"); !errors.Is(err, room.ErrInvalidToken) {
+			t.Errorf("error = %v, want %v", err, room.ErrInvalidToken)
 		}
 	})
 }
@@ -954,9 +868,9 @@ func TestServerStateManager_runCPUTurn_DecideError(t *testing.T) {
 			}
 			held := holdCPUTurn(t)
 			roomID, tokens, s := newCPUTurnRoom(t, WithDecider(decider.decide), WithSpawner(held.spawn))
-			room := mustRoom(t, s, roomID)
+			rm := mustRoom(t, s, roomID)
 			h := &captureHandler{}
-			room.Logger = slog.New(h)
+			rm.Logger = slog.New(h)
 
 			consumeCPUPhase(t, s, roomID, tokens[0])
 			held.runOutsideRoomLock()

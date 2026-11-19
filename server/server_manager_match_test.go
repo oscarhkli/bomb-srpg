@@ -2,6 +2,7 @@ package server
 
 import (
 	"bomb-srpg/engine"
+	"bomb-srpg/room"
 	"errors"
 	"net/http"
 	"reflect"
@@ -58,7 +59,7 @@ func TestServerStateManager_CreateMatch(t *testing.T) {
 				return roomID, s
 			},
 			gameCfg: validGameCfg(),
-			wantErr: errMatchExists,
+			wantErr: room.ErrMatchExists,
 		},
 		{
 			name: "Invalid Config",
@@ -72,7 +73,7 @@ func TestServerStateManager_CreateMatch(t *testing.T) {
 				StagePreset: "INVALID_STAGE",
 				MaxTurns:    10,
 			},
-			wantErr: errInvalidConfig,
+			wantErr: room.ErrInvalidConfig,
 		},
 	}
 
@@ -90,10 +91,10 @@ func TestServerStateManager_CreateMatch(t *testing.T) {
 				if len(playerTokens) != 2 || playerTokens[0] == "" || playerTokens[1] == "" || playerTokens[0] == playerTokens[1] {
 					t.Errorf("Expected 2 unique non-empty PlayerToken, got %v", playerTokens)
 				}
-				room := mustRoom(t, s, roomID)
+				rm := mustRoom(t, s, roomID)
 				assertGameCfgSynced(t, s, roomID)
-				if playerTokens != room.PlayerTokens {
-					t.Errorf("Expected response and MatchRoom share the same PlayerTokens, response %v vs MatchRoom %v", playerTokens, room.PlayerTokens)
+				if playerTokens != rm.PlayerTokens {
+					t.Errorf("Expected response and MatchRoom share the same PlayerTokens, response %v vs MatchRoom %v", playerTokens, rm.PlayerTokens)
 				}
 			}
 		})
@@ -126,9 +127,9 @@ func TestServerStateManager_Rematch(t *testing.T) {
 				s := NewServerStateManager()
 				roomID, _ := s.createMatchRoom()
 				tokens, _ := s.createMatch(roomID, validGameCfg())
-				room := mustRoom(t, s, roomID)
+				rm := mustRoom(t, s, roomID)
 				gameCfg := validGameCfg()
-				room.GameCfg = &gameCfg
+				rm.GameCfg = &gameCfg
 				return roomID, s, tokens
 			},
 			wantErr: nil,
@@ -140,12 +141,12 @@ func TestServerStateManager_Rematch(t *testing.T) {
 				s := NewServerStateManager()
 				roomID, _ := s.createMatchRoom()
 				mustCreateMatch(t, s, roomID, validGameCfg())
-				room := mustRoom(t, s, roomID)
+				rm := mustRoom(t, s, roomID)
 				gameCfg := validGameCfg()
-				room.GameCfg = &gameCfg
+				rm.GameCfg = &gameCfg
 				return roomID, s, [2]string{"INVALID_TOKEN", ""}
 			},
-			wantErr: errInvalidToken,
+			wantErr: room.ErrInvalidToken,
 		},
 		{
 			name: "Room Not Found",
@@ -164,7 +165,7 @@ func TestServerStateManager_Rematch(t *testing.T) {
 				roomID, _ := s.createMatchRoom()
 				return roomID, s, [2]string{}
 			},
-			wantErr: errMatchNotFound,
+			wantErr: room.ErrMatchNotFound,
 		},
 	}
 
@@ -176,7 +177,7 @@ func TestServerStateManager_Rematch(t *testing.T) {
 				t.Fatalf("Rematch() error = %v, want %v", err, tt.wantErr)
 			}
 			if err == nil {
-				room := mustRoom(t, s, roomID)
+				rm := mustRoom(t, s, roomID)
 				gameCfg := mustMatchConfig(t, s, roomID)
 				if gameCfg.StagePreset != "Plain" {
 					t.Errorf("Expected StagePreset 'Plain', got '%s'", gameCfg.StagePreset)
@@ -185,8 +186,8 @@ func TestServerStateManager_Rematch(t *testing.T) {
 					t.Errorf("Expected 2 unique non-empty PlayerToken, got %v", playerTokens)
 				}
 				assertGameCfgSynced(t, s, roomID)
-				if playerTokens != room.PlayerTokens {
-					t.Errorf("Expected response and MatchRoom share the same PlayerTokens, response %v vs MatchRoom %v", playerTokens, room.PlayerTokens)
+				if playerTokens != rm.PlayerTokens {
+					t.Errorf("Expected response and MatchRoom share the same PlayerTokens, response %v vs MatchRoom %v", playerTokens, rm.PlayerTokens)
 				}
 			}
 		})
@@ -235,7 +236,7 @@ func TestServerStateManager_DeleteMatch(t *testing.T) {
 				tokens, _ := s.createMatch(roomID, validGameCfg())
 				return roomID, s, tokens
 			},
-			wantErr: errMatchInProgress,
+			wantErr: room.ErrMatchInProgress,
 		},
 		{
 			name: "Invalid token",
@@ -244,12 +245,12 @@ func TestServerStateManager_DeleteMatch(t *testing.T) {
 				s := NewServerStateManager()
 				roomID, _ := s.createMatchRoom()
 				mustCreateMatch(t, s, roomID, validGameCfg())
-				room := mustRoom(t, s, roomID)
+				rm := mustRoom(t, s, roomID)
 				gameCfg := validGameCfg()
-				room.GameCfg = &gameCfg
+				rm.GameCfg = &gameCfg
 				return roomID, s, [2]string{"INVALID_TOKEN", ""}
 			},
-			wantErr: errInvalidToken,
+			wantErr: room.ErrInvalidToken,
 		},
 		{
 			name: "Room Not Found",
@@ -270,8 +271,8 @@ func TestServerStateManager_DeleteMatch(t *testing.T) {
 				t.Fatalf("Rematch() error = %v, want %v", err, tt.wantErr)
 			}
 			if err == nil {
-				if _, err := s.getMatchState(roomID); !errors.Is(err, errMatchNotFound) {
-					t.Fatalf("getMatchState() error = %v, want %v", err, errMatchNotFound)
+				if _, err := s.getMatchState(roomID); !errors.Is(err, room.ErrMatchNotFound) {
+					t.Fatalf("getMatchState() error = %v, want %v", err, room.ErrMatchNotFound)
 				}
 			}
 		})
@@ -350,7 +351,7 @@ func TestServerStateManager_GetMatchState(t *testing.T) {
 				roomID, _ := s.createMatchRoom()
 				return roomID, s
 			},
-			wantErr: errMatchNotFound,
+			wantErr: room.ErrMatchNotFound,
 		},
 	}
 
@@ -413,7 +414,7 @@ func TestServerStateManager_SubmitTurnCommand(t *testing.T) {
 				cmd := engine.NewMoveCommand(unitID, newPos)
 				return roomID, s, cmd, tokens[0]
 			},
-			wantErr: errInvalidTurnCmd,
+			wantErr: room.ErrInvalidTurnCmd,
 			validate: func(t *testing.T, gameEvents []engine.GameEvent, s *ServerStateManager, roomID string, cmd engine.TurnCommand) {
 				t.Helper()
 				unitID := engine.NewUnitID(1, 0)
@@ -435,7 +436,7 @@ func TestServerStateManager_SubmitTurnCommand(t *testing.T) {
 				cmd := engine.NewMoveCommand(unitID, newPos)
 				return roomID, s, cmd, "dummy-token"
 			},
-			wantErr: errInvalidConfig,
+			wantErr: room.ErrInvalidConfig,
 		},
 		{
 			name: "Room Not Found",
@@ -460,7 +461,7 @@ func TestServerStateManager_SubmitTurnCommand(t *testing.T) {
 				cmd := engine.NewMoveCommand(unitID, newPos)
 				return roomID, s, cmd, "dummy-token"
 			},
-			wantErr: errMatchNotFound,
+			wantErr: room.ErrMatchNotFound,
 		},
 	}
 
@@ -532,11 +533,11 @@ func TestServerStateManager_SubmitTurnCommand_TeamFromUnitID(t *testing.T) {
 		wantErr   error
 	}{
 		{"team-1 unit with team 1's token", 1, 1, nil},
-		{"team-2 unit with team 2's token", 2, 2, errInvalidTurnCmd},
-		{"team-2 unit with team 1's token", 2, 1, errInvalidToken},
-		{"team-1 unit with team 2's token", 1, 2, errInvalidToken},
-		{"team nibble 0", 0, 1, errInvalidConfig},
-		{"team nibble 3", 3, 1, errInvalidConfig},
+		{"team-2 unit with team 2's token", 2, 2, room.ErrInvalidTurnCmd},
+		{"team-2 unit with team 1's token", 2, 1, room.ErrInvalidToken},
+		{"team-1 unit with team 2's token", 1, 2, room.ErrInvalidToken},
+		{"team nibble 0", 0, 1, room.ErrInvalidConfig},
+		{"team nibble 3", 3, 1, room.ErrInvalidConfig},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -592,7 +593,7 @@ func TestServerStateManager_ResetTurn(t *testing.T) {
 				roomID, _ := s.createMatchRoom()
 				return roomID, s, "dummy-token"
 			},
-			wantErr: errMatchNotFound,
+			wantErr: room.ErrMatchNotFound,
 		},
 	}
 
@@ -666,7 +667,7 @@ func TestServerStateManager_ResolveTurn(t *testing.T) {
 				roomID, _ := s.createMatchRoom()
 				return roomID, s, "dummy-token"
 			},
-			wantErr: errMatchNotFound,
+			wantErr: room.ErrMatchNotFound,
 		},
 	}
 
@@ -724,14 +725,14 @@ func TestServerStateManager_Surrender(t *testing.T) {
 				return roomID, s, tokens
 			},
 			req:     surrenderRequest{TeamID: 3},
-			wantErr: errInvalidConfig,
+			wantErr: room.ErrInvalidConfig,
 			validate: func(t *testing.T, gameEvents []engine.GameEvent, s *ServerStateManager, roomID string, tokens [2]string) {
 				t.Helper()
 				if len(gameEvents) != 0 {
 					t.Errorf("Expected gameEvents to be empty, got %#v", gameEvents)
 				}
-				if err := s.deleteMatch(roomID, tokens[0]); !errors.Is(err, errMatchInProgress) {
-					t.Errorf("deleteMatch() error = %v, want %v", err, errMatchInProgress)
+				if err := s.deleteMatch(roomID, tokens[0]); !errors.Is(err, room.ErrMatchInProgress) {
+					t.Errorf("deleteMatch() error = %v, want %v", err, room.ErrMatchInProgress)
 				}
 			},
 		},
@@ -754,7 +755,7 @@ func TestServerStateManager_Surrender(t *testing.T) {
 				return roomID, s, [2]string{"dummy", "dummy"}
 			},
 			req:     surrenderRequest{TeamID: 1},
-			wantErr: errMatchNotFound,
+			wantErr: room.ErrMatchNotFound,
 		},
 	}
 
@@ -829,7 +830,7 @@ func TestServerStateManager_GetMatchConfig(t *testing.T) {
 				roomID, _ := s.createMatchRoom()
 				return roomID, s
 			},
-			wantErr: errMatchNotFound,
+			wantErr: room.ErrMatchNotFound,
 		},
 	}
 
@@ -918,7 +919,7 @@ func TestServerStateManager_GetAllowedTiles(t *testing.T) {
 				roomID, _ := s.createMatchRoom()
 				return roomID, s
 			},
-			wantErr: errMatchNotFound,
+			wantErr: room.ErrMatchNotFound,
 		},
 	}
 

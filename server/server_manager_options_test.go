@@ -41,3 +41,26 @@ func TestWithMatchFactory_UsedByCreateMatchAndRematch(t *testing.T) {
 		t.Errorf("turn after rematch = %d, want %d from the factory's match", got, want)
 	}
 }
+
+func TestWithRoomIDGenerator_NamesTheCreatedRoom(t *testing.T) {
+	var gotSize int
+	gen := func(size int) (string, error) {
+		gotSize = size
+		return "FIXED", nil
+	}
+	s := NewServerStateManager(WithRoomIDGenerator(gen))
+
+	got, err := s.createMatchRoom()
+	if err != nil {
+		t.Fatalf("createMatchRoom() error = %v", err)
+	}
+	if want := "FIXED"; got != want {
+		t.Errorf("room ID = %q, want %q", got, want)
+	}
+	if _, ok := s.Rooms.Load("FIXED"); !ok {
+		t.Error("room FIXED not registered")
+	}
+	if want := roomIDBytes; gotSize != want {
+		t.Errorf("generator size = %d, want %d", gotSize, want)
+	}
+}
