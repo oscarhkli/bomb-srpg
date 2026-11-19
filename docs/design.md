@@ -61,11 +61,10 @@ flowchart TB
 ```
 
 - **Data-Isolated Presentation Boundary**: Decouples rendering from the core transaction state machine. To enforce turn secrecy and prevent sandbox memory leaks across boundaries, UI layouts receive an isolated pointer to `engine.GameState` (`WorkingState`) instead of the parent `engine.Match` orchestrator.
-- **No Server-Side Renderer**: The server has no view layer: one JSON payload per request does not fit an imperative render API.
 - **Direct Serialization on the Web Boundary**: `server/http_handlers.go` serializes the active `WorkingState` struct straight to JSON on HTTP response targets, calling `*engine.Match` directly rather than going through a rendering contract.
 - **Flat Package Web Architecture**: Unlike the highly segregated `/engine` domain package, the `/server` package utilizes a cohesive flat file structure; `/room` is a sibling package like `/engine` and `/cpu`. This structure prevents circular dependencies during protocol handling and organizes network translation files by their specific communication protocol layer.
-- **Pointer-Driven Memory Persistence (`*engine.Match`)**: The server's HTTP handlers execute actions exclusively via `*engine.Match` references. This guarantees user interactions mutate master allocation frames natively, eliminating the memory duplication overhead of dynamic matrix slices.
-- **Unified Service Entry Gate (`ApplyTurnCommand`)**: The engine exposes a single `ApplyTurnCommand` method. HTTP handlers construct `TurnCommand` structs with a `Type` discriminator (`TurnCmdMove`, `TurnCmdPlaceBomb`), allowing the engine to function as a stateless, decoupled command processor.
+- **Pointer-Driven Memory Persistence (`*engine.Match`)**: HTTP handlers act on the match through a `*engine.Match` reference, so user actions mutate the match in place and no copy of the grid is made.
+- **Service Entry Gate (`ApplyTurnCommand`)**: HTTP handlers build `TurnCommand` structs with a `Type` discriminator (`TurnCmdMove`, `TurnCmdPlaceBomb`) and pass them to `ApplyTurnCommand`, so the engine works as a decoupled command processor.
 
 ## 7. Network Sync, Transaction Pipeline & Idempotency Invariants
 

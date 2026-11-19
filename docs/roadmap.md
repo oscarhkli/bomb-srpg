@@ -1,10 +1,10 @@
 # Project Roadmap
 
-## Phase 1: Core Engine
+## Phase 1: Core Engine & Terminal Driver
 
-- **Goal:** Implement the absolute minimum game rules running as a pure Go engine.
-- **Scope:** Bounded max 16x16 matrix (e.g., 7x7 dynamic support), player placement, 2 basic unit types (King, Soldier), adjacent move/attack actions, and turn switching.
-- **DoD:** A full match can be played out and won through engine calls, covered by engine tests, without an application crash.
+- **Goal:** Implement the absolute minimum game rules running entirely in a local command line interface.
+- **Scope:** Bounded max 16x16 matrix (e.g., 7x7 dynamic support), player placement, 2 basic unit types (King, Soldier), adjacent move/attack actions, basic command line parsing, and turn switching.
+- **DoD:** A full match can be played out and won by text inputs via the terminal without an application crash.
 
 ### TODO
 
@@ -23,9 +23,14 @@
 - [x] Starting turns
   - [x] Environment setup
   - [x] Sudden death
-- [x] Command
-- [x] Surrender
-- [x] TurnCommand
+- [x] CLI terminal
+  - [x] CLI Controller
+  - [x] Start/Restart Game
+  - [x] Display
+  - [x] GameEvent
+  - [x] Command
+  - [x] Surrender
+  - [x] TurnCommand
 - [x] Victory Condition
 - [x] In-turn movement restriction
 
@@ -60,7 +65,7 @@
 
 - **Goal:** Build a minimally playable Phaser.js client that runs locally — prioritize function over polish.
 - **Scope:** Phaser.js + Canvas rendering grid from JSON state, click -> HTTP command mapping, basic action log, victory screen. No animations/polish required.
-- **DoD:** Two local human players can play a full pass-and-play match in a browser at `localhost:8080` via HTTP polling.
+- **DoD:** Two local human players can play a full pass-and-play match in a browser at `localhost:8080` via HTTP polling. Terminal runner deprecated.
 
 ### TODO
 
