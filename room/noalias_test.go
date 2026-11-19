@@ -113,12 +113,12 @@ func TestRoom_NoAlias(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Submit() error = %v", err)
 		}
-		want := cloneEvents(f.r.Match.PlaybackLog)
+		want := cloneEvents(f.r.match.PlaybackLog)
 
 		scribbleEvents(t, gameEvents)
 
-		if !reflect.DeepEqual(f.r.Match.PlaybackLog, want) {
-			t.Errorf("playback log changed after the caller wrote to the returned events: got %+v, want %+v", f.r.Match.PlaybackLog, want)
+		if !reflect.DeepEqual(f.r.match.PlaybackLog, want) {
+			t.Errorf("playback log changed after the caller wrote to the returned events: got %+v, want %+v", f.r.match.PlaybackLog, want)
 		}
 	})
 
@@ -136,7 +136,7 @@ func TestRoom_NoAlias(t *testing.T) {
 		scribbleEvents(t, status.Plan)
 		scribbleEvents(t, status.Resolve)
 
-		cpuState := f.r.Match.CPU
+		cpuState := f.r.match.CPU
 		if cpuState.PlanGameEvents != nil || cpuState.ResolveTurnGameEvents != nil {
 			t.Errorf("room still holds the returned events: plan %+v, resolve %+v", cpuState.PlanGameEvents, cpuState.ResolveTurnGameEvents)
 		}
@@ -173,8 +173,8 @@ func TestRoom_NoAlias(t *testing.T) {
 			"Surrender":    "the engine returns copies and no live holder of them remains",
 		}
 		typ := reflect.TypeFor[*Room]()
-		for i := range typ.NumMethod() {
-			name := typ.Method(i).Name
+		for method := range typ.Methods() {
+			name := method.Name
 			if _, ok := noSharedMemory[name]; !ok && !covered[name] {
 				t.Errorf("exported method %s has no alias row and is not in noSharedMemory", name)
 			}

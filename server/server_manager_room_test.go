@@ -31,12 +31,9 @@ func TestServerStateManager_CreateMatchRoom(t *testing.T) {
 				if len(id) != 10 {
 					t.Errorf("Expected ID length 10, got %d: %s", len(id), id)
 				}
-				rm := mustRoom(t, s, id)
+				mustRoom(t, s, id)
 				if _, err := s.getMatchState(id); !errors.Is(err, room.ErrMatchNotFound) {
 					t.Errorf("getMatchState() error = %v, want %v", err, room.ErrMatchNotFound)
-				}
-				if rm.ID != id {
-					t.Errorf("Room.ID mismatch: got %s want %s", rm.ID, id)
 				}
 			},
 		},
@@ -45,7 +42,7 @@ func TestServerStateManager_CreateMatchRoom(t *testing.T) {
 			setup: func() *ServerStateManager {
 				s := NewServerStateManager()
 				existingID := "ABCDE"
-				s.Rooms.Store(existingID, room.New(existingID, room.Deps{Logger: discardLogger()}))
+				s.rooms.Store(existingID, room.New(existingID, room.Deps{Logger: discardLogger()}))
 				return s
 			},
 			wantErr: false,
@@ -57,10 +54,10 @@ func TestServerStateManager_CreateMatchRoom(t *testing.T) {
 				if len(id) != 10 {
 					t.Errorf("Invalid generated ID: %s", id)
 				}
-				if _, ok := s.Rooms.Load("ABCDE"); !ok {
+				if _, ok := s.rooms.Load("ABCDE"); !ok {
 					t.Error("Predefined room missing")
 				}
-				if _, ok := s.Rooms.Load(id); !ok {
+				if _, ok := s.rooms.Load(id); !ok {
 					t.Error("New room not added")
 				}
 			},
@@ -80,7 +77,7 @@ func TestServerStateManager_CreateMatchRoom(t *testing.T) {
 				}
 				s := NewServerStateManager(WithRoomIDGenerator(gen))
 				for _, id := range roomIDs {
-					s.Rooms.Store(id, room.New(id, room.Deps{Logger: discardLogger()}))
+					s.rooms.Store(id, room.New(id, room.Deps{Logger: discardLogger()}))
 				}
 				return s
 			},
@@ -91,7 +88,7 @@ func TestServerStateManager_CreateMatchRoom(t *testing.T) {
 					t.Errorf("Expected empty ID on error, got: %s", id)
 				}
 				for _, existing := range []string{"ID001", "ID002", "ID003", "ID004", "ID005"} {
-					if _, ok := s.Rooms.Load(existing); !ok {
+					if _, ok := s.rooms.Load(existing); !ok {
 						t.Errorf("Predefined room %s missing", existing)
 					}
 				}
@@ -152,8 +149,8 @@ func TestServerStateManager_cleanupInactiveRooms(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			s.cleanupInactiveRooms(time.Now().Add(tt.advance))
 
-			_, gotActive := s.Rooms.Load(activeID)
-			_, gotEnded := s.Rooms.Load(endedID)
+			_, gotActive := s.rooms.Load(activeID)
+			_, gotEnded := s.rooms.Load(endedID)
 			if gotActive != tt.wantActive {
 				t.Errorf("active room kept = %v, want %v", gotActive, tt.wantActive)
 			}

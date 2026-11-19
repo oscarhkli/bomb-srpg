@@ -57,7 +57,7 @@ func TestWithRoomIDGenerator_NamesTheCreatedRoom(t *testing.T) {
 	if want := "FIXED"; got != want {
 		t.Errorf("room ID = %q, want %q", got, want)
 	}
-	if _, ok := s.Rooms.Load("FIXED"); !ok {
+	if _, ok := s.rooms.Load("FIXED"); !ok {
 		t.Error("room FIXED not registered")
 	}
 	if want := roomIDBytes; gotSize != want {

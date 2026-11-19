@@ -249,8 +249,8 @@ func TestRoom_Obligations(t *testing.T) {
 		}
 		var uncovered []string
 		typ := reflect.TypeFor[*Room]()
-		for i := range typ.NumMethod() {
-			name := typ.Method(i).Name
+		for method := range typ.Methods() {
+			name := method.Name
 			if _, ok := exceptions[name]; !ok && !covered[name] {
 				uncovered = append(uncovered, name)
 			}

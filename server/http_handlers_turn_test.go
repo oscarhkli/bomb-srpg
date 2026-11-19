@@ -529,7 +529,7 @@ func TestHandleSurrender(t *testing.T) {
 		if got, want := response[0].WinnerTeamID, 2; got != want {
 			t.Errorf("Expected gameEvent WinnerTeamID = %v, got %v", want, got)
 		}
-		if _, ok := s.Rooms.Load(roomID); !ok {
+		if _, ok := s.rooms.Load(roomID); !ok {
 			t.Error("Expected room not to be deleted after surrender")
 		}
 	})
