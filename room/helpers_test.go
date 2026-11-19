@@ -109,3 +109,12 @@ func cpuReadyFixture(t *testing.T) fixture {
 	f.held.runAll()
 	return f
 }
+
+func validGameCfg() engine.GameCfg {
+	return engine.GameCfg{
+		StagePreset: "Plain",
+		P1Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Fighter", Role: engine.RoleNormal}},
+		P2Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Witch", Role: engine.RoleNormal}},
+		MaxTurns:    10,
+	}
+}
