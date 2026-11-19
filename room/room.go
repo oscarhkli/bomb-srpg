@@ -93,7 +93,7 @@ func (r *Room) validatePlayerToken(teamID int, token string) error {
 	return nil
 }
 
-func (r *Room) rejectDuringCPUTurn() error {
+func (r *Room) rejectDuringCPUTurnLocked() error {
 	if r.match.CPU.Phase == engine.TurnPhasePlanning {
 		return ErrCPUTurnInProgress
 	}
@@ -229,7 +229,7 @@ func (r *Room) command(token string, teamOf func(*engine.Match) int, policy cpuP
 		return err
 	}
 	if policy == rejectInCPUTurn {
-		if err := r.rejectDuringCPUTurn(); err != nil {
+		if err := r.rejectDuringCPUTurnLocked(); err != nil {
 			return err
 		}
 	}
