@@ -95,7 +95,7 @@ func newCPUTurnHandlerRoom(t *testing.T, opts ...Option) (string, [2]string, *Se
 	return roomID, tokens, s, NewHandler(s)
 }
 
-func consumeCPUPhase(t *testing.T, s *ServerStateManager, roomID, token string) (engine.CPUTurnPhase, []engine.GameEvent, []engine.GameEvent) {
+func consumeCPUPhase(t *testing.T, s *ServerStateManager, roomID, token string) (room.CPUTurnPhase, []engine.GameEvent, []engine.GameEvent) {
 	t.Helper()
 	status, err := mustRoom(t, s, roomID).ConsumeCPU(token)
 	if err != nil {
@@ -255,9 +255,9 @@ func TestServerStateManager_ConsumeCPUStatus_LaunchesCPUTurn(t *testing.T) {
 			held := holdCPUTurn(t)
 			roomID, tokens, s := createTestRoomWithCfg(t, gameCfg, WithDecider(decider.decide), WithSpawner(held.spawn), arrangedMatch(tt.arrange...))
 
-			wantPhase, wantHeld := engine.TurnPhaseIdle, 0
+			wantPhase, wantHeld := room.TurnPhaseIdle, 0
 			if tt.wantCPUTurn {
-				wantPhase, wantHeld = engine.TurnPhasePlanning, 1
+				wantPhase, wantHeld = room.TurnPhasePlanning, 1
 			}
 			phase, planGameEvents, resolveTurnGameEvents := consumeCPUPhase(t, s, roomID, tokens[tt.tokenIdx])
 			if phase != wantPhase {
@@ -273,8 +273,8 @@ func TestServerStateManager_ConsumeCPUStatus_LaunchesCPUTurn(t *testing.T) {
 			if tt.wantCPUTurn {
 				held.runOutsideRoomLock()
 				phase, planGameEvents, _ = consumeCPUPhase(t, s, roomID, tokens[tt.tokenIdx])
-				if phase != engine.TurnPhaseReady {
-					t.Errorf("ConsumeCPU() after the turn phase = %v, want %v", phase, engine.TurnPhaseReady)
+				if phase != room.TurnPhaseReady {
+					t.Errorf("ConsumeCPU() after the turn phase = %v, want %v", phase, room.TurnPhaseReady)
 				}
 			}
 
@@ -313,8 +313,8 @@ func TestServerStateManager_ConsumeCPUStatus_StaleReadyDropped(t *testing.T) {
 	}
 
 	phase, planGameEvents, resolveTurnGameEvents := consumeCPUPhase(t, s, roomID, tokens[0])
-	if phase != engine.TurnPhasePlanning {
-		t.Fatalf("launching consume phase = %v, want %v", phase, engine.TurnPhasePlanning)
+	if phase != room.TurnPhasePlanning {
+		t.Fatalf("launching consume phase = %v, want %v", phase, room.TurnPhasePlanning)
 	}
 	if len(planGameEvents) != 0 || len(resolveTurnGameEvents) != 0 {
 		t.Errorf("launching consume events = %#v and %#v, want none", planGameEvents, resolveTurnGameEvents)
@@ -325,8 +325,8 @@ func TestServerStateManager_ConsumeCPUStatus_StaleReadyDropped(t *testing.T) {
 
 	held.runOutsideRoomLock()
 	phase, planGameEvents, _ = consumeCPUPhase(t, s, roomID, tokens[0])
-	if phase != engine.TurnPhaseReady {
-		t.Fatalf("phase after the second turn = %v, want %v", phase, engine.TurnPhaseReady)
+	if phase != room.TurnPhaseReady {
+		t.Fatalf("phase after the second turn = %v, want %v", phase, room.TurnPhaseReady)
 	}
 	found := false
 	for _, evt := range planGameEvents {
@@ -353,16 +353,16 @@ func TestServerStateManager_ConsumeCPUStatus_ClearsResolveEvents(t *testing.T) {
 	held.runOutsideRoomLock()
 
 	phase, _, resolveTurnGameEvents := consumeCPUPhase(t, s, roomID, tokens[0])
-	if phase != engine.TurnPhaseReady {
-		t.Fatalf("phase after the turn = %v, want %v", phase, engine.TurnPhaseReady)
+	if phase != room.TurnPhaseReady {
+		t.Fatalf("phase after the turn = %v, want %v", phase, room.TurnPhaseReady)
 	}
 	if len(resolveTurnGameEvents) == 0 {
 		t.Fatal("Expected the placed bomb to tick in the resolve events, got none")
 	}
 
 	phase, planAgain, resolveAgain := consumeCPUPhase(t, s, roomID, tokens[0])
-	if phase != engine.TurnPhaseIdle {
-		t.Errorf("second consume phase = %v, want %v", phase, engine.TurnPhaseIdle)
+	if phase != room.TurnPhaseIdle {
+		t.Errorf("second consume phase = %v, want %v", phase, room.TurnPhaseIdle)
 	}
 	if len(planAgain) != 0 || len(resolveAgain) != 0 {
 		t.Errorf("second consume events = %#v and %#v, want none", planAgain, resolveAgain)
@@ -392,8 +392,8 @@ func TestServerStateManager_ConsumeCPUStatus_LaunchesOnce(t *testing.T) {
 	roomID, tokens, s := newCPUTurnRoom(t, WithDecider(decider.decide), WithSpawner(held.spawn))
 
 	for range 2 {
-		if phase, _, _ := consumeCPUPhase(t, s, roomID, tokens[0]); phase != engine.TurnPhasePlanning {
-			t.Fatalf("phase = %v, want %v", phase, engine.TurnPhasePlanning)
+		if phase, _, _ := consumeCPUPhase(t, s, roomID, tokens[0]); phase != room.TurnPhasePlanning {
+			t.Fatalf("phase = %v, want %v", phase, room.TurnPhasePlanning)
 		}
 	}
 	if got, want := held.count(), 1; got != want {
@@ -416,8 +416,8 @@ func TestServerStateManager_ConsumeCPUStatus_DefaultSpawn(t *testing.T) {
 	}
 	roomID, tokens, s := newCPUTurnRoom(t, WithDecider(decider.decide))
 
-	if phase, _, _ := consumeCPUPhase(t, s, roomID, tokens[0]); phase != engine.TurnPhasePlanning {
-		t.Fatalf("phase = %v, want %v", phase, engine.TurnPhasePlanning)
+	if phase, _, _ := consumeCPUPhase(t, s, roomID, tokens[0]); phase != room.TurnPhasePlanning {
+		t.Fatalf("phase = %v, want %v", phase, room.TurnPhasePlanning)
 	}
 	select {
 	case <-decider.called:
@@ -430,8 +430,8 @@ func TestServerStateManager_ConsumeCPUStatus_DefaultSpawn(t *testing.T) {
 	}
 
 	phase, planGameEvents, _ := consumeCPUPhase(t, s, roomID, tokens[0])
-	if phase != engine.TurnPhaseReady {
-		t.Errorf("phase after the turn = %v, want %v", phase, engine.TurnPhaseReady)
+	if phase != room.TurnPhaseReady {
+		t.Errorf("phase after the turn = %v, want %v", phase, room.TurnPhaseReady)
 	}
 	if !hasGameEvent(planGameEvents, engine.GameEvtUnitMoved, cpuUnitID) {
 		t.Errorf("Expected unit %#x to have moved, got %#v", cpuUnitID, planGameEvents)
@@ -443,7 +443,7 @@ func TestServerStateManager_runCPUTurn_Abandons(t *testing.T) {
 		name      string
 		act       func(t *testing.T, s *ServerStateManager, roomID string, tokens [2]string)
 		wantErr   error
-		wantPhase engine.CPUTurnPhase
+		wantPhase room.CPUTurnPhase
 	}{
 		{
 			name: "Match Replaced",
@@ -453,7 +453,7 @@ func TestServerStateManager_runCPUTurn_Abandons(t *testing.T) {
 					t.Fatalf("Rematch() error = %v", err)
 				}
 			},
-			wantPhase: engine.TurnPhaseIdle,
+			wantPhase: room.TurnPhaseIdle,
 		},
 		{
 			name: "Match Deleted",
@@ -471,7 +471,7 @@ func TestServerStateManager_runCPUTurn_Abandons(t *testing.T) {
 					t.Fatalf("Surrender() error = %v", err)
 				}
 			},
-			wantPhase: engine.TurnPhaseReady,
+			wantPhase: room.TurnPhaseReady,
 		},
 	}
 
@@ -490,8 +490,8 @@ func TestServerStateManager_runCPUTurn_Abandons(t *testing.T) {
 			})
 			roomID, tokens, s := newCPUTurnRoom(t, WithDecider(decider.decide), WithSpawner(held.spawn), firstCPUTurnPending)
 
-			if phase, _, _ := consumeCPUPhase(t, s, roomID, tokens[0]); phase != engine.TurnPhasePlanning {
-				t.Fatalf("launching consume phase = %v, want %v", phase, engine.TurnPhasePlanning)
+			if phase, _, _ := consumeCPUPhase(t, s, roomID, tokens[0]); phase != room.TurnPhasePlanning {
+				t.Fatalf("launching consume phase = %v, want %v", phase, room.TurnPhasePlanning)
 			}
 			tt.act(t, s, roomID, tokens)
 			wantTrueState := captured.TrueState.DeepCopy()
@@ -531,8 +531,8 @@ func TestServerStateManager_ReadsDuringCPUTurn(t *testing.T) {
 	}
 	roomID, tokens, s := newCPUTurnRoom(t, WithDecider(decide))
 
-	if phase, _, _ := consumeCPUPhase(t, s, roomID, tokens[0]); phase != engine.TurnPhasePlanning {
-		t.Fatalf("phase = %v, want %v", phase, engine.TurnPhasePlanning)
+	if phase, _, _ := consumeCPUPhase(t, s, roomID, tokens[0]); phase != room.TurnPhasePlanning {
+		t.Fatalf("phase = %v, want %v", phase, room.TurnPhasePlanning)
 	}
 	select {
 	case <-planning:
@@ -579,8 +579,8 @@ func TestServerStateManager_ReadsDuringCPUTurn(t *testing.T) {
 	if got, want := activeTeam, 1; got != want {
 		t.Errorf("active team after the CPU turn = %d, want %d", got, want)
 	}
-	if phase, _, _ := consumeCPUPhase(t, s, roomID, tokens[0]); phase != engine.TurnPhaseReady {
-		t.Errorf("Expected phase %v after the CPU turn, got %v", engine.TurnPhaseReady, phase)
+	if phase, _, _ := consumeCPUPhase(t, s, roomID, tokens[0]); phase != room.TurnPhaseReady {
+		t.Errorf("Expected phase %v after the CPU turn, got %v", room.TurnPhaseReady, phase)
 	}
 }
 
@@ -600,7 +600,7 @@ func TestServerStateManager_runCPUTurn_Panic(t *testing.T) {
 
 	// Proves the room mutex was released rather than left held by the unwinding goroutine.
 	turnPhase, _, resolveTurnGameEvents := consumeCPUPhase(t, s, roomID, tokens[0])
-	if got, want := turnPhase, engine.TurnPhaseReady; got != want {
+	if got, want := turnPhase, room.TurnPhaseReady; got != want {
 		t.Errorf("Expected %v turnPhase return, got %v", want, got)
 	}
 	if len(resolveTurnGameEvents) == 0 {
@@ -614,7 +614,7 @@ func TestServerStateManager_ConsumeCPUStatus(t *testing.T) {
 		name     string
 		setup    func(t *testing.T) (string, *ServerStateManager, string)
 		wantErr  error
-		validate func(t *testing.T, turnPhase engine.CPUTurnPhase, planGameEvents, resolveTurnGameEvents []engine.GameEvent, s *ServerStateManager, roomID, token string)
+		validate func(t *testing.T, turnPhase room.CPUTurnPhase, planGameEvents, resolveTurnGameEvents []engine.GameEvent, s *ServerStateManager, roomID, token string)
 	}{
 		{
 			name: "Success - TurnPhaseReady and clear status",
@@ -630,10 +630,10 @@ func TestServerStateManager_ConsumeCPUStatus(t *testing.T) {
 				return roomID, s, tokens[0]
 			},
 			wantErr: nil,
-			validate: func(t *testing.T, turnPhase engine.CPUTurnPhase, planGameEvents, resolveTurnGameEvents []engine.GameEvent, s *ServerStateManager, roomID, token string) {
+			validate: func(t *testing.T, turnPhase room.CPUTurnPhase, planGameEvents, resolveTurnGameEvents []engine.GameEvent, s *ServerStateManager, roomID, token string) {
 				t.Helper()
 
-				if got, want := turnPhase, engine.TurnPhaseReady; got != want {
+				if got, want := turnPhase, room.TurnPhaseReady; got != want {
 					t.Errorf("Expected %v turnPhase return, got %v", want, got)
 				}
 				if !hasGameEvent(planGameEvents, engine.GameEvtUnitMoved, unitID) {
@@ -641,7 +641,7 @@ func TestServerStateManager_ConsumeCPUStatus(t *testing.T) {
 				}
 
 				phase, planAgain, resolveAgain := consumeCPUPhase(t, s, roomID, token)
-				if got, want := phase, engine.TurnPhaseIdle; got != want {
+				if got, want := phase, room.TurnPhaseIdle; got != want {
 					t.Errorf("Expected the second consume to return %v, got %v", want, got)
 				}
 				if len(planAgain) != 0 || len(resolveAgain) != 0 {
@@ -657,18 +657,18 @@ func TestServerStateManager_ConsumeCPUStatus(t *testing.T) {
 				return roomID, s, tokens[0]
 			},
 			wantErr: nil,
-			validate: func(t *testing.T, turnPhase engine.CPUTurnPhase, planGameEvents, resolveTurnGameEvents []engine.GameEvent, s *ServerStateManager, roomID, token string) {
+			validate: func(t *testing.T, turnPhase room.CPUTurnPhase, planGameEvents, resolveTurnGameEvents []engine.GameEvent, s *ServerStateManager, roomID, token string) {
 				t.Helper()
 
-				if got, want := turnPhase, engine.TurnPhasePlanning; got != want {
+				if got, want := turnPhase, room.TurnPhasePlanning; got != want {
 					t.Errorf("Expected %v turnPhase return, got %v", want, got)
 				}
 				if len(planGameEvents) != 0 || len(resolveTurnGameEvents) != 0 {
 					t.Errorf("Expected no events while planning, got %#v and %#v", planGameEvents, resolveTurnGameEvents)
 				}
 
-				if phase, _, _ := consumeCPUPhase(t, s, roomID, token); phase != engine.TurnPhasePlanning {
-					t.Errorf("Expected the second consume to stay at %v, got %v", engine.TurnPhasePlanning, phase)
+				if phase, _, _ := consumeCPUPhase(t, s, roomID, token); phase != room.TurnPhasePlanning {
+					t.Errorf("Expected the second consume to stay at %v, got %v", room.TurnPhasePlanning, phase)
 				}
 			},
 		},
@@ -795,7 +795,7 @@ func TestServerStateManager_CPUTurnGate_NotGated(t *testing.T) {
 	roomID, tokens, s := newCPUTurnRoom(t, WithSpawner(held.spawn))
 
 	phase, _, _ := consumeCPUPhase(t, s, roomID, tokens[0])
-	if want := engine.TurnPhasePlanning; phase != want {
+	if want := room.TurnPhasePlanning; phase != want {
 		t.Errorf("ConsumeCPUStatus phase = %v, want %v", phase, want)
 	}
 
@@ -811,7 +811,7 @@ func TestServerStateManager_CPUTurnGate_NotGated(t *testing.T) {
 
 	held.runOutsideRoomLock()
 	phase, planGameEvents, resolveTurnGameEvents := consumeCPUPhase(t, s, roomID, tokens[0])
-	if want := engine.TurnPhaseReady; phase != want {
+	if want := room.TurnPhaseReady; phase != want {
 		t.Errorf("ConsumeCPUStatus phase after the abandoned turn = %v, want %v", phase, want)
 	}
 	if len(planGameEvents) != 0 || len(resolveTurnGameEvents) != 0 {
@@ -855,7 +855,7 @@ func TestServerStateManager_runCPUTurn_DecideError(t *testing.T) {
 			if got, want := decider.calls, 1; got != want {
 				t.Errorf("decide calls = %d, want %d", got, want)
 			}
-			if got, want := phase, engine.TurnPhaseReady; got != want {
+			if got, want := phase, room.TurnPhaseReady; got != want {
 				t.Errorf("Phase = %v, want %v", got, want)
 			}
 			if got, want := mustMatchState(t, s, roomID).ActiveTeam, 1; got != want {
@@ -910,8 +910,8 @@ func TestServerStateManager_runCPUTurn_EndsMatch(t *testing.T) {
 		t.Fatal("Expected hazards at creation with MaxTurns 0")
 	}
 
-	if phase, _, _ := consumeCPUPhase(t, s, roomID, tokens[0]); phase != engine.TurnPhasePlanning {
-		t.Fatalf("launching consume phase = %v, want %v", phase, engine.TurnPhasePlanning)
+	if phase, _, _ := consumeCPUPhase(t, s, roomID, tokens[0]); phase != room.TurnPhasePlanning {
+		t.Fatalf("launching consume phase = %v, want %v", phase, room.TurnPhasePlanning)
 	}
 	held.runOutsideRoomLock()
 
@@ -929,7 +929,7 @@ func TestServerStateManager_runCPUTurn_EndsMatch(t *testing.T) {
 	}
 
 	phase, planGameEvents, resolveTurnGameEvents := consumeCPUPhase(t, s, roomID, tokens[0])
-	if got, want := phase, engine.TurnPhaseReady; got != want {
+	if got, want := phase, room.TurnPhaseReady; got != want {
 		t.Errorf("Expected first consume %v, got %v", want, got)
 	}
 	if !slices.ContainsFunc(resolveTurnGameEvents, func(evt engine.GameEvent) bool {
@@ -947,7 +947,7 @@ func TestServerStateManager_runCPUTurn_EndsMatch(t *testing.T) {
 	}
 	for consume := 2; consume <= 3; consume++ {
 		phase, planAgain, resolveAgain := consumeCPUPhase(t, s, roomID, tokens[0])
-		if got, want := phase, engine.TurnPhaseIdle; got != want {
+		if got, want := phase, room.TurnPhaseIdle; got != want {
 			t.Errorf("Expected consume %d to be %v, got %v", consume, want, got)
 		}
 		if len(planAgain) != 0 || len(resolveAgain) != 0 {

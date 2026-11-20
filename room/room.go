@@ -38,6 +38,7 @@ type Room struct {
 	match        *engine.Match
 	cfg          *engine.GameCfg
 	lastActivity time.Time
+	cpu          cpuTurn
 	tokens       [2]string
 	log          *slog.Logger
 	deps         Deps
@@ -94,7 +95,7 @@ func (r *Room) validatePlayerToken(teamID int, token string) error {
 }
 
 func (r *Room) rejectDuringCPUTurnLocked() error {
-	if r.match.CPU.Phase == engine.TurnPhasePlanning {
+	if r.cpu.phase == TurnPhasePlanning {
 		return ErrCPUTurnInProgress
 	}
 	return nil
@@ -114,6 +115,11 @@ func (r *Room) buildMatchLocked(cfg engine.GameCfg) (*engine.Match, error) {
 		return nil, fmt.Errorf("%w: %w", ErrInvalidConfig, err)
 	}
 	return match, nil
+}
+
+func (r *Room) setMatchLocked(match *engine.Match) {
+	r.match = match
+	r.cpu = cpuTurn{}
 }
 
 func (r *Room) Start(cfg engine.GameCfg) ([2]string, error) {
@@ -139,7 +145,7 @@ func (r *Room) Start(cfg engine.GameCfg) ([2]string, error) {
 		return [2]string{}, err
 	}
 
-	r.match = match
+	r.setMatchLocked(match)
 	r.cfg = &cfg
 	r.tokens = tokens
 	r.lastActivity = r.deps.Now()
@@ -165,7 +171,7 @@ func (r *Room) Rematch(token string) ([2]string, error) {
 		return [2]string{}, err
 	}
 
-	r.match = match
+	r.setMatchLocked(match)
 	r.lastActivity = r.deps.Now()
 
 	return r.tokens, nil
@@ -189,7 +195,7 @@ func (r *Room) Delete(token string) error {
 		return fmt.Errorf("%w: roomID=%s", ErrMatchInProgress, r.id)
 	}
 
-	r.match = nil
+	r.setMatchLocked(nil)
 
 	return nil
 }

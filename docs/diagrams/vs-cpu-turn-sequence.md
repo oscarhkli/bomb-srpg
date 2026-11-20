@@ -33,7 +33,7 @@ sequenceDiagram
         activate SV
         SV->>SV: lock room mutex
         SV->>SV: VsCpu && ActiveTeam == 2 && Phase != Planning ?
-        SV->>SV: CPU.Phase = TurnPhasePlanning
+        SV->>SV: room CPU phase = TurnPhasePlanning
         SV->>GO: go runCPUTurn(match)
         SV->>SV: unlock room mutex
         SV-->>FE: phase: planning

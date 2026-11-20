@@ -98,7 +98,7 @@ func humanFixture(t *testing.T) fixture {
 func planningFixture(t *testing.T) fixture {
 	t.Helper()
 	f := startedFixture(t, vsCPUCfg(), cpuTurnPending)
-	if status, err := f.r.ConsumeCPU(f.tokens[0]); err != nil || status.Phase != engine.TurnPhasePlanning {
+	if status, err := f.r.ConsumeCPU(f.tokens[0]); err != nil || status.Phase != TurnPhasePlanning {
 		t.Fatalf("ConsumeCPU() = %v, %v, want phase Planning", status.Phase, err)
 	}
 	return f
