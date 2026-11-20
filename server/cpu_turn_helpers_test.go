@@ -58,8 +58,6 @@ func holdCPUTurn(t *testing.T) *heldCPUTurn {
 
 func (h *heldCPUTurn) spawn(f func()) { h.fns = append(h.fns, f) }
 
-func (h *heldCPUTurn) count() int { return len(h.fns) }
-
 func (h *heldCPUTurn) runOutsideRoomLock() {
 	h.t.Helper()
 	if h.next >= len(h.fns) {
@@ -87,13 +85,13 @@ func newCPUTurnHandlerRoom(t *testing.T, opts ...Option) (string, [2]string, *Se
 	return roomID, tokens, s, NewHandler(s)
 }
 
-func consumeCPUPhase(t *testing.T, s *ServerStateManager, roomID, token string) (room.CPUTurnPhase, []engine.GameEvent, []engine.GameEvent) {
+func consumeCPUPhase(t *testing.T, s *ServerStateManager, roomID, token string) (room.CPUTurnPhase, []engine.GameEvent) {
 	t.Helper()
 	status, err := mustRoom(t, s, roomID).ConsumeCPU(token)
 	if err != nil {
 		t.Fatalf("ConsumeCPU() error = %v", err)
 	}
-	return status.Phase, status.Plan, status.Resolve
+	return status.Phase, status.Plan
 }
 
 func newCPUTurnRoom(t *testing.T, opts ...Option) (string, [2]string, *ServerStateManager) {

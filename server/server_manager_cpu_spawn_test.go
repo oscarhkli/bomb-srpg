@@ -17,7 +17,7 @@ func TestServerStateManager_ConsumeCPUStatus_DefaultSpawn(t *testing.T) {
 	}
 	roomID, tokens, s := newCPUTurnRoom(t, WithDecider(decider.decide))
 
-	if phase, _, _ := consumeCPUPhase(t, s, roomID, tokens[0]); phase != room.TurnPhasePlanning {
+	if phase, _ := consumeCPUPhase(t, s, roomID, tokens[0]); phase != room.TurnPhasePlanning {
 		t.Fatalf("phase = %v, want %v", phase, room.TurnPhasePlanning)
 	}
 	select {
@@ -30,7 +30,7 @@ func TestServerStateManager_ConsumeCPUStatus_DefaultSpawn(t *testing.T) {
 		t.Errorf("active team after the turn = %d, want %d", got, want)
 	}
 
-	phase, planGameEvents, _ := consumeCPUPhase(t, s, roomID, tokens[0])
+	phase, planGameEvents := consumeCPUPhase(t, s, roomID, tokens[0])
 	if phase != room.TurnPhaseReady {
 		t.Errorf("phase after the turn = %v, want %v", phase, room.TurnPhaseReady)
 	}
