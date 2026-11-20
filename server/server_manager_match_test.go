@@ -91,11 +91,10 @@ func TestServerStateManager_CreateMatch(t *testing.T) {
 				if len(playerTokens) != 2 || playerTokens[0] == "" || playerTokens[1] == "" || playerTokens[0] == playerTokens[1] {
 					t.Errorf("Expected 2 unique non-empty PlayerToken, got %v", playerTokens)
 				}
-				rm := mustRoom(t, s, roomID)
-				assertGameCfgSynced(t, s, roomID)
-				if playerTokens != rm.PlayerTokens {
-					t.Errorf("Expected response and MatchRoom share the same PlayerTokens, response %v vs MatchRoom %v", playerTokens, rm.PlayerTokens)
+				if got := *mustMatchConfig(t, s, roomID); !reflect.DeepEqual(got, tt.gameCfg) {
+					t.Errorf("Config() = %+v, want the config passed to createMatch %+v", got, tt.gameCfg)
 				}
+				assertTokensAuthorize(t, s, roomID, playerTokens)
 			}
 		})
 	}
@@ -127,9 +126,6 @@ func TestServerStateManager_Rematch(t *testing.T) {
 				s := NewServerStateManager()
 				roomID, _ := s.createMatchRoom()
 				tokens, _ := s.createMatch(roomID, validGameCfg())
-				rm := mustRoom(t, s, roomID)
-				gameCfg := validGameCfg()
-				rm.GameCfg = &gameCfg
 				return roomID, s, tokens
 			},
 			wantErr: nil,
@@ -141,9 +137,6 @@ func TestServerStateManager_Rematch(t *testing.T) {
 				s := NewServerStateManager()
 				roomID, _ := s.createMatchRoom()
 				mustCreateMatch(t, s, roomID, validGameCfg())
-				rm := mustRoom(t, s, roomID)
-				gameCfg := validGameCfg()
-				rm.GameCfg = &gameCfg
 				return roomID, s, [2]string{"INVALID_TOKEN", ""}
 			},
 			wantErr: room.ErrInvalidToken,
@@ -177,7 +170,6 @@ func TestServerStateManager_Rematch(t *testing.T) {
 				t.Fatalf("Rematch() error = %v, want %v", err, tt.wantErr)
 			}
 			if err == nil {
-				rm := mustRoom(t, s, roomID)
 				gameCfg := mustMatchConfig(t, s, roomID)
 				if gameCfg.StagePreset != "Plain" {
 					t.Errorf("Expected StagePreset 'Plain', got '%s'", gameCfg.StagePreset)
@@ -185,10 +177,10 @@ func TestServerStateManager_Rematch(t *testing.T) {
 				if len(playerTokens) != 2 || playerTokens[0] == "" || playerTokens[1] == "" || playerTokens[0] == playerTokens[1] {
 					t.Errorf("Expected 2 unique non-empty PlayerToken, got %v", playerTokens)
 				}
-				assertGameCfgSynced(t, s, roomID)
-				if playerTokens != rm.PlayerTokens {
-					t.Errorf("Expected response and MatchRoom share the same PlayerTokens, response %v vs MatchRoom %v", playerTokens, rm.PlayerTokens)
+				if want := validGameCfg(); !reflect.DeepEqual(*gameCfg, want) {
+					t.Errorf("Config() = %+v, want %+v", *gameCfg, want)
 				}
+				assertTokensAuthorize(t, s, roomID, playerTokens)
 			}
 		})
 	}
@@ -245,9 +237,6 @@ func TestServerStateManager_DeleteMatch(t *testing.T) {
 				s := NewServerStateManager()
 				roomID, _ := s.createMatchRoom()
 				mustCreateMatch(t, s, roomID, validGameCfg())
-				rm := mustRoom(t, s, roomID)
-				gameCfg := validGameCfg()
-				rm.GameCfg = &gameCfg
 				return roomID, s, [2]string{"INVALID_TOKEN", ""}
 			},
 			wantErr: room.ErrInvalidToken,
@@ -298,17 +287,17 @@ func TestServerStateManager_GetMatchState(t *testing.T) {
 			wantErr: nil,
 			validate: func(t *testing.T, gs *engine.GameState, s *ServerStateManager, roomID string) {
 				t.Helper()
-				live := mustRoom(t, s, roomID).Match.WorkingState
-				if gs == live {
-					t.Error("Expected a copy of the WorkingState, got the live pointer")
+				fresh, err := engine.InitGame(validGameCfg())
+				if err != nil {
+					t.Fatalf("InitGame() error = %v", err)
 				}
-				if got, want := gs.Turn, live.Turn; got != want {
+				if got, want := gs.Turn, fresh.WorkingState.Turn; got != want {
 					t.Errorf("Expected Turn %d, got %d", want, got)
 				}
-				if got, want := gs.ActiveTeam, live.ActiveTeam; got != want {
+				if got, want := gs.ActiveTeam, fresh.WorkingState.ActiveTeam; got != want {
 					t.Errorf("Expected ActiveTeam %d, got %d", want, got)
 				}
-				if got, want := len(gs.Units), len(live.Units); got != want {
+				if got, want := len(gs.Units), len(fresh.WorkingState.Units); got != want {
 					t.Errorf("Expected %d units, got %d", want, got)
 				}
 			},
@@ -712,7 +701,7 @@ func TestServerStateManager_Surrender(t *testing.T) {
 				if got, want := gameEvents[0].WinnerTeamID, 2; got != want {
 					t.Errorf("Expected gameEvent WinnerTeamID = %v, got %v", want, got)
 				}
-				if _, ok := s.Rooms.Load(roomID); !ok {
+				if _, ok := s.rooms.Load(roomID); !ok {
 					t.Error("Expected room not to be deleted after surrender")
 				}
 			},

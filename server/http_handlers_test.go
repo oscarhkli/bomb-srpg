@@ -210,13 +210,12 @@ const (
 )
 
 type failureRoute struct {
-	handler   func(*Handler, http.ResponseWriter, *http.Request)
-	pattern   string
-	query     string
-	body      any
-	cases     failureSet
-	matchGone func(rm *room.Room)
-	bareRoom  bool
+	handler  func(*Handler, http.ResponseWriter, *http.Request)
+	pattern  string
+	query    string
+	body     any
+	cases    failureSet
+	bareRoom bool
 }
 
 func testRouteFailures(t *testing.T, route failureRoute) {
@@ -271,11 +270,7 @@ func testRouteFailures(t *testing.T, route failureRoute) {
 				return
 			}
 			roomID, tokens, s, h := createTestRoomWithMatch(t)
-			if route.matchGone != nil {
-				route.matchGone(mustRoom(t, s, roomID))
-			} else {
-				mustEndAndDeleteMatch(t, s, roomID, tokens[0])
-			}
+			mustEndAndDeleteMatch(t, s, roomID, tokens[0])
 			assertFailure(t, call(t, h, roomID, tokens[0]), http.StatusNotFound, "match not found")
 		})
 	}

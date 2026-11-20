@@ -75,7 +75,7 @@ func TestHandleCreateMatchRoom(t *testing.T) {
 		s := NewServerStateManager(WithRoomIDGenerator(gen))
 		h := NewHandler(s)
 		for _, id := range roomIDs {
-			s.Rooms.Store(id, room.New(id, room.Deps{Logger: discardLogger()}))
+			s.rooms.Store(id, room.New(id, room.Deps{Logger: discardLogger()}))
 		}
 
 		req, _ := http.NewRequest("POST", "/api/match-rooms", nil)
@@ -117,7 +117,6 @@ func TestHandleCreateNewMatch(t *testing.T) {
 			t.Error("Expected success=true in response, got false")
 		}
 
-		rm := mustRoom(t, s, roomID)
 		if _, err := s.getMatchState(roomID); err != nil {
 			t.Errorf("Match was not created in the server state manager: %v", err)
 		}
@@ -125,9 +124,7 @@ func TestHandleCreateNewMatch(t *testing.T) {
 		if len(response.PlayerTokens) != 2 || response.PlayerTokens[0] == "" || response.PlayerTokens[1] == "" || response.PlayerTokens[0] == response.PlayerTokens[1] {
 			t.Errorf("Expected 2 unique non-empty PlayerToken, got %v", response.PlayerTokens)
 		}
-		if response.PlayerTokens != rm.PlayerTokens {
-			t.Errorf("Expected response and MatchRoom shareTokens, response %v vs MatchRoom %v", response.PlayerTokens, rm.PlayerTokens)
-		}
+		assertTokensAuthorize(t, s, roomID, response.PlayerTokens)
 	})
 
 	testRouteFailures(t, failureRoute{
@@ -262,7 +259,6 @@ func TestHandleRematch(t *testing.T) {
 			t.Error("Expected success=true in response, got false")
 		}
 
-		rm := mustRoom(t, s, roomID)
 		if _, err := s.getMatchState(roomID); err != nil {
 			t.Errorf("Match was not created in the server state manager: %v", err)
 		}
@@ -270,19 +266,16 @@ func TestHandleRematch(t *testing.T) {
 		if len(response.PlayerTokens) != 2 || response.PlayerTokens[0] == "" || response.PlayerTokens[1] == "" || response.PlayerTokens[0] == response.PlayerTokens[1] {
 			t.Errorf("Expected 2 unique non-empty PlayerToken, got %v", response.PlayerTokens)
 		}
-		if response.PlayerTokens != rm.PlayerTokens {
-			t.Errorf("Expected response and MatchRoom shareTokens, response %v vs MatchRoom %v", response.PlayerTokens, rm.PlayerTokens)
-		}
 		if response.PlayerTokens != playerTokens {
 			t.Errorf("Expected Rematch to reuse existing PlayerTokens, got %v want %v", response.PlayerTokens, playerTokens)
 		}
+		assertTokensAuthorize(t, s, roomID, response.PlayerTokens)
 	})
 
 	testRouteFailures(t, failureRoute{
-		handler:   (*Handler).handleRematch,
-		pattern:   "POST /api/match-rooms/{roomID}/rematch",
-		cases:     failRoom | failMatch | failMissingAuth | failInvalidToken,
-		matchGone: func(rm *room.Room) { rm.GameCfg = nil },
+		handler: (*Handler).handleRematch,
+		pattern: "POST /api/match-rooms/{roomID}/rematch",
+		cases:   failRoom | failMissingAuth | failInvalidToken,
 	})
 
 	t.Run("Failure: failed to Encode response", func(t *testing.T) {

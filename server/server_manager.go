@@ -59,11 +59,11 @@ func mapError(err error) (int, string) {
 }
 
 type roomRegistry struct {
-	rooms sync.Map
+	byID sync.Map
 }
 
 func (r *roomRegistry) Load(id string) (*room.Room, bool) {
-	val, ok := r.rooms.Load(id)
+	val, ok := r.byID.Load(id)
 	if !ok {
 		return nil, false
 	}
@@ -71,17 +71,17 @@ func (r *roomRegistry) Load(id string) (*room.Room, bool) {
 	return rm, ok
 }
 
-func (r *roomRegistry) Store(id string, rm *room.Room) { r.rooms.Store(id, rm) }
+func (r *roomRegistry) Store(id string, rm *room.Room) { r.byID.Store(id, rm) }
 
 func (r *roomRegistry) LoadOrStore(id string, rm *room.Room) (loaded bool) {
-	_, loaded = r.rooms.LoadOrStore(id, rm)
+	_, loaded = r.byID.LoadOrStore(id, rm)
 	return loaded
 }
 
-func (r *roomRegistry) Delete(id string) { r.rooms.Delete(id) }
+func (r *roomRegistry) Delete(id string) { r.byID.Delete(id) }
 
 func (r *roomRegistry) Range(f func(id string, rm *room.Room) bool) {
-	r.rooms.Range(func(key, val any) bool {
+	r.byID.Range(func(key, val any) bool {
 		id, _ := key.(string)
 		rm, ok := val.(*room.Room)
 		if !ok {
@@ -92,7 +92,7 @@ func (r *roomRegistry) Range(f func(id string, rm *room.Room) bool) {
 }
 
 type ServerStateManager struct {
-	Rooms          roomRegistry
+	rooms          roomRegistry
 	generateRoomID func(int) (string, error)
 	decide         func(*engine.GameState) ([]engine.TurnCommand, error)
 	spawn          func(func())
@@ -164,7 +164,7 @@ func (s *ServerStateManager) createMatchRoom() (string, error) {
 			Spawn:    s.spawn,
 			NewMatch: s.newMatch,
 		})
-		if !s.Rooms.LoadOrStore(id, rm) {
+		if !s.rooms.LoadOrStore(id, rm) {
 			return id, nil
 		}
 	}
@@ -174,7 +174,7 @@ func (s *ServerStateManager) createMatchRoom() (string, error) {
 }
 
 func (s *ServerStateManager) Room(roomID string) (*room.Room, error) {
-	rm, ok := s.Rooms.Load(roomID)
+	rm, ok := s.rooms.Load(roomID)
 	if !ok {
 		s.Logger.Warn("match room not found", "roomID", roomID)
 		return nil, fmt.Errorf("%w: roomID=%s", errRoomNotFound, roomID)
@@ -288,7 +288,7 @@ func (s *ServerStateManager) getAllowedTiles(roomID string, unitID engine.UnitID
 }
 
 // RunCleanupLoop blocks until ctx is cancelled.
-func (s *ServerStateManager) RunCleanupLoop(ctx context.Context, interval time.Duration) {
+func (s *ServerStateManager) RunCleanupLoop(ctx context.Context, interval time.Duration, now func() time.Time) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for {
@@ -296,23 +296,18 @@ func (s *ServerStateManager) RunCleanupLoop(ctx context.Context, interval time.D
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			s.cleanupInactiveRooms()
+			s.cleanupInactiveRooms(now())
 		}
 	}
 }
 
 const roomInactivityTimeout = 60 * time.Minute
 
-func (s *ServerStateManager) cleanupInactiveRooms() {
-	now := time.Now()
-	s.Rooms.Range(func(id string, rm *room.Room) bool {
-		rm.Mu.Lock()
-		inactive := now.Sub(rm.LastActivity) > roomInactivityTimeout
-		rm.Mu.Unlock()
-
-		if inactive {
-			s.Rooms.Delete(id)
-			s.Logger.Info("removed room", "roomID", id, "inactive", inactive)
+func (s *ServerStateManager) cleanupInactiveRooms(now time.Time) {
+	s.rooms.Range(func(id string, rm *room.Room) bool {
+		if rm.Expired(now, roomInactivityTimeout) {
+			s.rooms.Delete(id)
+			s.Logger.Info("removed room", "roomID", id, "inactive", true)
 		}
 		return true
 	})
