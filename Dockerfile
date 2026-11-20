@@ -9,7 +9,7 @@ RUN npm run build
 # Stage 2: build the Go binary
 FROM golang:1.27.4-alpine AS backend-builder
 WORKDIR /app
-COPY go.mod ./
+COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 go build -o /app/bin/srpg-web ./cmd/srpg-web

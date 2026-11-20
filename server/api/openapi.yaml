@@ -1,0 +1,641 @@
+openapi: 3.0.3
+info:
+  title: Bomb Tactics API
+  version: 0.0.0
+  description: >-
+    HTTP API of the Bomb Tactics server. Any route may also answer 500 with a plain-text
+    message; no operation declares it. Error bodies are plain text.
+paths:
+  /api/health:
+    get:
+      operationId: getHealth
+      summary: Report that the server is up
+      responses:
+        '200':
+          description: The server is up
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+  /api/catalog:
+    get:
+      operationId: getCatalog
+      summary: List the archetypes and stage presets
+      responses:
+        '200':
+          description: The catalog
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Catalog'
+  /api/match-rooms:
+    post:
+      operationId: createMatchRoom
+      summary: Create an empty match room
+      responses:
+        '201':
+          description: The room, with its URL in the Location header
+          headers:
+            Location:
+              required: true
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateMatchRoomResponse'
+  /api/match-rooms/{roomID}/match:
+    post:
+      operationId: createMatch
+      summary: Start a match in an empty room
+      parameters:
+        - $ref: '#/components/parameters/RoomID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateMatchRequest'
+      responses:
+        '201':
+          description: The match started, with one token per team
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateMatchResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+    delete:
+      operationId: deleteMatch
+      summary: Delete a finished match
+      security:
+        - playerToken: []
+      parameters:
+        - $ref: '#/components/parameters/RoomID'
+      responses:
+        '204':
+          description: The match is deleted, or there was none
+        '401':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /api/match-rooms/{roomID}/rematch:
+    post:
+      operationId: rematch
+      summary: Replace the match with a fresh one from the same config
+      security:
+        - playerToken: []
+      parameters:
+        - $ref: '#/components/parameters/RoomID'
+      responses:
+        '201':
+          description: The new match, with the same two tokens
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateMatchResponse'
+        '401':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+  /api/match-rooms/{roomID}/match/state:
+    get:
+      operationId: getMatchState
+      summary: Read the working state of the match
+      parameters:
+        - $ref: '#/components/parameters/RoomID'
+      responses:
+        '200':
+          description: The working state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GameState'
+        '404':
+          $ref: '#/components/responses/Error'
+  /api/match-rooms/{roomID}/match/turn-commands:
+    post:
+      operationId: submitTurnCommand
+      summary: Plan one command for the active team
+      security:
+        - playerToken: []
+      parameters:
+        - $ref: '#/components/parameters/RoomID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TurnCommand'
+      responses:
+        '200':
+          description: The events the command produced
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GameEvent'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /api/match-rooms/{roomID}/match/cpu-status/consume:
+    post:
+      operationId: consumeCpuStatus
+      summary: Read and clear the CPU turn status
+      security:
+        - playerToken: []
+      parameters:
+        - $ref: '#/components/parameters/RoomID'
+      responses:
+        '200':
+          description: The CPU turn phase and its events
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CpuStatusResponse'
+        '401':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+  /api/match-rooms/{roomID}/match/reset:
+    post:
+      operationId: resetTurn
+      summary: Discard the planned commands of the turn
+      security:
+        - playerToken: []
+      parameters:
+        - $ref: '#/components/parameters/RoomID'
+      responses:
+        '204':
+          description: The turn is reset
+        '401':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /api/match-rooms/{roomID}/match/resolve:
+    post:
+      operationId: resolveTurn
+      summary: Resolve the turn
+      security:
+        - playerToken: []
+      parameters:
+        - $ref: '#/components/parameters/RoomID'
+      responses:
+        '200':
+          description: The events of the resolved turn
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResolveTurnResponse'
+        '401':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /api/match-rooms/{roomID}/match/surrender:
+    post:
+      operationId: surrender
+      summary: Surrender for a team
+      security:
+        - playerToken: []
+      parameters:
+        - $ref: '#/components/parameters/RoomID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SurrenderRequest'
+      responses:
+        '200':
+          description: The events the surrender produced
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GameEvent'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+  /api/match-rooms/{roomID}/match/config:
+    get:
+      operationId: getMatchConfig
+      summary: Read the config of the match
+      parameters:
+        - $ref: '#/components/parameters/RoomID'
+      responses:
+        '200':
+          description: The match config
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GameCfg'
+        '404':
+          $ref: '#/components/responses/Error'
+  /api/match-rooms/{roomID}/match/allowed-tiles:
+    get:
+      operationId: getAllowedTiles
+      summary: List the tiles a command of one unit may target
+      parameters:
+        - $ref: '#/components/parameters/RoomID'
+        - name: unitId
+          in: query
+          required: true
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 255
+        - name: turnCmdType
+          in: query
+          required: true
+          schema:
+            $ref: '#/components/schemas/TurnCmdType'
+      responses:
+        '200':
+          description: The allowed tiles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Coordinate'
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+components:
+  securitySchemes:
+    playerToken:
+      type: http
+      scheme: bearer
+  parameters:
+    RoomID:
+      name: roomID
+      in: path
+      required: true
+      schema:
+        type: string
+  responses:
+    Error:
+      description: Plain-text error message
+      content:
+        text/plain:
+          schema:
+            type: string
+  schemas:
+    Coordinate:
+      type: object
+      additionalProperties: false
+      properties:
+        x:
+          type: integer
+        y:
+          type: integer
+      required: [x, y]
+    TerrainType:
+      type: string
+      enum: [TerrainPlain, TerrainBlock, TerrainTower, TerrainWater, TerrainLava]
+    OccupantType:
+      type: string
+      enum: [OccupantNone, OccupantUnit, OccupantBomb, OccupantSoftBlock, OccupantItem]
+    SkillType:
+      type: string
+      enum: [Jump, Fly]
+    TurnCmdType:
+      type: string
+      enum: [move, placeBomb]
+    GameEvtType:
+      type: string
+      enum: [unitMoved, unitDamaged, unitDied, bombPlaced, bombCountdownUpdated, bombExploded, softBlockDestroyed, matchEnded]
+    Tile:
+      type: object
+      additionalProperties: false
+      properties:
+        type:
+          $ref: '#/components/schemas/TerrainType'
+        occupantType:
+          $ref: '#/components/schemas/OccupantType'
+        occupantId:
+          type: integer
+          format: int64
+      required: [type, occupantType, occupantId]
+    Unit:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: integer
+          minimum: 0
+          maximum: 255
+        type:
+          type: string
+        position:
+          $ref: '#/components/schemas/Coordinate'
+        speed:
+          type: integer
+        bombMaxRange:
+          type: integer
+        bombPower:
+          type: integer
+        maxBombCount:
+          type: integer
+        bombUsed:
+          type: integer
+        team:
+          type: integer
+        hp:
+          type: integer
+        skills:
+          type: array
+          items:
+            $ref: '#/components/schemas/SkillType'
+        hasMoved:
+          type: boolean
+        hasUsedSkill:
+          type: boolean
+      required: [id, type, position, speed, bombMaxRange, bombPower, maxBombCount, bombUsed, team, hp, skills, hasMoved, hasUsedSkill]
+    Bomb:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: integer
+          format: int64
+          minimum: 0
+        ownerId:
+          type: integer
+          minimum: 0
+          maximum: 255
+        position:
+          $ref: '#/components/schemas/Coordinate'
+        range:
+          type: integer
+        countdown:
+          type: integer
+      required: [id, ownerId, position, range, countdown]
+    SoftBlock:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: integer
+        position:
+          $ref: '#/components/schemas/Coordinate'
+      required: [id, position]
+    TurnCommand:
+      type: object
+      additionalProperties: false
+      properties:
+        type:
+          $ref: '#/components/schemas/TurnCmdType'
+        unitId:
+          type: integer
+          minimum: 0
+          maximum: 255
+        target:
+          $ref: '#/components/schemas/Coordinate'
+      required: [type, unitId, target]
+    GameEvent:
+      type: object
+      additionalProperties: false
+      properties:
+        type:
+          $ref: '#/components/schemas/GameEvtType'
+        unitId:
+          type: integer
+          minimum: 0
+          maximum: 255
+        bombId:
+          type: integer
+          format: int64
+          minimum: 0
+        softBlockId:
+          type: integer
+        itemId:
+          type: integer
+        position:
+          $ref: '#/components/schemas/Coordinate'
+        from:
+          $ref: '#/components/schemas/Coordinate'
+        to:
+          $ref: '#/components/schemas/Coordinate'
+        newHp:
+          type: integer
+        range:
+          type: integer
+        countdown:
+          type: integer
+        affectedPositions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Coordinate'
+        winnerTeamId:
+          type: integer
+      required: [type, unitId, newHp, countdown]
+    GameState:
+      type: object
+      additionalProperties: false
+      properties:
+        turn:
+          type: integer
+        inSuddenDeath:
+          type: boolean
+        activeTeam:
+          type: integer
+        grid:
+          type: array
+          items:
+            type: array
+            items:
+              $ref: '#/components/schemas/Tile'
+        units:
+          type: array
+          items:
+            $ref: '#/components/schemas/Unit'
+        bombs:
+          type: array
+          items:
+            $ref: '#/components/schemas/Bomb'
+        softBlocks:
+          type: array
+          items:
+            $ref: '#/components/schemas/SoftBlock'
+        turnCommands:
+          description: Always an empty array on the wire; no production code appends to it.
+          type: array
+          items:
+            $ref: '#/components/schemas/TurnCommand'
+        turnStartEvents:
+          type: array
+          items:
+            $ref: '#/components/schemas/GameEvent'
+      required: [turn, inSuddenDeath, activeTeam, grid, units, bombs, softBlocks, turnCommands, turnStartEvents]
+    UnitRole:
+      type: string
+      enum: [Normal, King, Boss]
+    CPUTurnPhase:
+      type: string
+      enum: [TurnPhaseIdle, TurnPhasePlanning, TurnPhaseReady]
+    Health:
+      type: object
+      additionalProperties: false
+      properties:
+        status:
+          type: string
+      required: [status]
+    Archetype:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+        speed:
+          type: integer
+        bombMaxRange:
+          type: integer
+        skills:
+          type: array
+          items:
+            $ref: '#/components/schemas/SkillType'
+      required: [name, speed, bombMaxRange, skills]
+    StagePreset:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        width:
+          type: integer
+        height:
+          type: integer
+        maxTurns:
+          type: integer
+      required: [name, description, width, height, maxTurns]
+    Catalog:
+      type: object
+      additionalProperties: false
+      properties:
+        archetypes:
+          type: array
+          items:
+            $ref: '#/components/schemas/Archetype'
+        stagePresets:
+          type: array
+          items:
+            $ref: '#/components/schemas/StagePreset'
+      required: [archetypes, stagePresets]
+    TeamSlot:
+      type: object
+      additionalProperties: false
+      properties:
+        archetype:
+          type: string
+        role:
+          $ref: '#/components/schemas/UnitRole'
+      required: [archetype, role]
+    GameCfg:
+      type: object
+      additionalProperties: false
+      properties:
+        vsCpu:
+          type: boolean
+        stagePreset:
+          type: string
+        p1Slots:
+          type: array
+          items:
+            $ref: '#/components/schemas/TeamSlot'
+        p2Slots:
+          type: array
+          items:
+            $ref: '#/components/schemas/TeamSlot'
+        maxTurns:
+          type: integer
+        allowResetTurn:
+          type: boolean
+      required: [vsCpu, stagePreset, p1Slots, p2Slots, maxTurns, allowResetTurn]
+    CreateMatchRoomResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+      required: [id]
+    CreateMatchRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        gameCfg:
+          $ref: '#/components/schemas/GameCfg'
+      required: [gameCfg]
+    CreateMatchResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        success:
+          type: boolean
+        playerTokens:
+          type: array
+          minItems: 2
+          maxItems: 2
+          items:
+            type: string
+      required: [success, playerTokens]
+    CpuStatusResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        turnPhase:
+          $ref: '#/components/schemas/CPUTurnPhase'
+        planGameEvents:
+          type: array
+          items:
+            $ref: '#/components/schemas/GameEvent'
+        resolveTurnGameEvents:
+          type: array
+          items:
+            $ref: '#/components/schemas/GameEvent'
+      required: [turnPhase, planGameEvents, resolveTurnGameEvents]
+    ResolveTurnResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        planGameEvents:
+          type: array
+          items:
+            $ref: '#/components/schemas/GameEvent'
+        resolveTurnGameEvents:
+          type: array
+          items:
+            $ref: '#/components/schemas/GameEvent'
+      required: [planGameEvents, resolveTurnGameEvents]
+    SurrenderRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        teamId:
+          type: integer
+      required: [teamId]
