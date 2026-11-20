@@ -131,7 +131,7 @@ func TestHandleCreateNewMatch(t *testing.T) {
 		handler: (*Handler).handleCreateMatch,
 		pattern: "POST /api/match-rooms/{roomID}/match",
 		body:    createMatchRequest{GameCfg: validGameCfg()},
-		cases:   failRoom,
+		cases:   failRoom | failRoomBadBody,
 	})
 
 	t.Run("Failure: match already exists", func(t *testing.T) {
@@ -275,7 +275,7 @@ func TestHandleRematch(t *testing.T) {
 	testRouteFailures(t, failureRoute{
 		handler: (*Handler).handleRematch,
 		pattern: "POST /api/match-rooms/{roomID}/rematch",
-		cases:   failRoom | failMissingAuth | failInvalidToken,
+		cases:   failRoom | failMissingAuth | failInvalidToken | failRoomNoToken,
 	})
 
 	t.Run("Failure: failed to Encode response", func(t *testing.T) {
@@ -342,6 +342,6 @@ func TestHandleDeleteMatch(t *testing.T) {
 	testRouteFailures(t, failureRoute{
 		handler: (*Handler).handleDeleteMatch,
 		pattern: "DELETE /api/match-rooms/{roomID}/match",
-		cases:   failRoom | failMissingAuth | failInvalidToken,
+		cases:   failRoom | failMissingAuth | failInvalidToken | failRoomNoToken,
 	})
 }
