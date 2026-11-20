@@ -32,8 +32,8 @@ func TestServerStateManager_CreateMatchRoom(t *testing.T) {
 					t.Errorf("Expected ID length 10, got %d: %s", len(id), id)
 				}
 				mustRoom(t, s, id)
-				if _, err := s.getMatchState(id); !errors.Is(err, room.ErrMatchNotFound) {
-					t.Errorf("getMatchState() error = %v, want %v", err, room.ErrMatchNotFound)
+				if _, err := mustRoom(t, s, id).State(); !errors.Is(err, room.ErrMatchNotFound) {
+					t.Errorf("State() error = %v, want %v", err, room.ErrMatchNotFound)
 				}
 			},
 		},
@@ -131,8 +131,8 @@ func TestServerStateManager_cleanupInactiveRooms(t *testing.T) {
 
 	endedID, _ := s.createMatchRoom()
 	endedTokens := mustCreateMatch(t, s, endedID, validGameCfg())
-	if _, err := s.surrender(endedID, 1, endedTokens[0]); err != nil {
-		t.Fatalf("surrender() error = %v", err)
+	if _, err := mustRoom(t, s, endedID).Surrender(1, endedTokens[0]); err != nil {
+		t.Fatalf("Surrender() error = %v", err)
 	}
 
 	tests := []struct {

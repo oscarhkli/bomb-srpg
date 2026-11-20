@@ -207,6 +207,8 @@ const (
 	failMissingAuth
 	failInvalidToken
 	failWrongTeam
+	failRoomNoToken
+	failRoomBadBody
 )
 
 type failureRoute struct {
@@ -231,11 +233,15 @@ func testRouteFailures(t *testing.T, route failureRoute) {
 	}
 	authed := route.cases&(failMissingAuth|failInvalidToken|failWrongTeam) != 0
 
-	call := func(t *testing.T, h *Handler, roomID, token string) *httptest.ResponseRecorder {
+	callWithBody := func(t *testing.T, h *Handler, roomID, token, reqBody string) *httptest.ResponseRecorder {
 		t.Helper()
 		handler := func(w http.ResponseWriter, r *http.Request) { route.handler(h, w, r) }
 		path := strings.Replace(routePath, "{roomID}", roomID, 1) + route.query
-		return doRequest(t, handler, route.pattern, method, path, body, token)
+		return doRequest(t, handler, route.pattern, method, path, reqBody, token)
+	}
+	call := func(t *testing.T, h *Handler, roomID, token string) *httptest.ResponseRecorder {
+		t.Helper()
+		return callWithBody(t, h, roomID, token, body)
 	}
 	assertFailure := func(t *testing.T, rr *httptest.ResponseRecorder, wantStatus int, wantMsg string) {
 		t.Helper()
@@ -260,6 +266,22 @@ func testRouteFailures(t *testing.T, route failureRoute) {
 			}
 			h := NewHandler(NewServerStateManager())
 			assertFailure(t, call(t, h, "NONEXISTENT", token), http.StatusNotFound, "room not found")
+		})
+	}
+	if route.cases&failRoomNoToken != 0 {
+		t.Run("Failure: room not found, missing Authorization header", func(t *testing.T) {
+			h := NewHandler(NewServerStateManager())
+			assertFailure(t, call(t, h, "NONEXISTENT", ""), http.StatusUnauthorized, "invalid player token")
+		})
+	}
+	if route.cases&failRoomBadBody != 0 {
+		t.Run("Failure: room not found, invalid body", func(t *testing.T) {
+			token := ""
+			if authed {
+				token = "dummy-token"
+			}
+			h := NewHandler(NewServerStateManager())
+			assertFailure(t, callWithBody(t, h, "NONEXISTENT", token, "{"), http.StatusBadRequest, "Invalid")
 		})
 	}
 	if route.cases&failMatch != 0 {

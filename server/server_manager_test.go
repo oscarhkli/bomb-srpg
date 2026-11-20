@@ -4,6 +4,7 @@ import (
 	"bomb-srpg/engine"
 	"bomb-srpg/room"
 	"fmt"
+	"net/http"
 	"testing"
 )
 
@@ -18,11 +19,11 @@ func validGameCfg() engine.GameCfg {
 
 func assertTokensAuthorize(t *testing.T, s *ServerStateManager, roomID string, tokens [2]string) {
 	t.Helper()
-	if err := s.resetTurn(roomID, tokens[0]); err != nil {
-		t.Errorf("resetTurn() with the team 1 token error = %v", err)
+	if err := mustRoom(t, s, roomID).Reset(tokens[0]); err != nil {
+		t.Errorf("Reset() with the team 1 token error = %v", err)
 	}
-	if _, err := s.surrender(roomID, 2, tokens[1]); err != nil {
-		t.Errorf("surrender() with the team 2 token error = %v", err)
+	if _, err := mustRoom(t, s, roomID).Surrender(2, tokens[1]); err != nil {
+		t.Errorf("Surrender() with the team 2 token error = %v", err)
 	}
 }
 
@@ -30,7 +31,7 @@ func createTestRoomWithCfg(t *testing.T, gameCfg engine.GameCfg, opts ...Option)
 	t.Helper()
 	s := NewServerStateManager(opts...)
 	roomID, _ := s.createMatchRoom()
-	tokens, _ := s.createMatch(roomID, gameCfg)
+	tokens, _ := mustRoom(t, s, roomID).Start(gameCfg)
 	return roomID, tokens, s
 }
 
@@ -50,7 +51,7 @@ func mustRoom(t *testing.T, s *ServerStateManager, roomID string) *room.Room {
 
 func mustCreateMatch(t *testing.T, s *ServerStateManager, roomID string, gameCfg engine.GameCfg) [2]string {
 	t.Helper()
-	tokens, err := s.createMatch(roomID, gameCfg)
+	tokens, err := mustRoom(t, s, roomID).Start(gameCfg)
 	if err != nil {
 		t.Fatalf("CreateMatch() error = %v", err)
 	}
@@ -107,6 +108,50 @@ func TestMapError(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			code, msg := mapError(tt.err)
+			if code != tt.wantCode || msg != tt.wantMsg {
+				t.Errorf("got (%d, %q) want (%d, %q)", code, msg, tt.wantCode, tt.wantMsg)
+			}
+		})
+	}
+}
+
+func TestMapError_EngineRejections(t *testing.T) {
+	tests := []struct {
+		name     string
+		run      func(t *testing.T) error
+		wantCode int
+		wantMsg  string
+	}{
+		{
+			name: "config rejected by the engine",
+			run: func(t *testing.T) error {
+				t.Helper()
+				gameCfg := validGameCfg()
+				gameCfg.StagePreset = "NoSuchStage"
+				s := NewServerStateManager()
+				roomID, _ := s.createMatchRoom()
+				_, err := mustRoom(t, s, roomID).Start(gameCfg)
+				return err
+			},
+			wantCode: http.StatusBadRequest,
+			wantMsg:  "invalid game config: invalid stage preset: stage preset 'NoSuchStage' not found",
+		},
+		{
+			name: "turn command rejected by the engine",
+			run: func(t *testing.T) error {
+				t.Helper()
+				roomID, tokens, s := createTestRoom(t)
+				cmd := engine.NewMoveCommand(engine.NewUnitID(1, 0), engine.Coordinate{X: 4, Y: 7777})
+				_, err := mustRoom(t, s, roomID).Submit(cmd, tokens[0])
+				return err
+			},
+			wantCode: http.StatusConflict,
+			wantMsg:  "invalid turn command: target out of move range",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			code, msg := mapError(tt.run(t))
 			if code != tt.wantCode || msg != tt.wantMsg {
 				t.Errorf("got (%d, %q) want (%d, %q)", code, msg, tt.wantCode, tt.wantMsg)
 			}

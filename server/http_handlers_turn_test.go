@@ -103,7 +103,7 @@ func TestHandleSubmitTurnCommand(t *testing.T) {
 		handler: (*Handler).handleSubmitTurnCommand,
 		pattern: "POST /api/match-rooms/{roomID}/match/turn-commands",
 		body:    engine.NewMoveCommand(engine.NewUnitID(1, 0), engine.Coordinate{X: 4, Y: 7}),
-		cases:   failRoom | failMatch | failMissingAuth | failInvalidToken | failWrongTeam,
+		cases:   failRoom | failMatch | failMissingAuth | failInvalidToken | failWrongTeam | failRoomNoToken | failRoomBadBody,
 	})
 
 	t.Run("Failure: failed to Encode", func(t *testing.T) {
@@ -279,7 +279,7 @@ func TestHandleConsumeCPUStatus(t *testing.T) {
 	testRouteFailures(t, failureRoute{
 		handler: (*Handler).handleConsumeCPUStatus,
 		pattern: consumePattern,
-		cases:   failRoom | failMatch | failMissingAuth | failInvalidToken,
+		cases:   failRoom | failMatch | failMissingAuth | failInvalidToken | failRoomNoToken,
 	})
 
 	t.Run("Failure: failed to Encode", func(t *testing.T) {
@@ -326,7 +326,7 @@ func TestHandleConsumeCPUStatus(t *testing.T) {
 
 func TestHandleResolveTurn_DuringCPUTurn(t *testing.T) {
 	roomID, playerTokens, s, h := newCPUTurnHandlerRoom(t, WithSpawner(holdCPUTurn(t).spawn))
-	if _, _, _, err := s.consumeCPUStatus(roomID, playerTokens[0]); err != nil {
+	if _, err := mustRoom(t, s, roomID).ConsumeCPU(playerTokens[0]); err != nil {
 		t.Fatalf("ConsumeCPUStatus() error = %v", err)
 	}
 
@@ -408,7 +408,7 @@ func TestHandleResetTurn(t *testing.T) {
 	testRouteFailures(t, failureRoute{
 		handler: (*Handler).handleResetTurn,
 		pattern: "POST /api/match-rooms/{roomID}/match/reset",
-		cases:   failRoom | failMatch | failMissingAuth | failInvalidToken | failWrongTeam,
+		cases:   failRoom | failMatch | failMissingAuth | failInvalidToken | failWrongTeam | failRoomNoToken,
 	})
 }
 
@@ -452,7 +452,7 @@ func TestHandleResolveTurn(t *testing.T) {
 	testRouteFailures(t, failureRoute{
 		handler: (*Handler).handleResolveTurn,
 		pattern: "POST /api/match-rooms/{roomID}/match/resolve",
-		cases:   failRoom | failMatch | failMissingAuth | failInvalidToken | failWrongTeam,
+		cases:   failRoom | failMatch | failMissingAuth | failInvalidToken | failWrongTeam | failRoomNoToken,
 	})
 
 	t.Run("Failure: failed to Encode", func(t *testing.T) {
@@ -470,7 +470,7 @@ func TestHandleResolveTurn(t *testing.T) {
 	t.Run("Test Contract", func(t *testing.T) {
 		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
 		unitID := engine.NewUnitID(1, 0)
-		if _, err := s.submitTurnCommand(roomID, engine.NewPlaceBombCommand(unitID, engine.Coordinate{X: 4, Y: 7}), playerTokens[0]); err != nil {
+		if _, err := mustRoom(t, s, roomID).Submit(engine.NewPlaceBombCommand(unitID, engine.Coordinate{X: 4, Y: 7}), playerTokens[0]); err != nil {
 			t.Fatalf("SubmitTurnCommand() error = %v", err)
 		}
 
@@ -548,6 +548,34 @@ func TestHandleSurrender(t *testing.T) {
 		}
 	})
 
+	t.Run("Failure: invalid team on an unknown room", func(t *testing.T) {
+		h := NewHandler(NewServerStateManager())
+
+		jsonBody, _ := json.Marshal(surrenderRequest{TeamID: 3})
+		rr := doRequest(t, h.handleSurrender, "POST /api/match-rooms/{roomID}/match/surrender", "POST", "/api/match-rooms/NONEXISTENT/match/surrender", string(jsonBody), "dummy-token")
+
+		if status := rr.Code; status != http.StatusBadRequest {
+			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusBadRequest)
+		}
+		if !strings.Contains(rr.Body.String(), "invalid game config") {
+			t.Errorf("Expected error message 'invalid game config', got: %s", rr.Body.String())
+		}
+	})
+
+	t.Run("Failure: invalid team, unknown room, no Authorization header", func(t *testing.T) {
+		h := NewHandler(NewServerStateManager())
+
+		jsonBody, _ := json.Marshal(surrenderRequest{TeamID: 3})
+		rr := doRequest(t, h.handleSurrender, "POST /api/match-rooms/{roomID}/match/surrender", "POST", "/api/match-rooms/NONEXISTENT/match/surrender", string(jsonBody), "")
+
+		if status := rr.Code; status != http.StatusUnauthorized {
+			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusUnauthorized)
+		}
+		if !strings.Contains(rr.Body.String(), "invalid player token") {
+			t.Errorf("Expected error message 'invalid player token', got: %s", rr.Body.String())
+		}
+	})
+
 	t.Run("Failure: invalid JSON format", func(t *testing.T) {
 		roomID, playerTokens, _, h := createTestRoomWithMatch(t)
 
@@ -565,7 +593,7 @@ func TestHandleSurrender(t *testing.T) {
 		handler: (*Handler).handleSurrender,
 		pattern: "POST /api/match-rooms/{roomID}/match/surrender",
 		body:    surrenderRequest{TeamID: 1},
-		cases:   failRoom | failMatch | failMissingAuth | failInvalidToken | failWrongTeam,
+		cases:   failRoom | failMatch | failMissingAuth | failInvalidToken | failWrongTeam | failRoomNoToken | failRoomBadBody,
 	})
 
 	t.Run("Failure: failed to Encode", func(t *testing.T) {
@@ -584,7 +612,7 @@ func TestHandleSurrender(t *testing.T) {
 	t.Run("Test Contract", func(t *testing.T) {
 		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
 		unitID := engine.NewUnitID(1, 0)
-		if _, err := s.submitTurnCommand(roomID, engine.NewPlaceBombCommand(unitID, engine.Coordinate{X: 4, Y: 7}), playerTokens[0]); err != nil {
+		if _, err := mustRoom(t, s, roomID).Submit(engine.NewPlaceBombCommand(unitID, engine.Coordinate{X: 4, Y: 7}), playerTokens[0]); err != nil {
 			t.Fatalf("SubmitTurnCommand() error = %v", err)
 		}
 
