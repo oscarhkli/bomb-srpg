@@ -71,7 +71,7 @@ func main() {
 	serverState := server.NewServerStateManager(server.WithLogger(logger))
 	handler := server.NewHandler(serverState, server.WithHandlerLogger(logger))
 
-	go serverState.RunCleanupLoop(ctx, server.CleanupInterval)
+	go serverState.RunCleanupLoop(ctx, server.CleanupInterval, time.Now)
 
 	r := http.NewServeMux()
 	fs := http.FileServer(http.Dir("./web/dist"))

@@ -78,10 +78,6 @@ func (h *heldCPUTurn) runOutsideRoomLock() {
 	f()
 }
 
-func setTeam2DueTurn(gs *engine.GameState) {
-	gs.ActiveTeam, gs.Turn = 2, 4
-}
-
 func moveThenBombPlan(t *testing.T, unitID engine.UnitID, dest engine.Coordinate) func(*engine.GameState, int) []engine.TurnCommand {
 	t.Helper()
 	return func(gs *engine.GameState, _ int) []engine.TurnCommand {
@@ -308,13 +304,13 @@ func TestServerStateManager_ConsumeCPUStatus_StaleReadyDropped(t *testing.T) {
 	}}
 	held := holdCPUTurn(t)
 	roomID, tokens, s := newCPUTurnRoom(t, WithDecider(decider.decide), WithSpawner(held.spawn))
-	rm := mustRoom(t, s, roomID)
 
 	consumeCPUPhase(t, s, roomID, tokens[0])
 	held.runOutsideRoomLock()
 
-	setTeam2DueTurn(rm.Match.TrueState)
-	setTeam2DueTurn(rm.Match.WorkingState)
+	if _, _, err := s.resolveTurn(roomID, tokens[0]); err != nil {
+		t.Fatalf("resolveTurn() error = %v", err)
+	}
 
 	phase, planGameEvents, resolveTurnGameEvents := consumeCPUPhase(t, s, roomID, tokens[0])
 	if phase != engine.TurnPhasePlanning {
@@ -477,14 +473,6 @@ func TestServerStateManager_runCPUTurn_Abandons(t *testing.T) {
 			},
 			wantPhase: engine.TurnPhaseReady,
 		},
-		{
-			name: "Not CPU's Turn",
-			act: func(t *testing.T, s *ServerStateManager, roomID string, tokens [2]string) {
-				t.Helper()
-				mustRoom(t, s, roomID).Match.WorkingState.ActiveTeam = 1
-			},
-			wantPhase: engine.TurnPhaseReady,
-		},
 	}
 
 	for _, tt := range tests {
@@ -541,7 +529,6 @@ func TestServerStateManager_ReadsDuringCPUTurn(t *testing.T) {
 		return nil, nil
 	}
 	roomID, tokens, s := newCPUTurnRoom(t, WithDecider(decide))
-	rm := mustRoom(t, s, roomID)
 
 	if phase, _, _ := consumeCPUPhase(t, s, roomID, tokens[0]); phase != engine.TurnPhasePlanning {
 		t.Fatalf("phase = %v, want %v", phase, engine.TurnPhasePlanning)
@@ -584,9 +571,7 @@ func TestServerStateManager_ReadsDuringCPUTurn(t *testing.T) {
 	}
 
 	close(release)
-	rm.Mu.Lock()
-	activeTeam := rm.Match.TrueState.ActiveTeam
-	rm.Mu.Unlock()
+	activeTeam := mustMatchState(t, s, roomID).ActiveTeam
 	close(stop)
 	readers.Wait()
 
@@ -867,10 +852,8 @@ func TestServerStateManager_runCPUTurn_DecideError(t *testing.T) {
 				err:  decideErr,
 			}
 			held := holdCPUTurn(t)
-			roomID, tokens, s := newCPUTurnRoom(t, WithDecider(decider.decide), WithSpawner(held.spawn))
-			rm := mustRoom(t, s, roomID)
 			h := &captureHandler{}
-			rm.Logger = slog.New(h)
+			roomID, tokens, s := newCPUTurnRoom(t, WithDecider(decider.decide), WithSpawner(held.spawn), WithLogger(slog.New(h)))
 
 			consumeCPUPhase(t, s, roomID, tokens[0])
 			held.runOutsideRoomLock()

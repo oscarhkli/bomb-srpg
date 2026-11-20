@@ -4,7 +4,6 @@ import (
 	"bomb-srpg/engine"
 	"bomb-srpg/room"
 	"fmt"
-	"reflect"
 	"testing"
 )
 
@@ -17,18 +16,13 @@ func validGameCfg() engine.GameCfg {
 	}
 }
 
-func assertGameCfgSynced(t *testing.T, s *ServerStateManager, roomID string) {
+func assertTokensAuthorize(t *testing.T, s *ServerStateManager, roomID string, tokens [2]string) {
 	t.Helper()
-	rm := mustRoom(t, s, roomID)
-	if rm.GameCfg == nil {
-		t.Fatal("Expected rm.GameCfg to be set")
+	if err := s.resetTurn(roomID, tokens[0]); err != nil {
+		t.Errorf("resetTurn() with the team 1 token error = %v", err)
 	}
-	matchCfg, err := s.getMatchConfig(roomID)
-	if err != nil {
-		t.Fatalf("getMatchConfig() error = %v", err)
-	}
-	if !reflect.DeepEqual(*rm.GameCfg, *matchCfg) {
-		t.Errorf("Expected MatchRoom and Match to have equal GameCfg values, MatchRoom %+v vs Match %+v", *rm.GameCfg, *matchCfg)
+	if _, err := s.surrender(roomID, 2, tokens[1]); err != nil {
+		t.Errorf("surrender() with the team 2 token error = %v", err)
 	}
 }
 
@@ -124,7 +118,7 @@ func TestRoomRegistry_RangeSkipsForeignValues(t *testing.T) {
 	var reg roomRegistry
 	want := room.New("ok", room.Deps{Logger: discardLogger()})
 	reg.Store("ok", want)
-	reg.rooms.Store("bad", "not a room")
+	reg.byID.Store("bad", "not a room")
 
 	var got []*room.Room
 	reg.Range(func(_ string, rm *room.Room) bool {
