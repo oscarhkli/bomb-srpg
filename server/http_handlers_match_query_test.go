@@ -131,7 +131,7 @@ func TestHandleGetMatchState(t *testing.T) {
 			t.Errorf("second GET turnStartEvents = %+v, want %+v", got, firstEvents)
 		}
 
-		if _, _, err := s.resolveTurn(roomID, tokens[0]); err != nil {
+		if _, _, err := mustRoom(t, s, roomID).Resolve(tokens[0]); err != nil {
 			t.Fatalf("ResolveTurn() error = %v", err)
 		}
 		nextEvents := getState().TurnStartEvents
@@ -177,10 +177,10 @@ func TestHandleGetMatchState(t *testing.T) {
 			MaxTurns:    10,
 		}
 		tokens := mustCreateMatch(t, s, roomID, gameCfg)
-		if _, err := s.submitTurnCommand(roomID, engine.NewPlaceBombCommand(unitID, pos), tokens[0]); err != nil {
+		if _, err := mustRoom(t, s, roomID).Submit(engine.NewPlaceBombCommand(unitID, pos), tokens[0]); err != nil {
 			t.Fatalf("SubmitTurnCommand(place bomb) error = %v", err)
 		}
-		if _, _, err := s.resolveTurn(roomID, tokens[0]); err != nil {
+		if _, _, err := mustRoom(t, s, roomID).Resolve(tokens[0]); err != nil {
 			t.Fatalf("ResolveTurn() error = %v", err)
 		}
 

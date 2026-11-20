@@ -19,11 +19,11 @@ func validGameCfg() engine.GameCfg {
 
 func assertTokensAuthorize(t *testing.T, s *ServerStateManager, roomID string, tokens [2]string) {
 	t.Helper()
-	if err := s.resetTurn(roomID, tokens[0]); err != nil {
-		t.Errorf("resetTurn() with the team 1 token error = %v", err)
+	if err := mustRoom(t, s, roomID).Reset(tokens[0]); err != nil {
+		t.Errorf("Reset() with the team 1 token error = %v", err)
 	}
-	if _, err := s.surrender(roomID, 2, tokens[1]); err != nil {
-		t.Errorf("surrender() with the team 2 token error = %v", err)
+	if _, err := mustRoom(t, s, roomID).Surrender(2, tokens[1]); err != nil {
+		t.Errorf("Surrender() with the team 2 token error = %v", err)
 	}
 }
 
@@ -31,7 +31,7 @@ func createTestRoomWithCfg(t *testing.T, gameCfg engine.GameCfg, opts ...Option)
 	t.Helper()
 	s := NewServerStateManager(opts...)
 	roomID, _ := s.createMatchRoom()
-	tokens, _ := s.createMatch(roomID, gameCfg)
+	tokens, _ := mustRoom(t, s, roomID).Start(gameCfg)
 	return roomID, tokens, s
 }
 
@@ -51,7 +51,7 @@ func mustRoom(t *testing.T, s *ServerStateManager, roomID string) *room.Room {
 
 func mustCreateMatch(t *testing.T, s *ServerStateManager, roomID string, gameCfg engine.GameCfg) [2]string {
 	t.Helper()
-	tokens, err := s.createMatch(roomID, gameCfg)
+	tokens, err := mustRoom(t, s, roomID).Start(gameCfg)
 	if err != nil {
 		t.Fatalf("CreateMatch() error = %v", err)
 	}

@@ -326,7 +326,7 @@ func TestHandleConsumeCPUStatus(t *testing.T) {
 
 func TestHandleResolveTurn_DuringCPUTurn(t *testing.T) {
 	roomID, playerTokens, s, h := newCPUTurnHandlerRoom(t, WithSpawner(holdCPUTurn(t).spawn))
-	if _, _, _, err := s.consumeCPUStatus(roomID, playerTokens[0]); err != nil {
+	if _, err := mustRoom(t, s, roomID).ConsumeCPU(playerTokens[0]); err != nil {
 		t.Fatalf("ConsumeCPUStatus() error = %v", err)
 	}
 
@@ -470,7 +470,7 @@ func TestHandleResolveTurn(t *testing.T) {
 	t.Run("Test Contract", func(t *testing.T) {
 		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
 		unitID := engine.NewUnitID(1, 0)
-		if _, err := s.submitTurnCommand(roomID, engine.NewPlaceBombCommand(unitID, engine.Coordinate{X: 4, Y: 7}), playerTokens[0]); err != nil {
+		if _, err := mustRoom(t, s, roomID).Submit(engine.NewPlaceBombCommand(unitID, engine.Coordinate{X: 4, Y: 7}), playerTokens[0]); err != nil {
 			t.Fatalf("SubmitTurnCommand() error = %v", err)
 		}
 
@@ -612,7 +612,7 @@ func TestHandleSurrender(t *testing.T) {
 	t.Run("Test Contract", func(t *testing.T) {
 		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
 		unitID := engine.NewUnitID(1, 0)
-		if _, err := s.submitTurnCommand(roomID, engine.NewPlaceBombCommand(unitID, engine.Coordinate{X: 4, Y: 7}), playerTokens[0]); err != nil {
+		if _, err := mustRoom(t, s, roomID).Submit(engine.NewPlaceBombCommand(unitID, engine.Coordinate{X: 4, Y: 7}), playerTokens[0]); err != nil {
 			t.Fatalf("SubmitTurnCommand() error = %v", err)
 		}
 

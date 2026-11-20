@@ -117,7 +117,7 @@ func TestHandleCreateNewMatch(t *testing.T) {
 			t.Error("Expected success=true in response, got false")
 		}
 
-		if _, err := s.getMatchState(roomID); err != nil {
+		if _, err := mustRoom(t, s, roomID).State(); err != nil {
 			t.Errorf("Match was not created in the server state manager: %v", err)
 		}
 
@@ -259,7 +259,7 @@ func TestHandleRematch(t *testing.T) {
 			t.Error("Expected success=true in response, got false")
 		}
 
-		if _, err := s.getMatchState(roomID); err != nil {
+		if _, err := mustRoom(t, s, roomID).State(); err != nil {
 			t.Errorf("Match was not created in the server state manager: %v", err)
 		}
 
@@ -301,8 +301,8 @@ func TestHandleRematch(t *testing.T) {
 func TestHandleDeleteMatch(t *testing.T) {
 	t.Run("Success: deletes an existing concluded Match", func(t *testing.T) {
 		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
-		if _, err := s.surrender(roomID, 1, playerTokens[0]); err != nil {
-			t.Fatalf("surrender() error = %v", err)
+		if _, err := mustRoom(t, s, roomID).Surrender(1, playerTokens[0]); err != nil {
+			t.Fatalf("Surrender() error = %v", err)
 		}
 
 		rr := doRequest(t, h.handleDeleteMatch, "DELETE /api/match-rooms/{roomID}/match", "DELETE", "/api/match-rooms/"+roomID+"/match", "", playerTokens[0])
@@ -310,8 +310,8 @@ func TestHandleDeleteMatch(t *testing.T) {
 		if status := rr.Code; status != http.StatusNoContent {
 			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusNoContent)
 		}
-		if _, err := s.getMatchState(roomID); !errors.Is(err, room.ErrMatchNotFound) {
-			t.Errorf("getMatchState() error = %v, want %v", err, room.ErrMatchNotFound)
+		if _, err := mustRoom(t, s, roomID).State(); !errors.Is(err, room.ErrMatchNotFound) {
+			t.Errorf("State() error = %v, want %v", err, room.ErrMatchNotFound)
 		}
 	})
 

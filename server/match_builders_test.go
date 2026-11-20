@@ -93,9 +93,9 @@ func findFreeNeighbour(gs *engine.GameState, pos engine.Coordinate) (engine.Coor
 
 func mustMatchState(t *testing.T, s *ServerStateManager, roomID string) *engine.GameState {
 	t.Helper()
-	gs, err := s.getMatchState(roomID)
+	gs, err := mustRoom(t, s, roomID).State()
 	if err != nil {
-		t.Fatalf("getMatchState() error = %v", err)
+		t.Fatalf("State() error = %v", err)
 	}
 	return gs
 }
@@ -118,10 +118,10 @@ func turnCommandsQueued(cmds ...engine.TurnCommand) matchArrangement {
 
 func mustEndAndDeleteMatch(t *testing.T, s *ServerStateManager, roomID, token string) {
 	t.Helper()
-	if _, err := s.surrender(roomID, 1, token); err != nil {
-		t.Fatalf("surrender() error = %v", err)
+	if _, err := mustRoom(t, s, roomID).Surrender(1, token); err != nil {
+		t.Fatalf("Surrender() error = %v", err)
 	}
-	if err := s.deleteMatch(roomID, token); err != nil {
-		t.Fatalf("deleteMatch() error = %v", err)
+	if err := mustRoom(t, s, roomID).Delete(token); err != nil {
+		t.Fatalf("Delete() error = %v", err)
 	}
 }

@@ -31,8 +31,8 @@ func TestWithMatchFactory_UsedByCreateMatchAndRematch(t *testing.T) {
 		t.Errorf("turn after createMatch = %d, want %d from the factory's match", got, want)
 	}
 
-	if _, err := s.rematch(roomID, tokens[0]); err != nil {
-		t.Fatalf("rematch() error = %v", err)
+	if _, err := mustRoom(t, s, roomID).Rematch(tokens[0]); err != nil {
+		t.Fatalf("Rematch() error = %v", err)
 	}
 	if got, want := len(built), 2; got != want {
 		t.Fatalf("factory calls after rematch = %d, want %d", got, want)
