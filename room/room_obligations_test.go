@@ -63,6 +63,12 @@ func TestRoom_Obligations(t *testing.T) {
 						t.Errorf("error = %v, want %v", err, ErrInvalidToken)
 					}
 				})
+				t.Run("wrong token in Planning is reported as an invalid token", func(t *testing.T) {
+					f := planningFixture(t)
+					if err := c.call(f.r, "x"); !errors.Is(err, ErrInvalidToken) {
+						t.Errorf("error = %v, want %v", err, ErrInvalidToken)
+					}
+				})
 				t.Run("match missing is reported before the token check", func(t *testing.T) {
 					f := newFixture()
 					if err := c.call(f.r, "x"); !errors.Is(err, ErrMatchNotFound) {
