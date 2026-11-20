@@ -56,6 +56,22 @@ jobs:
           version: v2.15.0
           args: ./cmd/... ./cpu/... ./engine/... ./room/... ./server/...
 
+  gen_check:
+    name: "Check generated files"
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Check generated files are current
+        run: make gen-check
+
   shell_lint:
     name: "Lint Shell"
     runs-on: ubuntu-24.04
@@ -178,7 +194,7 @@ jobs:
           coverage-artifact-name: "code-coverage"
           coverage-file-name: "coverage.txt"
           root-package: "bomb-srpg"
-          exclude: "models\\.go"
+          exclude: "models\\.go|\\.gen\\.go"
 
   e2e_tests:
     name: "Run Web E2E Tests (${{ matrix.project }})"
