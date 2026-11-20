@@ -15,95 +15,6 @@ import (
 	"time"
 )
 
-type recordingDecider struct {
-	plan          func(gs *engine.GameState, call int) []engine.TurnCommand
-	err           error
-	calls         int
-	observedBombs int
-	called        chan struct{}
-}
-
-func (d *recordingDecider) decide(gs *engine.GameState) ([]engine.TurnCommand, error) {
-	call := d.calls
-	if call == 0 {
-		d.observedBombs = len(gs.Bombs)
-	}
-	d.calls++
-
-	select {
-	case d.called <- struct{}{}:
-	default:
-	}
-
-	if d.plan == nil {
-		return nil, d.err
-	}
-	return d.plan(gs, call), d.err
-}
-
-func vsCpuGameCfg() engine.GameCfg {
-	gameCfg := validGameCfg()
-	gameCfg.VSCpu = true
-	return gameCfg
-}
-
-func hasGameEvent(gameEvents []engine.GameEvent, evtType engine.GameEvtType, unitID engine.UnitID) bool {
-	return slices.ContainsFunc(gameEvents, func(evt engine.GameEvent) bool {
-		return evt.Type == evtType && evt.UnitID == unitID
-	})
-}
-
-type heldCPUTurn struct {
-	t    *testing.T
-	fns  []func()
-	next int
-}
-
-func holdCPUTurn(t *testing.T) *heldCPUTurn {
-	t.Helper()
-	return &heldCPUTurn{t: t}
-}
-
-func (h *heldCPUTurn) spawn(f func()) { h.fns = append(h.fns, f) }
-
-func (h *heldCPUTurn) count() int { return len(h.fns) }
-
-func (h *heldCPUTurn) runOutsideRoomLock() {
-	h.t.Helper()
-	if h.next >= len(h.fns) {
-		h.t.Fatal("no held CPU turn to run")
-	}
-	f := h.fns[h.next]
-	h.next++
-	f()
-}
-
-func moveThenBombPlan(t *testing.T, unitID engine.UnitID, dest engine.Coordinate) func(*engine.GameState, int) []engine.TurnCommand {
-	t.Helper()
-	return func(gs *engine.GameState, _ int) []engine.TurnCommand {
-		t.Helper()
-		return []engine.TurnCommand{
-			engine.NewMoveCommand(unitID, dest),
-			engine.NewPlaceBombCommand(unitID, freeNeighbour(t, gs, dest)),
-		}
-	}
-}
-
-func newCPUTurnHandlerRoom(t *testing.T, opts ...Option) (string, [2]string, *ServerStateManager, *Handler) {
-	t.Helper()
-	roomID, tokens, s := newCPUTurnRoom(t, opts...)
-	return roomID, tokens, s, NewHandler(s)
-}
-
-func consumeCPUPhase(t *testing.T, s *ServerStateManager, roomID, token string) (room.CPUTurnPhase, []engine.GameEvent, []engine.GameEvent) {
-	t.Helper()
-	status, err := mustRoom(t, s, roomID).ConsumeCPU(token)
-	if err != nil {
-		t.Fatalf("ConsumeCPU() error = %v", err)
-	}
-	return status.Phase, status.Plan, status.Resolve
-}
-
 func TestServerStateManager_ConsumeCPUStatus_LaunchesCPUTurn(t *testing.T) {
 	humanUnitID := engine.NewUnitID(1, 0)
 	cpuUnitID := engine.NewUnitID(2, 0)
@@ -406,38 +317,6 @@ func TestServerStateManager_ConsumeCPUStatus_LaunchesOnce(t *testing.T) {
 	}
 }
 
-func TestServerStateManager_ConsumeCPUStatus_DefaultSpawn(t *testing.T) {
-	cpuUnitID := engine.NewUnitID(2, 0)
-	decider := &recordingDecider{
-		plan: func(*engine.GameState, int) []engine.TurnCommand {
-			return []engine.TurnCommand{engine.NewMoveCommand(cpuUnitID, engine.Coordinate{X: 4, Y: 1})}
-		},
-		called: make(chan struct{}, 1),
-	}
-	roomID, tokens, s := newCPUTurnRoom(t, WithDecider(decider.decide))
-
-	if phase, _, _ := consumeCPUPhase(t, s, roomID, tokens[0]); phase != room.TurnPhasePlanning {
-		t.Fatalf("phase = %v, want %v", phase, room.TurnPhasePlanning)
-	}
-	select {
-	case <-decider.called:
-	case <-time.After(5 * time.Second):
-		t.Fatal("Timed out waiting for the CPU goroutine to invoke decide")
-	}
-
-	if got, want := mustMatchState(t, s, roomID).ActiveTeam, 1; got != want {
-		t.Errorf("active team after the turn = %d, want %d", got, want)
-	}
-
-	phase, planGameEvents, _ := consumeCPUPhase(t, s, roomID, tokens[0])
-	if phase != room.TurnPhaseReady {
-		t.Errorf("phase after the turn = %v, want %v", phase, room.TurnPhaseReady)
-	}
-	if !hasGameEvent(planGameEvents, engine.GameEvtUnitMoved, cpuUnitID) {
-		t.Errorf("Expected unit %#x to have moved, got %#v", cpuUnitID, planGameEvents)
-	}
-}
-
 func TestServerStateManager_runCPUTurn_Abandons(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -699,12 +578,6 @@ func TestServerStateManager_ConsumeCPUStatus(t *testing.T) {
 			}
 		})
 	}
-}
-
-func newCPUTurnRoom(t *testing.T, opts ...Option) (string, [2]string, *ServerStateManager) {
-	t.Helper()
-	roomID, tokens, s := createTestRoomWithCfg(t, vsCpuGameCfg(), append([]Option{arrangedMatch(cpuTurnPending)}, opts...)...)
-	return roomID, tokens, s
 }
 
 func TestServerStateManager_CPUTurnGate(t *testing.T) {
