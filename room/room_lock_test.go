@@ -38,7 +38,14 @@ func TestRoom_WriteMethodsHoldExclusiveLock(t *testing.T) {
 		_, _, _ = r.Resolve(tokens[0])
 		_, _ = r.Surrender(1, tokens[0])
 		_ = r.Delete(tokens[0])
-		_, _ = r.Rematch(tokens[0])
+		tokens, err = r.Start(humanTurnCfg())
+		if err != nil {
+			t.Fatalf("Start() error = %v", err)
+		}
+		tokens, err = r.Rematch(tokens[0])
+		if err != nil {
+			t.Fatalf("Rematch() error = %v", err)
+		}
 	}
 	close(stop)
 	readers.Wait()

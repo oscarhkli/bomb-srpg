@@ -4,6 +4,7 @@ import (
 	"bomb-srpg/engine"
 	"bomb-srpg/room"
 	"fmt"
+	"net/http"
 	"testing"
 )
 
@@ -107,6 +108,50 @@ func TestMapError(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			code, msg := mapError(tt.err)
+			if code != tt.wantCode || msg != tt.wantMsg {
+				t.Errorf("got (%d, %q) want (%d, %q)", code, msg, tt.wantCode, tt.wantMsg)
+			}
+		})
+	}
+}
+
+func TestMapError_EngineRejections(t *testing.T) {
+	tests := []struct {
+		name     string
+		run      func(t *testing.T) error
+		wantCode int
+		wantMsg  string
+	}{
+		{
+			name: "config rejected by the engine",
+			run: func(t *testing.T) error {
+				t.Helper()
+				gameCfg := validGameCfg()
+				gameCfg.StagePreset = "NoSuchStage"
+				s := NewServerStateManager()
+				roomID, _ := s.createMatchRoom()
+				_, err := mustRoom(t, s, roomID).Start(gameCfg)
+				return err
+			},
+			wantCode: http.StatusBadRequest,
+			wantMsg:  "invalid game config: invalid stage preset: stage preset 'NoSuchStage' not found",
+		},
+		{
+			name: "turn command rejected by the engine",
+			run: func(t *testing.T) error {
+				t.Helper()
+				roomID, tokens, s := createTestRoom(t)
+				cmd := engine.NewMoveCommand(engine.NewUnitID(1, 0), engine.Coordinate{X: 4, Y: 7777})
+				_, err := mustRoom(t, s, roomID).Submit(cmd, tokens[0])
+				return err
+			},
+			wantCode: http.StatusConflict,
+			wantMsg:  "invalid turn command: target out of move range",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			code, msg := mapError(tt.run(t))
 			if code != tt.wantCode || msg != tt.wantMsg {
 				t.Errorf("got (%d, %q) want (%d, %q)", code, msg, tt.wantCode, tt.wantMsg)
 			}

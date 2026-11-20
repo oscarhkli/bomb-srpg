@@ -2,6 +2,7 @@ package room
 
 import (
 	"bomb-srpg/engine"
+	"errors"
 	"log/slog"
 	"testing"
 )
@@ -116,5 +117,92 @@ func validGameCfg() engine.GameCfg {
 		P1Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Fighter", Role: engine.RoleNormal}},
 		P2Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Witch", Role: engine.RoleNormal}},
 		MaxTurns:    10,
+	}
+}
+
+func unitAlreadyMoved(unitID engine.UnitID) func(*engine.Match) error {
+	return func(match *engine.Match) error {
+		unit, ok := match.WorkingState.Units[unitID]
+		if !ok {
+			return errors.New("unit not found")
+		}
+		unit.HasMoved = true
+		return nil
+	}
+}
+
+func bombAboutToExplode(unitID engine.UnitID) func(*engine.Match) error {
+	return func(match *engine.Match) error {
+		unit, ok := match.WorkingState.Units[unitID]
+		if !ok {
+			return errors.New("unit not found")
+		}
+		target, ok := findFreeNeighbour(match.WorkingState, unit.Position)
+		if !ok {
+			return errors.New("no free neighbour")
+		}
+		if _, err := match.CommandPlaceBomb(unitID, target); err != nil {
+			return err
+		}
+		for _, bomb := range match.WorkingState.Bombs {
+			if bomb.OwnerID == unitID {
+				bomb.Countdown = 1
+			}
+		}
+		return nil
+	}
+}
+
+func suddenDeathMidTurn(match *engine.Match) error {
+	match.WorkingState.InSuddenDeath = true
+	for _, unit := range match.WorkingState.Units {
+		unit.HasMoved = true
+		unit.HasUsedSkill = true
+	}
+	return nil
+}
+
+func findFreeNeighbour(gs *engine.GameState, pos engine.Coordinate) (engine.Coordinate, bool) {
+	for _, step := range []engine.Coordinate{{X: 0, Y: -1}, {X: 0, Y: 1}, {X: -1, Y: 0}, {X: 1, Y: 0}} {
+		target := engine.Coordinate{X: pos.X + step.X, Y: pos.Y + step.Y}
+		if gs.IsLandingLegal(target, engine.OccupantBomb) == nil {
+			return target, true
+		}
+	}
+	return engine.Coordinate{}, false
+}
+
+func startedRoom(t *testing.T, arrange ...func(*engine.Match) error) (*Room, [2]string) {
+	t.Helper()
+	f := startedFixture(t, validGameCfg(), arrange...)
+	return f.r, f.tokens
+}
+
+func mustState(t *testing.T, r *Room) *engine.GameState {
+	t.Helper()
+	gs, err := r.State()
+	if err != nil {
+		t.Fatalf("State() error = %v", err)
+	}
+	return gs
+}
+
+func endAndDelete(t *testing.T, r *Room, token string) {
+	t.Helper()
+	if _, err := r.Surrender(1, token); err != nil {
+		t.Fatalf("Surrender() error = %v", err)
+	}
+	if err := r.Delete(token); err != nil {
+		t.Fatalf("Delete() error = %v", err)
+	}
+}
+
+func assertTokensAuthorize(t *testing.T, r *Room, tokens [2]string) {
+	t.Helper()
+	if err := r.Reset(tokens[0]); err != nil {
+		t.Errorf("Reset() with the team 1 token error = %v", err)
+	}
+	if _, err := r.Surrender(2, tokens[1]); err != nil {
+		t.Errorf("Surrender() with the team 2 token error = %v", err)
 	}
 }

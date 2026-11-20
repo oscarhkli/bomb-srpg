@@ -81,15 +81,6 @@ func bombAboutToExplode(unitID engine.UnitID) matchArrangement {
 	}
 }
 
-func suddenDeathMidTurn(match *engine.Match) error {
-	match.WorkingState.InSuddenDeath = true
-	for _, unit := range match.WorkingState.Units {
-		unit.HasMoved = true
-		unit.HasUsedSkill = true
-	}
-	return nil
-}
-
 func findFreeNeighbour(gs *engine.GameState, pos engine.Coordinate) (engine.Coordinate, bool) {
 	for _, step := range []engine.Coordinate{{X: 0, Y: -1}, {X: 0, Y: 1}, {X: -1, Y: 0}, {X: 1, Y: 0}} {
 		target := engine.Coordinate{X: pos.X + step.X, Y: pos.Y + step.Y}
@@ -123,16 +114,6 @@ func turnCommandsQueued(cmds ...engine.TurnCommand) matchArrangement {
 		match.WorkingState.TurnCommands = cmds
 		return nil
 	}
-}
-
-func mustMatchConfig(t *testing.T, s *ServerStateManager, roomID string) *engine.GameCfg {
-	t.Helper()
-	mustMatchState(t, s, roomID)
-	gameCfg, err := s.getMatchConfig(roomID)
-	if err != nil {
-		t.Fatalf("getMatchConfig() error = %v", err)
-	}
-	return gameCfg
 }
 
 func mustEndAndDeleteMatch(t *testing.T, s *ServerStateManager, roomID, token string) {
