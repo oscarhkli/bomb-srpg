@@ -45,6 +45,15 @@ func (h *Handler) requireToken(w http.ResponseWriter, r *http.Request) (string, 
 	return token, true
 }
 
+func (h *Handler) requireRoom(w http.ResponseWriter, roomID, logMsg string) (*room.Room, bool) {
+	rm, err := h.Manager.Room(roomID)
+	if err != nil {
+		h.handleError(w, err, logMsg, "roomID", roomID)
+		return nil, false
+	}
+	return rm, true
+}
+
 func (h *Handler) handleError(w http.ResponseWriter, err error, logMsg string, args ...any) {
 	code, msg := mapError(err)
 	h.Logger.Warn(logMsg, append(args, "error", err)...)
@@ -134,7 +143,12 @@ func (h *Handler) handleCreateMatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tokens, err := h.Manager.createMatch(roomID, req.GameCfg)
+	rm, ok := h.requireRoom(w, roomID, "create match failed")
+	if !ok {
+		return
+	}
+
+	tokens, err := rm.Start(req.GameCfg)
 
 	if !h.writeMatchCreated(tokens, err, roomID, w) {
 		return
@@ -162,7 +176,12 @@ func (h *Handler) handleRematch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tokens, err := h.Manager.rematch(roomID, token)
+	rm, ok := h.requireRoom(w, roomID, "create match failed")
+	if !ok {
+		return
+	}
+
+	tokens, err := rm.Rematch(token)
 
 	if !h.writeMatchCreated(tokens, err, roomID, w) {
 		return
@@ -179,7 +198,12 @@ func (h *Handler) handleDeleteMatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.Manager.deleteMatch(roomID, token); err != nil {
+	rm, ok := h.requireRoom(w, roomID, "delete match failed")
+	if !ok {
+		return
+	}
+
+	if err := rm.Delete(token); err != nil {
 		h.handleError(w, err, "delete match failed", "roomID", roomID)
 		return
 	}
@@ -192,7 +216,12 @@ func (h *Handler) handleDeleteMatch(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) handleGetMatchState(w http.ResponseWriter, r *http.Request) {
 	roomID := r.PathValue("roomID")
 
-	gs, err := h.Manager.getMatchState(roomID)
+	rm, ok := h.requireRoom(w, roomID, "get match state failed")
+	if !ok {
+		return
+	}
+
+	gs, err := rm.State()
 	if err != nil {
 		h.handleError(w, err, "get match state failed", "roomID", roomID)
 		return
@@ -216,7 +245,12 @@ func (h *Handler) handleSubmitTurnCommand(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	gameEvents, err := h.Manager.submitTurnCommand(roomID, req, token)
+	rm, ok := h.requireRoom(w, roomID, "submit turn command failed")
+	if !ok {
+		return
+	}
+
+	gameEvents, err := rm.Submit(req, token)
 	if err != nil {
 		h.handleError(w, err, "submit turn command failed", "roomID", roomID)
 		return
@@ -239,14 +273,19 @@ func (h *Handler) handleConsumeCPUStatus(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	turnPhase, planGameEvents, resolveTurnGameEvents, err := h.Manager.consumeCPUStatus(roomID, token)
+	rm, ok := h.requireRoom(w, roomID, "consume cpu status failed")
+	if !ok {
+		return
+	}
+
+	status, err := rm.ConsumeCPU(token)
 	if err != nil {
 		h.handleError(w, err, "consume cpu status failed", "roomID", roomID)
 		return
 	}
-	h.Logger.Debug("consume cpu status", "roomID", roomID, "turnPhase", turnPhase, "planGameEvents", planGameEvents, "resolveTurnGameEvents", resolveTurnGameEvents)
+	h.Logger.Debug("consume cpu status", "roomID", roomID, "turnPhase", status.Phase, "planGameEvents", status.Plan, "resolveTurnGameEvents", status.Resolve)
 
-	res := cpuStatusResponse{TurnPhase: turnPhase, PlanGameEvents: planGameEvents, ResolveTurnGameEvents: resolveTurnGameEvents}
+	res := cpuStatusResponse{TurnPhase: status.Phase, PlanGameEvents: status.Plan, ResolveTurnGameEvents: status.Resolve}
 	h.writeJSON(w, http.StatusOK, res, "encode cpu status response failed")
 }
 
@@ -258,7 +297,12 @@ func (h *Handler) handleResetTurn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.Manager.resetTurn(roomID, token); err != nil {
+	rm, ok := h.requireRoom(w, roomID, "reset turn failed")
+	if !ok {
+		return
+	}
+
+	if err := rm.Reset(token); err != nil {
 		h.handleError(w, err, "reset turn failed", "roomID", roomID)
 		return
 	}
@@ -279,7 +323,12 @@ func (h *Handler) handleResolveTurn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	planGameEvents, resolveTurnGameEvents, err := h.Manager.resolveTurn(roomID, token)
+	rm, ok := h.requireRoom(w, roomID, "resolve turn failed")
+	if !ok {
+		return
+	}
+
+	planGameEvents, resolveTurnGameEvents, err := rm.Resolve(token)
 	if err != nil {
 		h.handleError(w, err, "resolve turn failed", "roomID", roomID)
 		return
@@ -309,7 +358,17 @@ func (h *Handler) handleSurrender(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	gameEvents, err := h.Manager.surrender(roomID, req.TeamID, token)
+	if req.TeamID != engine.Team1 && req.TeamID != engine.Team2 {
+		h.handleError(w, fmt.Errorf("%w: team must be 1 or 2", room.ErrInvalidConfig), "surrender failed", "roomID", roomID)
+		return
+	}
+
+	rm, ok := h.requireRoom(w, roomID, "surrender failed")
+	if !ok {
+		return
+	}
+
+	gameEvents, err := rm.Surrender(req.TeamID, token)
 	if err != nil {
 		h.handleError(w, err, "surrender failed", "roomID", roomID)
 		return
@@ -320,13 +379,18 @@ func (h *Handler) handleSurrender(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) handleGetMatchConfig(w http.ResponseWriter, r *http.Request) {
 	roomID := r.PathValue("roomID")
-	gameCfg, err := h.Manager.getMatchConfig(roomID)
+	rm, ok := h.requireRoom(w, roomID, "get match config failed")
+	if !ok {
+		return
+	}
+
+	gameCfg, err := rm.Config()
 	if err != nil {
 		h.handleError(w, err, "get match config failed", "roomID", roomID)
 		return
 	}
 
-	h.writeJSON(w, http.StatusOK, gameCfg, "encode gameConfig failed")
+	h.writeJSON(w, http.StatusOK, &gameCfg, "encode gameConfig failed")
 }
 
 func (h *Handler) handleGetAllowedTiles(w http.ResponseWriter, r *http.Request) {
@@ -345,7 +409,12 @@ func (h *Handler) handleGetAllowedTiles(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	allowed, err := h.Manager.getAllowedTiles(roomID, engine.UnitID(unitID), engine.TurnCmdType(turnCmdType))
+	rm, ok := h.requireRoom(w, roomID, "get allowed tiles failed")
+	if !ok {
+		return
+	}
+
+	allowed, err := rm.AllowedTiles(engine.UnitID(unitID), engine.TurnCmdType(turnCmdType))
 	if err != nil {
 		h.handleError(w, err, "get allowed tiles failed", "roomID", roomID)
 		return
