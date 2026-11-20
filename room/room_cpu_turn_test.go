@@ -390,8 +390,7 @@ func TestRoom_CPUTurn_Abandons(t *testing.T) {
 	}
 }
 
-// Readers must not touch the match while the CPU goroutine mutates it. Meaningful under -race.
-func TestRoom_ReadsDuringCPUTurn(t *testing.T) {
+func TestRoom_ReadsDuringCPUTurnDoNotRaceMatch(t *testing.T) {
 	cpuUnitID := engine.NewUnitID(2, 0)
 
 	planning, release := make(chan struct{}), make(chan struct{})
@@ -458,7 +457,7 @@ func TestRoom_ReadsDuringCPUTurn(t *testing.T) {
 	}
 }
 
-func TestRoom_CPUTurn_Panic(t *testing.T) {
+func TestRoom_CPUTurn_PanicReleasesRoomMutex(t *testing.T) {
 	f := startedFixtureWith(t, cpuTurnCfg(),
 		withDecide(func(*engine.GameState) ([]engine.TurnCommand, error) { panic("decide exploded") }),
 		cpuTurnPending, bombPlacedBy(engine.NewUnitID(2, 0)))
@@ -470,7 +469,6 @@ func TestRoom_CPUTurn_Panic(t *testing.T) {
 		t.Errorf("Expected the forfeited turn to still advance to %d, got %d", want, got)
 	}
 
-	// Proves the room mutex was released rather than left held by the unwinding goroutine.
 	turnPhase, _, resolveTurnGameEvents := consumeCPUPhase(t, f.r, f.tokens[0])
 	if got, want := turnPhase, TurnPhaseReady; got != want {
 		t.Errorf("Expected %v turnPhase return, got %v", want, got)
