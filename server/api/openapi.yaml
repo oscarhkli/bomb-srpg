@@ -482,6 +482,7 @@ components:
           items:
             $ref: '#/components/schemas/SoftBlock'
         turnCommands:
+          description: Always an empty array on the wire; no production code appends to it.
           type: array
           items:
             $ref: '#/components/schemas/TurnCommand'

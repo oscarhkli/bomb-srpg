@@ -3,12 +3,14 @@ package server
 import (
 	"bomb-srpg/engine"
 	"bytes"
+	"encoding"
 	"encoding/json/v2"
 	"fmt"
 	"maps"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"reflect"
 	"regexp"
 	"slices"
 	"strings"
@@ -392,7 +394,12 @@ func (r *openAPIRig) staticCases() {
 	}
 
 	empty := r.newRoom()
+	unknownArchetype := validGameCfg()
+	unknownArchetype.P1Slots[1].Archetype = "Nope"
 	badRequests := []call{
+		{method: http.MethodPost, path: empty + "/match", body: marshalBody(t, struct {
+			GameCfg engine.GameCfg `json:"gameCfg"`
+		}{unknownArchetype})},
 		{method: http.MethodPost, path: empty + "/match", body: []byte("{"), malformed: true},
 		{method: http.MethodPost, path: empty + "/match", body: marshalBody(t, struct {
 			GameCfg engine.GameCfg `json:"gameCfg"`
@@ -414,6 +421,7 @@ func (r *openAPIRig) staticCases() {
 		{method: http.MethodPost, path: room + "/match/turn-commands", auth: bearer(tokens[0]), body: marshalBody(t, engine.NewMoveCommand(fighter, engine.Coordinate{X: 0, Y: 0}))},
 		{method: http.MethodDelete, path: room + "/match", auth: bearer(tokens[0])},
 		{method: http.MethodGet, path: room + "/match/allowed-tiles?unitId=200&turnCmdType=move"},
+		{method: http.MethodGet, path: room + "/match/allowed-tiles?unitId=17&turnCmdType=nope", malformed: true},
 	}
 	for _, c := range conflicts {
 		r.do(c, http.StatusConflict)
@@ -519,16 +527,9 @@ func (r *openAPIRig) assertComplete() {
 		}
 	}
 
-	var declared []string
-	for _, v := range r.doc.Components.Schemas["GameEvtType"].Value.Enum {
-		if kind, ok := v.(string); ok {
-			declared = append(declared, kind)
-		}
-	}
-	seen := slices.Sorted(maps.Keys(r.kinds))
-	if !slices.Equal(slices.Sorted(slices.Values(declared)), seen) {
-		t.Errorf("event kinds seen = %v, want the spec enum %v", seen, declared)
-	}
+	r.assertEnums()
+	r.assertClosedAndNonNullable()
+	r.assertGuards()
 
 	for _, name := range slices.Sorted(maps.Keys(r.doc.Components.Schemas)) {
 		schema := r.doc.Components.Schemas[name].Value
@@ -542,6 +543,159 @@ func (r *openAPIRig) assertComplete() {
 		if got := slices.Sorted(slices.Values(schema.Required)); !slices.Equal(got, want) {
 			t.Errorf("schema %s required = %v, want %v", name, got, want)
 		}
+	}
+}
+
+func textEnumNames[T interface {
+	~int
+	encoding.TextMarshaler
+}](t *testing.T) []string {
+	t.Helper()
+	var names []string
+	for v := T(0); ; v++ {
+		text, err := v.MarshalText()
+		if err != nil {
+			t.Fatalf("marshal %T(%d): %v", v, v, err)
+		}
+		if strings.HasSuffix(string(text), "Unknown") {
+			return names
+		}
+		names = append(names, string(text))
+	}
+}
+
+func engineSkillNames(t *testing.T) []string {
+	t.Helper()
+	field, ok := reflect.TypeFor[engine.Archetype]().FieldByName("PresetSkills")
+	if !ok {
+		t.Fatal("engine.Archetype has no PresetSkills field")
+	}
+	all := reflect.New(field.Type).Elem()
+	all.SetUint(1<<32 - 1)
+	var names []string
+	decodeBody(t, marshalBody(t, all.Interface()), &names)
+	return names
+}
+
+func (r *openAPIRig) specEnum(name string) []string {
+	r.t.Helper()
+	ref := r.doc.Components.Schemas[name]
+	if ref == nil {
+		r.t.Fatalf("spec has no schema %s", name)
+	}
+	var values []string
+	for _, v := range ref.Value.Enum {
+		s, ok := v.(string)
+		if !ok {
+			r.t.Fatalf("schema %s enum value %v is not a string", name, v)
+		}
+		values = append(values, s)
+	}
+	return values
+}
+
+func (r *openAPIRig) assertEnums() {
+	t := r.t
+	t.Helper()
+	want := map[string][]string{
+		"TerrainType":  textEnumNames[engine.TerrainType](t),
+		"OccupantType": textEnumNames[engine.OccupantType](t),
+		"UnitRole":     textEnumNames[engine.UnitRole](t),
+		"CPUTurnPhase": textEnumNames[engine.CPUTurnPhase](t),
+		"SkillType":    engineSkillNames(t),
+		"TurnCmdType":  {string(engine.TurnCmdMove), string(engine.TurnCmdPlaceBomb)},
+		"GameEvtType":  slices.Sorted(maps.Keys(r.kinds)),
+	}
+	for _, name := range slices.Sorted(maps.Keys(r.doc.Components.Schemas)) {
+		if len(r.doc.Components.Schemas[name].Value.Enum) > 0 && want[name] == nil {
+			t.Errorf("schema %s has an enum with no engine list to compare against", name)
+		}
+	}
+	for _, name := range slices.Sorted(maps.Keys(want)) {
+		got := slices.Sorted(slices.Values(r.specEnum(name)))
+		if w := slices.Sorted(slices.Values(want[name])); !slices.Equal(got, w) {
+			t.Errorf("spec enum %s = %v, want the engine values %v", name, got, w)
+		}
+	}
+}
+
+func (r *openAPIRig) assertClosedAndNonNullable() {
+	t := r.t
+	t.Helper()
+	var visit func(at string, ref *openapi3.SchemaRef)
+	visit = func(at string, ref *openapi3.SchemaRef) {
+		if ref == nil || ref.Ref != "" {
+			return
+		}
+		s := ref.Value
+		if s.Nullable {
+			t.Errorf("%s is nullable", at)
+		}
+		if s.Type.Is("object") && (s.AdditionalProperties.Has == nil || *s.AdditionalProperties.Has) {
+			t.Errorf("%s is an object without additionalProperties: false", at)
+		}
+		for _, name := range slices.Sorted(maps.Keys(s.Properties)) {
+			visit(at+"."+name, s.Properties[name])
+		}
+		visit(at+"[]", s.Items)
+		visit(at+"{}", s.AdditionalProperties.Schema)
+		for _, group := range [][]*openapi3.SchemaRef{s.AllOf, s.OneOf, s.AnyOf} {
+			for i, sub := range group {
+				visit(fmt.Sprintf("%s(%d)", at, i), sub)
+			}
+		}
+		visit(at+".not", s.Not)
+	}
+	content := func(at string, c openapi3.Content) {
+		for mediaType, media := range c {
+			visit(at+" "+mediaType, media.Schema)
+		}
+	}
+	for _, name := range slices.Sorted(maps.Keys(r.doc.Components.Schemas)) {
+		visit("schema "+name, r.doc.Components.Schemas[name])
+	}
+	for _, name := range slices.Sorted(maps.Keys(r.doc.Components.Responses)) {
+		content("response "+name, r.doc.Components.Responses[name].Value.Content)
+	}
+	for _, path := range r.doc.Paths.Keys() {
+		item := r.doc.Paths.Value(path)
+		for method, op := range item.Operations() {
+			at := method + " " + path
+			for _, p := range slices.Concat(item.Parameters, op.Parameters) {
+				visit(at+" parameter "+p.Value.Name, p.Value.Schema)
+			}
+			if op.RequestBody != nil {
+				content(at+" request", op.RequestBody.Value.Content)
+			}
+			for _, code := range op.Responses.Keys() {
+				resp := op.Responses.Value(code).Value
+				content(at+" "+code, resp.Content)
+				for name, h := range resp.Headers {
+					visit(at+" "+code+" header "+name, h.Value.Schema)
+				}
+			}
+		}
+	}
+}
+
+func (r *openAPIRig) assertGuards() {
+	t := r.t
+	t.Helper()
+	post := r.doc.Paths.Value("/api/match-rooms").Post
+	if post == nil {
+		t.Fatal("spec lacks POST /api/match-rooms")
+	}
+	created := post.Responses.Value("201")
+	if created == nil || created.Value.Headers["Location"] == nil || !created.Value.Headers["Location"].Value.Required {
+		t.Error("POST /api/match-rooms 201 must declare the Location header as required")
+	}
+
+	tokens := r.doc.Components.Schemas["CreateMatchResponse"].Value.Properties["playerTokens"].Value
+	if tokens.MinItems != 2 {
+		t.Errorf("CreateMatchResponse.playerTokens minItems = %d, want 2", tokens.MinItems)
+	}
+	if tokens.MaxItems == nil || *tokens.MaxItems != 2 {
+		t.Error("CreateMatchResponse.playerTokens maxItems must be 2")
 	}
 }
 
