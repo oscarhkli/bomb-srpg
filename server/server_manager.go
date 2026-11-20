@@ -288,7 +288,7 @@ func (s *ServerStateManager) getAllowedTiles(roomID string, unitID engine.UnitID
 }
 
 // RunCleanupLoop blocks until ctx is cancelled.
-func (s *ServerStateManager) RunCleanupLoop(ctx context.Context, interval time.Duration) {
+func (s *ServerStateManager) RunCleanupLoop(ctx context.Context, interval time.Duration, now func() time.Time) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for {
@@ -296,7 +296,7 @@ func (s *ServerStateManager) RunCleanupLoop(ctx context.Context, interval time.D
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			s.cleanupInactiveRooms(time.Now())
+			s.cleanupInactiveRooms(now())
 		}
 	}
 }

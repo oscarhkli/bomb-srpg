@@ -168,7 +168,7 @@ func TestServerStateManager_RunCleanupLoop(t *testing.T) {
 	defer cancel()
 	done := make(chan struct{})
 	go func() {
-		s.RunCleanupLoop(ctx, time.Millisecond)
+		s.RunCleanupLoop(ctx, time.Millisecond, time.Now)
 		close(done)
 	}()
 
@@ -177,6 +177,42 @@ func TestServerStateManager_RunCleanupLoop(t *testing.T) {
 	case <-done:
 	case <-time.After(2 * time.Second):
 		t.Fatal("loop did not stop after cancel")
+	}
+}
+
+func TestServerStateManager_RunCleanupLoop_removesRoomsIdleAtTheInjectedTime(t *testing.T) {
+	s := NewServerStateManager()
+	id, _ := s.createMatchRoom()
+	mustCreateMatch(t, s, id, validGameCfg())
+
+	ticks := make(chan struct{}, 2)
+	later := func() time.Time {
+		select {
+		case ticks <- struct{}{}:
+		default:
+		}
+		return time.Now().Add(2 * roomInactivityTimeout)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		s.RunCleanupLoop(ctx, time.Millisecond, later)
+		close(done)
+	}()
+
+	for range 2 {
+		select {
+		case <-ticks:
+		case <-time.After(2 * time.Second):
+			cancel()
+			t.Fatal("loop never read the injected clock")
+		}
+	}
+	cancel()
+	<-done
+
+	if _, ok := s.rooms.Load(id); ok {
+		t.Error("idle room was not removed")
 	}
 }
 
