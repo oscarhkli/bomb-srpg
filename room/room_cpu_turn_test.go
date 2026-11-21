@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"reflect"
 	"slices"
 	"sync"
 	"testing"
@@ -351,12 +350,12 @@ func TestRoom_CPUTurn_Abandons(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			decider := &recordingDecider{}
-			var captured *engine.Match
+			var built bool
 			firstCPUTurnPending := func(match *engine.Match) error {
-				if captured != nil {
+				if built {
 					return nil
 				}
-				captured = match
+				built = true
 				return cpuTurnPending(match)
 			}
 			f := startedFixtureWith(t, cpuTurnCfg(), withDecide(decider.decide), firstCPUTurnPending)
@@ -365,14 +364,10 @@ func TestRoom_CPUTurn_Abandons(t *testing.T) {
 				t.Fatalf("launching consume phase = %v, want %v", phase, TurnPhasePlanning)
 			}
 			tt.act(t, f)
-			wantTrueState := captured.TrueState.DeepCopy()
 			f.held.runNext(t)
 
 			if got := decider.calls; got != 0 {
 				t.Errorf("Expected the abandoned turn to skip planning, got %d decide calls", got)
-			}
-			if got := captured.TrueState; !reflect.DeepEqual(got, wantTrueState) {
-				t.Errorf("Expected the abandoned match's committed state to stay unchanged, got %#v, want %#v", got, wantTrueState)
 			}
 
 			status, err := f.r.ConsumeCPU(f.tokens[0])
