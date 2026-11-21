@@ -56,16 +56,26 @@ func New(id string, deps Deps) *Room {
 	}
 }
 
-func randomHex(byteLength int) string {
+func randomHex(byteLength int) (string, error) {
 	b := make([]byte, byteLength)
-	_, _ = cryptorand.Read(b)
-	return hex.EncodeToString(b)
+	if _, err := cryptorand.Read(b); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b), nil
 }
 
 const tokenBytes = 16
 
-func generatePlayerTokens() [2]string {
-	return [2]string{randomHex(tokenBytes), randomHex(tokenBytes)}
+func generatePlayerTokens() ([2]string, error) {
+	var tokens [2]string
+	for i := range 2 {
+		token, err := randomHex(tokenBytes)
+		if err != nil {
+			return [2]string{}, fmt.Errorf("failed to generate playerToken for Player %d: %w", i, err)
+		}
+		tokens[i] = token
+	}
+	return tokens, nil
 }
 
 func matchToken(a, b string) bool {
@@ -129,7 +139,11 @@ func (r *Room) Start(cfg engine.GameCfg) ([2]string, error) {
 		return [2]string{}, err
 	}
 
-	tokens := generatePlayerTokens()
+	tokens, err := generatePlayerTokens()
+	if err != nil {
+		r.log.Warn("failed to generate player tokens", "roomID", r.id, "error", err)
+		return [2]string{}, err
+	}
 
 	r.setMatchLocked(match)
 	r.cfg = &cfg
