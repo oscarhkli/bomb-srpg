@@ -6,6 +6,7 @@ import sonarjs from 'eslint-plugin-sonarjs'
 import maxCommentLines from './eslint-rules/max-comment-lines.js'
 
 export default [
+  { ignores: ['src/api/schema.gen.ts'] },
   { linterOptions: { noInlineConfig: true } },
   js.configs.recommended,
   ...tsPlugin.configs['flat/recommended-type-checked'],
