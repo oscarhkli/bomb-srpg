@@ -65,13 +65,13 @@ type CpuPollResult =
 
 export interface MatchSceneData {
   roomId: string;
-  playerTokens: [string, string];
+  playerTokens: string[];
   isRematch?: boolean;
 }
 
 export default class MatchScene extends Phaser.Scene {
   private roomId!: string;
-  private playerTokens!: [string, string];
+  private playerTokens!: string[];
   private gameState!: GameState;
   private gameCfg!: GameCfg;
   private gameCfgPromise!: Promise<GameCfg>;

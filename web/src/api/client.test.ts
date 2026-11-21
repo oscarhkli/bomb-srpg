@@ -32,28 +32,46 @@ import type {
 
 const mockFetch = vi.fn();
 
-function mockOk<T>(status: number, body: T) {
-  mockFetch.mockResolvedValueOnce({
-    ok: true,
-    status,
-    json: () => Promise.resolve(body),
-  });
+function reply(status: number, body?: unknown) {
+  if (body === undefined) {
+    mockFetch.mockResolvedValueOnce(new Response(null, { status }));
+  } else if (typeof body === 'string') {
+    mockFetch.mockResolvedValueOnce(
+      new Response(body, { status, headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
+    );
+  } else {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify(body), {
+        status,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+  }
 }
 
-function mockErr(status: number, message: string) {
-  mockFetch.mockResolvedValueOnce({
-    ok: false,
-    status,
-    text: () => Promise.resolve(message),
-  });
+async function sent() {
+  expect(mockFetch).toHaveBeenCalledOnce();
+  const req = (mockFetch.mock.calls[0] as [Request])[0];
+  const url = new URL(req.url);
+  return {
+    method: req.method,
+    path: url.pathname,
+    query: url.search,
+    authorization: req.headers.get('Authorization'),
+    contentType: req.headers.get('Content-Type'),
+    body: await req.text(),
+  };
 }
 
 beforeEach(() => {
   vi.stubGlobal('fetch', mockFetch);
-  mockFetch.mockClear();
+  mockFetch.mockReset();
   initRoom('test-room-123');
   initToken('test-token-abc');
 });
+
+const AUTH = 'Bearer test-token-abc';
+const JSON_TYPE = 'application/json';
 
 describe('api.ts', () => {
   describe('getCatalog', () => {
@@ -71,17 +89,23 @@ describe('api.ts', () => {
         },
       ];
       const fixture: Catalog = { archetypes: archetypesFixture, stagePresets: stagePresetsFixture };
-      mockOk(200, fixture);
+      reply(200, fixture);
 
       const result = await getCatalog();
 
       expect(result).toEqual(fixture);
-      expect(mockFetch).toHaveBeenCalledOnce();
-      expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('/api/catalog'));
+      expect(await sent()).toEqual({
+        method: 'GET',
+        path: '/api/catalog',
+        query: '',
+        authorization: null,
+        contentType: null,
+        body: '',
+      });
     });
 
     it('should throw ApiError on non-2xx response', async () => {
-      mockErr(500, 'Internal server error');
+      reply(500, 'Internal server error');
 
       const error = await getCatalog().catch((e: unknown) => e);
       expect(error).toBeInstanceOf(ApiError);
@@ -90,22 +114,74 @@ describe('api.ts', () => {
     });
   });
 
+  describe('error and transport behaviour', () => {
+    it('should keep a numeric plain-text error body as a string message', async () => {
+      reply(500, '123');
+
+      const error = await getCatalog().catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(ApiError);
+      expect((error as ApiError).status).toBe(500);
+      expect((error as ApiError).message).toBe('123');
+    });
+
+    it('should keep the raw text of a numeric error body with a newline', async () => {
+      reply(500, '123\n');
+
+      const error = await getCatalog().catch((e: unknown) => e);
+      expect((error as ApiError).message).toBe('123\n');
+    });
+
+    it('should give an empty message for an empty error body', async () => {
+      mockFetch.mockResolvedValueOnce(
+        new Response('', { status: 500, headers: { 'Content-Length': '0' } })
+      );
+
+      const error = await getCatalog().catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(ApiError);
+      expect((error as ApiError).status).toBe(500);
+      expect((error as ApiError).message).toBe('');
+    });
+
+    it('should reject when the network is down', async () => {
+      mockFetch.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+
+      await expect(getCatalog()).rejects.toThrow('Failed to fetch');
+    });
+
+    it('should call public routes without a token', async () => {
+      vi.resetModules();
+      const fresh = await import('./client');
+      reply(200, { archetypes: [], stagePresets: [] });
+      reply(201, { id: 'room1' });
+
+      await fresh.getCatalog();
+      await fresh.createMatchRoom();
+
+      for (const [req] of mockFetch.mock.calls as [Request][]) {
+        expect(req.headers.get('Authorization')).toBeNull();
+      }
+    });
+  });
+
   describe('createMatchRoom', () => {
     it('should POST and return room id', async () => {
-      mockOk(201, { id: 'room1' });
+      reply(201, { id: 'room1' });
 
       const result = await createMatchRoom();
 
       expect(result).toEqual({ id: 'room1' });
-      expect(mockFetch).toHaveBeenCalledOnce();
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringMatching(/\/api\/match-rooms$/),
-        expect.objectContaining({ method: 'POST' })
-      );
+      expect(await sent()).toEqual({
+        method: 'POST',
+        path: '/api/match-rooms',
+        query: '',
+        authorization: null,
+        contentType: null,
+        body: '',
+      });
     });
 
     it('should throw ApiError on failure', async () => {
-      mockErr(500, 'Failed to create room');
+      reply(500, 'Failed to create room');
 
       const error = await createMatchRoom().catch((e: unknown) => e);
       expect(error).toBeInstanceOf(ApiError);
@@ -125,19 +201,23 @@ describe('api.ts', () => {
 
     it('should POST game config and return player tokens', async () => {
       const resp = { success: true, playerTokens: ['token1', 'token2'] };
-      mockOk(201, resp);
+      reply(201, resp);
 
       const result = await createMatch(req);
 
       expect(result).toEqual(resp);
-      const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
-      expect(url).toContain('/api/match-rooms/test-room-123/match');
-      expect(options.method).toBe('POST');
-      expect(options.body).toBe(JSON.stringify(req));
+      expect(await sent()).toEqual({
+        method: 'POST',
+        path: '/api/match-rooms/test-room-123/match',
+        query: '',
+        authorization: null,
+        contentType: JSON_TYPE,
+        body: JSON.stringify(req),
+      });
     });
 
     it('should throw ApiError on invalid config', async () => {
-      mockErr(400, 'invalid game config');
+      reply(400, 'invalid game config');
 
       const error = await createMatch(req).catch((e: unknown) => e);
       expect(error).toBeInstanceOf(ApiError);
@@ -149,19 +229,23 @@ describe('api.ts', () => {
   describe('rematch', () => {
     it('should POST game config and return player tokens', async () => {
       const resp = { success: true, playerTokens: ['token1', 'token2'] };
-      mockOk(201, resp);
+      reply(201, resp);
 
       const result = await rematch();
 
       expect(result).toEqual(resp);
-      const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
-      expect(url).toContain('/api/match-rooms/test-room-123/rematch');
-      expect(options.method).toBe('POST');
-      expect(options.headers).toHaveProperty('Authorization', 'Bearer test-token-abc');
+      expect(await sent()).toEqual({
+        method: 'POST',
+        path: '/api/match-rooms/test-room-123/rematch',
+        query: '',
+        authorization: AUTH,
+        contentType: null,
+        body: '',
+      });
     });
 
     it('should throw ApiError on invalid config', async () => {
-      mockErr(401, 'invalid token');
+      reply(401, 'invalid token');
 
       const error = await rematch().catch((e: unknown) => e);
       expect(error).toBeInstanceOf(ApiError);
@@ -172,18 +256,22 @@ describe('api.ts', () => {
 
   describe('deleteMatch', () => {
     it('should DELETE with auth and resolve with no content', async () => {
-      mockOk(204, undefined);
+      reply(204, undefined);
 
       await expect(deleteMatch()).resolves.toBeUndefined();
 
-      const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
-      expect(url).toContain('/api/match-rooms/test-room-123/match');
-      expect(options.method).toBe('DELETE');
-      expect(options.headers).toHaveProperty('Authorization', 'Bearer test-token-abc');
+      expect(await sent()).toEqual({
+        method: 'DELETE',
+        path: '/api/match-rooms/test-room-123/match',
+        query: '',
+        authorization: AUTH,
+        contentType: null,
+        body: '',
+      });
     });
 
     it('should throw ApiError when match still in progress', async () => {
-      mockErr(409, 'match still in progress');
+      reply(409, 'match still in progress');
 
       const error = await deleteMatch().catch((e: unknown) => e);
       expect(error).toBeInstanceOf(ApiError);
@@ -196,18 +284,23 @@ describe('api.ts', () => {
     const fixture: GameState = makeState({ activeTeam: 0, grid: [] });
 
     it('should GET and return game state', async () => {
-      mockOk(200, fixture);
+      reply(200, fixture);
 
       const result = await getMatchState();
 
       expect(result).toEqual(fixture);
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/match-rooms/test-room-123/match/state')
-      );
+      expect(await sent()).toEqual({
+        method: 'GET',
+        path: '/api/match-rooms/test-room-123/match/state',
+        query: '',
+        authorization: null,
+        contentType: null,
+        body: '',
+      });
     });
 
     it('should throw ApiError when match not found', async () => {
-      mockErr(404, 'match not found');
+      reply(404, 'match not found');
 
       const error = await getMatchState().catch((e: unknown) => e);
       expect(error).toBeInstanceOf(ApiError);
@@ -224,17 +317,23 @@ describe('api.ts', () => {
     };
 
     it('should POST with auth and return events', async () => {
-      mockOk(200, fixture);
+      reply(200, fixture);
 
       const result = await consumeCpuStatus();
 
       expect(result).toEqual(fixture);
-      const [, options] = mockFetch.mock.calls[0] as [string, RequestInit];
-      expect(options.headers).toHaveProperty('Authorization');
+      expect(await sent()).toEqual({
+        method: 'POST',
+        path: '/api/match-rooms/test-room-123/match/cpu-status/consume',
+        query: '',
+        authorization: AUTH,
+        contentType: null,
+        body: '',
+      });
     });
 
     it('should throw ApiError on failure', async () => {
-      mockErr(401, 'invalid player token');
+      reply(401, 'invalid player token');
 
       const error = await consumeCpuStatus().catch((e: unknown) => e);
       expect(error).toBeInstanceOf(ApiError);
@@ -249,19 +348,23 @@ describe('api.ts', () => {
     ];
 
     it('should POST command with auth and return game events', async () => {
-      mockOk(200, fixture);
+      reply(200, fixture);
 
       const result = await submitTurnCommand(cmdFixture);
 
       expect(result).toEqual(fixture);
-      const [, options] = mockFetch.mock.calls[0] as [string, RequestInit];
-      expect(options.method).toBe('POST');
-      expect(options.headers).toHaveProperty('Authorization', 'Bearer test-token-abc');
-      expect(options.body).toBe(JSON.stringify(cmdFixture));
+      expect(await sent()).toEqual({
+        method: 'POST',
+        path: '/api/match-rooms/test-room-123/match/turn-commands',
+        query: '',
+        authorization: AUTH,
+        contentType: JSON_TYPE,
+        body: JSON.stringify(cmdFixture),
+      });
     });
 
     it('should throw ApiError on invalid command', async () => {
-      mockErr(409, 'invalid turn command');
+      reply(409, 'invalid turn command');
 
       const error = await submitTurnCommand(cmdFixture).catch((e: unknown) => e);
       expect(error).toBeInstanceOf(ApiError);
@@ -271,18 +374,22 @@ describe('api.ts', () => {
 
   describe('resetTurn', () => {
     it('should POST with auth and resolve with no content', async () => {
-      mockOk(204, undefined);
+      reply(204, undefined);
 
       await expect(resetTurn()).resolves.toBeUndefined();
 
-      const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
-      expect(url).toContain('/api/match-rooms/test-room-123/match/reset');
-      expect(options.method).toBe('POST');
-      expect(options.headers).toHaveProperty('Authorization', 'Bearer test-token-abc');
+      expect(await sent()).toEqual({
+        method: 'POST',
+        path: '/api/match-rooms/test-room-123/match/reset',
+        query: '',
+        authorization: AUTH,
+        contentType: null,
+        body: '',
+      });
     });
 
     it('should throw ApiError on failure', async () => {
-      mockErr(500, 'internal error');
+      reply(500, 'internal error');
 
       await expect(resetTurn()).rejects.toThrow(ApiError);
     });
@@ -295,17 +402,23 @@ describe('api.ts', () => {
     };
 
     it('should POST with auth and return events', async () => {
-      mockOk(200, fixture);
+      reply(200, fixture);
 
       const result = await resolveTurn();
 
       expect(result).toEqual(fixture);
-      const [, options] = mockFetch.mock.calls[0] as [string, RequestInit];
-      expect(options.headers).toHaveProperty('Authorization');
+      expect(await sent()).toEqual({
+        method: 'POST',
+        path: '/api/match-rooms/test-room-123/match/resolve',
+        query: '',
+        authorization: AUTH,
+        contentType: null,
+        body: '',
+      });
     });
 
     it('should throw ApiError on failure', async () => {
-      mockErr(401, 'invalid player token');
+      reply(401, 'invalid player token');
 
       const error = await resolveTurn().catch((e: unknown) => e);
       expect(error).toBeInstanceOf(ApiError);
@@ -318,19 +431,23 @@ describe('api.ts', () => {
     const fixture: GameEvent[] = [{ type: 'matchEnded', winnerTeamId: 1 }];
 
     it('should POST surrender request with auth', async () => {
-      mockOk(200, fixture);
+      reply(200, fixture);
 
       const result = await surrender(req);
 
       expect(result).toEqual(fixture);
-      const [, options] = mockFetch.mock.calls[0] as [string, RequestInit];
-      expect(options.method).toBe('POST');
-      expect(options.headers).toHaveProperty('Authorization');
-      expect(options.body).toBe(JSON.stringify(req));
+      expect(await sent()).toEqual({
+        method: 'POST',
+        path: '/api/match-rooms/test-room-123/match/surrender',
+        query: '',
+        authorization: AUTH,
+        contentType: JSON_TYPE,
+        body: JSON.stringify(req),
+      });
     });
 
     it('should throw ApiError on invalid team id', async () => {
-      mockErr(400, 'invalid game config');
+      reply(400, 'invalid game config');
 
       await expect(surrender({ teamId: 5 })).rejects.toThrow(ApiError);
     });
@@ -346,18 +463,23 @@ describe('api.ts', () => {
     });
 
     it('should GET and return game config', async () => {
-      mockOk(200, fixture);
+      reply(200, fixture);
 
       const result = await getMatchConfig();
 
       expect(result).toEqual(fixture);
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/match-rooms/test-room-123/match/config')
-      );
+      expect(await sent()).toEqual({
+        method: 'GET',
+        path: '/api/match-rooms/test-room-123/match/config',
+        query: '',
+        authorization: null,
+        contentType: null,
+        body: '',
+      });
     });
 
     it('should throw ApiError on failure', async () => {
-      mockErr(404, 'match not found');
+      reply(404, 'match not found');
 
       await expect(getMatchConfig()).rejects.toThrow(ApiError);
     });
@@ -369,18 +491,23 @@ describe('api.ts', () => {
         { x: 1, y: 2 },
         { x: 2, y: 3 },
       ];
-      mockOk(200, fixture);
+      reply(200, fixture);
 
       const result = await getAllowedTiles({ unitId: 1, turnCmdType: 'move' });
 
       expect(result).toEqual(fixture);
-      const [url] = mockFetch.mock.calls[0] as [string];
-      expect(url).toContain('unitId=1');
-      expect(url).toContain('turnCmdType=move');
+      expect(await sent()).toEqual({
+        method: 'GET',
+        path: '/api/match-rooms/test-room-123/match/allowed-tiles',
+        query: '?unitId=1&turnCmdType=move',
+        authorization: null,
+        contentType: null,
+        body: '',
+      });
     });
 
     it('should throw ApiError on failure', async () => {
-      mockErr(400, 'missing required query parameters');
+      reply(400, 'missing required query parameters');
 
       const error = await getAllowedTiles({ unitId: 1, turnCmdType: 'move' }).catch(
         (e: unknown) => e

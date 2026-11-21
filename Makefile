@@ -70,8 +70,12 @@ web-coverage: web/node_modules web-format web-typecheck
 gen-spec-index:
 	go run scripts/gen-spec-index.go
 
-gen:
+GEN_PATHS = server/api web/src/api/schema.gen.ts
+
+gen: web/node_modules
 	go generate ./server/api
+	cd web && npm run gen
 
 gen-check: gen
-	git diff --exit-code -- server/api
+	git diff --exit-code HEAD -- $(GEN_PATHS)
+	test -z "$$(git ls-files --others --exclude-standard -- $(GEN_PATHS))"
