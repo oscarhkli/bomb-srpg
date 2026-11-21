@@ -76,14 +76,14 @@ interface Answer<T> {
 
 function unwrap<T>({ data, error, response }: Answer<T>): T {
   if (error !== undefined || data === undefined) {
-    throw new ApiError(response.status, String(error));
+    throw new ApiError(response.status, String(error ?? ''));
   }
   return data;
 }
 
 function unwrapVoid({ error, response }: Answer<undefined>): void {
   if (error !== undefined) {
-    throw new ApiError(response.status, String(error));
+    throw new ApiError(response.status, String(error ?? ''));
   }
 }
 

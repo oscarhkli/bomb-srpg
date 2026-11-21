@@ -131,6 +131,17 @@ describe('api.ts', () => {
       expect((error as ApiError).message).toBe('123\n');
     });
 
+    it('should give an empty message for an empty error body', async () => {
+      mockFetch.mockResolvedValueOnce(
+        new Response('', { status: 500, headers: { 'Content-Length': '0' } })
+      );
+
+      const error = await getCatalog().catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(ApiError);
+      expect((error as ApiError).status).toBe(500);
+      expect((error as ApiError).message).toBe('');
+    });
+
     it('should reject when the network is down', async () => {
       mockFetch.mockRejectedValueOnce(new TypeError('Failed to fetch'));
 
