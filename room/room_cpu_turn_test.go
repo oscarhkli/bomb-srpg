@@ -811,3 +811,22 @@ func TestRoom_CPUTurn_DecideScribblingOnItsStateLeavesTheMatchAlone(t *testing.T
 		t.Errorf("turn after the CPU turn = %d, want %d", got, want)
 	}
 }
+
+func TestRoom_ConsumeCPU_SynchronousSpawnDoesNotDeadlock(t *testing.T) {
+	f := cpuTurnFixture(t, func(d *Deps) { d.Spawn = func(run func()) { run() } })
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		consumeCPUPhase(t, f.r, f.tokens[0])
+	}()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("ConsumeCPU() hung: a Spawn that runs its function before returning deadlocked on the room lock")
+	}
+
+	if phase, _, resolve := consumeCPUPhase(t, f.r, f.tokens[0]); phase != TurnPhaseReady || len(resolve) == 0 {
+		t.Errorf("second ConsumeCPU() = phase %v with %d resolve events, want Ready with events", phase, len(resolve))
+	}
+}
