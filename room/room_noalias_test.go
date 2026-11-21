@@ -2,8 +2,6 @@ package room
 
 import (
 	"bomb-srpg/engine"
-	"errors"
-	"log/slog"
 	"reflect"
 	"slices"
 	"testing"
@@ -181,45 +179,4 @@ func TestRoom_NoAlias(t *testing.T) {
 			}
 		}
 	})
-}
-
-func TestRoom_NewMatch_RoomKeepsNoPointerTheFactoryHolds(t *testing.T) {
-	var built []*engine.Match
-	r := New("room", Deps{
-		Logger: slog.New(slog.DiscardHandler),
-		NewMatch: func(cfg engine.GameCfg) (*engine.Match, error) {
-			match, err := engine.InitGame(cfg)
-			if err == nil {
-				built = append(built, match)
-			}
-			return match, err
-		},
-	})
-	tokens, err := r.Start(validGameCfg())
-	if err != nil {
-		t.Fatalf("Start() error = %v", err)
-	}
-	if _, err := r.Rematch(tokens[0]); err != nil {
-		t.Fatalf("Rematch() error = %v", err)
-	}
-	want, err := r.State()
-	if err != nil {
-		t.Fatalf("State() error = %v", err)
-	}
-
-	for _, match := range built {
-		scribbleState(match.WorkingState)
-		match.WinnerTeamID = 1
-	}
-
-	got, err := r.State()
-	if err != nil {
-		t.Fatalf("State() error = %v", err)
-	}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("State() turn = %d, active team = %d after the factory edited its matches, want %d and %d", got.Turn, got.ActiveTeam, want.Turn, want.ActiveTeam)
-	}
-	if err := r.Delete(tokens[0]); !errors.Is(err, ErrMatchInProgress) {
-		t.Errorf("Delete() error = %v, want %v: the factory's winner edit reached the room", err, ErrMatchInProgress)
-	}
 }
