@@ -114,7 +114,7 @@ func (r *Room) buildMatchLocked(cfg engine.GameCfg) (*engine.Match, error) {
 		r.log.Error("invalid game config", "gameCfg", cfg, "error", err)
 		return nil, fmt.Errorf("%w: %w", ErrInvalidConfig, err)
 	}
-	return match, nil
+	return match.Clone(), nil
 }
 
 func (r *Room) setMatchLocked(match *engine.Match) {

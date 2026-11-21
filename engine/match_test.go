@@ -2429,3 +2429,34 @@ func TestMatch_Surrender_ReturnedEventsDoNotAliasMatch(t *testing.T) {
 		t.Errorf("WinnerTeamID = %d, want 2", m.WinnerTeamID)
 	}
 }
+
+func TestMatch_Clone_SharesNoMemory(t *testing.T) {
+	m, err := InitGame(GameCfg{
+		StagePreset: "Plain",
+		P1Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
+		P2Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Witch", Role: RoleNormal}},
+		MaxTurns:    10,
+	})
+	if err != nil {
+		t.Fatalf("InitGame() error = %v", err)
+	}
+	m.PlaybackLog = []GameEvent{{Type: GameEvtType("x"), Position: &Coordinate{X: 1, Y: 2}}}
+	want := m.Clone()
+	if !reflect.DeepEqual(want, m) {
+		t.Fatalf("Clone() = %+v, want an equal match %+v", want, m)
+	}
+
+	got := m.Clone()
+	got.WinnerTeamID = 1
+	got.GameCfg.P1Slots[0].Archetype = "scribbled"
+	got.TrueState.Turn += 100
+	got.WorkingState.Turn += 100
+	for _, unit := range got.WorkingState.Units {
+		unit.HasMoved = !unit.HasMoved
+	}
+	got.PlaybackLog[0].Position.X = -1
+
+	if !reflect.DeepEqual(m, want) {
+		t.Errorf("match after editing its clone = %+v, want unchanged %+v", m, want)
+	}
+}
