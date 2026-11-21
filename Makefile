@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := test
-.PHONY: fmt vet test test-race bench lint shell-lint pre-push install-hooks coverage build-server run-server web-dev web-format web-typecheck web-test web-lint web-build web-e2e image-smoke web-coverage gen-spec-index
+.PHONY: fmt vet test test-race bench lint shell-lint pre-push install-hooks coverage build-server run-server web-dev web-format web-typecheck web-test web-lint web-build web-e2e image-smoke web-coverage gen-spec-index gen gen-check
 
 fmt:
 	go fmt ./...
@@ -22,7 +22,7 @@ lint:
 shell-lint:
 	shellcheck scripts/*.sh
 
-pre-push: lint test web-lint web-test
+pre-push: gen-check lint test web-lint web-test
 
 install-hooks:
 	printf '#!/bin/sh\nexec make pre-push\n' > $$(git rev-parse --git-path hooks)/pre-push
@@ -69,3 +69,9 @@ web-coverage: web/node_modules web-format web-typecheck
 
 gen-spec-index:
 	go run scripts/gen-spec-index.go
+
+gen:
+	go generate ./server/api
+
+gen-check: gen
+	git diff --exit-code -- server/api
