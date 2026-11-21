@@ -82,7 +82,7 @@ func matchToken(a, b string) bool {
 	return subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1
 }
 
-func (r *Room) validatePlayerTokenLocked(teamID int, token string) error {
+func (r *Room) validatePlayerToken(teamID int, token string) error {
 	idx := teamID - 1
 	if idx < 0 || idx > 1 {
 		return ErrInvalidConfig
@@ -101,7 +101,7 @@ func (r *Room) rejectDuringCPUTurnLocked() error {
 	return nil
 }
 
-func (r *Room) validateAnyMatchPlayerTokenLocked(token string) error {
+func (r *Room) validateAnyMatchPlayerToken(token string) error {
 	if !matchToken(r.tokens[0], token) && !matchToken(r.tokens[1], token) {
 		return ErrInvalidToken
 	}
@@ -157,7 +157,7 @@ func (r *Room) Rematch(token string) ([2]string, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if err := r.validateAnyMatchPlayerTokenLocked(token); err != nil {
+	if err := r.validateAnyMatchPlayerToken(token); err != nil {
 		return [2]string{}, err
 	}
 
@@ -181,7 +181,7 @@ func (r *Room) Delete(token string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if err := r.validateAnyMatchPlayerTokenLocked(token); err != nil {
+	if err := r.validateAnyMatchPlayerToken(token); err != nil {
 		return err
 	}
 
@@ -231,7 +231,7 @@ func (r *Room) command(token string, teamOf func(*engine.Match) int, policy cpuP
 	if r.match == nil {
 		return r.matchNotFound()
 	}
-	if err := r.validatePlayerTokenLocked(teamOf(r.match), token); err != nil {
+	if err := r.validatePlayerToken(teamOf(r.match), token); err != nil {
 		return err
 	}
 	if policy == rejectInCPUTurn {

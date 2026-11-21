@@ -124,7 +124,7 @@ func (r *Room) ConsumeCPU(token string) (CPUStatus, error) {
 		return CPUStatus{}, fmt.Errorf("%w: roomID=%s", ErrMatchNotFound, r.id)
 	}
 
-	if err := r.validateAnyMatchPlayerTokenLocked(token); err != nil {
+	if err := r.validateAnyMatchPlayerToken(token); err != nil {
 		return CPUStatus{}, err
 	}
 

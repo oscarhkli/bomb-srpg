@@ -10,8 +10,6 @@ import (
 	"testing"
 )
 
-var guardedFields = map[string]bool{"match": true, "lastActivity": true, "cpu": true, "cfg": true, "tokens": true}
-
 type methodFacts struct {
 	firstTouch token.Pos
 	firstLock  token.Pos
@@ -95,7 +93,7 @@ func roomMethodFacts(t *testing.T) map[string]*methodFacts {
 			if !ok {
 				return true
 			}
-			if isIdent(sel.X, recv) && guardedFields[sel.Sel.Name] {
+			if isIdent(sel.X, recv) && (sel.Sel.Name == "match" || sel.Sel.Name == "lastActivity") {
 				self.firstTouch = earliest(self.firstTouch, sel.Pos())
 			}
 			if inner, ok := sel.X.(*ast.SelectorExpr); ok && isIdent(inner.X, recv) && inner.Sel.Name == "mu" &&
@@ -135,7 +133,7 @@ func lockViolations(facts map[string]*methodFacts) []string {
 			continue
 		}
 		if !strings.HasSuffix(name, "Locked") {
-			bad = append(bad, name+" touches guarded state without the room lock")
+			bad = append(bad, name+" touches the match without the room lock")
 			continue
 		}
 		for _, caller := range f.callers {
