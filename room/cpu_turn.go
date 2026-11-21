@@ -88,7 +88,7 @@ func (r *Room) runCPUTurn(match *engine.Match) {
 
 	var err error
 	for attempt := range maxCPUReplanAttempts {
-		cmds, decideErr := r.deps.Decide(match.WorkingState.DeepCopy())
+		cmds, decideErr := r.deps.Decide(match.WorkingState)
 		if decideErr != nil {
 			r.log.Warn("CPU decide reported errors", "attempt", attempt, "error", decideErr)
 		}
