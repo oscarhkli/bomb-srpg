@@ -2,7 +2,9 @@ package room
 
 import (
 	"bomb-srpg/engine"
+	"encoding/json/v2"
 	"errors"
+	"reflect"
 	"slices"
 	"testing"
 )
@@ -115,10 +117,123 @@ func TestRoom_CPUTurnAbandons_NotCPUsTurn(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ConsumeCPU() error = %v", err)
 	}
-	if status.Phase != engine.TurnPhaseReady {
-		t.Errorf("ConsumeCPU() phase = %v, want %v", status.Phase, engine.TurnPhaseReady)
+	if status.Phase != TurnPhaseReady {
+		t.Errorf("ConsumeCPU() phase = %v, want %v", status.Phase, TurnPhaseReady)
 	}
 	if len(status.Plan) != 0 || len(status.Resolve) != 0 {
 		t.Errorf("ConsumeCPU() events = %+v and %+v, want none", status.Plan, status.Resolve)
+	}
+}
+
+func TestCPUTurnPhaseString(t *testing.T) {
+	tests := []struct {
+		name      string
+		turnPhase CPUTurnPhase
+		want      string
+	}{
+		{"TurnPhase Idle", TurnPhaseIdle, "TurnPhaseIdle"},
+		{"TurnPhase Planning", TurnPhasePlanning, "TurnPhasePlanning"},
+		{"TurnPhase Ready", TurnPhaseReady, "TurnPhaseReady"},
+		{"Invalid Value", CPUTurnPhase(99), "TurnPhaseUnknown"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.turnPhase.String(); got != tt.want {
+				t.Errorf("CPUTurnPhase.String() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCPUTurnPhaseEncoding(t *testing.T) {
+	tests := []struct {
+		name  string
+		phase CPUTurnPhase
+		want  string
+	}{
+		{"ready", TurnPhaseReady, `"TurnPhaseReady"`},
+		{"unknown value", CPUTurnPhase(99), `"TurnPhaseUnknown"`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := json.Marshal(tt.phase)
+			if err != nil {
+				t.Fatalf("Marshal() error = %v", err)
+			}
+			if string(got) != tt.want {
+				t.Errorf("Marshal() = %s, want %s", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestRoom_CPUStateReset(t *testing.T) {
+	tests := []struct {
+		name      string
+		act       func(t *testing.T, f fixture)
+		wantReset bool
+	}{
+		{
+			name: "Rematch",
+			act: func(t *testing.T, f fixture) {
+				t.Helper()
+				if _, err := f.r.Rematch(f.tokens[0]); err != nil {
+					t.Fatalf("Rematch() error = %v", err)
+				}
+			},
+			wantReset: true,
+		},
+		{
+			name: "Delete",
+			act: func(t *testing.T, f fixture) {
+				t.Helper()
+				endAndDelete(t, f.r, f.tokens[0])
+			},
+			wantReset: true,
+		},
+		{
+			name: "Surrender then Rematch",
+			act: func(t *testing.T, f fixture) {
+				t.Helper()
+				if _, err := f.r.Surrender(1, f.tokens[0]); err != nil {
+					t.Fatalf("Surrender() error = %v", err)
+				}
+				if _, err := f.r.Rematch(f.tokens[0]); err != nil {
+					t.Fatalf("Rematch() error = %v", err)
+				}
+			},
+			wantReset: true,
+		},
+		{
+			name: "second Start",
+			act: func(t *testing.T, f fixture) {
+				t.Helper()
+				if _, err := f.r.Start(vsCPUCfg()); !errors.Is(err, ErrMatchExists) {
+					t.Fatalf("Start() error = %v, want %v", err, ErrMatchExists)
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := cpuReadyFixture(t)
+			before := f.r.cpu
+			if before.phase != TurnPhaseReady || len(before.plan) == 0 {
+				t.Fatalf("setup cpu state = %+v, want phase Ready with buffered events", before)
+			}
+
+			tt.act(t, f)
+
+			want := before
+			if tt.wantReset {
+				want = cpuTurn{}
+			}
+			if !reflect.DeepEqual(f.r.cpu, want) {
+				t.Errorf("cpu state = %+v, want %+v", f.r.cpu, want)
+			}
+		})
 	}
 }

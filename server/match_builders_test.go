@@ -31,11 +31,6 @@ func cpuTurnPending(match *engine.Match) error {
 	return nil
 }
 
-func matchEnded(match *engine.Match) error {
-	match.WinnerTeamID = 1
-	return nil
-}
-
 func unitAlreadyMoved(unitID engine.UnitID) matchArrangement {
 	return func(match *engine.Match) error {
 		unit, ok := match.WorkingState.Units[unitID]
@@ -45,11 +40,6 @@ func unitAlreadyMoved(unitID engine.UnitID) matchArrangement {
 		unit.HasMoved = true
 		return nil
 	}
-}
-
-func firstTurnResolved(match *engine.Match) error {
-	match.ResolveTurn()
-	return nil
 }
 
 func bombPlacedBy(unitID engine.UnitID) matchArrangement {

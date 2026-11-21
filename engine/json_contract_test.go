@@ -324,11 +324,10 @@ func TestConfigEncoding(t *testing.T) {
 
 func TestEnumEncoding(t *testing.T) {
 	checkEncoding(t, []encodingCase{
-		{"cpu phase", TurnPhaseReady, `"TurnPhaseReady"`},
 		{
 			"unknown values",
-			[]any{TerrainType(99), OccupantType(99), UnitRole(99), CPUTurnPhase(99)},
-			`["TerrainUnknown", "OccupantUnknown", "Unknown", "TurnPhaseUnknown"]`,
+			[]any{TerrainType(99), OccupantType(99), UnitRole(99)},
+			`["TerrainUnknown", "OccupantUnknown", "Unknown"]`,
 		},
 	})
 }

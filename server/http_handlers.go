@@ -260,9 +260,9 @@ func (h *Handler) handleSubmitTurnCommand(w http.ResponseWriter, r *http.Request
 }
 
 type cpuStatusResponse struct {
-	TurnPhase             engine.CPUTurnPhase `json:"turnPhase"`
-	PlanGameEvents        []engine.GameEvent  `json:"planGameEvents"`
-	ResolveTurnGameEvents []engine.GameEvent  `json:"resolveTurnGameEvents"`
+	TurnPhase             room.CPUTurnPhase  `json:"turnPhase"`
+	PlanGameEvents        []engine.GameEvent `json:"planGameEvents"`
+	ResolveTurnGameEvents []engine.GameEvent `json:"resolveTurnGameEvents"`
 }
 
 func (h *Handler) handleConsumeCPUStatus(w http.ResponseWriter, r *http.Request) {

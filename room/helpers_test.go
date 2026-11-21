@@ -2,22 +2,84 @@ package room
 
 import (
 	"bomb-srpg/engine"
+	"context"
 	"errors"
 	"log/slog"
+	"sync"
 	"testing"
 )
 
-type heldSpawn struct{ fns []func() }
+type heldSpawn struct {
+	fns  []func()
+	next int
+}
 
 func (h *heldSpawn) spawn(f func()) { h.fns = append(h.fns, f) }
 
+func (h *heldSpawn) count() int { return len(h.fns) }
+
+func (h *heldSpawn) runNext(t *testing.T) {
+	t.Helper()
+	if h.next >= len(h.fns) {
+		t.Fatal("no held CPU turn to run")
+	}
+	f := h.fns[h.next]
+	h.next++
+	f()
+}
+
 func (h *heldSpawn) runAll() {
-	fns := h.fns
-	h.fns = nil
-	for _, f := range fns {
+	end := len(h.fns)
+	for h.next < end {
+		f := h.fns[h.next]
+		h.next++
 		f()
 	}
 }
+
+type recordingDecider struct {
+	plan          func(gs *engine.GameState, call int) []engine.TurnCommand
+	err           error
+	calls         int
+	observedBombs int
+}
+
+func (d *recordingDecider) decide(gs *engine.GameState) ([]engine.TurnCommand, error) {
+	call := d.calls
+	if call == 0 {
+		d.observedBombs = len(gs.Bombs)
+	}
+	d.calls++
+
+	if d.plan == nil {
+		return nil, d.err
+	}
+	return d.plan(gs, call), d.err
+}
+
+func withDecide(decide func(*engine.GameState) ([]engine.TurnCommand, error)) func(*Deps) {
+	return func(d *Deps) { d.Decide = decide }
+}
+
+type captureHandler struct {
+	mu      sync.Mutex
+	records []slog.Record
+}
+
+func (h *captureHandler) Enabled(_ context.Context, level slog.Level) bool {
+	return level >= slog.LevelWarn
+}
+
+func (h *captureHandler) Handle(_ context.Context, r slog.Record) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.records = append(h.records, r)
+	return nil
+}
+
+func (h *captureHandler) WithAttrs([]slog.Attr) slog.Handler { return h }
+
+func (h *captureHandler) WithGroup(string) slog.Handler { return h }
 
 func cpuTurnPending(match *engine.Match) error {
 	match.WorkingState.Turn = 2
@@ -39,11 +101,15 @@ var cpuPlan = []engine.TurnCommand{
 	engine.NewPlaceBombCommand(engine.NewUnitID(2, 0), engine.Coordinate{X: 4, Y: 2}),
 }
 
-func newFixture(arrange ...func(*engine.Match) error) fixture {
+func newFixture() fixture {
+	return newFixtureWith(nil)
+}
+
+func newFixtureWith(tweak func(*Deps), arrange ...func(*engine.Match) error) fixture {
 	clock := newFakeClock()
 	held := &heldSpawn{}
 	decides := new(int)
-	r := New("room", Deps{
+	deps := Deps{
 		Logger: slog.New(slog.DiscardHandler),
 		Decide: func(*engine.GameState) ([]engine.TurnCommand, error) {
 			*decides++
@@ -63,7 +129,11 @@ func newFixture(arrange ...func(*engine.Match) error) fixture {
 			return match, nil
 		},
 		Now: clock.now,
-	})
+	}
+	if tweak != nil {
+		tweak(&deps)
+	}
+	r := New("room", deps)
 	return fixture{r: r, clock: clock, held: held, decides: decides}
 }
 
@@ -81,7 +151,12 @@ func vsCPUCfg() engine.GameCfg {
 
 func startedFixture(t *testing.T, cfg engine.GameCfg, arrange ...func(*engine.Match) error) fixture {
 	t.Helper()
-	f := newFixture(arrange...)
+	return startedFixtureWith(t, cfg, nil, arrange...)
+}
+
+func startedFixtureWith(t *testing.T, cfg engine.GameCfg, tweak func(*Deps), arrange ...func(*engine.Match) error) fixture {
+	t.Helper()
+	f := newFixtureWith(tweak, arrange...)
 	tokens, err := f.r.Start(cfg)
 	if err != nil {
 		t.Fatalf("Start() error = %v", err)
@@ -98,7 +173,7 @@ func humanFixture(t *testing.T) fixture {
 func planningFixture(t *testing.T) fixture {
 	t.Helper()
 	f := startedFixture(t, vsCPUCfg(), cpuTurnPending)
-	if status, err := f.r.ConsumeCPU(f.tokens[0]); err != nil || status.Phase != engine.TurnPhasePlanning {
+	if status, err := f.r.ConsumeCPU(f.tokens[0]); err != nil || status.Phase != TurnPhasePlanning {
 		t.Fatalf("ConsumeCPU() = %v, %v, want phase Planning", status.Phase, err)
 	}
 	return f
@@ -109,6 +184,41 @@ func cpuReadyFixture(t *testing.T) fixture {
 	f := planningFixture(t)
 	f.held.runAll()
 	return f
+}
+
+func cpuTurnCfg() engine.GameCfg {
+	cfg := validGameCfg()
+	cfg.VSCpu = true
+	return cfg
+}
+
+func cpuTurnFixture(t *testing.T, tweak func(*Deps)) fixture {
+	t.Helper()
+	return startedFixtureWith(t, cpuTurnCfg(), tweak, cpuTurnPending)
+}
+
+func consumeCPUPhase(t *testing.T, r *Room, token string) (CPUTurnPhase, []engine.GameEvent, []engine.GameEvent) {
+	t.Helper()
+	status, err := r.ConsumeCPU(token)
+	if err != nil {
+		t.Fatalf("ConsumeCPU() error = %v", err)
+	}
+	return status.Phase, status.Plan, status.Resolve
+}
+
+func moveThenBombPlan(t *testing.T, unitID engine.UnitID, dest engine.Coordinate) func(*engine.GameState, int) []engine.TurnCommand {
+	t.Helper()
+	return func(gs *engine.GameState, _ int) []engine.TurnCommand {
+		t.Helper()
+		target, ok := findFreeNeighbour(gs, dest)
+		if !ok {
+			t.Fatalf("no free neighbour next to %v", dest)
+		}
+		return []engine.TurnCommand{
+			engine.NewMoveCommand(unitID, dest),
+			engine.NewPlaceBombCommand(unitID, target),
+		}
+	}
 }
 
 func validGameCfg() engine.GameCfg {
@@ -131,7 +241,17 @@ func unitAlreadyMoved(unitID engine.UnitID) func(*engine.Match) error {
 	}
 }
 
-func bombAboutToExplode(unitID engine.UnitID) func(*engine.Match) error {
+func matchEnded(match *engine.Match) error {
+	match.WinnerTeamID = 1
+	return nil
+}
+
+func firstTurnResolved(match *engine.Match) error {
+	match.ResolveTurn()
+	return nil
+}
+
+func bombPlacedBy(unitID engine.UnitID) func(*engine.Match) error {
 	return func(match *engine.Match) error {
 		unit, ok := match.WorkingState.Units[unitID]
 		if !ok {
@@ -141,7 +261,14 @@ func bombAboutToExplode(unitID engine.UnitID) func(*engine.Match) error {
 		if !ok {
 			return errors.New("no free neighbour")
 		}
-		if _, err := match.CommandPlaceBomb(unitID, target); err != nil {
+		_, err := match.CommandPlaceBomb(unitID, target)
+		return err
+	}
+}
+
+func bombAboutToExplode(unitID engine.UnitID) func(*engine.Match) error {
+	return func(match *engine.Match) error {
+		if err := bombPlacedBy(unitID)(match); err != nil {
 			return err
 		}
 		for _, bomb := range match.WorkingState.Bombs {

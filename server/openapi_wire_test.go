@@ -2,6 +2,7 @@ package server
 
 import (
 	"bomb-srpg/engine"
+	"bomb-srpg/room"
 	"bytes"
 	"encoding"
 	"encoding/json/v2"
@@ -601,7 +602,7 @@ func (r *openAPIRig) assertEnums() {
 		"TerrainType":  textEnumNames[engine.TerrainType](t),
 		"OccupantType": textEnumNames[engine.OccupantType](t),
 		"UnitRole":     textEnumNames[engine.UnitRole](t),
-		"CPUTurnPhase": textEnumNames[engine.CPUTurnPhase](t),
+		"CPUTurnPhase": textEnumNames[room.CPUTurnPhase](t),
 		"SkillType":    engineSkillNames(t),
 		"TurnCmdType":  {string(engine.TurnCmdMove), string(engine.TurnCmdPlaceBomb)},
 		"GameEvtType":  slices.Sorted(maps.Keys(r.kinds)),
