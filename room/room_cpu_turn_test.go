@@ -825,3 +825,32 @@ func TestRoom_ConsumeCPU_SynchronousSpawnDoesNotDeadlock(t *testing.T) {
 		t.Errorf("second ConsumeCPU() = phase %v with %d resolve events, want Ready with events", phase, len(resolve))
 	}
 }
+
+func TestRoom_ConsumeCPU_SpawnThatDropsRunKeepsPlanning(t *testing.T) {
+	var spawns int
+	f := cpuTurnFixture(t, func(d *Deps) { d.Spawn = func(func()) { spawns++ } })
+
+	for range 2 {
+		if phase, _, _ := consumeCPUPhase(t, f.r, f.tokens[0]); phase != TurnPhasePlanning {
+			t.Fatalf("ConsumeCPU() phase = %v, want %v", phase, TurnPhasePlanning)
+		}
+	}
+	if spawns != 1 {
+		t.Errorf("spawn calls after two consumes = %d, want 1", spawns)
+	}
+
+	cpuMove := engine.NewMoveCommand(engine.NewUnitID(2, 0), engine.Coordinate{X: 4, Y: 1})
+	if _, err := f.r.Submit(cpuMove, f.tokens[1]); !errors.Is(err, ErrCPUTurnInProgress) {
+		t.Errorf("Submit() error = %v, want %v", err, ErrCPUTurnInProgress)
+	}
+
+	if _, err := f.r.Rematch(f.tokens[0]); err != nil {
+		t.Fatalf("Rematch() error = %v", err)
+	}
+	if phase, _, _ := consumeCPUPhase(t, f.r, f.tokens[0]); phase != TurnPhasePlanning {
+		t.Fatalf("ConsumeCPU() after Rematch phase = %v, want %v", phase, TurnPhasePlanning)
+	}
+	if spawns != 2 {
+		t.Errorf("spawn calls after Rematch = %d, want 2", spawns)
+	}
+}
