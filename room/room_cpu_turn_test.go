@@ -793,3 +793,21 @@ func TestRoom_CPUTurn_EndsMatch(t *testing.T) {
 		t.Errorf("Expected decide to run %d time, got %d", want, got)
 	}
 }
+
+func TestRoom_CPUTurn_DecideScribblingOnItsStateLeavesTheMatchAlone(t *testing.T) {
+	scribble := func(gs *engine.GameState) ([]engine.TurnCommand, error) {
+		gs.Turn += 100
+		return nil, nil
+	}
+	f := cpuTurnFixture(t, withDecide(scribble))
+	consumeCPUPhase(t, f.r, f.tokens[0])
+	f.held.runAll()
+
+	gs, err := f.r.State()
+	if err != nil {
+		t.Fatalf("State() error = %v", err)
+	}
+	if got, want := gs.Turn, 3; got != want {
+		t.Errorf("turn after the CPU turn = %d, want %d", got, want)
+	}
+}
