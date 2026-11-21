@@ -124,6 +124,13 @@ describe('api.ts', () => {
       expect((error as ApiError).message).toBe('123');
     });
 
+    it('should keep the raw text of a numeric error body with a newline', async () => {
+      reply(500, '123\n');
+
+      const error = await getCatalog().catch((e: unknown) => e);
+      expect((error as ApiError).message).toBe('123\n');
+    });
+
     it('should reject when the network is down', async () => {
       mockFetch.mockRejectedValueOnce(new TypeError('Failed to fetch'));
 

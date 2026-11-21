@@ -18,7 +18,13 @@ import type {
 
 const api = createClient<paths>({
   baseUrl: window.location.origin,
-  fetch: req => globalThis.fetch(req),
+  fetch: async req => {
+    const res = await globalThis.fetch(req);
+    if (res.ok) {
+      return res;
+    }
+    return new Response(JSON.stringify(await res.text()), res);
+  },
 });
 
 let roomId: string | undefined;
