@@ -36,7 +36,6 @@ export function makeUnit(overrides: Partial<Unit> = {}): Unit {
     skills: [],
     hasMoved: false,
     hasUsedSkill: false,
-    role: 'Normal',
     ...overrides,
   };
 }

@@ -1,3 +1,5 @@
+import createClient from 'openapi-fetch';
+import type { paths } from './schema.gen';
 import type {
   CreateMatchRoomResponse,
   CreateMatchRequest,
@@ -13,6 +15,17 @@ import type {
   CpuStatusResponse,
   ResolveTurnResponse,
 } from './types';
+
+const api = createClient<paths>({
+  baseUrl: window.location.origin,
+  fetch: async req => {
+    const res = await globalThis.fetch(req);
+    if (res.ok) {
+      return res;
+    }
+    return new Response(JSON.stringify(await res.text()), res);
+  },
+});
 
 let roomId: string | undefined;
 let token: string | undefined;
@@ -55,132 +68,131 @@ function authHeaders(): HeadersInit {
   };
 }
 
-function buildUrl(path: string, query?: Record<string, string>): string {
-  if (!query) {
-    return path;
-  }
-  return `${path}?${new URLSearchParams(query).toString()}`;
+interface Answer<T> {
+  data?: T;
+  error?: string | number;
+  response: Response;
 }
 
-async function handleResponse<T>(res: Response): Promise<T> {
-  if (!res.ok) {
-    const message = await res.text();
-    throw new ApiError(res.status, message);
+function unwrap<T>({ data, error, response }: Answer<T>): T {
+  if (error !== undefined || data === undefined) {
+    throw new ApiError(response.status, String(error ?? ''));
   }
-  return res.json() as Promise<T>;
+  return data;
+}
+
+function unwrapVoid({ error, response }: Answer<undefined>): void {
+  if (error !== undefined) {
+    throw new ApiError(response.status, String(error ?? ''));
+  }
 }
 
 export async function getCatalog(): Promise<Catalog> {
-  const res = await fetch(buildUrl('/api/catalog'));
-  return handleResponse<Catalog>(res);
+  return unwrap(await api.GET('/api/catalog'));
 }
 
 export async function createMatchRoom(): Promise<CreateMatchRoomResponse> {
-  const res = await fetch(buildUrl('/api/match-rooms'), {
-    method: 'POST',
-  });
-  return handleResponse<CreateMatchRoomResponse>(res);
+  return unwrap(await api.POST('/api/match-rooms'));
 }
 
 export async function createMatch(req: CreateMatchRequest): Promise<CreateMatchResponse> {
-  const roomId = requireRoomId();
-  const res = await fetch(buildUrl(`/api/match-rooms/${roomId}/match`), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(req),
-  });
-  return handleResponse<CreateMatchResponse>(res);
+  const roomID = requireRoomId();
+  return unwrap(
+    await api.POST('/api/match-rooms/{roomID}/match', { params: { path: { roomID } }, body: req })
+  );
 }
 
 export async function rematch(): Promise<CreateMatchResponse> {
-  const roomId = requireRoomId();
-  const res = await fetch(buildUrl(`/api/match-rooms/${roomId}/rematch`), {
-    method: 'POST',
-    headers: authHeaders(),
-  });
-  return handleResponse<CreateMatchResponse>(res);
+  const roomID = requireRoomId();
+  return unwrap(
+    await api.POST('/api/match-rooms/{roomID}/rematch', {
+      params: { path: { roomID } },
+      headers: authHeaders(),
+    })
+  );
 }
 
 export async function deleteMatch(): Promise<void> {
-  const roomId = requireRoomId();
-  const res = await fetch(buildUrl(`/api/match-rooms/${roomId}/match`), {
-    method: 'DELETE',
-    headers: authHeaders(),
-  });
-  if (!res.ok) {
-    const message = await res.text();
-    throw new ApiError(res.status, message);
-  }
+  const roomID = requireRoomId();
+  unwrapVoid(
+    await api.DELETE('/api/match-rooms/{roomID}/match', {
+      params: { path: { roomID } },
+      headers: authHeaders(),
+    })
+  );
 }
 
 export async function getMatchState(): Promise<GameState> {
-  const roomId = requireRoomId();
-  const res = await fetch(buildUrl(`/api/match-rooms/${roomId}/match/state`));
-  return handleResponse<GameState>(res);
+  const roomID = requireRoomId();
+  return unwrap(
+    await api.GET('/api/match-rooms/{roomID}/match/state', { params: { path: { roomID } } })
+  );
 }
 
 export async function consumeCpuStatus(): Promise<CpuStatusResponse> {
-  const roomId = requireRoomId();
-  const res = await fetch(buildUrl(`/api/match-rooms/${roomId}/match/cpu-status/consume`), {
-    method: 'POST',
-    headers: authHeaders(),
-  });
-  return handleResponse<CpuStatusResponse>(res);
+  const roomID = requireRoomId();
+  return unwrap(
+    await api.POST('/api/match-rooms/{roomID}/match/cpu-status/consume', {
+      params: { path: { roomID } },
+      headers: authHeaders(),
+    })
+  );
 }
 
 export async function submitTurnCommand(cmd: TurnCommand): Promise<GameEvent[]> {
-  const roomId = requireRoomId();
-  const res = await fetch(buildUrl(`/api/match-rooms/${roomId}/match/turn-commands`), {
-    method: 'POST',
-    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-    body: JSON.stringify(cmd),
-  });
-  return handleResponse<GameEvent[]>(res);
+  const roomID = requireRoomId();
+  return unwrap(
+    await api.POST('/api/match-rooms/{roomID}/match/turn-commands', {
+      params: { path: { roomID } },
+      headers: authHeaders(),
+      body: cmd,
+    })
+  );
 }
 
 export async function resetTurn(): Promise<void> {
-  const roomId = requireRoomId();
-  const res = await fetch(buildUrl(`/api/match-rooms/${roomId}/match/reset`), {
-    method: 'POST',
-    headers: authHeaders(),
-  });
-  if (!res.ok) {
-    const message = await res.text();
-    throw new ApiError(res.status, message);
-  }
+  const roomID = requireRoomId();
+  unwrapVoid(
+    await api.POST('/api/match-rooms/{roomID}/match/reset', {
+      params: { path: { roomID } },
+      headers: authHeaders(),
+    })
+  );
 }
 
 export async function resolveTurn(): Promise<ResolveTurnResponse> {
-  const roomId = requireRoomId();
-  const res = await fetch(buildUrl(`/api/match-rooms/${roomId}/match/resolve`), {
-    method: 'POST',
-    headers: authHeaders(),
-  });
-  return handleResponse<ResolveTurnResponse>(res);
+  const roomID = requireRoomId();
+  return unwrap(
+    await api.POST('/api/match-rooms/{roomID}/match/resolve', {
+      params: { path: { roomID } },
+      headers: authHeaders(),
+    })
+  );
 }
 
 export async function surrender(req: SurrenderRequest): Promise<GameEvent[]> {
-  const roomId = requireRoomId();
-  const res = await fetch(buildUrl(`/api/match-rooms/${roomId}/match/surrender`), {
-    method: 'POST',
-    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-    body: JSON.stringify(req),
-  });
-  return handleResponse<GameEvent[]>(res);
+  const roomID = requireRoomId();
+  return unwrap(
+    await api.POST('/api/match-rooms/{roomID}/match/surrender', {
+      params: { path: { roomID } },
+      headers: authHeaders(),
+      body: req,
+    })
+  );
 }
 
 export async function getMatchConfig(): Promise<GameCfg> {
-  const roomId = requireRoomId();
-  const res = await fetch(buildUrl(`/api/match-rooms/${roomId}/match/config`));
-  return handleResponse<GameCfg>(res);
+  const roomID = requireRoomId();
+  return unwrap(
+    await api.GET('/api/match-rooms/{roomID}/match/config', { params: { path: { roomID } } })
+  );
 }
 
 export async function getAllowedTiles(req: AllowedTilesRequest): Promise<AllowedTilesResponse> {
-  const roomId = requireRoomId();
-  const query = {
-    unitId: String(req.unitId),
-    turnCmdType: req.turnCmdType,
-  };
-  const res = await fetch(buildUrl(`/api/match-rooms/${roomId}/match/allowed-tiles`, query));
-  return handleResponse<AllowedTilesResponse>(res);
+  const roomID = requireRoomId();
+  return unwrap(
+    await api.GET('/api/match-rooms/{roomID}/match/allowed-tiles', {
+      params: { path: { roomID }, query: req },
+    })
+  );
 }
