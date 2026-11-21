@@ -44,14 +44,14 @@ type CPUStatus struct {
 	Resolve []engine.GameEvent
 }
 
-func (r *Room) launchCPUTurnIfDueLocked() (run func()) {
+func (r *Room) launchCPUTurnIfDueLocked() {
 	match := r.match
 	if !match.GameCfg.VSCpu || match.WinnerTeamID != 0 || match.WorkingState.ActiveTeam != engine.Team2 ||
 		r.cpu.phase == TurnPhasePlanning {
-		return nil
+		return
 	}
 	r.cpu = cpuTurn{phase: TurnPhasePlanning}
-	return func() { r.runCPUTurn(match) }
+	r.deps.Spawn(func() { r.runCPUTurn(match) })
 }
 
 func (r *Room) runCPUTurn(match *engine.Match) {
@@ -116,32 +116,24 @@ func applyPlan(match *engine.Match, plan []engine.TurnCommand) error {
 // ConsumeCPU returns the CPU turn phase and events, and resets a Ready phase to Idle.
 // It launches the CPU turn first if one is due.
 func (r *Room) ConsumeCPU(token string) (CPUStatus, error) {
-	status, run, err := r.takeCPUStatus(token)
-	if run != nil {
-		r.deps.Spawn(run)
-	}
-	return status, err
-}
-
-func (r *Room) takeCPUStatus(token string) (CPUStatus, func(), error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	if r.match == nil {
 		r.log.Warn("match not found")
-		return CPUStatus{}, nil, fmt.Errorf("%w: roomID=%s", ErrMatchNotFound, r.id)
+		return CPUStatus{}, fmt.Errorf("%w: roomID=%s", ErrMatchNotFound, r.id)
 	}
 
 	if err := r.validateAnyMatchPlayerTokenLocked(token); err != nil {
-		return CPUStatus{}, nil, err
+		return CPUStatus{}, err
 	}
 
-	run := r.launchCPUTurnIfDueLocked()
+	r.launchCPUTurnIfDueLocked()
 
 	status := CPUStatus{Phase: r.cpu.phase, Plan: r.cpu.plan, Resolve: r.cpu.resolve}
 	if status.Phase == TurnPhaseReady {
 		r.cpu = cpuTurn{}
 	}
 
-	return status, run, nil
+	return status, nil
 }
