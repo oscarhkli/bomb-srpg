@@ -2,6 +2,7 @@ package server
 
 import (
 	"bomb-srpg/engine"
+	"bomb-srpg/room"
 	"cmp"
 	"encoding/json/v2"
 	"net/http"
@@ -202,7 +203,7 @@ func TestHandleConsumeCPUStatus(t *testing.T) {
 			t.Fatalf("Failed to decode response JSON payload: %v", err)
 		}
 
-		if got, want := response.TurnPhase, engine.TurnPhaseReady.String(); got != want {
+		if got, want := response.TurnPhase, room.TurnPhaseReady.String(); got != want {
 			t.Errorf("Expected turnPhase %v, got %v", want, got)
 		}
 		if !hasGameEvent(response.PlanGameEvents, engine.GameEvtUnitMoved, cpuUnitID) {
@@ -213,7 +214,7 @@ func TestHandleConsumeCPUStatus(t *testing.T) {
 		if err := json.UnmarshalRead(consume(t, h, roomID, playerTokens[0]).Body, &again); err != nil {
 			t.Fatalf("Failed to decode response JSON payload: %v", err)
 		}
-		if got, want := again.TurnPhase, engine.TurnPhaseIdle.String(); got != want {
+		if got, want := again.TurnPhase, room.TurnPhaseIdle.String(); got != want {
 			t.Errorf("Expected turnPhase reset to %v, got %v", want, got)
 		}
 		if len(again.PlanGameEvents) != 0 || len(again.ResolveTurnGameEvents) != 0 {
@@ -238,7 +239,7 @@ func TestHandleConsumeCPUStatus(t *testing.T) {
 			t.Fatalf("Failed to decode response JSON payload: %v", err)
 		}
 
-		if got, want := response.TurnPhase, engine.TurnPhasePlanning.String(); got != want {
+		if got, want := response.TurnPhase, room.TurnPhasePlanning.String(); got != want {
 			t.Errorf("Expected turnPhase %v, got %v", want, got)
 		}
 		if got, want := len(response.PlanGameEvents), 0; got != want {
@@ -271,7 +272,7 @@ func TestHandleConsumeCPUStatus(t *testing.T) {
 		if err := json.UnmarshalRead(rr.Body, &response); err != nil {
 			t.Fatalf("Failed to decode response JSON payload: %v", err)
 		}
-		if got, want := response.TurnPhase, engine.TurnPhaseIdle.String(); got != want {
+		if got, want := response.TurnPhase, room.TurnPhaseIdle.String(); got != want {
 			t.Errorf("Expected turnPhase %v, got %v", want, got)
 		}
 	})

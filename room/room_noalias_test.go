@@ -129,16 +129,15 @@ func TestRoom_NoAlias(t *testing.T) {
 		if err != nil {
 			t.Fatalf("ConsumeCPU() error = %v", err)
 		}
-		if status.Phase != engine.TurnPhaseReady {
-			t.Fatalf("ConsumeCPU() phase = %v, want %v", status.Phase, engine.TurnPhaseReady)
+		if status.Phase != TurnPhaseReady {
+			t.Fatalf("ConsumeCPU() phase = %v, want %v", status.Phase, TurnPhaseReady)
 		}
 
 		scribbleEvents(t, status.Plan)
 		scribbleEvents(t, status.Resolve)
 
-		cpuState := f.r.match.CPU
-		if cpuState.PlanGameEvents != nil || cpuState.ResolveTurnGameEvents != nil {
-			t.Errorf("room still holds the returned events: plan %+v, resolve %+v", cpuState.PlanGameEvents, cpuState.ResolveTurnGameEvents)
+		if f.r.cpu.plan != nil || f.r.cpu.resolve != nil {
+			t.Errorf("room still holds the returned events: plan %+v, resolve %+v", f.r.cpu.plan, f.r.cpu.resolve)
 		}
 	})
 

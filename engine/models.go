@@ -318,44 +318,12 @@ func (gs *GameState) MarshalJSON() ([]byte, error) {
 	})
 }
 
-type CPUTurnPhase int
-
-const (
-	TurnPhaseIdle CPUTurnPhase = iota
-	TurnPhasePlanning
-	TurnPhaseReady
-)
-
-func (c CPUTurnPhase) String() string {
-	switch c {
-	case TurnPhaseIdle:
-		return "TurnPhaseIdle"
-	case TurnPhasePlanning:
-		return "TurnPhasePlanning"
-	case TurnPhaseReady:
-		return "TurnPhaseReady"
-	default:
-		return "TurnPhaseUnknown"
-	}
-}
-
-func (c CPUTurnPhase) MarshalText() ([]byte, error) {
-	return []byte(c.String()), nil
-}
-
-type cpuState struct {
-	Phase                 CPUTurnPhase
-	PlanGameEvents        []GameEvent
-	ResolveTurnGameEvents []GameEvent
-}
-
 type Match struct {
 	GameCfg      GameCfg
 	TrueState    *GameState
 	WorkingState *GameState
 	// events since the last ResolveTurn
 	PlaybackLog []GameEvent
-	CPU         cpuState
 	// 0 = in progress, 1/2 = winner, -1 = draw
 	WinnerTeamID int
 }

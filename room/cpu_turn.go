@@ -7,8 +7,39 @@ import (
 
 const maxCPUReplanAttempts = 5
 
+type CPUTurnPhase int
+
+const (
+	TurnPhaseIdle CPUTurnPhase = iota
+	TurnPhasePlanning
+	TurnPhaseReady
+)
+
+func (c CPUTurnPhase) String() string {
+	switch c {
+	case TurnPhaseIdle:
+		return "TurnPhaseIdle"
+	case TurnPhasePlanning:
+		return "TurnPhasePlanning"
+	case TurnPhaseReady:
+		return "TurnPhaseReady"
+	default:
+		return "TurnPhaseUnknown"
+	}
+}
+
+func (c CPUTurnPhase) MarshalText() ([]byte, error) {
+	return []byte(c.String()), nil
+}
+
+type cpuTurn struct {
+	phase   CPUTurnPhase
+	plan    []engine.GameEvent
+	resolve []engine.GameEvent
+}
+
 type CPUStatus struct {
-	Phase   engine.CPUTurnPhase
+	Phase   CPUTurnPhase
 	Plan    []engine.GameEvent
 	Resolve []engine.GameEvent
 }
@@ -16,12 +47,10 @@ type CPUStatus struct {
 func (r *Room) launchCPUTurnIfDueLocked() {
 	match := r.match
 	if !match.GameCfg.VSCpu || match.WinnerTeamID != 0 || match.WorkingState.ActiveTeam != engine.Team2 ||
-		match.CPU.Phase == engine.TurnPhasePlanning {
+		r.cpu.phase == TurnPhasePlanning {
 		return
 	}
-	match.CPU.Phase = engine.TurnPhasePlanning
-	match.CPU.PlanGameEvents = nil
-	match.CPU.ResolveTurnGameEvents = nil
+	r.cpu = cpuTurn{phase: TurnPhasePlanning}
 	r.deps.Spawn(func() { r.runCPUTurn(match) })
 }
 
@@ -34,7 +63,7 @@ func (r *Room) runCPUTurn(match *engine.Match) {
 		return
 	}
 	defer func() {
-		match.CPU.Phase = engine.TurnPhaseReady
+		r.cpu.phase = TurnPhaseReady
 		r.lastActivity = r.deps.Now()
 	}()
 
@@ -53,7 +82,7 @@ func (r *Room) runCPUTurn(match *engine.Match) {
 		if rec := recover(); rec != nil {
 			r.log.Error("CPU turn panicked, forfeiting", "panic", rec)
 			match.ResetTurn()
-			match.CPU.PlanGameEvents, match.CPU.ResolveTurnGameEvents = match.ResolveTurn()
+			r.cpu.plan, r.cpu.resolve = match.ResolveTurn()
 		}
 	}()
 
@@ -72,7 +101,7 @@ func (r *Room) runCPUTurn(match *engine.Match) {
 		r.log.Error("CPU replan attempts exhausted, committing partial turn", "attempts", maxCPUReplanAttempts, "error", err)
 	}
 
-	match.CPU.PlanGameEvents, match.CPU.ResolveTurnGameEvents = match.ResolveTurn()
+	r.cpu.plan, r.cpu.resolve = match.ResolveTurn()
 }
 
 func applyPlan(match *engine.Match, plan []engine.TurnCommand) error {
@@ -101,12 +130,9 @@ func (r *Room) ConsumeCPU(token string) (CPUStatus, error) {
 
 	r.launchCPUTurnIfDueLocked()
 
-	cpuState := &r.match.CPU
-	status := CPUStatus{Phase: cpuState.Phase, Plan: cpuState.PlanGameEvents, Resolve: cpuState.ResolveTurnGameEvents}
-	if status.Phase == engine.TurnPhaseReady {
-		cpuState.PlanGameEvents = nil
-		cpuState.ResolveTurnGameEvents = nil
-		cpuState.Phase = engine.TurnPhaseIdle
+	status := CPUStatus{Phase: r.cpu.phase, Plan: r.cpu.plan, Resolve: r.cpu.resolve}
+	if status.Phase == TurnPhaseReady {
+		r.cpu = cpuTurn{}
 	}
 
 	return status, nil

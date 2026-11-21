@@ -1,7 +1,6 @@
 package room
 
 import (
-	"bomb-srpg/engine"
 	"sync"
 	"testing"
 )
@@ -22,7 +21,7 @@ func TestRoom_ConsumeCPURacesTheCPUTurn(t *testing.T) {
 				default:
 				}
 				status, err := f.r.ConsumeCPU(f.tokens[0])
-				if err == nil && status.Phase == engine.TurnPhaseReady {
+				if err == nil && status.Phase == TurnPhaseReady {
 					once.Do(func() { close(ready) })
 				}
 			}
