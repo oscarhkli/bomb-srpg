@@ -56,33 +56,23 @@ func New(id string, deps Deps) *Room {
 	}
 }
 
-func randomHex(byteLength int) (string, error) {
+func randomHex(byteLength int) string {
 	b := make([]byte, byteLength)
-	if _, err := cryptorand.Read(b); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(b), nil
+	_, _ = cryptorand.Read(b)
+	return hex.EncodeToString(b)
 }
 
 const tokenBytes = 16
 
-func generatePlayerTokens() ([2]string, error) {
-	var tokens [2]string
-	for i := range 2 {
-		token, err := randomHex(tokenBytes)
-		if err != nil {
-			return [2]string{}, fmt.Errorf("failed to generate playerToken for Player %d: %w", i, err)
-		}
-		tokens[i] = token
-	}
-	return tokens, nil
+func generatePlayerTokens() [2]string {
+	return [2]string{randomHex(tokenBytes), randomHex(tokenBytes)}
 }
 
 func matchToken(a, b string) bool {
 	return subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1
 }
 
-func (r *Room) validatePlayerToken(teamID int, token string) error {
+func (r *Room) validatePlayerTokenLocked(teamID int, token string) error {
 	idx := teamID - 1
 	if idx < 0 || idx > 1 {
 		return ErrInvalidConfig
@@ -101,7 +91,7 @@ func (r *Room) rejectDuringCPUTurnLocked() error {
 	return nil
 }
 
-func (r *Room) validateAnyMatchPlayerToken(token string) error {
+func (r *Room) validateAnyMatchPlayerTokenLocked(token string) error {
 	if !matchToken(r.tokens[0], token) && !matchToken(r.tokens[1], token) {
 		return ErrInvalidToken
 	}
@@ -109,12 +99,14 @@ func (r *Room) validateAnyMatchPlayerToken(token string) error {
 }
 
 func (r *Room) buildMatchLocked(cfg engine.GameCfg) (*engine.Match, error) {
+	cfg.P1Slots = slices.Clone(cfg.P1Slots)
+	cfg.P2Slots = slices.Clone(cfg.P2Slots)
 	match, err := r.deps.NewMatch(cfg)
 	if err != nil {
 		r.log.Error("invalid game config", "gameCfg", cfg, "error", err)
 		return nil, fmt.Errorf("%w: %w", ErrInvalidConfig, err)
 	}
-	return match, nil
+	return match.Clone(), nil
 }
 
 func (r *Room) setMatchLocked(match *engine.Match) {
@@ -139,11 +131,7 @@ func (r *Room) Start(cfg engine.GameCfg) ([2]string, error) {
 		return [2]string{}, err
 	}
 
-	tokens, err := generatePlayerTokens()
-	if err != nil {
-		r.log.Warn("failed to generate player tokens", "roomID", r.id, "error", err)
-		return [2]string{}, err
-	}
+	tokens := generatePlayerTokens()
 
 	r.setMatchLocked(match)
 	r.cfg = &cfg
@@ -157,7 +145,7 @@ func (r *Room) Rematch(token string) ([2]string, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if err := r.validateAnyMatchPlayerToken(token); err != nil {
+	if err := r.validateAnyMatchPlayerTokenLocked(token); err != nil {
 		return [2]string{}, err
 	}
 
@@ -181,7 +169,7 @@ func (r *Room) Delete(token string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if err := r.validateAnyMatchPlayerToken(token); err != nil {
+	if err := r.validateAnyMatchPlayerTokenLocked(token); err != nil {
 		return err
 	}
 
@@ -231,7 +219,7 @@ func (r *Room) command(token string, teamOf func(*engine.Match) int, policy cpuP
 	if r.match == nil {
 		return r.matchNotFound()
 	}
-	if err := r.validatePlayerToken(teamOf(r.match), token); err != nil {
+	if err := r.validatePlayerTokenLocked(teamOf(r.match), token); err != nil {
 		return err
 	}
 	if policy == rejectInCPUTurn {

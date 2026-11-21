@@ -2429,3 +2429,85 @@ func TestMatch_Surrender_ReturnedEventsDoNotAliasMatch(t *testing.T) {
 		t.Errorf("WinnerTeamID = %d, want 2", m.WinnerTeamID)
 	}
 }
+
+func newCloneFixture(t *testing.T) *Match {
+	t.Helper()
+	m, err := InitGame(GameCfg{
+		StagePreset: "Plain",
+		P1Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
+		P2Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Witch", Role: RoleNormal}},
+		MaxTurns:    10,
+	})
+	if err != nil {
+		t.Fatalf("InitGame() error = %v", err)
+	}
+	m.PlaybackLog = []GameEvent{{Type: GameEvtType("x"), Position: &Coordinate{X: 1, Y: 2}}}
+	for _, gs := range []*GameState{m.TrueState, m.WorkingState} {
+		gs.Bombs[900] = &Bomb{ID: 900, OwnerID: 1, Position: Coordinate{X: 3, Y: 3}, Range: 2, Countdown: 1}
+		gs.SoftBlocks[900] = &SoftBlock{ID: 900, Position: Coordinate{X: 4, Y: 4}}
+		gs.TurnCommands = []TurnCommand{NewMoveCommand(1, Coordinate{X: 2, Y: 2})}
+		gs.TurnStartEvents = []GameEvent{{
+			Type:              GameEvtType("y"),
+			Position:          &Coordinate{X: 5, Y: 5},
+			AffectedPositions: []Coordinate{{X: 6, Y: 6}},
+		}}
+	}
+	return m
+}
+
+func scribbleMatch(m *Match) {
+	m.WinnerTeamID = 1
+	m.GameCfg.P1Slots[0].Archetype = "scribbled"
+	m.PlaybackLog[0].Position.X = -1
+	for _, gs := range []*GameState{m.TrueState, m.WorkingState} {
+		gs.Turn += 100
+		gs.Grid[0][0].OccupantID += 77
+		for _, unit := range gs.Units {
+			unit.HasMoved = !unit.HasMoved
+		}
+		gs.Bombs[900].Range = 99
+		gs.Bombs[901] = &Bomb{ID: 901}
+		gs.SoftBlocks[900].Position.X = 99
+		gs.SoftBlocks[901] = &SoftBlock{ID: 901}
+		gs.TurnCommands[0].Target.X = 99
+		gs.TurnStartEvents[0].Position.X = 99
+		gs.TurnStartEvents[0].AffectedPositions[0].X = 99
+	}
+}
+
+func TestMatch_Clone_SharesNoMemory(t *testing.T) {
+	m := newCloneFixture(t)
+	if want := newCloneFixture(t); !reflect.DeepEqual(want, m) {
+		t.Fatalf("fixture is not deterministic: %+v vs %+v", want, m)
+	}
+	if got := m.Clone(); !reflect.DeepEqual(got, m) {
+		t.Fatalf("Clone() = %+v, want an equal match %+v", got, m)
+	}
+
+	t.Run("editing the clone leaves the original", func(t *testing.T) {
+		got := m.Clone()
+		scribbleMatch(got)
+		if want := newCloneFixture(t); !reflect.DeepEqual(m, want) {
+			t.Errorf("match after editing its clone = %+v, want unchanged %+v", m, want)
+		}
+	})
+
+	t.Run("editing the original leaves the clone", func(t *testing.T) {
+		got := m.Clone()
+		scribbleMatch(m)
+		if want := newCloneFixture(t); !reflect.DeepEqual(got, want) {
+			t.Errorf("clone after editing the original = %+v, want unchanged %+v", got, want)
+		}
+	})
+	t.Run("nil and empty slices stay as they are", func(t *testing.T) {
+		m := newCloneFixture(t)
+		m.PlaybackLog = []GameEvent{}
+		m.TrueState.TurnCommands = nil
+		m.TrueState.TurnStartEvents = []GameEvent{}
+		m.WorkingState.TurnCommands = []TurnCommand{}
+		m.WorkingState.TurnStartEvents = nil
+		if got := m.Clone(); !reflect.DeepEqual(got, m) {
+			t.Errorf("Clone() = %+v, want %+v", got, m)
+		}
+	})
+}

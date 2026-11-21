@@ -3,6 +3,7 @@ package engine
 import (
 	"fmt"
 	"math/rand"
+	"slices"
 )
 
 func (m *Match) ResetTurn() {
@@ -475,4 +476,17 @@ func (m *Match) evaluateVictoryConditions() int {
 	default:
 		return matchDrawn
 	}
+}
+
+func (m *Match) Clone() *Match {
+	if m == nil {
+		return nil
+	}
+	clone := *m
+	clone.GameCfg.P1Slots = slices.Clone(m.GameCfg.P1Slots)
+	clone.GameCfg.P2Slots = slices.Clone(m.GameCfg.P2Slots)
+	clone.TrueState = m.TrueState.DeepCopy()
+	clone.WorkingState = m.WorkingState.DeepCopy()
+	clone.PlaybackLog = cloneGameEvents(m.PlaybackLog)
+	return &clone
 }
