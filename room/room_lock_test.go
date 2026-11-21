@@ -5,9 +5,10 @@ import (
 	"log/slog"
 	"sync"
 	"testing"
+	"time"
 )
 
-func TestRoom_WriteMethodsHoldExclusiveLock(t *testing.T) {
+func TestRoom_WriteMethodsHoldExclusiveLockAgainstReadsAndExpiry(t *testing.T) {
 	r := New("room", Deps{Logger: slog.New(slog.DiscardHandler), NewMatch: engine.InitGame})
 	tokens, err := r.Start(humanTurnCfg())
 	if err != nil {
@@ -26,6 +27,7 @@ func TestRoom_WriteMethodsHoldExclusiveLock(t *testing.T) {
 					_, _ = r.State()
 					_, _ = r.Config()
 					_, _ = r.AllowedTiles(engine.NewUnitID(1, 0), engine.TurnCmdMove)
+					_ = r.Expired(time.Now(), time.Hour)
 				}
 			}
 		})
