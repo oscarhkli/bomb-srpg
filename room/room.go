@@ -109,12 +109,14 @@ func (r *Room) validateAnyMatchPlayerTokenLocked(token string) error {
 }
 
 func (r *Room) buildMatchLocked(cfg engine.GameCfg) (*engine.Match, error) {
+	cfg.P1Slots = slices.Clone(cfg.P1Slots)
+	cfg.P2Slots = slices.Clone(cfg.P2Slots)
 	match, err := r.deps.NewMatch(cfg)
 	if err != nil {
 		r.log.Error("invalid game config", "gameCfg", cfg, "error", err)
 		return nil, fmt.Errorf("%w: %w", ErrInvalidConfig, err)
 	}
-	return match, nil
+	return match.Clone(), nil
 }
 
 func (r *Room) setMatchLocked(match *engine.Match) {
