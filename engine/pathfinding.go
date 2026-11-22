@@ -57,18 +57,18 @@ func (gs *GameState) expandNode(queue []pathNode, node pathNode, rule MovementRu
 			continue
 		}
 
-		canPass, canLand := rule.checkPassability(grid[nextPos.Y][nextPos.X])
-		if !canPass && !canLand {
+		access := rule.checkPassability(grid[nextPos.Y][nextPos.X])
+		if access == accessBlocked {
 			continue
 		}
 
 		oldSteps, seen := steps[nextPos]
-		if seen && (canLand || oldSteps <= nextStep) {
+		if seen && (access == accessStop || oldSteps <= nextStep) {
 			continue
 		}
 
 		steps[nextPos] = nextStep
-		if canPass {
+		if access == accessThrough {
 			queue = append(queue, pathNode{Pos: nextPos, Step: nextStep, Dir: dir})
 		}
 	}
@@ -76,19 +76,27 @@ func (gs *GameState) expandNode(queue []pathNode, node pathNode, rule MovementRu
 	return queue
 }
 
-func (mr MovementRule) checkPassability(tile Tile) (canPass bool, canLand bool) {
+type tileAccess int
+
+const (
+	accessBlocked tileAccess = iota
+	accessStop
+	accessThrough
+)
+
+func (mr MovementRule) checkPassability(tile Tile) tileAccess {
 	if tile.Type == TerrainBlock && (mr.PassPermissions&PassHardBlocks == 0) {
-		return false, false
+		return accessBlocked
 	}
 
 	if tile.OccupantType == OccupantUnit && (mr.PassPermissions&PassUnits == 0) {
-		return false, false
+		return accessBlocked
 	}
 
 	var permissionFlag PassFlag
 	switch tile.OccupantType {
 	case OccupantNone, OccupantUnit:
-		return true, false
+		return accessThrough
 	case OccupantBomb:
 		permissionFlag = PassBombs
 	case OccupantSoftBlock:
@@ -98,14 +106,14 @@ func (mr MovementRule) checkPassability(tile Tile) (canPass bool, canLand bool) 
 	}
 
 	if mr.PassPermissions&permissionFlag != 0 {
-		return true, false
+		return accessThrough
 	}
 
 	if mr.StopOnNonUnitOccupant {
-		return false, true
+		return accessStop
 	}
 
-	return false, false
+	return accessBlocked
 }
 
 func (u Unit) NewMovementRule() MovementRule {

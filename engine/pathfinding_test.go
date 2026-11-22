@@ -518,28 +518,26 @@ func TestGameState_FindAllowedTilesForCommand(t *testing.T) {
 
 func TestMovementRule_CheckPassability(t *testing.T) {
 	tests := []struct {
-		name        string
-		rule        MovementRule
-		tile        Tile
-		wantCanPass bool
-		wantCanLand bool
+		name string
+		rule MovementRule
+		tile Tile
+		want tileAccess
 	}{
-		{"Open tile can be passed", MovementRule{}, Tile{}, true, false},
-		{"Unit blocks without PassUnits", MovementRule{}, Tile{OccupantType: OccupantUnit}, false, false},
-		{"Unit can be passed with PassUnits", MovementRule{PassPermissions: PassUnits}, Tile{OccupantType: OccupantUnit}, true, false},
-		{"Hard block blocks without PassHardBlocks", MovementRule{}, Tile{Type: TerrainBlock}, false, false},
-		{"Hard block can be passed with PassHardBlocks", MovementRule{PassPermissions: PassHardBlocks}, Tile{Type: TerrainBlock}, true, false},
-		{"Bomb blocks without permission", MovementRule{}, Tile{OccupantType: OccupantBomb}, false, false},
-		{"Bomb can only be landed on when the rule stops on non-unit occupants", MovementRule{StopOnNonUnitOccupant: true}, Tile{OccupantType: OccupantBomb}, false, true},
-		{"Bomb can be passed with PassBombs", MovementRule{PassPermissions: PassBombs, StopOnNonUnitOccupant: true}, Tile{OccupantType: OccupantBomb}, true, false},
-		{"Soft block can only be landed on when the rule stops on non-unit occupants", MovementRule{StopOnNonUnitOccupant: true}, Tile{OccupantType: OccupantSoftBlock}, false, true},
-		{"Item can be passed with PassItems", MovementRule{PassPermissions: PassItems}, Tile{OccupantType: OccupantItem}, true, false},
+		{"Open tile can be passed", MovementRule{}, Tile{}, accessThrough},
+		{"Unit blocks without PassUnits", MovementRule{}, Tile{OccupantType: OccupantUnit}, accessBlocked},
+		{"Unit can be passed with PassUnits", MovementRule{PassPermissions: PassUnits}, Tile{OccupantType: OccupantUnit}, accessThrough},
+		{"Hard block blocks without PassHardBlocks", MovementRule{}, Tile{Type: TerrainBlock}, accessBlocked},
+		{"Hard block can be passed with PassHardBlocks", MovementRule{PassPermissions: PassHardBlocks}, Tile{Type: TerrainBlock}, accessThrough},
+		{"Bomb blocks without permission", MovementRule{}, Tile{OccupantType: OccupantBomb}, accessBlocked},
+		{"Bomb can only be landed on when the rule stops on non-unit occupants", MovementRule{StopOnNonUnitOccupant: true}, Tile{OccupantType: OccupantBomb}, accessStop},
+		{"Bomb can be passed with PassBombs", MovementRule{PassPermissions: PassBombs, StopOnNonUnitOccupant: true}, Tile{OccupantType: OccupantBomb}, accessThrough},
+		{"Soft block can only be landed on when the rule stops on non-unit occupants", MovementRule{StopOnNonUnitOccupant: true}, Tile{OccupantType: OccupantSoftBlock}, accessStop},
+		{"Item can be passed with PassItems", MovementRule{PassPermissions: PassItems}, Tile{OccupantType: OccupantItem}, accessThrough},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotPass, gotLand := tt.rule.checkPassability(tt.tile)
-			if gotPass != tt.wantCanPass || gotLand != tt.wantCanLand {
-				t.Errorf("CheckPassability() = (%v, %v), want (%v, %v)", gotPass, gotLand, tt.wantCanPass, tt.wantCanLand)
+			if got := tt.rule.checkPassability(tt.tile); got != tt.want {
+				t.Errorf("checkPassability() = %v, want %v", got, tt.want)
 			}
 		})
 	}

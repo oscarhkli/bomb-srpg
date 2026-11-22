@@ -14,6 +14,7 @@ func TestInitGameState_Suite(t *testing.T) {
 		cfg                GameCfg
 		wantErr            error
 		wantPlayer         string
+		wantMsg            string
 		expectedTotalUnits int
 	}{
 		{
@@ -212,6 +213,28 @@ func TestInitGameState_Suite(t *testing.T) {
 			wantErr: ErrInvalidStagePreset,
 		},
 		{
+			name: "Failure: King team of 6 units reports the 2 to 5 range",
+			cfg: GameCfg{
+				StagePreset: "Plain",
+				P1Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}, {Archetype: "Witch", Role: RoleNormal}, {Archetype: "Bandit", Role: RoleNormal}, {Archetype: "Witch", Role: RoleNormal}, {Archetype: "Fighter", Role: RoleNormal}},
+				P2Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
+			},
+			wantErr:    ErrInvalidTeamSize,
+			wantPlayer: "Player 1",
+			wantMsg:    "invalid team size: Player 1 must have between 2 and 5 units, got 6",
+		},
+		{
+			name: "Failure: King-only team of 1 unit reports the 2 to 5 range",
+			cfg: GameCfg{
+				StagePreset: "Plain",
+				P1Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}},
+				P2Slots:     []TeamSlot{{Archetype: "King", Role: RoleKing}, {Archetype: "Fighter", Role: RoleNormal}},
+			},
+			wantErr:    ErrInvalidTeamSize,
+			wantPlayer: "Player 1",
+			wantMsg:    "invalid team size: Player 1 must have between 2 and 5 units, got 1",
+		},
+		{
 			name: "Success: With Global Overrides for Speed and Bomb Range Positive",
 			cfg: GameCfg{
 				StagePreset:                "Plain",
@@ -408,6 +431,9 @@ func TestInitGameState_Suite(t *testing.T) {
 			if tt.wantErr != nil {
 				if !strings.Contains(err.Error(), tt.wantPlayer) {
 					t.Errorf("Expected error to name %s, got %q", tt.wantPlayer, err.Error())
+				}
+				if tt.wantMsg != "" && err.Error() != tt.wantMsg {
+					t.Errorf("error = %q, want %q", err.Error(), tt.wantMsg)
 				}
 				return
 			}
