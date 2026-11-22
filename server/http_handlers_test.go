@@ -3,6 +3,7 @@ package server
 import (
 	"bomb-srpg/engine"
 	"bomb-srpg/room"
+	"bomb-srpg/server/api"
 	"encoding/json/jsontext"
 	"encoding/json/v2"
 	"errors"
@@ -10,15 +11,10 @@ import (
 	"maps"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 )
-
-func testMux(pattern string, h http.HandlerFunc) *http.ServeMux {
-	mux := http.NewServeMux()
-	mux.HandleFunc(pattern, h)
-	return mux
-}
 
 func assertObjectContract(t *testing.T, body []byte, expectedFields []string, nestedChecks func(t *testing.T, raw map[string]any)) {
 	t.Helper()
@@ -174,35 +170,61 @@ func createTestRoomWithMatch(t *testing.T, opts ...Option) (string, [2]string, *
 	return roomID, playerTokens, s, h
 }
 
-func doRequest(t *testing.T, handler http.HandlerFunc, pattern, method, path, body, token string) *httptest.ResponseRecorder {
-	t.Helper()
-	req, err := http.NewRequest(method, path, strings.NewReader(body))
-	if err != nil {
-		t.Fatalf("Failed to create request: %v", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	if token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
-	}
-	rr := httptest.NewRecorder()
-	testMux(pattern, handler).ServeHTTP(rr, req)
-	return rr
+func routedMux(h *Handler) *http.ServeMux {
+	mux := http.NewServeMux()
+	RegisterRoutes(mux, h)
+	return mux
 }
 
 func serveRequest(t *testing.T, h *Handler, method, path, body string, header http.Header) *httptest.ResponseRecorder {
 	t.Helper()
-	mux := http.NewServeMux()
-	RegisterRoutes(mux, h)
 	req := httptest.NewRequest(method, path, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	maps.Copy(req.Header, header)
 	rr := httptest.NewRecorder()
-	mux.ServeHTTP(rr, req)
+	routedMux(h).ServeHTTP(rr, req)
 	return rr
 }
 
 func bearerHeader(token string) http.Header {
 	return http.Header{"Authorization": {"Bearer " + token}}
+}
+
+func doRequest(t *testing.T, h *Handler, method, path, body, token string) *httptest.ResponseRecorder {
+	t.Helper()
+	var header http.Header
+	if token != "" {
+		header = bearerHeader(token)
+	}
+	return serveRequest(t, h, method, path, body, header)
+}
+
+func wireMoveCmd(unitID engine.UnitID, x, y int) api.TurnCommand {
+	return api.TurnCommand{Type: api.Move, UnitID: int(unitID), Target: api.Coordinate{X: x, Y: y}}
+}
+
+func wirePlaceBombCmd(unitID engine.UnitID, x, y int) api.TurnCommand {
+	return api.TurnCommand{Type: api.PlaceBomb, UnitID: int(unitID), Target: api.Coordinate{X: x, Y: y}}
+}
+
+func hasWireEvent(events []api.GameEvent, evtType api.GameEvtType, unitID engine.UnitID) bool {
+	return slices.ContainsFunc(events, func(evt api.GameEvent) bool {
+		return evt.Type == evtType && evt.UnitID == int(unitID)
+	})
+}
+
+func wireBombID(evt api.GameEvent) int64 {
+	if evt.BombID == nil {
+		return 0
+	}
+	return *evt.BombID
+}
+
+func wireWinner(evt api.GameEvent) int {
+	if evt.WinnerTeamID == nil {
+		return 0
+	}
+	return *evt.WinnerTeamID
 }
 
 func newTestRoom(t *testing.T, opts ...Option) (string, *ServerStateManager, *Handler) {
@@ -229,7 +251,6 @@ const (
 )
 
 type failureRoute struct {
-	handler  func(*Handler, http.ResponseWriter, *http.Request)
 	pattern  string
 	query    string
 	body     any
@@ -252,9 +273,8 @@ func testRouteFailures(t *testing.T, route failureRoute) {
 
 	callWithBody := func(t *testing.T, h *Handler, roomID, token, reqBody string) *httptest.ResponseRecorder {
 		t.Helper()
-		handler := func(w http.ResponseWriter, r *http.Request) { route.handler(h, w, r) }
 		path := strings.Replace(routePath, "{roomID}", roomID, 1) + route.query
-		return doRequest(t, handler, route.pattern, method, path, reqBody, token)
+		return doRequest(t, h, method, path, reqBody, token)
 	}
 	call := func(t *testing.T, h *Handler, roomID, token string) *httptest.ResponseRecorder {
 		t.Helper()
@@ -407,14 +427,7 @@ func TestHandleHealthCheck(t *testing.T) {
 	h := NewHandler(NewServerStateManager())
 
 	t.Run("Success: returns ok status", func(t *testing.T) {
-		req, err := http.NewRequest("GET", "/api/health", nil)
-		if err != nil {
-			t.Fatalf("Failed to create request: %v", err)
-		}
-
-		rr := httptest.NewRecorder()
-
-		http.HandlerFunc(h.handleHealthCheck).ServeHTTP(rr, req)
+		rr := doRequest(t, h, "GET", "/api/health", "", "")
 
 		if status := rr.Code; status != http.StatusOK {
 			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusOK)
@@ -425,7 +438,7 @@ func TestHandleHealthCheck(t *testing.T) {
 			t.Errorf("Handler returned wrong content type: got %v want %v", contentType, expectedHeader)
 		}
 
-		var response healthCheckResponse
+		var response api.Health
 		if err := json.UnmarshalRead(rr.Body, &response); err != nil {
 			t.Fatalf("Failed to decode response JSON payload: %v", err)
 		}
@@ -436,7 +449,7 @@ func TestHandleHealthCheck(t *testing.T) {
 	})
 
 	t.Run("Failure: failed to Encode", func(t *testing.T) {
-		testEncodeFailure(t, http.HandlerFunc(h.handleHealthCheck),
+		testEncodeFailure(t, routedMux(h),
 			func() *http.Request {
 				req, _ := http.NewRequest("GET", "/api/health", nil)
 				return req
@@ -444,10 +457,7 @@ func TestHandleHealthCheck(t *testing.T) {
 	})
 
 	t.Run("Test Contract", func(t *testing.T) {
-		req, _ := http.NewRequest("GET", "/api/health", nil)
-		rr := httptest.NewRecorder()
-
-		http.HandlerFunc(h.handleHealthCheck).ServeHTTP(rr, req)
+		rr := doRequest(t, h, "GET", "/api/health", "", "")
 
 		assertObjectContract(t, rr.Body.Bytes(), []string{"status"}, nil)
 	})
@@ -457,14 +467,7 @@ func TestHandleGetCatalog(t *testing.T) {
 	h := NewHandler(NewServerStateManager())
 
 	t.Run("Success: called engine.GetAllArchetypes and engine.GetAllStagePresets", func(t *testing.T) {
-		req, err := http.NewRequest("GET", "/api/catalog", nil)
-		if err != nil {
-			t.Fatalf("Failed to create request: %v", err)
-		}
-
-		rr := httptest.NewRecorder()
-
-		http.HandlerFunc(h.handleGetCatalog).ServeHTTP(rr, req)
+		rr := doRequest(t, h, "GET", "/api/catalog", "", "")
 
 		if status := rr.Code; status != http.StatusOK {
 			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusOK)
@@ -492,7 +495,7 @@ func TestHandleGetCatalog(t *testing.T) {
 	})
 
 	t.Run("Failure: failed to Encode", func(t *testing.T) {
-		testEncodeFailure(t, http.HandlerFunc(h.handleGetCatalog),
+		testEncodeFailure(t, routedMux(h),
 			func() *http.Request {
 				req, _ := http.NewRequest("GET", "/api/catalog", nil)
 				return req
@@ -500,10 +503,7 @@ func TestHandleGetCatalog(t *testing.T) {
 	})
 
 	t.Run("Test Contract", func(t *testing.T) {
-		req, _ := http.NewRequest("GET", "/api/catalog", nil)
-		rr := httptest.NewRecorder()
-
-		http.HandlerFunc(h.handleGetCatalog).ServeHTTP(rr, req)
+		rr := doRequest(t, h, "GET", "/api/catalog", "", "")
 
 		assertObjectContract(t, rr.Body.Bytes(), []string{"archetypes", "stagePresets"}, func(t *testing.T, raw map[string]any) {
 			t.Helper()

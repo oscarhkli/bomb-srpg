@@ -4,11 +4,9 @@ import (
 	"encoding/json/v2"
 	"fmt"
 	"net/http"
-	"net/http/httptest"
-	"strings"
 	"testing"
 
-	"bomb-srpg/engine"
+	"bomb-srpg/server/api"
 )
 
 func TestSurrenderRequestDecoding(t *testing.T) {
@@ -34,10 +32,7 @@ func TestSurrenderRequestDecoding(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			roomID, playerTokens, _, h := createTestRoomWithMatch(t)
-			req := httptest.NewRequest("POST", "/api/match-rooms/"+roomID+"/match/surrender", strings.NewReader(tt.body))
-			req.Header.Set("Authorization", "Bearer "+playerTokens[0])
-			rr := httptest.NewRecorder()
-			testMux("POST /api/match-rooms/{roomID}/match/surrender", h.handleSurrender).ServeHTTP(rr, req)
+			rr := doRequest(t, h, "POST", "/api/match-rooms/"+roomID+"/match/surrender", tt.body, playerTokens[0])
 
 			if rr.Code != tt.wantStatus {
 				t.Fatalf("status = %d, want %d", rr.Code, tt.wantStatus)
@@ -45,11 +40,11 @@ func TestSurrenderRequestDecoding(t *testing.T) {
 			if tt.wantStatus != http.StatusOK {
 				return
 			}
-			var gameEvents []engine.GameEvent
+			var gameEvents []api.GameEvent
 			if err := json.UnmarshalRead(rr.Body, &gameEvents); err != nil {
 				t.Fatalf("decode response: %v", err)
 			}
-			if len(gameEvents) != 1 || gameEvents[0].WinnerTeamID != 2 {
+			if len(gameEvents) != 1 || wireWinner(gameEvents[0]) != 2 {
 				t.Errorf("gameEvents = %+v, want one event with WinnerTeamID 2", gameEvents)
 			}
 		})
@@ -58,9 +53,7 @@ func TestSurrenderRequestDecoding(t *testing.T) {
 
 func TestMatchStateWireShape(t *testing.T) {
 	roomID, _, _, h := createTestRoomWithMatch(t)
-	req := httptest.NewRequest("GET", "/api/match-rooms/"+roomID+"/match/state", nil)
-	rr := httptest.NewRecorder()
-	testMux("GET /api/match-rooms/{roomID}/match/state", h.handleGetMatchState).ServeHTTP(rr, req)
+	rr := doRequest(t, h, "GET", "/api/match-rooms/"+roomID+"/match/state", "", "")
 	if rr.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", rr.Code, http.StatusOK)
 	}
