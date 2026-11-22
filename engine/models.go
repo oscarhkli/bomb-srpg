@@ -142,13 +142,17 @@ func (s skillType) String() string {
 
 // MarshalJSON encodes the set as the names of its skills, never null.
 func (s skillType) MarshalJSON() ([]byte, error) {
-	var names []string
+	return json.Marshal(s.Names())
+}
+
+func (s skillType) Names() []string {
+	names := []string{}
 	for _, skill := range allSkills() {
 		if skill&s != 0 {
 			names = append(names, skill.String())
 		}
 	}
-	return json.Marshal(names)
+	return names
 }
 
 type Archetype struct {

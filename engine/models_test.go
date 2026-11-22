@@ -2,6 +2,7 @@ package engine
 
 import (
 	"encoding/json/v2"
+	"slices"
 	"testing"
 )
 
@@ -67,6 +68,28 @@ func TestSkillTypeString(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := tt.skill.String(); got != tt.want {
 				t.Errorf("SkillType.String() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSkillTypeNames(t *testing.T) {
+	tests := []struct {
+		name  string
+		skill skillType
+		want  []string
+	}{
+		{"none", skillNone, []string{}},
+		{"jump", skillCanJump, []string{"Jump"}},
+		{"fly", skillCanFly, []string{"Fly"}},
+		{"both, jump before fly", skillCanJump | skillCanFly, []string{"Jump", "Fly"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.skill.Names()
+			if got == nil || !slices.Equal(got, tt.want) {
+				t.Errorf("Names() = %#v, want %#v", got, tt.want)
 			}
 		})
 	}

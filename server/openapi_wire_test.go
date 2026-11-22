@@ -559,8 +559,10 @@ func engineSkillNames(t *testing.T) []string {
 	}
 	all := reflect.New(field.Type).Elem()
 	all.SetUint(1<<32 - 1)
-	var names []string
-	decodeBody(t, marshalBody(t, all.Interface()), &names)
+	names, ok := reflect.TypeAssert[[]string](all.MethodByName("Names").Call(nil)[0])
+	if !ok {
+		t.Fatal("PresetSkills.Names() does not return []string")
+	}
 	return names
 }
 
