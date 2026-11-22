@@ -109,6 +109,13 @@ linters:
           deny:
             - pkg: bomb-srpg/cmd
               desc: only cmd composes packages
+    ireturn:
+      allow:
+        - anon
+        - error
+        - empty
+        - stdlib
+        - 'bomb-srpg/server/api\.\w+ResponseObject$'
     errcheck:
       exclude-functions:
         - fmt.Fprint

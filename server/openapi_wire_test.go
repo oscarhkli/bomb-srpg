@@ -10,9 +10,7 @@ import (
 	"maps"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"reflect"
-	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -174,40 +172,6 @@ func TestOpenAPIValidatorRejects(t *testing.T) {
 				t.Errorf("check() error = %v, want it to name the method and path", err)
 			}
 		})
-	}
-}
-
-func TestOpenAPIOperationsMatchRoutes(t *testing.T) {
-	src, err := os.ReadFile("routes.go")
-	if err != nil {
-		t.Fatal(err)
-	}
-	re := regexp.MustCompile(`mux\.HandleFunc\("([A-Z]+) (/[^"]*)"`)
-	registered := map[string]bool{}
-	for _, m := range re.FindAllSubmatch(src, -1) {
-		registered[string(m[1])+" "+string(m[2])] = true
-	}
-
-	doc := loadOpenAPISpec(t)
-	described := map[string]bool{}
-	for path, item := range doc.Paths.Map() {
-		for method := range item.Operations() {
-			described[method+" "+path] = true
-		}
-	}
-
-	for _, op := range slices.Sorted(maps.Keys(registered)) {
-		if !described[op] {
-			t.Errorf("%s is registered in routes.go but missing from the spec", op)
-		}
-	}
-	for _, op := range slices.Sorted(maps.Keys(described)) {
-		if !registered[op] {
-			t.Errorf("%s is in the spec but not registered in routes.go", op)
-		}
-	}
-	if len(registered) == 0 {
-		t.Fatal("no routes parsed from routes.go")
 	}
 }
 

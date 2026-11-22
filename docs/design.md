@@ -50,7 +50,7 @@
 ## 6. Monolithic Architectural Separation & Presentation Boundaries
 
 - **Data-Isolated Presentation Boundary**: Decouples rendering from the core transaction state machine. To enforce turn secrecy and prevent sandbox memory leaks across boundaries, UI layouts receive an isolated pointer to `engine.GameState` (`WorkingState`) instead of the parent `engine.Match` orchestrator.
-- **Direct Serialization on the Web Boundary**: `server/http_handlers.go` serializes the active `WorkingState` struct straight to JSON on HTTP response targets, calling `*engine.Match` directly rather than going through a rendering contract.
+- **Mapped Wire Types on the Web Boundary**: `server/api_server.go` maps engine values to the wire types generated from the OpenAPI spec (`server/api`), and the generated strict server writes them as JSON. The compiler checks each success response against the spec, and the engine's own types never reach the wire.
 - **Flat Package Web Architecture**: The `/server` package holds the HTTP handlers, routing and middleware in one flat package. Each distinct concept gets its own small package beside it (`/engine`, `/room`, `/cpu`), and the OpenAPI spec and the API code generated from it live in `server/api`.
 - **Pointer-Driven Memory Persistence (`*engine.Match`)**: HTTP handlers act on the match through a `*engine.Match` reference, so user actions mutate the match in place and no copy of the grid is made.
 - **Service Entry Gate (`ApplyTurnCommand`)**: HTTP handlers build `TurnCommand` structs with a `Type` discriminator (`TurnCmdMove`, `TurnCmdPlaceBomb`) and pass them to `ApplyTurnCommand`, so the engine works as a decoupled command processor.
