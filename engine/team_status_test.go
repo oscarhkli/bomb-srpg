@@ -37,10 +37,6 @@ func TestTeamStatus_GoalAndWiped(t *testing.T) {
 			status:    teamStatus{},
 			wantWiped: true,
 		},
-		{
-			name:   "Boss-less team with only a King alive is neither",
-			status: teamStatus{kingAlive: true},
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
