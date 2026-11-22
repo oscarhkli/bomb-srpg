@@ -238,6 +238,65 @@ func TestHandleCreateNewMatch(t *testing.T) {
 	})
 }
 
+func TestCreateMatchDecoding(t *testing.T) {
+	const (
+		formatMsg = "Invalid configuration format"
+		slots     = `"p1Slots":[{"archetype":"King","role":"King"},{"archetype":"Fighter","role":"Normal"}],` +
+			`"p2Slots":[{"archetype":"King","role":"King"},{"archetype":"Witch","role":"Normal"}]`
+		cfg = `{"gameCfg":{"stagePreset":"Plain","maxTurns":10,` + slots + `}`
+	)
+	tests := []struct {
+		name       string
+		room       string
+		body       string
+		wantStatus int
+		wantMsg    string
+	}{
+		{"exact keys", "", cfg + `}`, http.StatusCreated, ""},
+		{"duplicate key", "", `{"gameCfg":{"stagePreset":"Plain","stagePreset":"Plain","maxTurns":10,` + slots + `}}`, http.StatusBadRequest, formatMsg},
+		{"trailing data after value", "", cfg + `} garbage`, http.StatusBadRequest, formatMsg},
+		{"unknown role", "", `{"gameCfg":{"stagePreset":"Plain","maxTurns":10,"p1Slots":[{"archetype":"King","role":"Nope"}],"p2Slots":[]}}`, http.StatusBadRequest, formatMsg},
+		{"malformed body to an unknown room", "NONEXISTENT", `{`, http.StatusBadRequest, formatMsg},
+		{"valid body to an unknown room", "NONEXISTENT", cfg + `}`, http.StatusNotFound, "room not found"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			roomID, _, h := newTestRoom(t)
+			if tt.room != "" {
+				roomID = tt.room
+			}
+
+			rr := serveRequest(t, h, "POST", "/api/match-rooms/"+roomID+"/match", tt.body, nil)
+
+			if rr.Code != tt.wantStatus {
+				t.Fatalf("status = %d, want %d, body %q", rr.Code, tt.wantStatus, rr.Body.String())
+			}
+			if !strings.Contains(rr.Body.String(), tt.wantMsg) {
+				t.Errorf("body = %q, want it to contain %q", rr.Body.String(), tt.wantMsg)
+			}
+		})
+	}
+
+	t.Run("test-only overrides in the body are ignored", func(t *testing.T) {
+		roomID, s, h := newTestRoom(t)
+		body := `{"gameCfg":{"stagePreset":"Plain","maxTurns":10,"globalSpeedOverride":9,` + slots + `}}`
+
+		rr := serveRequest(t, h, "POST", "/api/match-rooms/"+roomID+"/match", body, nil)
+
+		if rr.Code != http.StatusCreated {
+			t.Fatalf("status = %d, want %d, body %q", rr.Code, http.StatusCreated, rr.Body.String())
+		}
+		gameCfg, err := mustRoom(t, s, roomID).Config()
+		if err != nil {
+			t.Fatalf("Config() error = %v", err)
+		}
+		if gameCfg.GlobalSpeedOverride != 0 {
+			t.Errorf("GlobalSpeedOverride = %d, want 0", gameCfg.GlobalSpeedOverride)
+		}
+	})
+}
+
 func TestHandleRematch(t *testing.T) {
 	t.Run("Success: wipes existing Match and creates a new one", func(t *testing.T) {
 		roomID, playerTokens, s, h := createTestRoomWithMatch(t)

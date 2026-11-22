@@ -2,8 +2,11 @@ package server
 
 import (
 	"bomb-srpg/engine"
+	"bomb-srpg/server/api"
+	"cmp"
 	"encoding/json/v2"
 	"net/http"
+	"net/http/httptest"
 	"reflect"
 	"slices"
 	"strings"
@@ -263,6 +266,15 @@ func TestHandleGetMatchConfig(t *testing.T) {
 	})
 }
 
+func dividedGameCfg() engine.GameCfg {
+	return engine.GameCfg{
+		StagePreset: "Divided",
+		P1Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Fighter", Role: engine.RoleNormal}},
+		P2Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Witch", Role: engine.RoleNormal}},
+		MaxTurns:    10,
+	}
+}
+
 func TestHandleGetAllowedTiles(t *testing.T) {
 	t.Run("Success: get the allowedTiles in an existing room", func(t *testing.T) {
 		roomID, s, h := newTestRoom(t)
@@ -324,35 +336,67 @@ func TestHandleGetAllowedTiles(t *testing.T) {
 		}
 	})
 
-	queryFailureCfg := engine.GameCfg{
-		StagePreset: "Divided",
-		P1Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Fighter", Role: engine.RoleNormal}},
-		P2Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Witch", Role: engine.RoleNormal}},
-		MaxTurns:    10,
-	}
-	queryFailureTests := []struct {
-		name    string
-		query   string
-		wantMsg string
+	const (
+		missingMsg   = "missing required query parameters: unitId and turnCmdType are required"
+		invalidIDMsg = "Invalid unitId parameter"
+	)
+	queryTests := []struct {
+		name       string
+		query      string
+		wantStatus int
+		wantMsg    string
 	}{
-		{"Failure: missing query string", "", "missing required query parameters"},
-		{"Failure: invalid query string", "?unitId=abc&turnCmdType=move", "Invalid unitId parameter"},
+		{"no query", "", http.StatusBadRequest, missingMsg},
+		{"unitId only", "?unitId=16", http.StatusBadRequest, missingMsg},
+		{"turnCmdType only", "?turnCmdType=move", http.StatusBadRequest, missingMsg},
+		{"empty unitId", "?unitId=&turnCmdType=move", http.StatusBadRequest, missingMsg},
+		{"empty turnCmdType", "?unitId=16&turnCmdType=", http.StatusBadRequest, missingMsg},
+		{"non-numeric unitId without turnCmdType", "?unitId=abc", http.StatusBadRequest, missingMsg},
+		{"non-numeric unitId", "?unitId=abc&turnCmdType=move", http.StatusBadRequest, invalidIDMsg},
+		{"negative unitId", "?unitId=-1&turnCmdType=move", http.StatusBadRequest, invalidIDMsg},
+		{"unitId above 255", "?unitId=256&turnCmdType=move", http.StatusBadRequest, invalidIDMsg},
+		{"unitId 255 names no unit", "?unitId=255&turnCmdType=move", http.StatusConflict, "unit not found"},
+		{"leading zero reads as 1, which names no unit", "?unitId=01&turnCmdType=move", http.StatusConflict, "unit not found"},
 	}
-	for _, tt := range queryFailureTests {
-		t.Run(tt.name, func(t *testing.T) {
+	for _, tt := range queryTests {
+		t.Run("Failure: "+tt.name, func(t *testing.T) {
 			roomID, s, h := newTestRoom(t)
-			mustCreateMatch(t, s, roomID, queryFailureCfg)
+			mustCreateMatch(t, s, roomID, dividedGameCfg())
 
-			rr := doRequest(t, h.handleGetAllowedTiles, "GET /api/match-rooms/{roomID}/match/allowed-tiles", "GET", "/api/match-rooms/"+roomID+"/match/allowed-tiles"+tt.query, "", "")
+			rr := serveRequest(t, h, "GET", "/api/match-rooms/"+roomID+"/match/allowed-tiles"+tt.query, "", nil)
 
-			if got := rr.Code; got != http.StatusBadRequest {
-				t.Errorf("Handler returned wrong status code: got %v want %v", got, http.StatusBadRequest)
+			if got := rr.Code; got != tt.wantStatus {
+				t.Errorf("Handler returned wrong status code: got %v want %v", got, tt.wantStatus)
 			}
 			if got := rr.Body.String(); !strings.Contains(got, tt.wantMsg) {
 				t.Errorf("Expected error message %q, got: %s", tt.wantMsg, got)
 			}
 		})
 	}
+
+	t.Run("Success: a zero-padded unitId reads as the same unit", func(t *testing.T) {
+		roomID, s, h := newTestRoom(t)
+		mustCreateMatch(t, s, roomID, dividedGameCfg())
+		base := "/api/match-rooms/" + roomID + "/match/allowed-tiles?turnCmdType=move&unitId="
+
+		plain := serveRequest(t, h, "GET", base+"16", "", nil)
+		padded := serveRequest(t, h, "GET", base+"016", "", nil)
+
+		if plain.Code != http.StatusOK || padded.Code != http.StatusOK {
+			t.Fatalf("status = %d and %d, want both %d", plain.Code, padded.Code, http.StatusOK)
+		}
+		sorted := func(rr *httptest.ResponseRecorder) []api.Coordinate {
+			var tiles []api.Coordinate
+			if err := json.UnmarshalRead(rr.Body, &tiles); err != nil {
+				t.Fatalf("Failed to decode response JSON payload: %v", err)
+			}
+			slices.SortFunc(tiles, func(a, b api.Coordinate) int { return cmp.Or(cmp.Compare(a.X, b.X), cmp.Compare(a.Y, b.Y)) })
+			return tiles
+		}
+		if got, want := sorted(padded), sorted(plain); len(want) == 0 || !slices.Equal(got, want) {
+			t.Errorf("unitId=016 tiles = %v, want the tiles of unitId=16, %v", got, want)
+		}
+	})
 
 	testRouteFailures(t, failureRoute{
 		handler:  (*Handler).handleGetAllowedTiles,

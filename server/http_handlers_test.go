@@ -7,6 +7,7 @@ import (
 	"encoding/json/v2"
 	"errors"
 	"fmt"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -188,6 +189,22 @@ func doRequest(t *testing.T, handler http.HandlerFunc, pattern, method, path, bo
 	return rr
 }
 
+func serveRequest(t *testing.T, h *Handler, method, path, body string, header http.Header) *httptest.ResponseRecorder {
+	t.Helper()
+	mux := http.NewServeMux()
+	RegisterRoutes(mux, h)
+	req := httptest.NewRequest(method, path, strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	maps.Copy(req.Header, header)
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+	return rr
+}
+
+func bearerHeader(token string) http.Header {
+	return http.Header{"Authorization": {"Bearer " + token}}
+}
+
 func newTestRoom(t *testing.T, opts ...Option) (string, *ServerStateManager, *Handler) {
 	t.Helper()
 	s := NewServerStateManager(opts...)
@@ -309,6 +326,47 @@ func testRouteFailures(t *testing.T, route failureRoute) {
 	if route.cases&failWrongTeam != 0 {
 		t.Run("Failure: wrong team token", func(t *testing.T) {
 			assertInvalidToken(t, func(tokens [2]string) string { return tokens[1] })
+		})
+	}
+}
+
+func TestErrorResponseShape(t *testing.T) {
+	tests := []struct {
+		name       string
+		method     string
+		path       func(roomID string) string
+		body       string
+		withToken  bool
+		wantStatus int
+	}{
+		{"400", "POST", func(r string) string { return "/api/match-rooms/" + r + "/match" }, "{", false, http.StatusBadRequest},
+		{"401", "POST", func(r string) string { return "/api/match-rooms/" + r + "/match/reset" }, "", false, http.StatusUnauthorized},
+		{"404", "GET", func(string) string { return "/api/match-rooms/NONEXISTENT/match/state" }, "", false, http.StatusNotFound},
+		{"409", "DELETE", func(r string) string { return "/api/match-rooms/" + r + "/match" }, "", true, http.StatusConflict},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			roomID, playerTokens, _, h := createTestRoomWithMatch(t)
+			var header http.Header
+			if tt.withToken {
+				header = bearerHeader(playerTokens[0])
+			}
+
+			rr := serveRequest(t, h, tt.method, tt.path(roomID), tt.body, header)
+
+			if rr.Code != tt.wantStatus {
+				t.Fatalf("status = %d, want %d, body %q", rr.Code, tt.wantStatus, rr.Body.String())
+			}
+			if got, want := rr.Header().Get("Content-Type"), "text/plain; charset=utf-8"; got != want {
+				t.Errorf("Content-Type = %q, want %q", got, want)
+			}
+			if got, want := rr.Header().Get("X-Content-Type-Options"), "nosniff"; got != want {
+				t.Errorf("X-Content-Type-Options = %q, want %q", got, want)
+			}
+			if body := rr.Body.String(); !strings.HasSuffix(body, "\n") {
+				t.Errorf("body = %q, want it to end with a newline", body)
+			}
 		})
 	}
 }

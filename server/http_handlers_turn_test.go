@@ -148,6 +148,49 @@ func TestHandleSubmitTurnCommand(t *testing.T) {
 	})
 }
 
+func TestSubmitTurnCommandDecoding(t *testing.T) {
+	const (
+		formatMsg = "Invalid turnCommand format"
+		target    = `"target":{"x":4,"y":7}`
+	)
+	tests := []struct {
+		name       string
+		body       string
+		noToken    bool
+		wantStatus int
+		wantMsg    string
+	}{
+		{"exact keys", `{"type":"move","unitId":16,` + target + `}`, false, http.StatusOK, ""},
+		{"keys match case-sensitively", `{"Type":"move","unitId":16,` + target + `}`, false, http.StatusConflict, ""},
+		{"duplicate key", `{"type":"move","type":"placeBomb","unitId":16,` + target + `}`, false, http.StatusBadRequest, formatMsg},
+		{"trailing data after value", `{"type":"move","unitId":16,` + target + `} garbage`, false, http.StatusBadRequest, formatMsg},
+		{"unitId above 255", `{"type":"move","unitId":256,` + target + `}`, false, http.StatusBadRequest, formatMsg},
+		{"negative unitId", `{"type":"move","unitId":-1,` + target + `}`, false, http.StatusBadRequest, formatMsg},
+		{"unknown type", `{"type":"fly","unitId":16,` + target + `}`, false, http.StatusConflict, ""},
+		{"malformed body without a token", `{`, true, http.StatusBadRequest, formatMsg},
+		{"valid body without a token", `{"type":"move","unitId":16,` + target + `}`, true, http.StatusUnauthorized, "invalid player token"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			roomID, playerTokens, _, h := createTestRoomWithMatch(t)
+			header := bearerHeader(playerTokens[0])
+			if tt.noToken {
+				header = nil
+			}
+
+			rr := serveRequest(t, h, "POST", "/api/match-rooms/"+roomID+"/match/turn-commands", tt.body, header)
+
+			if rr.Code != tt.wantStatus {
+				t.Fatalf("status = %d, want %d, body %q", rr.Code, tt.wantStatus, rr.Body.String())
+			}
+			if !strings.Contains(rr.Body.String(), tt.wantMsg) {
+				t.Errorf("body = %q, want it to contain %q", rr.Body.String(), tt.wantMsg)
+			}
+		})
+	}
+}
+
 func createSuddenDeathRoom(t *testing.T, opts ...Option) (string, [2]string, *ServerStateManager, *Handler) {
 	t.Helper()
 	roomID, s, h := newTestRoom(t, opts...)
@@ -624,6 +667,44 @@ func TestHandleSurrender(t *testing.T) {
 			"unitId", "countdown", "newHp"},
 			nil)
 	})
+}
+
+func TestSurrenderCheckOrder(t *testing.T) {
+	const surrenderPath = "/match/surrender"
+	tests := []struct {
+		name       string
+		room       string
+		body       string
+		header     func(tokens [2]string) http.Header
+		wantStatus int
+		wantMsg    string
+	}{
+		{"malformed body wins over the token and the room", "", `{`, func(tokens [2]string) http.Header { return bearerHeader(tokens[1]) }, http.StatusBadRequest, "Invalid surrenderRequest format"},
+		{"other team's token", "", `{"teamId":1}`, func(tokens [2]string) http.Header { return bearerHeader(tokens[1]) }, http.StatusUnauthorized, "invalid player token"},
+		{"no token", "", `{"teamId":1}`, func([2]string) http.Header { return nil }, http.StatusUnauthorized, "invalid player token"},
+		{"bad team without Authorization", "", `{"teamId":3}`, func([2]string) http.Header { return nil }, http.StatusUnauthorized, "invalid player token"},
+		{"bad team with a non-Bearer header", "", `{"teamId":3}`, func([2]string) http.Header { return http.Header{"Authorization": {"Token abc"}} }, http.StatusUnauthorized, "invalid player token"},
+		{"bad team with a valid token", "", `{"teamId":3}`, func(tokens [2]string) http.Header { return bearerHeader(tokens[0]) }, http.StatusBadRequest, "team must be 1 or 2"},
+		{"bad team in a nonexistent room", "NONEXISTENT", `{"teamId":3}`, func(tokens [2]string) http.Header { return bearerHeader(tokens[0]) }, http.StatusBadRequest, "team must be 1 or 2"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			roomID, playerTokens, _, h := createTestRoomWithMatch(t)
+			if tt.room != "" {
+				roomID = tt.room
+			}
+
+			rr := serveRequest(t, h, "POST", "/api/match-rooms/"+roomID+surrenderPath, tt.body, tt.header(playerTokens))
+
+			if rr.Code != tt.wantStatus {
+				t.Fatalf("status = %d, want %d, body %q", rr.Code, tt.wantStatus, rr.Body.String())
+			}
+			if !strings.Contains(rr.Body.String(), tt.wantMsg) {
+				t.Errorf("body = %q, want it to contain %q", rr.Body.String(), tt.wantMsg)
+			}
+		})
+	}
 }
 
 func TestHandleResolveTurn_SuddenDeathMatchEnd(t *testing.T) {
