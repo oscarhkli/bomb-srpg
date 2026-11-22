@@ -36,6 +36,23 @@ func TestUnitIDCodecs(t *testing.T) {
 	}
 }
 
+func TestSystemUnitID_IsTeam0Index0(t *testing.T) {
+	gotTeam, gotIndex := SystemUnitID.Decode()
+	if gotTeam != 0 || gotIndex != 0 {
+		t.Errorf("SystemUnitID.Decode() = (%d, %d), want (0, 0)", gotTeam, gotIndex)
+	}
+
+	for _, team := range []int{Team1, Team2} {
+		id := NewUnitID(team, 0)
+		if id == SystemUnitID {
+			t.Errorf("NewUnitID(%d, 0) = SystemUnitID, want a distinct ID", team)
+		}
+		if gotTeam, _ := id.Decode(); gotTeam != team {
+			t.Errorf("NewUnitID(%d, 0).Decode() team = %d, want %d", team, gotTeam, team)
+		}
+	}
+}
+
 func TestBombIDCodecs(t *testing.T) {
 	tests := []struct {
 		name        string
