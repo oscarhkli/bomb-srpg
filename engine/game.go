@@ -9,6 +9,12 @@ const noUnit string = "NO_UNIT"
 
 const maxTurnsLimit = 100
 
+const (
+	minTeamSizeWithBoss = 1
+	minTeamSizeWithKing = 2
+	maxTeamSize         = 5
+)
+
 func terrainToken() map[rune]TerrainType {
 	return map[rune]TerrainType{
 		'.': TerrainPlain,
@@ -132,12 +138,12 @@ func validateTeamComposition(slots []TeamSlot, playerLabel string) error {
 		return fmt.Errorf("%w: %s must have either Boss or King, got %v", errInvalidTeamFormation, playerLabel, slots)
 	}
 
-	minTeamSize := 2
+	minTeamSize := minTeamSizeWithKing
 	if hasBoss {
-		minTeamSize = 1
+		minTeamSize = minTeamSizeWithBoss
 	}
-	if t := teamSize(slots); t < minTeamSize || t > 5 {
-		return fmt.Errorf("%w: %s must have between %d and 5 units, got %d", ErrInvalidTeamSize, playerLabel, minTeamSize, t)
+	if t := teamSize(slots); t < minTeamSize || t > maxTeamSize {
+		return fmt.Errorf("%w: %s must have between %d and %d units, got %d", ErrInvalidTeamSize, playerLabel, minTeamSize, maxTeamSize, t)
 	}
 	if !hasBoss && !hasExactlyOneAndFirstIsKing(slots) {
 		return fmt.Errorf("%w: %s must have exactly one King as the first unit", ErrMissingKing, playerLabel)
