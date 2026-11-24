@@ -16,13 +16,7 @@ func (strictJSONCodec) Marshal(v any) ([]byte, error) { return json.Marshal(v) }
 
 func (strictJSONCodec) Unmarshal(data []byte, v any) error { return json.Unmarshal(data, v) }
 
-var _ = installStrictCodec()
-
-func installStrictCodec() *strictJSONCodec {
-	c := &strictJSONCodec{}
-	runtime.SetJSONCodec(c)
-	return c
-}
+func InstallJSONCodec() { runtime.SetJSONCodec(strictJSONCodec{}) }
 
 func RegisterRoutes(mux *http.ServeMux, h *Handler) {
 	strict := api.NewStrictHandlerWithOptions(h, []api.StrictMiddlewareFunc{h.withToken}, api.StrictHTTPServerOptions{
