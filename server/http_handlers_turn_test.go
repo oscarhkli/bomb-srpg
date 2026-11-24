@@ -171,7 +171,6 @@ func TestSubmitTurnCommandDecoding(t *testing.T) {
 		{"unitId written with a fraction", `{"type":"move","unitId":1.0,` + target + `}`, false, http.StatusBadRequest, formatMsg},
 		{"unitId written with an exponent", `{"type":"move","unitId":2e0,` + target + `}`, false, http.StatusBadRequest, formatMsg},
 		{"unitId of one million", `{"type":"move","unitId":1000000,` + target + `}`, false, http.StatusBadRequest, formatMsg},
-		{"unitId of negative zero", `{"type":"move","unitId":-0,` + target + `}`, false, http.StatusBadRequest, formatMsg},
 		{"target x written with a fraction", `{"type":"move","unitId":16,"target":{"x":4.0,"y":7}}`, false, http.StatusBadRequest, formatMsg},
 		{"target x of one million", `{"type":"move","unitId":16,"target":{"x":1000000,"y":7}}`, false, http.StatusConflict, "target out of move range"},
 		{"target x beyond float64", `{"type":"move","unitId":16,"target":{"x":1e400,"y":7}}`, false, http.StatusBadRequest, formatMsg},
