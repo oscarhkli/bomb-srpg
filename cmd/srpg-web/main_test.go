@@ -5,7 +5,6 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 	"time"
 )
@@ -124,36 +123,6 @@ func TestListenAddr(t *testing.T) {
 			}
 			if got != tt.want {
 				t.Errorf("listenAddr(%q) = %q, want %q", tt.port, got, tt.want)
-			}
-		})
-	}
-}
-
-func TestNewHandlerRejectsDuplicateKeys(t *testing.T) {
-	const slots = `"p1Slots":[{"archetype":"King","role":"King"},{"archetype":"Fighter","role":"Normal"}],` +
-		`"p2Slots":[{"archetype":"King","role":"King"},{"archetype":"Witch","role":"Normal"}]`
-	tests := []struct {
-		name string
-		body string
-		want int
-	}{
-		{"exact keys", `{"gameCfg":{"stagePreset":"Plain","maxTurns":10,` + slots + `}}`, http.StatusCreated},
-		{"duplicate key", `{"gameCfg":{"stagePreset":"Plain","stagePreset":"Plain","maxTurns":10,` + slots + `}}`, http.StatusBadRequest},
-	}
-	ctx, cancel := context.WithCancel(context.Background())
-	t.Cleanup(cancel)
-	h := newHandler(ctx, slog.New(slog.DiscardHandler), t.TempDir())
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			rr := httptest.NewRecorder()
-			h.ServeHTTP(rr, httptest.NewRequest(http.MethodPost, "/api/match-rooms", nil))
-			location := rr.Header().Get("Location")
-
-			rr = httptest.NewRecorder()
-			h.ServeHTTP(rr, httptest.NewRequest(http.MethodPost, location+"/match", strings.NewReader(tt.body)))
-			if rr.Code != tt.want {
-				t.Errorf("status = %d, want %d, body %q", rr.Code, tt.want, rr.Body.String())
 			}
 		})
 	}

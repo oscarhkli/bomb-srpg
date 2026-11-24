@@ -27,6 +27,7 @@ func TestSurrenderRequestDecoding(t *testing.T) {
 		{"fractional number", `{"teamId":1.5}`, http.StatusBadRequest},
 		{"array body", `[1]`, http.StatusBadRequest},
 		{"empty body", ``, http.StatusBadRequest},
+		{"whitespace-only body", " \n\t", http.StatusBadRequest},
 	}
 
 	for _, tt := range tests {
