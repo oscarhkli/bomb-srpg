@@ -44,8 +44,8 @@ func TestWireEventBytes(t *testing.T) {
 		},
 		{
 			"unit damaged",
-			engine.GameEvent{Type: engine.GameEvtUnitDamaged, UnitID: 17, Position: &pos},
-			`{"countdown":0,"newHp":0,"position":{"x":1,"y":2},"type":"unitDamaged","unitId":17}`,
+			engine.GameEvent{Type: engine.GameEvtUnitDamaged, UnitID: 17, Position: &pos, NewHP: 4},
+			`{"countdown":0,"newHp":4,"position":{"x":1,"y":2},"type":"unitDamaged","unitId":17}`,
 		},
 		{
 			"unit died",
@@ -118,15 +118,19 @@ func TestWireStateBytes(t *testing.T) {
 	grid := [][]engine.Tile{{{Type: engine.TerrainWater, OccupantType: engine.OccupantBomb, OccupantID: 9}}}
 	const gridJSON = `[[{"occupantId":9,"occupantType":"OccupantBomb","type":"TerrainWater"}]]`
 
-	skilled := engine.Unit{ID: 18, Type: engine.Archetype{Name: "Witch"}, Position: pos, Team: 2, HP: 1}
+	stats := func(u engine.Unit) engine.Unit {
+		u.Speed, u.BombMaxRange, u.BombPower, u.MaxBombCount, u.BombUsed, u.HP = 3, 4, 5, 6, 2, 7
+		return u
+	}
+	skilled := stats(engine.Unit{ID: 18, Type: engine.Archetype{Name: "Witch"}, Position: pos, Team: 2, HasUsedSkill: true})
 	withSkills(t, &skilled.Skills, 3)
 
 	full := &engine.GameState{
 		Turn: 2, InSuddenDeath: true, ActiveTeam: 2, Grid: grid,
 		Units: map[engine.UnitID]*engine.Unit{
-			20: {ID: 20, Type: engine.Archetype{Name: "Fighter"}, Position: pos, Team: 2, HP: 1},
-			17: {ID: 17, Type: engine.Archetype{Name: "King"}, Position: pos, Team: 1, HP: 1, HasMoved: true},
-			19: {ID: 19, Type: engine.Archetype{Name: "Bandit"}, Position: pos, Team: 2, HP: 1},
+			20: new(stats(engine.Unit{ID: 20, Type: engine.Archetype{Name: "Fighter"}, Position: pos, Team: 2})),
+			17: new(stats(engine.Unit{ID: 17, Type: engine.Archetype{Name: "King"}, Position: pos, Team: 1, HasMoved: true})),
+			19: new(stats(engine.Unit{ID: 19, Type: engine.Archetype{Name: "Bandit"}, Position: pos, Team: 2})),
 			18: &skilled,
 		},
 		Bombs: map[engine.BombID]*engine.Bomb{
@@ -143,9 +147,9 @@ func TestWireStateBytes(t *testing.T) {
 		},
 		TurnStartEvents: []engine.GameEvent{{Type: engine.GameEvtBombPlaced, UnitID: 17, BombID: 70000, Position: &pos, Range: 2, Countdown: 3}},
 	}
-	const unitHead = `{"bombMaxRange":0,"bombPower":0,"bombUsed":0,"hasMoved":`
-	const unitMid = `,"hasUsedSkill":false,"hp":1,"id":`
-	const unitTail = `,"maxBombCount":0,"position":{"x":1,"y":2},"skills":`
+	const unitHead = `{"bombMaxRange":4,"bombPower":5,"bombUsed":2,"hasMoved":`
+	const unitMid = `,"hp":7,"id":`
+	const unitTail = `,"maxBombCount":6,"position":{"x":1,"y":2},"skills":`
 	wantFull := `{"activeTeam":2,` +
 		`"bombs":[` +
 		`{"countdown":3,"id":70000,"ownerId":17,"position":{"x":1,"y":2},"range":2},` +
@@ -158,10 +162,10 @@ func TestWireStateBytes(t *testing.T) {
 		`{"target":{"x":1,"y":3},"type":"placeBomb","unitId":17}],` +
 		`"turnStartEvents":[{"bombId":70000,"countdown":3,"newHp":0,"position":{"x":1,"y":2},"range":2,"type":"bombPlaced","unitId":17}],` +
 		`"units":[` +
-		unitHead + `true` + unitMid + `17` + unitTail + `[],"speed":0,"team":1,"type":"King"},` +
-		unitHead + `false` + unitMid + `18` + unitTail + `["Jump","Fly"],"speed":0,"team":2,"type":"Witch"},` +
-		unitHead + `false` + unitMid + `19` + unitTail + `[],"speed":0,"team":2,"type":"Bandit"},` +
-		unitHead + `false` + unitMid + `20` + unitTail + `[],"speed":0,"team":2,"type":"Fighter"}]}`
+		unitHead + `true,"hasUsedSkill":false` + unitMid + `17` + unitTail + `[],"speed":3,"team":1,"type":"King"},` +
+		unitHead + `false,"hasUsedSkill":true` + unitMid + `18` + unitTail + `["Jump","Fly"],"speed":3,"team":2,"type":"Witch"},` +
+		unitHead + `false,"hasUsedSkill":false` + unitMid + `19` + unitTail + `[],"speed":3,"team":2,"type":"Bandit"},` +
+		unitHead + `false,"hasUsedSkill":false` + unitMid + `20` + unitTail + `[],"speed":3,"team":2,"type":"Fighter"}]}`
 
 	tests := []struct {
 		name  string

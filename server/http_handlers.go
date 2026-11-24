@@ -512,8 +512,10 @@ func engineTeamSlots(slots []api.TeamSlot) ([]engine.TeamSlot, error) {
 	out := make([]engine.TeamSlot, 0, len(slots))
 	for _, slot := range slots {
 		var role engine.UnitRole
-		if err := role.UnmarshalText([]byte(slot.Role)); err != nil {
-			return nil, badRequest(invalidConfigText)
+		if slot.Role != "" {
+			if err := role.UnmarshalText([]byte(slot.Role)); err != nil {
+				return nil, badRequest(invalidConfigText)
+			}
 		}
 		out = append(out, engine.TeamSlot{Archetype: slot.Archetype, Role: role})
 	}

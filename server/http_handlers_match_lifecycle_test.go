@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bomb-srpg/engine"
 	"bomb-srpg/room"
 	"bomb-srpg/server/api"
 	"encoding/json/v2"
@@ -224,6 +225,11 @@ func TestCreateMatchDecoding(t *testing.T) {
 			`"p2Slots":[{"archetype":"King","role":"King"},{"archetype":"Witch","role":"Normal"}]`
 		cfg = `{"gameCfg":{"stagePreset":"Plain","maxTurns":10,` + slots + `}`
 	)
+	roleCfg := func(slot string) string {
+		return `{"gameCfg":{"stagePreset":"Plain","maxTurns":10,` +
+			`"p1Slots":[{"archetype":"King","role":"King"},` + slot + `],` +
+			`"p2Slots":[{"archetype":"King","role":"King"},{"archetype":"Witch","role":"Normal"}]}}`
+	}
 	tests := []struct {
 		name       string
 		room       string
@@ -246,6 +252,12 @@ func TestCreateMatchDecoding(t *testing.T) {
 		{"maxTurns written with an exponent", "", strings.Replace(cfg, `"maxTurns":10`, `"maxTurns":1e1`, 1) + `}`, http.StatusBadRequest, formatMsg},
 		{"maxTurns of one million", "", strings.Replace(cfg, `"maxTurns":10`, `"maxTurns":1000000`, 1) + `}`, http.StatusBadRequest, "invalid max turns: 1000000"},
 		{"unknown role", "", `{"gameCfg":{"stagePreset":"Plain","maxTurns":10,"p1Slots":[{"archetype":"King","role":"Nope"}],"p2Slots":[]}}`, http.StatusBadRequest, formatMsg},
+		{"role missing from a slot", "", roleCfg(`{"archetype":"Fighter"}`), http.StatusCreated, ""},
+		{"role null in a slot", "", roleCfg(`{"archetype":"Fighter","role":null}`), http.StatusCreated, ""},
+		{"role unknown in a slot", "", roleCfg(`{"archetype":"Fighter","role":"Zed"}`), http.StatusBadRequest, formatMsg},
+		{"null slot", "", roleCfg(`null`), http.StatusBadRequest, "invalid game config: unknown archetype: archetype '' for Player 1 not found"},
+		{"role without archetype", "", roleCfg(`{"role":"Normal"}`), http.StatusBadRequest, "unknown archetype"},
+		{"valid slot", "", roleCfg(`{"archetype":"Fighter","role":"Normal"}`), http.StatusCreated, ""},
 		{"malformed body to an unknown room", "NONEXISTENT", `{`, http.StatusBadRequest, formatMsg},
 		{"valid body to an unknown room", "NONEXISTENT", cfg + `}`, http.StatusNotFound, "room not found"},
 	}
@@ -267,6 +279,31 @@ func TestCreateMatchDecoding(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("each team keeps its own slots", func(t *testing.T) {
+		roomID, s, h := newTestRoom(t)
+		body := `{"gameCfg":{"stagePreset":"Plain","maxTurns":10,` +
+			`"p1Slots":[{"archetype":"King","role":"King"},{"archetype":"Fighter","role":"Normal"}],` +
+			`"p2Slots":[{"archetype":"Bandit","role":"Boss"},{"archetype":"Witch","role":"Normal"}]}}`
+
+		rr := serveRequest(t, h, "POST", "/api/match-rooms/"+roomID+"/match", body, nil)
+
+		if rr.Code != http.StatusCreated {
+			t.Fatalf("status = %d, want %d, body %q", rr.Code, http.StatusCreated, rr.Body.String())
+		}
+		gameCfg, err := mustRoom(t, s, roomID).Config()
+		if err != nil {
+			t.Fatalf("Config() error = %v", err)
+		}
+		wantP1 := []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Fighter", Role: engine.RoleNormal}}
+		wantP2 := []engine.TeamSlot{{Archetype: "Bandit", Role: engine.RoleBoss}, {Archetype: "Witch", Role: engine.RoleNormal}}
+		if !slices.Equal(gameCfg.P1Slots, wantP1) {
+			t.Errorf("P1Slots = %v, want %v", gameCfg.P1Slots, wantP1)
+		}
+		if !slices.Equal(gameCfg.P2Slots, wantP2) {
+			t.Errorf("P2Slots = %v, want %v", gameCfg.P2Slots, wantP2)
+		}
+	})
 
 	t.Run("test-only overrides in the body are ignored", func(t *testing.T) {
 		roomID, s, h := newTestRoom(t)
