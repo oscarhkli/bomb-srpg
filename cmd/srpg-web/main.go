@@ -49,6 +49,22 @@ const (
 	healthTimeout   = 2 * time.Second
 )
 
+func newHandler(ctx context.Context, logger *slog.Logger, webDir string) http.Handler {
+	server.InstallJSONCodec()
+
+	serverState := server.NewServerStateManager(server.WithLogger(logger))
+	handler := server.NewHandler(serverState, server.WithHandlerLogger(logger))
+
+	go serverState.RunCleanupLoop(ctx, server.CleanupInterval, time.Now)
+
+	r := http.NewServeMux()
+	r.Handle("GET /", http.FileServer(http.Dir(webDir)))
+
+	server.RegisterRoutes(r, handler)
+
+	return server.SecurityHeaders(server.RecoverPanic(logger, r))
+}
+
 func main() {
 	addr, err := listenAddr(os.Getenv)
 	if err != nil {
@@ -68,20 +84,9 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	serverState := server.NewServerStateManager(server.WithLogger(logger))
-	handler := server.NewHandler(serverState, server.WithHandlerLogger(logger))
-
-	go serverState.RunCleanupLoop(ctx, server.CleanupInterval, time.Now)
-
-	r := http.NewServeMux()
-	fs := http.FileServer(http.Dir("./web/dist"))
-	r.Handle("GET /", fs)
-
-	server.RegisterRoutes(r, handler)
-
 	s := &http.Server{
 		Addr:         addr,
-		Handler:      server.SecurityHeaders(server.RecoverPanic(logger, r)),
+		Handler:      newHandler(ctx, logger, "./web/dist"),
 		ReadTimeout:  readTimeout,
 		WriteTimeout: writeTimeout,
 	}

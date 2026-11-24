@@ -95,11 +95,11 @@ func (h *Handler) responseError(w http.ResponseWriter, r *http.Request, err erro
 
 func (h *Handler) requestError(w http.ResponseWriter, r *http.Request, err error) {
 	switch r.Pattern {
-	case createMatchPattern:
+	case "POST /api/match-rooms/{roomID}/match":
 		h.responseError(w, r, badRequest(invalidConfigText))
-	case turnCommandsPattern:
+	case "POST /api/match-rooms/{roomID}/match/turn-commands":
 		h.responseError(w, r, badRequest(invalidTurnCmdText))
-	case surrenderPattern:
+	case "POST /api/match-rooms/{roomID}/match/surrender":
 		h.responseError(w, r, badRequest(invalidSurrenderText))
 	default:
 		h.responseError(w, r, badRequest(err.Error()))
