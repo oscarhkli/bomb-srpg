@@ -59,6 +59,17 @@ func TestEventAndCommandEncoding(t *testing.T) {
 			}`,
 		},
 		{
+			"unit died",
+			NewUnitDiedEvent(17, pos),
+			`{
+				"type": "unitDied",
+				"unitId": 17,
+				"position": {"x": 1, "y": 2},
+				"newHp": 0,
+				"countdown": 0
+			}`,
+		},
+		{
 			"bomb placed",
 			newBombPlacedEvent(17, 70000, pos, 2, 3),
 			`{
@@ -69,6 +80,18 @@ func TestEventAndCommandEncoding(t *testing.T) {
 				"newHp": 0,
 				"range": 2,
 				"countdown": 3
+			}`,
+		},
+		{
+			"bomb countdown updated",
+			newBombCountdownUpdatedEvent(70000, pos, 2),
+			`{
+				"type": "bombCountdownUpdated",
+				"unitId": 0,
+				"bombId": 70000,
+				"position": {"x": 1, "y": 2},
+				"newHp": 0,
+				"countdown": 2
 			}`,
 		},
 		{
@@ -115,6 +138,15 @@ func TestEventAndCommandEncoding(t *testing.T) {
 			NewMoveCommand(17, Coordinate{X: 4, Y: 7}),
 			`{
 				"type": "move",
+				"unitId": 17,
+				"target": {"x": 4, "y": 7}
+			}`,
+		},
+		{
+			"place bomb command",
+			NewPlaceBombCommand(17, Coordinate{X: 4, Y: 7}),
+			`{
+				"type": "placeBomb",
 				"unitId": 17,
 				"target": {"x": 4, "y": 7}
 			}`,

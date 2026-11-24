@@ -3,6 +3,7 @@ package server
 import (
 	"bomb-srpg/engine"
 	"bomb-srpg/room"
+	"bomb-srpg/server/api"
 	"fmt"
 	"net/http"
 	"testing"
@@ -13,6 +14,15 @@ func validGameCfg() engine.GameCfg {
 		StagePreset: "Plain",
 		P1Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Fighter", Role: engine.RoleNormal}},
 		P2Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Witch", Role: engine.RoleNormal}},
+		MaxTurns:    10,
+	}
+}
+
+func validWireGameCfg() api.GameCfg {
+	return api.GameCfg{
+		StagePreset: "Plain",
+		P1Slots:     []api.TeamSlot{{Archetype: "King", Role: api.King}, {Archetype: "Fighter", Role: api.Normal}},
+		P2Slots:     []api.TeamSlot{{Archetype: "King", Role: api.King}, {Archetype: "Witch", Role: api.Normal}},
 		MaxTurns:    10,
 	}
 }

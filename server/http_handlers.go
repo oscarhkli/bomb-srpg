@@ -3,11 +3,15 @@ package server
 import (
 	"bomb-srpg/engine"
 	"bomb-srpg/room"
-	"encoding/json/v2"
+	"bomb-srpg/server/api"
+	"context"
+	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
+	"math"
 	"net/http"
-	"strconv"
+	"slices"
 	"strings"
 )
 
@@ -35,40 +39,6 @@ func NewHandler(m *ServerStateManager, opts ...HandlerOption) *Handler {
 	return h
 }
 
-func (h *Handler) requireToken(w http.ResponseWriter, r *http.Request) (string, bool) {
-	token, err := h.extractBearerToken(r)
-	if err != nil {
-		code, msg := mapError(err)
-		http.Error(w, msg, code)
-		return "", false
-	}
-	return token, true
-}
-
-func (h *Handler) requireRoom(w http.ResponseWriter, roomID, logMsg string) (*room.Room, bool) {
-	rm, err := h.Manager.Room(roomID)
-	if err != nil {
-		h.handleError(w, err, logMsg, "roomID", roomID)
-		return nil, false
-	}
-	return rm, true
-}
-
-func (h *Handler) handleError(w http.ResponseWriter, err error, logMsg string, args ...any) {
-	code, msg := mapError(err)
-	h.Logger.Warn(logMsg, append(args, "error", err)...)
-	http.Error(w, msg, code)
-}
-
-func (h *Handler) writeJSON(w http.ResponseWriter, status int, res any, logMsg string, args ...any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	if err := json.MarshalWrite(w, res); err != nil {
-		h.Logger.Error(logMsg, append(args, "error", err)...)
-		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
-	}
-}
-
 func (h *Handler) extractBearerToken(r *http.Request) (string, error) {
 	auth := r.Header.Get("Authorization")
 	if auth == "" {
@@ -81,344 +51,492 @@ func (h *Handler) extractBearerToken(r *http.Request) (string, error) {
 	return token, nil
 }
 
-type healthCheckResponse struct {
-	Status string `json:"status"`
+type statusError struct {
+	status int
+	text   string
 }
 
-func (h *Handler) handleHealthCheck(w http.ResponseWriter, _ *http.Request) {
-	res := healthCheckResponse{Status: "ok"}
-	h.writeJSON(w, http.StatusOK, res, "encode health check failed")
+func (e *statusError) Error() string { return e.text }
+
+func badRequest(text string) error {
+	return &statusError{status: http.StatusBadRequest, text: text}
 }
 
-type catalogResponse struct {
-	Archetypes   []engine.Archetype   `json:"archetypes"`
-	StagePresets []engine.StagePreset `json:"stagePresets"`
+type tokenKey struct{}
+
+type tokenResult struct {
+	token string
+	err   error
 }
 
-func (h *Handler) handleGetCatalog(w http.ResponseWriter, _ *http.Request) {
-	archetypes := engine.GetAllArchetypes()
-	stagePresets := engine.GetAllStagePresets()
-
-	res := catalogResponse{Archetypes: archetypes, StagePresets: stagePresets}
-	h.writeJSON(w, http.StatusOK, res, "encode catalog failed")
+func (h *Handler) withToken(next api.StrictHandlerFunc, _ string) api.StrictHandlerFunc {
+	return func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		token, err := h.extractBearerToken(r)
+		return next(context.WithValue(ctx, tokenKey{}, tokenResult{token: token, err: err}), w, r, request)
+	}
 }
 
-type createMatchRoomResponse struct {
-	ID string `json:"id"`
+func tokenFromContext(ctx context.Context) (string, error) {
+	res, ok := ctx.Value(tokenKey{}).(tokenResult)
+	if !ok {
+		return "", room.ErrInvalidToken
+	}
+	return res.token, res.err
 }
 
-func (h *Handler) handleCreateMatchRoom(w http.ResponseWriter, _ *http.Request) {
+func (h *Handler) responseError(w http.ResponseWriter, r *http.Request, err error) {
+	status, text := mapError(err)
+	if statusErr, ok := errors.AsType[*statusError](err); ok {
+		status, text = statusErr.status, statusErr.text
+	}
+	h.Logger.Warn("request failed", "method", r.Method, "pattern", r.Pattern, "status", status, "error", err)
+	http.Error(w, text, status)
+}
+
+func (h *Handler) requestError(w http.ResponseWriter, r *http.Request, err error) {
+	switch r.Pattern {
+	case "POST /api/match-rooms/{roomID}/match":
+		h.responseError(w, r, badRequest(invalidConfigText))
+	case "POST /api/match-rooms/{roomID}/match/turn-commands":
+		h.responseError(w, r, badRequest(invalidTurnCmdText))
+	case "POST /api/match-rooms/{roomID}/match/surrender":
+		h.responseError(w, r, badRequest(invalidSurrenderText))
+	default:
+		h.responseError(w, r, badRequest(err.Error()))
+	}
+}
+
+const (
+	missingQueryText     = "missing required query parameters: unitId and turnCmdType are required"
+	invalidUnitIDText    = "Invalid unitId parameter"
+	invalidConfigText    = "Invalid configuration format"
+	invalidTurnCmdText   = "Invalid turnCommand format"
+	invalidSurrenderText = "Invalid surrenderRequest format"
+	maxWireUnitID        = math.MaxUint8
+)
+
+func (h *Handler) bindError(w http.ResponseWriter, r *http.Request, err error) {
+	var required *api.RequiredParamError
+	var invalid *api.InvalidParamFormatError
+	switch {
+	case errors.As(err, &required):
+		h.responseError(w, r, badRequest(missingQueryText))
+	case errors.As(err, &invalid) && invalid.ParamName == "unitId":
+		query := r.URL.Query()
+		if query.Get("unitId") == "" || query.Get("turnCmdType") == "" {
+			h.responseError(w, r, badRequest(missingQueryText))
+			return
+		}
+		h.responseError(w, r, badRequest(invalidUnitIDText))
+	default:
+		h.responseError(w, r, badRequest(err.Error()))
+	}
+}
+
+func (h *Handler) GetHealth(_ context.Context, _ api.GetHealthRequestObject) (api.GetHealthResponseObject, error) {
+	return api.GetHealth200JSONResponse{Status: "ok"}, nil
+}
+
+func (h *Handler) GetCatalog(_ context.Context, _ api.GetCatalogRequestObject) (api.GetCatalogResponseObject, error) {
+	return api.GetCatalog200JSONResponse(wireCatalog(engine.GetAllArchetypes(), engine.GetAllStagePresets())), nil
+}
+
+func (h *Handler) CreateMatchRoom(_ context.Context, _ api.CreateMatchRoomRequestObject) (api.CreateMatchRoomResponseObject, error) {
 	id, err := h.Manager.createMatchRoom()
 	if err != nil {
 		h.Logger.Error("create match room failed", "error", err)
-		http.Error(w, "Failed to create new MatchRoom", http.StatusInternalServerError)
-		return
+		return nil, &statusError{status: http.StatusInternalServerError, text: "Failed to create new MatchRoom"}
 	}
-
-	location := fmt.Sprintf("/api/match-rooms/%s", id)
-	w.Header().Set("Location", location)
-
-	res := createMatchRoomResponse{ID: id}
-	h.writeJSON(w, http.StatusCreated, res, "encode match room failed", "roomID", id)
-
 	h.Logger.Info("match room created", "roomID", id)
+	return api.CreateMatchRoom201JSONResponse{
+		Body:    api.CreateMatchRoomResponse{ID: id},
+		Headers: api.CreateMatchRoom201ResponseHeaders{Location: "/api/match-rooms/" + id},
+	}, nil
 }
 
-type createMatchRequest struct {
-	GameCfg engine.GameCfg `json:"gameCfg"`
-}
-
-type createMatchResponse struct {
-	Success      bool      `json:"success"`
-	PlayerTokens [2]string `json:"playerTokens"`
-}
-
-func (h *Handler) handleCreateMatch(w http.ResponseWriter, r *http.Request) {
-	roomID := r.PathValue("roomID")
-
-	var req createMatchRequest
-	if err := json.UnmarshalRead(r.Body, &req); err != nil {
-		h.Logger.Warn("invalid config format", "error", err)
-		http.Error(w, "Invalid configuration format", http.StatusBadRequest)
-		return
-	}
-
-	rm, ok := h.requireRoom(w, roomID, "create match failed")
-	if !ok {
-		return
-	}
-
-	tokens, err := rm.Start(req.GameCfg)
-
-	if !h.writeMatchCreated(tokens, err, roomID, w) {
-		return
-	}
-
-	h.Logger.Info("match created", "roomID", roomID)
-}
-
-func (h *Handler) writeMatchCreated(tokens [2]string, err error, roomID string, w http.ResponseWriter) bool {
+func (h *Handler) CreateMatch(_ context.Context, request api.CreateMatchRequestObject) (api.CreateMatchResponseObject, error) {
+	gameCfg, err := engineGameCfg(request.Body.GameCfg)
 	if err != nil {
-		h.handleError(w, err, "create match failed", "roomID", roomID)
-		return false
+		return nil, err
 	}
-
-	res := createMatchResponse{Success: true, PlayerTokens: tokens}
-	h.writeJSON(w, http.StatusCreated, res, "encode match failed", "roomID", roomID)
-	return true
+	rm, err := h.Manager.Room(request.RoomID)
+	if err != nil {
+		return nil, err
+	}
+	tokens, err := rm.Start(gameCfg)
+	if err != nil {
+		return nil, err
+	}
+	h.Logger.Info("match created", "roomID", request.RoomID)
+	return api.CreateMatch201JSONResponse(wireMatchCreated(tokens)), nil
 }
 
-func (h *Handler) handleRematch(w http.ResponseWriter, r *http.Request) {
-	roomID := r.PathValue("roomID")
-
-	token, ok := h.requireToken(w, r)
-	if !ok {
-		return
+func (h *Handler) Rematch(ctx context.Context, request api.RematchRequestObject) (api.RematchResponseObject, error) {
+	token, err := tokenFromContext(ctx)
+	if err != nil {
+		return nil, err
 	}
-
-	rm, ok := h.requireRoom(w, roomID, "create match failed")
-	if !ok {
-		return
+	rm, err := h.Manager.Room(request.RoomID)
+	if err != nil {
+		return nil, err
 	}
-
 	tokens, err := rm.Rematch(token)
-
-	if !h.writeMatchCreated(tokens, err, roomID, w) {
-		return
+	if err != nil {
+		return nil, err
 	}
-
-	h.Logger.Info("rematch created", "roomID", roomID)
+	h.Logger.Info("rematch created", "roomID", request.RoomID)
+	return api.Rematch201JSONResponse(wireMatchCreated(tokens)), nil
 }
 
-func (h *Handler) handleDeleteMatch(w http.ResponseWriter, r *http.Request) {
-	roomID := r.PathValue("roomID")
-
-	token, ok := h.requireToken(w, r)
-	if !ok {
-		return
+func (h *Handler) DeleteMatch(ctx context.Context, request api.DeleteMatchRequestObject) (api.DeleteMatchResponseObject, error) {
+	token, err := tokenFromContext(ctx)
+	if err != nil {
+		return nil, err
 	}
-
-	rm, ok := h.requireRoom(w, roomID, "delete match failed")
-	if !ok {
-		return
+	rm, err := h.Manager.Room(request.RoomID)
+	if err != nil {
+		return nil, err
 	}
-
 	if err := rm.Delete(token); err != nil {
-		h.handleError(w, err, "delete match failed", "roomID", roomID)
-		return
+		return nil, err
 	}
-
-	w.WriteHeader(http.StatusNoContent)
-
-	h.Logger.Info("match deleted", "roomID", roomID)
+	h.Logger.Info("match deleted", "roomID", request.RoomID)
+	return api.DeleteMatch204Response{}, nil
 }
 
-func (h *Handler) handleGetMatchState(w http.ResponseWriter, r *http.Request) {
-	roomID := r.PathValue("roomID")
-
-	rm, ok := h.requireRoom(w, roomID, "get match state failed")
-	if !ok {
-		return
+func (h *Handler) GetMatchState(_ context.Context, request api.GetMatchStateRequestObject) (api.GetMatchStateResponseObject, error) {
+	rm, err := h.Manager.Room(request.RoomID)
+	if err != nil {
+		return nil, err
 	}
-
 	gs, err := rm.State()
 	if err != nil {
-		h.handleError(w, err, "get match state failed", "roomID", roomID)
-		return
+		return nil, err
 	}
-
-	h.writeJSON(w, http.StatusOK, gs, "encode gameState failed")
+	return api.GetMatchState200JSONResponse(wireGameState(gs)), nil
 }
 
-func (h *Handler) handleSubmitTurnCommand(w http.ResponseWriter, r *http.Request) {
-	roomID := r.PathValue("roomID")
-
-	var req engine.TurnCommand
-	if err := json.UnmarshalRead(r.Body, &req); err != nil {
-		h.Logger.Warn("invalid turnCommand format", "error", err)
-		http.Error(w, "Invalid turnCommand format", http.StatusBadRequest)
-		return
-	}
-
-	token, ok := h.requireToken(w, r)
-	if !ok {
-		return
-	}
-
-	rm, ok := h.requireRoom(w, roomID, "submit turn command failed")
-	if !ok {
-		return
-	}
-
-	gameEvents, err := rm.Submit(req, token)
+func (h *Handler) SubmitTurnCommand(ctx context.Context, request api.SubmitTurnCommandRequestObject) (api.SubmitTurnCommandResponseObject, error) {
+	cmd, err := engineTurnCommand(*request.Body)
 	if err != nil {
-		h.handleError(w, err, "submit turn command failed", "roomID", roomID)
-		return
+		return nil, err
 	}
-
-	h.writeJSON(w, http.StatusOK, gameEvents, "encode gameEvents failed")
+	token, err := tokenFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	rm, err := h.Manager.Room(request.RoomID)
+	if err != nil {
+		return nil, err
+	}
+	gameEvents, err := rm.Submit(cmd, token)
+	if err != nil {
+		return nil, err
+	}
+	return api.SubmitTurnCommand200JSONResponse(mapSlice(gameEvents, wireGameEvent)), nil
 }
 
-type cpuStatusResponse struct {
-	TurnPhase             room.CPUTurnPhase  `json:"turnPhase"`
-	PlanGameEvents        []engine.GameEvent `json:"planGameEvents"`
-	ResolveTurnGameEvents []engine.GameEvent `json:"resolveTurnGameEvents"`
-}
-
-func (h *Handler) handleConsumeCPUStatus(w http.ResponseWriter, r *http.Request) {
-	roomID := r.PathValue("roomID")
-
-	token, ok := h.requireToken(w, r)
-	if !ok {
-		return
+func (h *Handler) ConsumeCPUStatus(ctx context.Context, request api.ConsumeCPUStatusRequestObject) (api.ConsumeCPUStatusResponseObject, error) {
+	token, err := tokenFromContext(ctx)
+	if err != nil {
+		return nil, err
 	}
-
-	rm, ok := h.requireRoom(w, roomID, "consume cpu status failed")
-	if !ok {
-		return
+	rm, err := h.Manager.Room(request.RoomID)
+	if err != nil {
+		return nil, err
 	}
-
 	status, err := rm.ConsumeCPU(token)
 	if err != nil {
-		h.handleError(w, err, "consume cpu status failed", "roomID", roomID)
-		return
+		return nil, err
 	}
-	h.Logger.Debug("consume cpu status", "roomID", roomID, "turnPhase", status.Phase, "planGameEvents", status.Plan, "resolveTurnGameEvents", status.Resolve)
-
-	res := cpuStatusResponse{TurnPhase: status.Phase, PlanGameEvents: status.Plan, ResolveTurnGameEvents: status.Resolve}
-	h.writeJSON(w, http.StatusOK, res, "encode cpu status response failed")
+	h.Logger.Debug("consume cpu status", "roomID", request.RoomID, "turnPhase", status.Phase, "planGameEvents", status.Plan, "resolveTurnGameEvents", status.Resolve)
+	return api.ConsumeCPUStatus200JSONResponse{
+		TurnPhase:             api.CPUTurnPhase(status.Phase.String()),
+		PlanGameEvents:        mapSlice(status.Plan, wireGameEvent),
+		ResolveTurnGameEvents: mapSlice(status.Resolve, wireGameEvent),
+	}, nil
 }
 
-func (h *Handler) handleResetTurn(w http.ResponseWriter, r *http.Request) {
-	roomID := r.PathValue("roomID")
-
-	token, ok := h.requireToken(w, r)
-	if !ok {
-		return
+func (h *Handler) ResetTurn(ctx context.Context, request api.ResetTurnRequestObject) (api.ResetTurnResponseObject, error) {
+	token, err := tokenFromContext(ctx)
+	if err != nil {
+		return nil, err
 	}
-
-	rm, ok := h.requireRoom(w, roomID, "reset turn failed")
-	if !ok {
-		return
+	rm, err := h.Manager.Room(request.RoomID)
+	if err != nil {
+		return nil, err
 	}
-
 	if err := rm.Reset(token); err != nil {
-		h.handleError(w, err, "reset turn failed", "roomID", roomID)
-		return
+		return nil, err
 	}
-
-	w.WriteHeader(http.StatusNoContent)
+	return api.ResetTurn204Response{}, nil
 }
 
-type resolveTurnResponse struct {
-	PlanGameEvents        []engine.GameEvent `json:"planGameEvents"`
-	ResolveTurnGameEvents []engine.GameEvent `json:"resolveTurnGameEvents"`
-}
-
-func (h *Handler) handleResolveTurn(w http.ResponseWriter, r *http.Request) {
-	roomID := r.PathValue("roomID")
-
-	token, ok := h.requireToken(w, r)
-	if !ok {
-		return
+func (h *Handler) ResolveTurn(ctx context.Context, request api.ResolveTurnRequestObject) (api.ResolveTurnResponseObject, error) {
+	token, err := tokenFromContext(ctx)
+	if err != nil {
+		return nil, err
 	}
-
-	rm, ok := h.requireRoom(w, roomID, "resolve turn failed")
-	if !ok {
-		return
+	rm, err := h.Manager.Room(request.RoomID)
+	if err != nil {
+		return nil, err
 	}
-
 	planGameEvents, resolveTurnGameEvents, err := rm.Resolve(token)
 	if err != nil {
-		h.handleError(w, err, "resolve turn failed", "roomID", roomID)
-		return
+		return nil, err
 	}
-	h.Logger.Debug("resolve turn", "roomID", roomID, "planGameEvents", planGameEvents, "resolveTurnGameEvents", resolveTurnGameEvents)
-
-	res := resolveTurnResponse{PlanGameEvents: planGameEvents, ResolveTurnGameEvents: resolveTurnGameEvents}
-	h.writeJSON(w, http.StatusOK, res, "encode resolve turn response failed")
+	h.Logger.Debug("resolve turn", "roomID", request.RoomID, "planGameEvents", planGameEvents, "resolveTurnGameEvents", resolveTurnGameEvents)
+	return api.ResolveTurn200JSONResponse{
+		PlanGameEvents:        mapSlice(planGameEvents, wireGameEvent),
+		ResolveTurnGameEvents: mapSlice(resolveTurnGameEvents, wireGameEvent),
+	}, nil
 }
 
-type surrenderRequest struct {
-	TeamID int `json:"teamId"`
-}
-
-func (h *Handler) handleSurrender(w http.ResponseWriter, r *http.Request) {
-	roomID := r.PathValue("roomID")
-
-	var req surrenderRequest
-	if err := json.UnmarshalRead(r.Body, &req); err != nil {
-		h.Logger.Warn("invalid surrender request format", "error", err)
-		http.Error(w, "Invalid surrenderRequest format", http.StatusBadRequest)
-		return
-	}
-
-	token, ok := h.requireToken(w, r)
-	if !ok {
-		return
-	}
-
-	if req.TeamID != engine.Team1 && req.TeamID != engine.Team2 {
-		h.handleError(w, fmt.Errorf("%w: team must be 1 or 2", room.ErrInvalidConfig), "surrender failed", "roomID", roomID)
-		return
-	}
-
-	rm, ok := h.requireRoom(w, roomID, "surrender failed")
-	if !ok {
-		return
-	}
-
-	gameEvents, err := rm.Surrender(req.TeamID, token)
+func (h *Handler) Surrender(ctx context.Context, request api.SurrenderRequestObject) (api.SurrenderResponseObject, error) {
+	token, err := tokenFromContext(ctx)
 	if err != nil {
-		h.handleError(w, err, "surrender failed", "roomID", roomID)
-		return
+		return nil, err
 	}
-
-	h.writeJSON(w, http.StatusOK, gameEvents, "encode gameEvents failed")
+	teamID := request.Body.TeamID
+	if teamID != engine.Team1 && teamID != engine.Team2 {
+		return nil, fmt.Errorf("%w: team must be 1 or 2", room.ErrInvalidConfig)
+	}
+	rm, err := h.Manager.Room(request.RoomID)
+	if err != nil {
+		return nil, err
+	}
+	gameEvents, err := rm.Surrender(teamID, token)
+	if err != nil {
+		return nil, err
+	}
+	return api.Surrender200JSONResponse(mapSlice(gameEvents, wireGameEvent)), nil
 }
 
-func (h *Handler) handleGetMatchConfig(w http.ResponseWriter, r *http.Request) {
-	roomID := r.PathValue("roomID")
-	rm, ok := h.requireRoom(w, roomID, "get match config failed")
-	if !ok {
-		return
+func (h *Handler) GetMatchConfig(_ context.Context, request api.GetMatchConfigRequestObject) (api.GetMatchConfigResponseObject, error) {
+	rm, err := h.Manager.Room(request.RoomID)
+	if err != nil {
+		return nil, err
 	}
-
 	gameCfg, err := rm.Config()
 	if err != nil {
-		h.handleError(w, err, "get match config failed", "roomID", roomID)
-		return
+		return nil, err
 	}
-
-	h.writeJSON(w, http.StatusOK, &gameCfg, "encode gameConfig failed")
+	return api.GetMatchConfig200JSONResponse(wireGameCfg(gameCfg)), nil
 }
 
-func (h *Handler) handleGetAllowedTiles(w http.ResponseWriter, r *http.Request) {
-	roomID := r.PathValue("roomID")
-	unitIDStr := r.URL.Query().Get("unitId")
-	turnCmdType := r.URL.Query().Get("turnCmdType")
-
-	if unitIDStr == "" || turnCmdType == "" {
-		http.Error(w, "missing required query parameters: unitId and turnCmdType are required", http.StatusBadRequest)
-		return
+func (h *Handler) GetAllowedTiles(_ context.Context, request api.GetAllowedTilesRequestObject) (api.GetAllowedTilesResponseObject, error) {
+	if request.Params.TurnCmdType == "" {
+		return nil, badRequest(missingQueryText)
 	}
-
-	unitID, err := strconv.ParseUint(unitIDStr, 10, 8)
-	if err != nil {
-		http.Error(w, "Invalid unitId parameter", http.StatusBadRequest)
-		return
-	}
-
-	rm, ok := h.requireRoom(w, roomID, "get allowed tiles failed")
+	unitID, ok := engineUnitID(request.Params.UnitID)
 	if !ok {
-		return
+		return nil, badRequest(invalidUnitIDText)
 	}
-
-	allowed, err := rm.AllowedTiles(engine.UnitID(unitID), engine.TurnCmdType(turnCmdType))
+	rm, err := h.Manager.Room(request.RoomID)
 	if err != nil {
-		h.handleError(w, err, "get allowed tiles failed", "roomID", roomID)
-		return
+		return nil, err
 	}
+	allowed, err := rm.AllowedTiles(unitID, engine.TurnCmdType(request.Params.TurnCmdType))
+	if err != nil {
+		return nil, err
+	}
+	return api.GetAllowedTiles200JSONResponse(wireCoordinates(allowed)), nil
+}
 
-	h.writeJSON(w, http.StatusOK, allowed, "encode allowedTiles failed")
+func mapSlice[S, D any](src []S, convert func(S) D) []D {
+	out := make([]D, 0, len(src))
+	for _, v := range src {
+		out = append(out, convert(v))
+	}
+	return out
+}
+
+func nonZeroPtr[T comparable](v T) *T {
+	var zero T
+	if v == zero {
+		return nil
+	}
+	return &v
+}
+
+func engineUnitID(n int) (engine.UnitID, bool) {
+	if n < 0 || n > maxWireUnitID {
+		return 0, false
+	}
+	return engine.UnitID(n & maxWireUnitID), true
+}
+
+func wireCoordinate(c engine.Coordinate) api.Coordinate {
+	return api.Coordinate{X: c.X, Y: c.Y}
+}
+
+func wireCoordinates(cs []engine.Coordinate) []api.Coordinate {
+	return mapSlice(cs, wireCoordinate)
+}
+
+func wireCoordinatePtr(c *engine.Coordinate) *api.Coordinate {
+	if c == nil {
+		return nil
+	}
+	w := wireCoordinate(*c)
+	return &w
+}
+
+func wireSkills(names []string) []api.SkillType {
+	return mapSlice(names, func(name string) api.SkillType { return api.SkillType(name) })
+}
+
+func wireGameEvent(evt engine.GameEvent) api.GameEvent {
+	out := api.GameEvent{
+		Type:         api.GameEvtType(evt.Type),
+		UnitID:       int(evt.UnitID),
+		NewHp:        evt.NewHP,
+		Countdown:    evt.Countdown,
+		Position:     wireCoordinatePtr(evt.Position),
+		From:         wireCoordinatePtr(evt.From),
+		To:           wireCoordinatePtr(evt.To),
+		BombID:       nonZeroPtr(int64(evt.BombID)),
+		SoftBlockID:  nonZeroPtr(evt.SoftBlockID),
+		ItemID:       nonZeroPtr(evt.ItemID),
+		Range:        nonZeroPtr(evt.Range),
+		WinnerTeamID: nonZeroPtr(evt.WinnerTeamID),
+	}
+	if len(evt.AffectedPositions) > 0 {
+		affected := wireCoordinates(evt.AffectedPositions)
+		out.AffectedPositions = &affected
+	}
+	return out
+}
+
+func wireTile(t engine.Tile) api.Tile {
+	return api.Tile{
+		Type:         api.TerrainType(t.Type.String()),
+		OccupantType: api.OccupantType(t.OccupantType.String()),
+		OccupantID:   t.OccupantID,
+	}
+}
+
+func wireUnit(u *engine.Unit) api.Unit {
+	return api.Unit{
+		ID:           int(u.ID),
+		Type:         u.Type.Name,
+		Position:     wireCoordinate(u.Position),
+		Speed:        u.Speed,
+		BombMaxRange: u.BombMaxRange,
+		BombPower:    u.BombPower,
+		MaxBombCount: u.MaxBombCount,
+		BombUsed:     u.BombUsed,
+		Team:         u.Team,
+		Hp:           u.HP,
+		Skills:       wireSkills(u.Skills.Names()),
+		HasMoved:     u.HasMoved,
+		HasUsedSkill: u.HasUsedSkill,
+	}
+}
+
+func wireBomb(b *engine.Bomb) api.Bomb {
+	return api.Bomb{
+		ID:        int64(b.ID),
+		OwnerID:   int(b.OwnerID),
+		Position:  wireCoordinate(b.Position),
+		Range:     b.Range,
+		Countdown: b.Countdown,
+	}
+}
+
+func wireSoftBlock(sb *engine.SoftBlock) api.SoftBlock {
+	return api.SoftBlock{ID: sb.ID, Position: wireCoordinate(sb.Position)}
+}
+
+func wireTurnCommand(cmd engine.TurnCommand) api.TurnCommand {
+	return api.TurnCommand{Type: api.TurnCmdType(cmd.Type), UnitID: int(cmd.UnitID), Target: wireCoordinate(cmd.Target)}
+}
+
+func wireGameState(gs *engine.GameState) api.GameState {
+	return api.GameState{
+		Turn:            gs.Turn,
+		InSuddenDeath:   gs.InSuddenDeath,
+		ActiveTeam:      gs.ActiveTeam,
+		Grid:            mapSlice(gs.Grid, func(row []engine.Tile) []api.Tile { return mapSlice(row, wireTile) }),
+		Units:           mapSlice(slices.Sorted(maps.Keys(gs.Units)), func(id engine.UnitID) api.Unit { return wireUnit(gs.Units[id]) }),
+		Bombs:           mapSlice(slices.Sorted(maps.Keys(gs.Bombs)), func(id engine.BombID) api.Bomb { return wireBomb(gs.Bombs[id]) }),
+		SoftBlocks:      mapSlice(slices.Sorted(maps.Keys(gs.SoftBlocks)), func(id int) api.SoftBlock { return wireSoftBlock(gs.SoftBlocks[id]) }),
+		TurnCommands:    mapSlice(gs.TurnCommands, wireTurnCommand),
+		TurnStartEvents: mapSlice(gs.TurnStartEvents, wireGameEvent),
+	}
+}
+
+func wireTeamSlot(slot engine.TeamSlot) api.TeamSlot {
+	return api.TeamSlot{Archetype: slot.Archetype, Role: api.UnitRole(slot.Role.String())}
+}
+
+func wireGameCfg(cfg engine.GameCfg) api.GameCfg {
+	return api.GameCfg{
+		VsCPU:          cfg.VSCpu,
+		StagePreset:    cfg.StagePreset,
+		P1Slots:        mapSlice(cfg.P1Slots, wireTeamSlot),
+		P2Slots:        mapSlice(cfg.P2Slots, wireTeamSlot),
+		MaxTurns:       cfg.MaxTurns,
+		AllowResetTurn: cfg.AllowResetTurn,
+	}
+}
+
+func wireCatalog(archetypes []engine.Archetype, stagePresets []engine.StagePreset) api.Catalog {
+	return api.Catalog{
+		Archetypes: mapSlice(archetypes, func(a engine.Archetype) api.Archetype {
+			return api.Archetype{Name: a.Name, Speed: a.BaseSpeed, BombMaxRange: a.BombMaxRange, Skills: wireSkills(a.PresetSkills.Names())}
+		}),
+		StagePresets: mapSlice(stagePresets, func(p engine.StagePreset) api.StagePreset {
+			return api.StagePreset{Name: p.Name, Description: p.Description, Width: p.Width, Height: p.Height, MaxTurns: p.MaxTurns}
+		}),
+	}
+}
+
+func wireMatchCreated(tokens [2]string) api.CreateMatchResponse {
+	return api.CreateMatchResponse{Success: true, PlayerTokens: tokens[:]}
+}
+
+func engineTurnCommand(cmd api.TurnCommand) (engine.TurnCommand, error) {
+	unitID, ok := engineUnitID(cmd.UnitID)
+	if !ok {
+		return engine.TurnCommand{}, badRequest(invalidTurnCmdText)
+	}
+	return engine.TurnCommand{
+		Type:   engine.TurnCmdType(cmd.Type),
+		UnitID: unitID,
+		Target: engine.Coordinate{X: cmd.Target.X, Y: cmd.Target.Y},
+	}, nil
+}
+
+func engineTeamSlots(slots []api.TeamSlot) ([]engine.TeamSlot, error) {
+	out := make([]engine.TeamSlot, 0, len(slots))
+	for _, slot := range slots {
+		var role engine.UnitRole
+		if slot.Role != "" {
+			if err := role.UnmarshalText([]byte(slot.Role)); err != nil {
+				return nil, badRequest(invalidConfigText)
+			}
+		}
+		out = append(out, engine.TeamSlot{Archetype: slot.Archetype, Role: role})
+	}
+	return out, nil
+}
+
+func engineGameCfg(cfg api.GameCfg) (engine.GameCfg, error) {
+	p1Slots, err := engineTeamSlots(cfg.P1Slots)
+	if err != nil {
+		return engine.GameCfg{}, err
+	}
+	p2Slots, err := engineTeamSlots(cfg.P2Slots)
+	if err != nil {
+		return engine.GameCfg{}, err
+	}
+	return engine.GameCfg{
+		VSCpu:          cfg.VsCPU,
+		StagePreset:    cfg.StagePreset,
+		P1Slots:        p1Slots,
+		P2Slots:        p2Slots,
+		MaxTurns:       cfg.MaxTurns,
+		AllowResetTurn: cfg.AllowResetTurn,
+	}, nil
 }

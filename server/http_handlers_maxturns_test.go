@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bomb-srpg/server/api"
 	"encoding/json/v2"
 	"net/http"
 	"testing"
@@ -22,14 +23,14 @@ func TestHandleCreateMatch_MaxTurnsBound(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			roomID, _, h := newTestRoom(t)
 
-			cfg := validGameCfg()
+			cfg := validWireGameCfg()
 			cfg.MaxTurns = tt.maxTurns
-			body, err := json.Marshal(createMatchRequest{GameCfg: cfg})
+			body, err := json.Marshal(api.CreateMatchRequest{GameCfg: cfg})
 			if err != nil {
 				t.Fatalf("Failed to encode request: %v", err)
 			}
 
-			rr := doRequest(t, h.handleCreateMatch, "POST /api/match-rooms/{roomID}/match", http.MethodPost, "/api/match-rooms/"+roomID+"/match", string(body), "")
+			rr := doRequest(t, h, http.MethodPost, "/api/match-rooms/"+roomID+"/match", string(body), "")
 
 			if rr.Code != tt.want {
 				t.Errorf("got status %d, want %d (body %q)", rr.Code, tt.want, rr.Body.String())

@@ -1,20 +1,27 @@
 package server
 
-import "net/http"
+import (
+	"bomb-srpg/server/api"
+	"encoding/json/v2"
+	"net/http"
+
+	"github.com/oapi-codegen/runtime"
+)
+
+type strictJSONCodec struct {
+	runtime.StdJSONCodec
+}
+
+func (strictJSONCodec) Marshal(v any) ([]byte, error) { return json.Marshal(v) }
+
+func (strictJSONCodec) Unmarshal(data []byte, v any) error { return json.Unmarshal(data, v) }
+
+func InstallJSONCodec() { runtime.SetJSONCodec(strictJSONCodec{}) }
 
 func RegisterRoutes(mux *http.ServeMux, h *Handler) {
-	mux.HandleFunc("GET /api/health", h.handleHealthCheck)
-	mux.HandleFunc("GET /api/catalog", h.handleGetCatalog)
-	mux.HandleFunc("POST /api/match-rooms", h.handleCreateMatchRoom)
-	mux.HandleFunc("POST /api/match-rooms/{roomID}/match", h.handleCreateMatch)
-	mux.HandleFunc("POST /api/match-rooms/{roomID}/rematch", h.handleRematch)
-	mux.HandleFunc("DELETE /api/match-rooms/{roomID}/match", h.handleDeleteMatch)
-	mux.HandleFunc("GET /api/match-rooms/{roomID}/match/state", h.handleGetMatchState)
-	mux.HandleFunc("POST /api/match-rooms/{roomID}/match/turn-commands", h.handleSubmitTurnCommand)
-	mux.HandleFunc("POST /api/match-rooms/{roomID}/match/cpu-status/consume", h.handleConsumeCPUStatus)
-	mux.HandleFunc("POST /api/match-rooms/{roomID}/match/reset", h.handleResetTurn)
-	mux.HandleFunc("POST /api/match-rooms/{roomID}/match/resolve", h.handleResolveTurn)
-	mux.HandleFunc("POST /api/match-rooms/{roomID}/match/surrender", h.handleSurrender)
-	mux.HandleFunc("GET /api/match-rooms/{roomID}/match/config", h.handleGetMatchConfig)
-	mux.HandleFunc("GET /api/match-rooms/{roomID}/match/allowed-tiles", h.handleGetAllowedTiles)
+	strict := api.NewStrictHandlerWithOptions(h, []api.StrictMiddlewareFunc{h.withToken}, api.StrictHTTPServerOptions{
+		RequestErrorHandlerFunc:  h.requestError,
+		ResponseErrorHandlerFunc: h.responseError,
+	})
+	api.HandlerWithOptions(strict, api.StdHTTPServerOptions{BaseRouter: mux, ErrorHandlerFunc: h.bindError})
 }

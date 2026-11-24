@@ -3,16 +3,14 @@ package server
 import (
 	"bomb-srpg/engine"
 	"bomb-srpg/room"
+	"bomb-srpg/server/api"
 	"bytes"
-	"encoding"
 	"encoding/json/v2"
 	"fmt"
 	"maps"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"reflect"
-	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -177,40 +175,6 @@ func TestOpenAPIValidatorRejects(t *testing.T) {
 	}
 }
 
-func TestOpenAPIOperationsMatchRoutes(t *testing.T) {
-	src, err := os.ReadFile("routes.go")
-	if err != nil {
-		t.Fatal(err)
-	}
-	re := regexp.MustCompile(`mux\.HandleFunc\("([A-Z]+) (/[^"]*)"`)
-	registered := map[string]bool{}
-	for _, m := range re.FindAllSubmatch(src, -1) {
-		registered[string(m[1])+" "+string(m[2])] = true
-	}
-
-	doc := loadOpenAPISpec(t)
-	described := map[string]bool{}
-	for path, item := range doc.Paths.Map() {
-		for method := range item.Operations() {
-			described[method+" "+path] = true
-		}
-	}
-
-	for _, op := range slices.Sorted(maps.Keys(registered)) {
-		if !described[op] {
-			t.Errorf("%s is registered in routes.go but missing from the spec", op)
-		}
-	}
-	for _, op := range slices.Sorted(maps.Keys(described)) {
-		if !registered[op] {
-			t.Errorf("%s is in the spec but not registered in routes.go", op)
-		}
-	}
-	if len(registered) == 0 {
-		t.Fatal("no routes parsed from routes.go")
-	}
-}
-
 type call struct {
 	method    string
 	path      string
@@ -300,17 +264,13 @@ func (r *openAPIRig) newRoom() string {
 	return "/api/match-rooms/" + res.ID
 }
 
-func (r *openAPIRig) startMatch(room string, cfg engine.GameCfg) [2]string {
+func (r *openAPIRig) startMatch(room string, cfg api.GameCfg) [2]string {
 	r.t.Helper()
-	body := marshalBody(r.t, struct {
-		GameCfg engine.GameCfg `json:"gameCfg"`
-	}{cfg})
+	body := marshalBody(r.t, api.CreateMatchRequest{GameCfg: cfg})
 	raw := r.do(call{method: http.MethodPost, path: room + "/match", body: body}, http.StatusCreated)
-	var res struct {
-		PlayerTokens [2]string `json:"playerTokens"`
-	}
+	var res api.CreateMatchResponse
 	decodeBody(r.t, raw, &res)
-	return res.PlayerTokens
+	return [2]string(res.PlayerTokens)
 }
 
 type openAPIState struct {
@@ -331,7 +291,7 @@ func (r *openAPIRig) resolveActiveTeam(room string, tokens [2]string) {
 	r.do(call{method: http.MethodPost, path: room + "/match/resolve", auth: bearer(token)}, http.StatusOK)
 }
 
-func (r *openAPIRig) submit(room, token string, cmd engine.TurnCommand, want int) {
+func (r *openAPIRig) submit(room, token string, cmd api.TurnCommand, want int) {
 	r.t.Helper()
 	r.do(call{method: http.MethodPost, path: room + "/match/turn-commands", auth: bearer(token), body: marshalBody(r.t, cmd)}, want)
 }
@@ -340,15 +300,11 @@ func (r *openAPIRig) staticCases() {
 	t := r.t
 	t.Helper()
 	room := r.newRoom()
-	tokens := r.startMatch(room, validGameCfg())
+	tokens := r.startMatch(room, validWireGameCfg())
 	fighter := engine.NewUnitID(1, 1)
-	move := marshalBody(t, engine.NewMoveCommand(fighter, engine.Coordinate{X: 2, Y: 8}))
-	surrender := marshalBody(t, struct {
-		TeamID int `json:"teamId"`
-	}{1})
-	createBody := marshalBody(t, struct {
-		GameCfg engine.GameCfg `json:"gameCfg"`
-	}{validGameCfg()})
+	move := marshalBody(t, wireMoveCmd(fighter, 2, 8))
+	surrender := marshalBody(t, api.SurrenderRequest{TeamID: 1})
+	createBody := marshalBody(t, api.CreateMatchRequest{GameCfg: validWireGameCfg()})
 
 	tokenRoutes := []struct {
 		method    string
@@ -395,19 +351,15 @@ func (r *openAPIRig) staticCases() {
 	}
 
 	empty := r.newRoom()
-	unknownArchetype := validGameCfg()
+	unknownArchetype := validWireGameCfg()
 	unknownArchetype.P1Slots[1].Archetype = "Nope"
 	badRequests := []call{
-		{method: http.MethodPost, path: empty + "/match", body: marshalBody(t, struct {
-			GameCfg engine.GameCfg `json:"gameCfg"`
-		}{unknownArchetype})},
+		{method: http.MethodPost, path: empty + "/match", body: marshalBody(t, api.CreateMatchRequest{GameCfg: unknownArchetype})},
 		{method: http.MethodPost, path: empty + "/match", body: []byte("{"), malformed: true},
-		{method: http.MethodPost, path: empty + "/match", body: marshalBody(t, struct {
-			GameCfg engine.GameCfg `json:"gameCfg"`
-		}{engine.GameCfg{StagePreset: "Nope", P1Slots: []engine.TeamSlot{}, P2Slots: []engine.TeamSlot{}}})},
+		{method: http.MethodPost, path: empty + "/match", body: marshalBody(t, api.CreateMatchRequest{GameCfg: api.GameCfg{StagePreset: "Nope", P1Slots: []api.TeamSlot{}, P2Slots: []api.TeamSlot{}}})},
 		{method: http.MethodPost, path: room + "/match/turn-commands", auth: bearer(tokens[0]), body: []byte("{"), malformed: true},
-		{method: http.MethodPost, path: room + "/match/turn-commands", auth: bearer(tokens[0]), body: marshalBody(t, engine.NewMoveCommand(0, engine.Coordinate{X: 2, Y: 8}))},
-		{method: http.MethodPost, path: room + "/match/turn-commands", auth: bearer(tokens[0]), body: marshalBody(t, engine.NewMoveCommand(engine.NewUnitID(3, 1), engine.Coordinate{X: 2, Y: 8}))},
+		{method: http.MethodPost, path: room + "/match/turn-commands", auth: bearer(tokens[0]), body: marshalBody(t, wireMoveCmd(0, 2, 8))},
+		{method: http.MethodPost, path: room + "/match/turn-commands", auth: bearer(tokens[0]), body: marshalBody(t, wireMoveCmd(engine.NewUnitID(3, 1), 2, 8))},
 		{method: http.MethodPost, path: room + "/match/surrender", auth: bearer(tokens[0]), body: []byte("{"), malformed: true},
 		{method: http.MethodPost, path: room + "/match/surrender", auth: bearer(tokens[0]), body: []byte(`{"teamId":3}`)},
 		{method: http.MethodGet, path: room + "/match/allowed-tiles?turnCmdType=move", malformed: true},
@@ -419,7 +371,7 @@ func (r *openAPIRig) staticCases() {
 
 	conflicts := []call{
 		{method: http.MethodPost, path: room + "/match", body: createBody},
-		{method: http.MethodPost, path: room + "/match/turn-commands", auth: bearer(tokens[0]), body: marshalBody(t, engine.NewMoveCommand(fighter, engine.Coordinate{X: 0, Y: 0}))},
+		{method: http.MethodPost, path: room + "/match/turn-commands", auth: bearer(tokens[0]), body: marshalBody(t, wireMoveCmd(fighter, 0, 0))},
 		{method: http.MethodDelete, path: room + "/match", auth: bearer(tokens[0])},
 		{method: http.MethodGet, path: room + "/match/allowed-tiles?unitId=200&turnCmdType=move"},
 		{method: http.MethodGet, path: room + "/match/allowed-tiles?unitId=17&turnCmdType=nope", malformed: true},
@@ -436,7 +388,7 @@ func (r *openAPIRig) lifecycle() {
 	r.do(call{method: http.MethodGet, path: "/api/catalog"}, http.StatusOK)
 
 	room := r.newRoom()
-	cfg := validGameCfg()
+	cfg := validWireGameCfg()
 	cfg.StagePreset = "Divided"
 	cfg.MaxTurns = 20
 	cfg.AllowResetTurn = true
@@ -447,15 +399,15 @@ func (r *openAPIRig) lifecycle() {
 	r.do(call{method: http.MethodGet, path: fmt.Sprintf("%s/match/allowed-tiles?unitId=%d&turnCmdType=move", room, fighter)}, http.StatusOK)
 	r.do(call{method: http.MethodPost, path: room + "/rematch", auth: bearer(tokens[0])}, http.StatusCreated)
 
-	r.submit(room, tokens[0], engine.NewMoveCommand(fighter, engine.Coordinate{X: 2, Y: 8}), http.StatusOK)
-	r.submit(room, tokens[0], engine.NewMoveCommand(fighter, engine.Coordinate{X: 3, Y: 8}), http.StatusConflict)
+	r.submit(room, tokens[0], wireMoveCmd(fighter, 2, 8), http.StatusOK)
+	r.submit(room, tokens[0], wireMoveCmd(fighter, 3, 8), http.StatusConflict)
 	r.do(call{method: http.MethodPost, path: room + "/match/reset", auth: bearer(tokens[0])}, http.StatusNoContent)
-	r.submit(room, tokens[0], engine.NewMoveCommand(fighter, engine.Coordinate{X: 2, Y: 8}), http.StatusOK)
+	r.submit(room, tokens[0], wireMoveCmd(fighter, 2, 8), http.StatusOK)
 	r.resolveActiveTeam(room, tokens)
 	r.resolveActiveTeam(room, tokens)
 
-	r.submit(room, tokens[0], engine.NewMoveCommand(fighter, engine.Coordinate{X: 2, Y: 6}), http.StatusOK)
-	r.submit(room, tokens[0], engine.NewPlaceBombCommand(fighter, engine.Coordinate{X: 2, Y: 5}), http.StatusOK)
+	r.submit(room, tokens[0], wireMoveCmd(fighter, 2, 6), http.StatusOK)
+	r.submit(room, tokens[0], wirePlaceBombCmd(fighter, 2, 5), http.StatusOK)
 	if len(r.state(room).Bombs) == 0 {
 		t.Error("bombs is empty after a bomb was placed")
 	}
@@ -488,7 +440,9 @@ func (r *openAPIRig) vsCPU() {
 		WithSpawner(hold.spawn),
 	)
 	room := r.newRoom()
-	tokens := r.startMatch(room, vsCpuGameCfg())
+	cfg := validWireGameCfg()
+	cfg.VsCPU = true
+	tokens := r.startMatch(room, cfg)
 	r.do(call{method: http.MethodPost, path: room + "/match/resolve", auth: bearer(tokens[0])}, http.StatusOK)
 
 	consume := call{method: http.MethodPost, path: room + "/match/cpu-status/consume", auth: bearer(tokens[0])}
@@ -502,7 +456,7 @@ func (r *openAPIRig) vsCPU() {
 	if got := phase(); got != "TurnPhasePlanning" {
 		t.Errorf("first consume phase = %q, want TurnPhasePlanning", got)
 	}
-	r.submit(room, tokens[1], engine.NewMoveCommand(cpuUnit, engine.Coordinate{X: 5, Y: 1}), http.StatusConflict)
+	r.submit(room, tokens[1], wireMoveCmd(cpuUnit, 5, 1), http.StatusConflict)
 	r.do(call{method: http.MethodPost, path: room + "/match/reset", auth: bearer(tokens[1])}, http.StatusConflict)
 	r.do(call{method: http.MethodPost, path: room + "/match/resolve", auth: bearer(tokens[1])}, http.StatusConflict)
 
@@ -549,19 +503,15 @@ func (r *openAPIRig) assertComplete() {
 
 func textEnumNames[T interface {
 	~int
-	encoding.TextMarshaler
-}](t *testing.T) []string {
-	t.Helper()
+	fmt.Stringer
+}]() []string {
 	var names []string
 	for v := T(0); ; v++ {
-		text, err := v.MarshalText()
-		if err != nil {
-			t.Fatalf("marshal %T(%d): %v", v, v, err)
-		}
-		if strings.HasSuffix(string(text), "Unknown") {
+		name := v.String()
+		if strings.HasSuffix(name, "Unknown") {
 			return names
 		}
-		names = append(names, string(text))
+		names = append(names, name)
 	}
 }
 
@@ -573,8 +523,10 @@ func engineSkillNames(t *testing.T) []string {
 	}
 	all := reflect.New(field.Type).Elem()
 	all.SetUint(1<<32 - 1)
-	var names []string
-	decodeBody(t, marshalBody(t, all.Interface()), &names)
+	names, ok := reflect.TypeAssert[[]string](all.MethodByName("Names").Call(nil)[0])
+	if !ok {
+		t.Fatal("PresetSkills.Names() does not return []string")
+	}
 	return names
 }
 
@@ -599,10 +551,10 @@ func (r *openAPIRig) assertEnums() {
 	t := r.t
 	t.Helper()
 	want := map[string][]string{
-		"TerrainType":  textEnumNames[engine.TerrainType](t),
-		"OccupantType": textEnumNames[engine.OccupantType](t),
-		"UnitRole":     textEnumNames[engine.UnitRole](t),
-		"CPUTurnPhase": textEnumNames[room.CPUTurnPhase](t),
+		"TerrainType":  textEnumNames[engine.TerrainType](),
+		"OccupantType": textEnumNames[engine.OccupantType](),
+		"UnitRole":     textEnumNames[engine.UnitRole](),
+		"CPUTurnPhase": textEnumNames[room.CPUTurnPhase](),
 		"SkillType":    engineSkillNames(t),
 		"TurnCmdType":  {string(engine.TurnCmdMove), string(engine.TurnCmdPlaceBomb)},
 		"GameEvtType":  slices.Sorted(maps.Keys(r.kinds)),

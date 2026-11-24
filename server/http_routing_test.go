@@ -2,9 +2,11 @@ package server
 
 import (
 	"bomb-srpg/engine"
+	"bomb-srpg/server/api"
 	"bytes"
 	"encoding/json/v2"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -26,6 +28,7 @@ func TestHTTPRouting(t *testing.T) {
 		method     string
 		path       string
 		wantStatus int
+		wantAllow  string
 	}{
 		{
 			name:       "GET /api/health",
@@ -38,6 +41,7 @@ func TestHTTPRouting(t *testing.T) {
 			method:     "POST",
 			path:       "/api/health",
 			wantStatus: http.StatusMethodNotAllowed,
+			wantAllow:  "GET, HEAD",
 		},
 		{
 			name:       "GET /api/catalog",
@@ -311,16 +315,16 @@ func TestHTTPRouting(t *testing.T) {
 		},
 	}
 
-	gameCfgBody, _ := json.Marshal(engine.GameCfg{
+	gameCfgBody, _ := json.Marshal(api.CreateMatchRequest{GameCfg: api.GameCfg{
 		StagePreset: "Plain",
-		P1Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}},
-		P2Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}},
+		P1Slots:     []api.TeamSlot{{Archetype: "King", Role: api.King}},
+		P2Slots:     []api.TeamSlot{{Archetype: "King", Role: api.King}},
 		MaxTurns:    10,
-	})
+	}})
 
-	turnCmdBody, _ := json.Marshal(engine.NewMoveCommand(engine.NewUnitID(1, 0), engine.Coordinate{X: 4, Y: 7}))
+	turnCmdBody, _ := json.Marshal(wireMoveCmd(engine.NewUnitID(1, 0), 4, 7))
 
-	surrenderReqBody, _ := json.Marshal(surrenderRequest{TeamID: 1})
+	surrenderReqBody, _ := json.Marshal(api.SurrenderRequest{TeamID: 1})
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -360,7 +364,45 @@ func TestHTTPRouting(t *testing.T) {
 				t.Errorf("Status code: got %d want %d", resp.StatusCode, tt.wantStatus)
 			}
 
-			_, _ = io.Copy(io.Discard, resp.Body)
+			respBody, _ := io.ReadAll(resp.Body)
+			if tt.wantAllow == "" {
+				return
+			}
+			if got := resp.Header.Get("Allow"); got != tt.wantAllow {
+				t.Errorf("Allow = %q, want %q", got, tt.wantAllow)
+			}
+			if got, want := string(respBody), "Method Not Allowed\n"; got != want {
+				t.Errorf("body = %q, want %q", got, want)
+			}
+		})
+	}
+}
+
+func TestSecurityHeadersOnEveryResponse(t *testing.T) {
+	mux := http.NewServeMux()
+	RegisterRoutes(mux, NewHandler(NewServerStateManager()))
+	logger := slog.New(slog.DiscardHandler)
+	handler := SecurityHeaders(RecoverPanic(logger, mux))
+
+	tests := []struct {
+		name       string
+		path       string
+		wantStatus int
+	}{
+		{"success", "/api/health", http.StatusOK},
+		{"error", "/api/match-rooms/NONEXISTENT/match/state", http.StatusNotFound},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rr := httptest.NewRecorder()
+			handler.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, tt.path, nil))
+
+			if rr.Code != tt.wantStatus {
+				t.Fatalf("status = %d, want %d", rr.Code, tt.wantStatus)
+			}
+			if got, want := rr.Header().Get("X-Content-Type-Options"), "nosniff"; got != want {
+				t.Errorf("X-Content-Type-Options = %q, want %q", got, want)
+			}
 		})
 	}
 }
