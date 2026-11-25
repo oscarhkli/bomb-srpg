@@ -42,6 +42,17 @@ func unitAlreadyMoved(unitID engine.UnitID) matchArrangement {
 	}
 }
 
+func unitWithHP(unitID engine.UnitID, hp int) matchArrangement {
+	return func(match *engine.Match) error {
+		unit, ok := match.WorkingState.Units[unitID]
+		if !ok {
+			return errors.New("unit not found")
+		}
+		unit.HP = hp
+		return nil
+	}
+}
+
 func bombPlacedBy(unitID engine.UnitID) matchArrangement {
 	return func(match *engine.Match) error {
 		unit, ok := match.WorkingState.Units[unitID]

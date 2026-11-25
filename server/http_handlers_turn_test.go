@@ -459,7 +459,7 @@ func TestHandleResolveTurn(t *testing.T) {
 
 	t.Run("Blast events keep affectedPositions and newHp on the wire", func(t *testing.T) {
 		unitID := engine.NewUnitID(1, 0)
-		roomID, playerTokens, _, h := createTestRoomWithMatch(t, arrangedMatch(bombAboutToExplode(unitID)))
+		roomID, playerTokens, _, h := createTestRoomWithMatch(t, arrangedMatch(unitWithHP(unitID, 2), bombAboutToExplode(unitID)))
 
 		rr := doRequest(t, h, "POST", "/api/match-rooms/"+roomID+"/match/resolve", "", playerTokens[0])
 
@@ -481,8 +481,8 @@ func TestHandleResolveTurn(t *testing.T) {
 		if affected, _ := eventOf("bombExploded")["affectedPositions"].([]any); len(affected) == 0 {
 			t.Errorf("bombExploded affectedPositions is empty or missing")
 		}
-		if newHp, ok := eventOf("unitDamaged")["newHp"].(float64); !ok || newHp != 0 {
-			t.Errorf("unitDamaged newHp = %#v, want 0", eventOf("unitDamaged")["newHp"])
+		if newHp, ok := eventOf("unitDamaged")["newHp"].(float64); !ok || newHp != 1 {
+			t.Errorf("unitDamaged newHp = %#v, want 1", eventOf("unitDamaged")["newHp"])
 		}
 	})
 }
