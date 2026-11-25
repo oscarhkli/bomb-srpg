@@ -1,7 +1,6 @@
 package engine
 
 import (
-	"encoding/json/v2"
 	"slices"
 	"testing"
 )
@@ -123,30 +122,29 @@ func TestUnitRole_UnmarshalText(t *testing.T) {
 		want    UnitRole
 		wantErr bool
 	}{
-		{"Role Normal", `"Normal"`, RoleNormal, false},
-		{"Role King", `"King"`, RoleKing, false},
-		{"Role Boss", `"Boss"`, RoleBoss, false},
-		{"Role Unknown", `"ABC"`, RoleNormal, true},
-		{"Wrong JSON Type", `2`, RoleNormal, true},
+		{"Role Normal", "Normal", RoleNormal, false},
+		{"Role King", "King", RoleKing, false},
+		{"Role Boss", "Boss", RoleBoss, false},
+		{"Role Unknown", "ABC", RoleNormal, true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var got UnitRole
-			err := json.Unmarshal([]byte(tt.input), &got)
+			err := got.UnmarshalText([]byte(tt.input))
 
 			if tt.wantErr {
 				if err == nil {
-					t.Fatalf("Unmarshal(%s) error = nil, want error", tt.input)
+					t.Fatalf("UnmarshalText(%q) error = nil, want error", tt.input)
 				}
 				return
 			}
 
 			if err != nil {
-				t.Fatalf("Unmarshal(%s) unexpected error: %v", tt.input, err)
+				t.Fatalf("UnmarshalText(%q) unexpected error: %v", tt.input, err)
 			}
 			if got != tt.want {
-				t.Errorf("Unmarshal(%s) = %v, want %v", tt.input, got, tt.want)
+				t.Errorf("UnmarshalText(%q) = %v, want %v", tt.input, got, tt.want)
 			}
 		})
 	}

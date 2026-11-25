@@ -9,9 +9,9 @@ const (
 
 // TurnCommand's Type determines the action; UnitID and Target are always required.
 type TurnCommand struct {
-	Type   TurnCmdType `json:"type"`
-	UnitID UnitID      `json:"unitId"`
-	Target Coordinate  `json:"target"`
+	Type   TurnCmdType
+	UnitID UnitID
+	Target Coordinate
 }
 
 func NewMoveCommand(unitID UnitID, target Coordinate) TurnCommand {
