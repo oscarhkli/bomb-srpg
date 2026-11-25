@@ -28,10 +28,6 @@ func (c CPUTurnPhase) String() string {
 	}
 }
 
-func (c CPUTurnPhase) MarshalText() ([]byte, error) {
-	return []byte(c.String()), nil
-}
-
 type cpuTurn struct {
 	phase   CPUTurnPhase
 	plan    []engine.GameEvent

@@ -2,7 +2,6 @@ package room
 
 import (
 	"bomb-srpg/engine"
-	"encoding/json/v2"
 	"errors"
 	"reflect"
 	"slices"
@@ -141,29 +140,6 @@ func TestCPUTurnPhaseString(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := tt.turnPhase.String(); got != tt.want {
 				t.Errorf("CPUTurnPhase.String() = %q, want %q", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestCPUTurnPhaseEncoding(t *testing.T) {
-	tests := []struct {
-		name  string
-		phase CPUTurnPhase
-		want  string
-	}{
-		{"ready", TurnPhaseReady, `"TurnPhaseReady"`},
-		{"unknown value", CPUTurnPhase(99), `"TurnPhaseUnknown"`},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := json.Marshal(tt.phase)
-			if err != nil {
-				t.Fatalf("Marshal() error = %v", err)
-			}
-			if string(got) != tt.want {
-				t.Errorf("Marshal() = %s, want %s", got, tt.want)
 			}
 		})
 	}
