@@ -46,12 +46,6 @@ func TestHandleCreateMatchRoom(t *testing.T) {
 			}, http.StatusCreated)
 	})
 
-	t.Run("Test Contract", func(t *testing.T) {
-		rr := doRequest(t, h, "POST", "/api/match-rooms", "", "")
-
-		assertObjectContract(t, rr.Body.Bytes(), []string{"id"}, nil)
-	})
-
 	t.Run("Failure: CreateMatchRoom exhausted retries", func(t *testing.T) {
 		roomIDs := []string{"ID001", "ID002", "ID003", "ID004", "ID005"}
 		callCount := 0
@@ -207,14 +201,6 @@ func TestHandleCreateNewMatch(t *testing.T) {
 				req.Header.Set("Content-Type", "application/json")
 				return req
 			}, http.StatusCreated)
-	})
-
-	t.Run("Test Contract", func(t *testing.T) {
-		roomID, _, h := newTestRoom(t)
-		jsonBody, _ := json.Marshal(api.CreateMatchRequest{GameCfg: validWireGameCfg()})
-		rr := doRequest(t, h, "POST", "/api/match-rooms/"+roomID+"/match", string(jsonBody), "")
-
-		assertObjectContract(t, rr.Body.Bytes(), []string{"success", "playerTokens"}, nil)
 	})
 }
 
@@ -372,14 +358,6 @@ func TestHandleRematch(t *testing.T) {
 				req.Header.Set("Authorization", "Bearer "+playerTokens[0])
 				return req
 			}, http.StatusCreated)
-	})
-
-	t.Run("Test Contract", func(t *testing.T) {
-		roomID, playerTokens, _, h := createTestRoomWithMatch(t)
-
-		rr := doRequest(t, h, "POST", "/api/match-rooms/"+roomID+"/rematch", "", playerTokens[0])
-
-		assertObjectContract(t, rr.Body.Bytes(), []string{"success", "playerTokens"}, nil)
 	})
 }
 

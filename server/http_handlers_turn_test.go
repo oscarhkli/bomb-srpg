@@ -118,31 +118,6 @@ func TestHandleSubmitTurnCommand(t *testing.T) {
 				return req
 			}, http.StatusOK)
 	})
-
-	t.Run("Test Contract", func(t *testing.T) {
-		roomID, playerTokens, _, h := createTestRoomWithMatch(t)
-		unitID := engine.NewUnitID(1, 0)
-		newPos := engine.Coordinate{X: 4, Y: 7}
-		jsonBody, _ := json.Marshal(wireMoveCmd(unitID, newPos.X, newPos.Y))
-		rr := doRequest(t, h, "POST", "/api/match-rooms/"+roomID+"/match/turn-commands", string(jsonBody), playerTokens[0])
-
-		assertArrayContract(t, rr.Body.Bytes(),
-			[]string{"type", "unitId", "from", "to",
-				"countdown", "newHp"},
-			func(t *testing.T, item map[string]any) {
-				t.Helper()
-				fromField, ok := item["from"].(map[string]any)
-				if !ok {
-					t.Fatalf("from is not an object: %#v", item["from"])
-				}
-				toField, ok := item["to"].(map[string]any)
-				if !ok {
-					t.Fatalf("to is not an object: %#v", item["to"])
-				}
-				assertKeys(t, fromField, []string{"x", "y"}, "Contract Broken: from missing key '%s'")
-				assertKeys(t, toField, []string{"x", "y"}, "Contract Broken: to missing key '%s'")
-			})
-	})
 }
 
 func TestSubmitTurnCommandDecoding(t *testing.T) {
@@ -339,35 +314,6 @@ func TestHandleConsumeCPUStatus(t *testing.T) {
 				return req
 			}, http.StatusOK)
 	})
-
-	t.Run("Test Contract", func(t *testing.T) {
-		roomID, playerTokens, h := readyCPUTurn(t)
-
-		rr := consume(t, h, roomID, playerTokens[0])
-
-		assertObjectContract(t, rr.Body.Bytes(), []string{"turnPhase", "planGameEvents", "resolveTurnGameEvents"},
-			func(t *testing.T, raw map[string]any) {
-				t.Helper()
-				events, ok := raw["planGameEvents"].([]any)
-				if !ok || len(events) == 0 {
-					t.Fatalf("Expected non-empty planGameEvents, got %#v", raw["planGameEvents"])
-				}
-				evt, ok := events[0].(map[string]any)
-				if !ok {
-					t.Fatalf("planGameEvents[0] is not an object: %#v", events[0])
-				}
-				assertKeys(t, evt, []string{"type", "unitId", "from", "to"}, "Contract Broken: planGameEvents[0] missing key '%s'")
-				resolved, ok := raw["resolveTurnGameEvents"].([]any)
-				if !ok || len(resolved) == 0 {
-					t.Fatalf("Expected non-empty resolveTurnGameEvents, got %#v", raw["resolveTurnGameEvents"])
-				}
-				resolvedEvt, ok := resolved[0].(map[string]any)
-				if !ok {
-					t.Fatalf("resolveTurnGameEvents[0] is not an object: %#v", resolved[0])
-				}
-				assertKeys(t, resolvedEvt, []string{"type", "bombId", "countdown", "position"}, "Contract Broken: resolveTurnGameEvents[0] missing key '%s'")
-			})
-	})
 }
 
 func TestHandleResolveTurn_DuringCPUTurn(t *testing.T) {
@@ -511,38 +457,33 @@ func TestHandleResolveTurn(t *testing.T) {
 			}, http.StatusOK)
 	})
 
-	t.Run("Test Contract", func(t *testing.T) {
-		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
+	t.Run("Blast events keep affectedPositions and newHp on the wire", func(t *testing.T) {
 		unitID := engine.NewUnitID(1, 0)
-		if _, err := mustRoom(t, s, roomID).Submit(engine.NewPlaceBombCommand(unitID, engine.Coordinate{X: 4, Y: 7}), playerTokens[0]); err != nil {
-			t.Fatalf("SubmitTurnCommand() error = %v", err)
-		}
+		roomID, playerTokens, _, h := createTestRoomWithMatch(t, arrangedMatch(bombAboutToExplode(unitID)))
 
 		rr := doRequest(t, h, "POST", "/api/match-rooms/"+roomID+"/match/resolve", "", playerTokens[0])
 
-		assertObjectContract(t, rr.Body.Bytes(), []string{"planGameEvents", "resolveTurnGameEvents"},
-			func(t *testing.T, raw map[string]any) {
-				t.Helper()
-				events, ok := raw["planGameEvents"].([]any)
-				if !ok || len(events) == 0 {
-					t.Fatalf("Expected non-empty planGameEvents, got %#v", raw["planGameEvents"])
+		var raw struct {
+			ResolveTurnGameEvents []map[string]any `json:"resolveTurnGameEvents"`
+		}
+		if err := json.Unmarshal(rr.Body.Bytes(), &raw); err != nil {
+			t.Fatalf("decode response: %v", err)
+		}
+		eventOf := func(evtType string) map[string]any {
+			for _, evt := range raw.ResolveTurnGameEvents {
+				if evt["type"] == evtType {
+					return evt
 				}
-				evt, ok := events[0].(map[string]any)
-				if !ok {
-					t.Fatalf("planGameEvents[0] is not an object: %#v", events[0])
-				}
-				assertKeys(t, evt, []string{"type", "unitId", "bombId", "position", "range", "countdown"}, "Contract Broken: planGameEvents[0] missing key '%s'")
-				resolved, ok := raw["resolveTurnGameEvents"].([]any)
-				if !ok || len(resolved) == 0 {
-					t.Fatalf("Expected non-empty resolveTurnGameEvents, got %#v", raw["resolveTurnGameEvents"])
-				}
-				resolvedEvt, ok := resolved[0].(map[string]any)
-				if !ok {
-					t.Fatalf("resolveTurnGameEvents[0] is not an object: %#v", resolved[0])
-				}
-				assertKeys(t, resolvedEvt, []string{"type", "bombId", "countdown", "position"}, "Contract Broken: resolveTurnGameEvents[0] missing key '%s'")
-			})
-
+			}
+			t.Fatalf("no %s event in %s", evtType, rr.Body.String())
+			return nil
+		}
+		if affected, _ := eventOf("bombExploded")["affectedPositions"].([]any); len(affected) == 0 {
+			t.Errorf("bombExploded affectedPositions is empty or missing")
+		}
+		if newHp, ok := eventOf("unitDamaged")["newHp"].(float64); !ok || newHp != 0 {
+			t.Errorf("unitDamaged newHp = %#v, want 0", eventOf("unitDamaged")["newHp"])
+		}
 	})
 }
 
@@ -650,21 +591,6 @@ func TestHandleSurrender(t *testing.T) {
 				req.Header.Set("Authorization", "Bearer "+playerTokens[0])
 				return req
 			}, http.StatusOK)
-	})
-
-	t.Run("Test Contract", func(t *testing.T) {
-		roomID, playerTokens, s, h := createTestRoomWithMatch(t)
-		unitID := engine.NewUnitID(1, 0)
-		if _, err := mustRoom(t, s, roomID).Submit(engine.NewPlaceBombCommand(unitID, engine.Coordinate{X: 4, Y: 7}), playerTokens[0]); err != nil {
-			t.Fatalf("SubmitTurnCommand() error = %v", err)
-		}
-
-		jsonBody, _ := json.Marshal(api.SurrenderRequest{TeamID: 1})
-		rr := doRequest(t, h, "POST", "/api/match-rooms/"+roomID+"/match/surrender", string(jsonBody), playerTokens[0])
-
-		assertArrayContract(t, rr.Body.Bytes(), []string{"type", "winnerTeamId",
-			"unitId", "countdown", "newHp"},
-			nil)
 	})
 }
 

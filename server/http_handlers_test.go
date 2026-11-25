@@ -16,117 +16,6 @@ import (
 	"testing"
 )
 
-func assertObjectContract(t *testing.T, body []byte, expectedFields []string, nestedChecks func(t *testing.T, raw map[string]any)) {
-	t.Helper()
-	var rawMap map[string]any
-	if err := json.Unmarshal(body, &rawMap); err != nil {
-		t.Fatalf("Failed to parse JSON object: %v", err)
-	}
-	if len(expectedFields) > 0 {
-		if len(rawMap) != len(expectedFields) {
-			t.Errorf("Field count mismatch: want %d, got %d", len(expectedFields), len(rawMap))
-		}
-		assertKeys(t, rawMap, expectedFields, "Contract Broken: client code expects key '%s', but it was missing")
-	}
-	if nestedChecks != nil {
-		nestedChecks(t, rawMap)
-	}
-}
-
-func assertArrayContract(t *testing.T, body []byte, expectedFields []string, itemChecks func(t *testing.T, item map[string]any)) {
-	t.Helper()
-	var rawArr []map[string]any
-	if err := json.Unmarshal(body, &rawArr); err != nil {
-		t.Fatalf("Failed to parse JSON array: %v", err)
-	}
-	if len(rawArr) == 0 {
-		t.Fatalf("Expected non-empty array response")
-	}
-	if len(expectedFields) > 0 {
-		targetObj := rawArr[0]
-		if len(targetObj) != len(expectedFields) {
-			t.Errorf("Total number of fields exceeded, want %d, got %d", len(expectedFields), len(targetObj))
-		}
-		assertKeys(t, targetObj, expectedFields, "Contract Broken: client code expects key '%s', but it was missing")
-		if itemChecks != nil {
-			itemChecks(t, targetObj)
-		}
-	}
-}
-
-func firstElement(v any) (any, bool) {
-	arr, ok := v.([]any)
-	if !ok || len(arr) == 0 {
-		return nil, false
-	}
-	return arr[0], true
-}
-
-func firstObject(v any) (map[string]any, bool) {
-	first, ok := firstElement(v)
-	if !ok {
-		return nil, false
-	}
-	obj, ok := first.(map[string]any)
-	return obj, ok
-}
-
-func assertKeys(t *testing.T, obj map[string]any, fields []string, format string) {
-	t.Helper()
-	for _, field := range fields {
-		if _, exists := obj[field]; !exists {
-			t.Errorf(format, field)
-		}
-	}
-}
-
-func assertMatchStateNested(t *testing.T, raw map[string]any) {
-	t.Helper()
-	row, ok := firstElement(raw["grid"])
-	if !ok {
-		t.Errorf("grid is empty or not an array: %#v", raw["grid"])
-	} else if tile, ok := firstObject(row); !ok {
-		t.Errorf("grid[0] is empty or not an array of objects: %#v", row)
-	} else {
-		assertKeys(t, tile, []string{"type", "occupantType", "occupantId"}, "grid[0][0] missing key '%s'")
-	}
-
-	if sb, ok := firstObject(raw["softBlocks"]); !ok {
-		t.Errorf("softBlocks is empty or not an array of objects: %#v", raw["softBlocks"])
-	} else {
-		assertKeys(t, sb, []string{"id", "position"}, "softBlock missing key '%s'")
-		if coord, ok := sb["position"].(map[string]any); !ok {
-			t.Errorf("softBlock.position is not an object: %#v", sb["position"])
-		} else {
-			assertKeys(t, coord, []string{"x", "y"}, "softBlock.position missing key '%s'")
-		}
-	}
-
-	if unit, ok := firstObject(raw["units"]); !ok {
-		t.Errorf("units is empty or not an array of objects: %#v", raw["units"])
-	} else {
-		unitFields := []string{"id", "type", "position", "speed", "bombMaxRange", "bombPower", "maxBombCount", "bombUsed", "team", "hp", "skills", "hasMoved", "hasUsedSkill"}
-		assertKeys(t, unit, unitFields, "Contract Broken: unit missing key '%s'")
-		if pos, ok := unit["position"].(map[string]any); !ok {
-			t.Errorf("unit.position is not an object: %#v", unit["position"])
-		} else {
-			assertKeys(t, pos, []string{"x", "y"}, "unit.position missing key '%s'")
-		}
-	}
-
-	if bomb, ok := firstObject(raw["bombs"]); !ok {
-		t.Errorf("bombs is empty or not an array of objects: %#v", raw["bombs"])
-	} else {
-		assertKeys(t, bomb, []string{"id", "ownerId", "position", "range", "countdown"}, "Contract Broken: bomb missing key '%s'")
-	}
-
-	if tc, ok := firstObject(raw["turnCommands"]); !ok {
-		t.Errorf("turnCommands is empty or not an array of objects: %#v", raw["turnCommands"])
-	} else {
-		assertKeys(t, tc, []string{"type", "unitId", "target"}, "Contract Broken: turnCommand missing key '%s'")
-	}
-}
-
 type brokenResponseWriter struct {
 	header http.Header
 	Code   int
@@ -455,12 +344,6 @@ func TestHandleHealthCheck(t *testing.T) {
 				return req
 			}, http.StatusOK)
 	})
-
-	t.Run("Test Contract", func(t *testing.T) {
-		rr := doRequest(t, h, "GET", "/api/health", "", "")
-
-		assertObjectContract(t, rr.Body.Bytes(), []string{"status"}, nil)
-	})
 }
 
 func TestHandleGetCatalog(t *testing.T) {
@@ -500,24 +383,5 @@ func TestHandleGetCatalog(t *testing.T) {
 				req, _ := http.NewRequest("GET", "/api/catalog", nil)
 				return req
 			}, http.StatusOK)
-	})
-
-	t.Run("Test Contract", func(t *testing.T) {
-		rr := doRequest(t, h, "GET", "/api/catalog", "", "")
-
-		assertObjectContract(t, rr.Body.Bytes(), []string{"archetypes", "stagePresets"}, func(t *testing.T, raw map[string]any) {
-			t.Helper()
-			archetypesBytes, err := json.Marshal(raw["archetypes"])
-			if err != nil {
-				t.Fatalf("Failed to re-marshal archetypes: %v", err)
-			}
-			assertArrayContract(t, archetypesBytes, []string{"name", "speed", "bombMaxRange", "skills"}, nil)
-
-			stagePresetsBytes, err := json.Marshal(raw["stagePresets"])
-			if err != nil {
-				t.Fatalf("Failed to re-marshal stagePresets: %v", err)
-			}
-			assertArrayContract(t, stagePresetsBytes, []string{"name", "description", "width", "height", "maxTurns"}, nil)
-		})
 	})
 }

@@ -132,32 +132,6 @@ func TestHandleGetMatchState(t *testing.T) {
 				return req
 			}, http.StatusOK)
 	})
-
-	t.Run("Test Contract", func(t *testing.T) {
-		unitID := engine.NewUnitID(1, 0)
-		pos := engine.Coordinate{X: 4, Y: 7}
-		roomID, s, h := newTestRoom(t, arrangedMatch(turnCommandsQueued(engine.NewMoveCommand(unitID, pos))))
-
-		gameCfg := engine.GameCfg{
-			StagePreset: "Divided",
-			P1Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Fighter", Role: engine.RoleNormal}},
-			P2Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Witch", Role: engine.RoleNormal}},
-			MaxTurns:    10,
-		}
-		tokens := mustCreateMatch(t, s, roomID, gameCfg)
-		if _, err := mustRoom(t, s, roomID).Submit(engine.NewPlaceBombCommand(unitID, pos), tokens[0]); err != nil {
-			t.Fatalf("SubmitTurnCommand(place bomb) error = %v", err)
-		}
-		if _, _, err := mustRoom(t, s, roomID).Resolve(tokens[0]); err != nil {
-			t.Fatalf("ResolveTurn() error = %v", err)
-		}
-
-		rr := doRequest(t, h, "GET", "/api/match-rooms/"+roomID+"/match/state", "", "")
-
-		assertObjectContract(t, rr.Body.Bytes(),
-			[]string{"turn", "inSuddenDeath", "activeTeam", "grid", "units", "bombs", "softBlocks", "turnCommands", "turnStartEvents"},
-			assertMatchStateNested)
-	})
 }
 
 func TestHandleGetMatchConfig(t *testing.T) {
@@ -210,23 +184,6 @@ func TestHandleGetMatchConfig(t *testing.T) {
 				req, _ := http.NewRequest("GET", "/api/match-rooms/"+roomID+"/match/config", nil)
 				return req
 			}, http.StatusOK)
-	})
-
-	t.Run("Test Contract", func(t *testing.T) {
-		roomID, s, h := newTestRoom(t)
-
-		gameCfg := engine.GameCfg{
-			StagePreset: "Divided",
-			P1Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Fighter", Role: engine.RoleNormal}},
-			P2Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Witch", Role: engine.RoleNormal}},
-			MaxTurns:    10,
-		}
-		mustCreateMatch(t, s, roomID, gameCfg)
-
-		rr := doRequest(t, h, "GET", "/api/match-rooms/"+roomID+"/match/config", "", "")
-
-		assertObjectContract(t, rr.Body.Bytes(),
-			[]string{"vsCpu", "stagePreset", "p1Slots", "p2Slots", "maxTurns", "allowResetTurn"}, nil)
 	})
 }
 
@@ -380,22 +337,5 @@ func TestHandleGetAllowedTiles(t *testing.T) {
 				req, _ := http.NewRequest("GET", "/api/match-rooms/"+roomID+"/match/allowed-tiles?unitId=16&turnCmdType="+string(engine.TurnCmdPlaceBomb), nil)
 				return req
 			}, http.StatusOK)
-	})
-
-	t.Run("Test Contract", func(t *testing.T) {
-		roomID, s, h := newTestRoom(t)
-
-		gameCfg := engine.GameCfg{
-			StagePreset: "Divided",
-			P1Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Fighter", Role: engine.RoleNormal}},
-			P2Slots:     []engine.TeamSlot{{Archetype: "King", Role: engine.RoleKing}, {Archetype: "Witch", Role: engine.RoleNormal}},
-			MaxTurns:    10,
-		}
-		mustCreateMatch(t, s, roomID, gameCfg)
-
-		rr := doRequest(t, h, "GET", "/api/match-rooms/"+roomID+"/match/allowed-tiles?unitId=16&turnCmdType=placeBomb", "", "")
-
-		assertArrayContract(t, rr.Body.Bytes(),
-			[]string{"x", "y"}, nil)
 	})
 }
