@@ -76,6 +76,8 @@ linters:
               desc: engine knows no transport
             - pkg: os
               desc: engine does no I/O
+            - pkg: encoding/json
+              desc: engine knows no wire format
         cpu:
           files:
             - "**/cpu/*.go"

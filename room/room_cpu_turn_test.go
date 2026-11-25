@@ -2,7 +2,6 @@ package room
 
 import (
 	"bomb-srpg/engine"
-	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -418,13 +417,8 @@ func TestRoom_ReadsDuringCPUTurnDoNotRaceMatch(t *testing.T) {
 					return
 				default:
 				}
-				gs, err := f.r.State()
-				if err != nil {
+				if _, err := f.r.State(); err != nil {
 					t.Errorf("State() error = %v", err)
-					return
-				}
-				if _, err := json.Marshal(gs); err != nil {
-					t.Errorf("Marshal(gameState) error = %v", err)
 					return
 				}
 				if _, err := f.r.AllowedTiles(cpuUnitID, engine.TurnCmdMove); err != nil {

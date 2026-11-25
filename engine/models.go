@@ -1,9 +1,7 @@
 package engine
 
 import (
-	"encoding/json/v2"
 	"fmt"
-	"maps"
 	"math"
 	"slices"
 )
@@ -35,14 +33,10 @@ func (t TerrainType) String() string {
 	}
 }
 
-func (t TerrainType) MarshalText() ([]byte, error) {
-	return []byte(t.String()), nil
-}
-
 // Coordinate is a grid position; (0,0) is the top-left tile.
 type Coordinate struct {
-	X int `json:"x"`
-	Y int `json:"y"`
+	X int
+	Y int
 }
 
 type OccupantType int
@@ -72,19 +66,15 @@ func (o OccupantType) String() string {
 	}
 }
 
-func (o OccupantType) MarshalText() ([]byte, error) {
-	return []byte(o.String()), nil
-}
-
 const (
 	Team1 = 1
 	Team2 = 2
 )
 
 type Tile struct {
-	Type         TerrainType  `json:"type"`
-	OccupantType OccupantType `json:"occupantType"`
-	OccupantID   int64        `json:"occupantId"`
+	Type         TerrainType
+	OccupantType OccupantType
+	OccupantID   int64
 }
 
 // unitID returns OccupantID as a UnitID, wrapping values wider than the type.
@@ -98,21 +88,21 @@ func (t Tile) BombID() BombID {
 }
 
 type SoftBlock struct {
-	ID       int        `json:"id"`
-	Position Coordinate `json:"position"`
+	ID       int
+	Position Coordinate
 }
 
 type StagePreset struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	Width       int    `json:"width"`
-	Height      int    `json:"height"`
-	MaxTurns    int    `json:"maxTurns"`
+	Name        string
+	Description string
+	Width       int
+	Height      int
+	MaxTurns    int
 	// Visual layout matrix; each string is a row (Y), each char a column (X)
-	LayoutGrid          []string      `json:"-"`
-	SoftBlocks          []Coordinate  `json:"-"`
-	P1StartingPositions [5]Coordinate `json:"-"`
-	P2StartingPositions [5]Coordinate `json:"-"`
+	LayoutGrid          []string
+	SoftBlocks          []Coordinate
+	P1StartingPositions [5]Coordinate
+	P2StartingPositions [5]Coordinate
 }
 
 type skillType uint32
@@ -140,11 +130,6 @@ func (s skillType) String() string {
 	}
 }
 
-// MarshalJSON encodes the set as the names of its skills, never null.
-func (s skillType) MarshalJSON() ([]byte, error) {
-	return json.Marshal(s.Names())
-}
-
 func (s skillType) Names() []string {
 	names := []string{}
 	for _, skill := range allSkills() {
@@ -156,15 +141,15 @@ func (s skillType) Names() []string {
 }
 
 type Archetype struct {
-	Name         string    `json:"name"`
-	BaseSpeed    int       `json:"speed"`
-	BombMaxRange int       `json:"bombMaxRange"`
-	BombMinRange int       `json:"-"`
-	BombPower    int       `json:"-"`
-	MaxBombCount int       `json:"-"`
-	BaseHP       int       `json:"-"`
-	PresetSkills skillType `json:"skills"`
-	Selectable   bool      `json:"-"`
+	Name         string
+	BaseSpeed    int
+	BombMaxRange int
+	BombMinRange int
+	BombPower    int
+	MaxBombCount int
+	BaseHP       int
+	PresetSkills skillType
+	Selectable   bool
 }
 
 type UnitRole int
@@ -185,10 +170,6 @@ func (r UnitRole) String() string {
 		return "Unknown"
 	}
 	return names[r]
-}
-
-func (r UnitRole) MarshalText() ([]byte, error) {
-	return []byte(r.String()), nil
 }
 
 func (r *UnitRole) UnmarshalText(text []byte) error {
@@ -224,63 +205,31 @@ type Unit struct {
 	HasUsedSkill bool
 }
 
-func (u Unit) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
-		ID           UnitID     `json:"id"`
-		Type         string     `json:"type"`
-		Position     Coordinate `json:"position"`
-		Speed        int        `json:"speed"`
-		BombMaxRange int        `json:"bombMaxRange"`
-		BombPower    int        `json:"bombPower"`
-		MaxBombCount int        `json:"maxBombCount"`
-		BombUsed     int        `json:"bombUsed"`
-		Team         int        `json:"team"`
-		HP           int        `json:"hp"`
-		Skills       skillType  `json:"skills"`
-		HasMoved     bool       `json:"hasMoved"`
-		HasUsedSkill bool       `json:"hasUsedSkill"`
-	}{
-		u.ID,
-		u.Type.Name,
-		u.Position,
-		u.Speed,
-		u.BombMaxRange,
-		u.BombPower,
-		u.MaxBombCount,
-		u.BombUsed,
-		u.Team,
-		u.HP,
-		u.Skills,
-		u.HasMoved,
-		u.HasUsedSkill,
-	})
-}
-
 type Bomb struct {
-	ID       BombID     `json:"id"`
-	OwnerID  UnitID     `json:"ownerId"`
-	Position Coordinate `json:"position"`
-	Range    int        `json:"range"`
+	ID       BombID
+	OwnerID  UnitID
+	Position Coordinate
+	Range    int
 	// Turns remaining until detonation; <0 for non-countdown bombs
-	Countdown int `json:"countdown"`
+	Countdown int
 }
 
 type TeamSlot struct {
-	Archetype string   `json:"archetype"`
-	Role      UnitRole `json:"role"`
+	Archetype string
+	Role      UnitRole
 }
 
 type GameCfg struct {
-	VSCpu       bool       `json:"vsCpu"`
-	StagePreset string     `json:"stagePreset"`
-	P1Slots     []TeamSlot `json:"p1Slots"`
-	P2Slots     []TeamSlot `json:"p2Slots"`
+	VSCpu       bool
+	StagePreset string
+	P1Slots     []TeamSlot
+	P2Slots     []TeamSlot
 	// Turn limit; 0 = instant sudden death
-	MaxTurns                    int  `json:"maxTurns"`
-	AllowResetTurn              bool `json:"allowResetTurn"`
-	GlobalSpeedOverride         int  `json:"-"`
-	GlobalBombCountdownOverride int  `json:"-"`
-	GlobalBombMaxRangeOverride  int  `json:"-"`
+	MaxTurns                    int
+	AllowResetTurn              bool
+	GlobalSpeedOverride         int
+	GlobalBombCountdownOverride int
+	GlobalBombMaxRangeOverride  int
 }
 
 type GameState struct {
@@ -295,31 +244,6 @@ type GameState struct {
 	SoftBlocks      map[int]*SoftBlock
 	TurnCommands    []TurnCommand
 	TurnStartEvents []GameEvent
-}
-
-// MarshalJSON emits the client-facing shape, with the entity maps flattened to arrays.
-func (gs *GameState) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
-		Turn            int           `json:"turn"`
-		InSuddenDeath   bool          `json:"inSuddenDeath"`
-		ActiveTeam      int           `json:"activeTeam"`
-		Grid            [][]Tile      `json:"grid"`
-		Units           []*Unit       `json:"units"`
-		Bombs           []*Bomb       `json:"bombs"`
-		SoftBlocks      []*SoftBlock  `json:"softBlocks"`
-		TurnCommands    []TurnCommand `json:"turnCommands"`
-		TurnStartEvents []GameEvent   `json:"turnStartEvents"`
-	}{
-		gs.Turn,
-		gs.InSuddenDeath,
-		gs.ActiveTeam,
-		gs.Grid,
-		slices.Collect(maps.Values(gs.Units)),
-		slices.Collect(maps.Values(gs.Bombs)),
-		slices.Collect(maps.Values(gs.SoftBlocks)),
-		gs.TurnCommands,
-		gs.TurnStartEvents,
-	})
 }
 
 type Match struct {

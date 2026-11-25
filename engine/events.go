@@ -13,21 +13,21 @@ const (
 	GameEvtMatchEnded           GameEvtType = "matchEnded"
 )
 
-// GameEvent's Type selects the event variant; optional fields are omitted when zero.
+// GameEvent's Type selects the event variant; fields a variant does not use stay zero.
 type GameEvent struct {
-	Type              GameEvtType  `json:"type"`
-	UnitID            UnitID       `json:"unitId"`
-	BombID            BombID       `json:"bombId,omitzero"`
-	SoftBlockID       int          `json:"softBlockId,omitzero"`
-	ItemID            int          `json:"itemId,omitzero"`
-	Position          *Coordinate  `json:"position,omitzero"`
-	From              *Coordinate  `json:"from,omitzero"`
-	To                *Coordinate  `json:"to,omitzero"`
-	NewHP             int          `json:"newHp"`
-	Range             int          `json:"range,omitzero"`
-	Countdown         int          `json:"countdown"`
-	AffectedPositions []Coordinate `json:"affectedPositions,omitempty"`
-	WinnerTeamID      int          `json:"winnerTeamId,omitzero"`
+	Type              GameEvtType
+	UnitID            UnitID
+	BombID            BombID
+	SoftBlockID       int
+	ItemID            int
+	Position          *Coordinate
+	From              *Coordinate
+	To                *Coordinate
+	NewHP             int
+	Range             int
+	Countdown         int
+	AffectedPositions []Coordinate
+	WinnerTeamID      int
 }
 
 func NewUnitMovedEvent(unitID UnitID, from, to Coordinate) GameEvent {
