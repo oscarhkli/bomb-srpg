@@ -99,13 +99,6 @@ func softBlocksAt(positions ...engine.Coordinate) matchArrangement {
 	}
 }
 
-func turnCommandsQueued(cmds ...engine.TurnCommand) matchArrangement {
-	return func(match *engine.Match) error {
-		match.WorkingState.TurnCommands = cmds
-		return nil
-	}
-}
-
 func mustEndAndDeleteMatch(t *testing.T, s *ServerStateManager, roomID, token string) {
 	t.Helper()
 	if _, err := mustRoom(t, s, roomID).Surrender(1, token); err != nil {
