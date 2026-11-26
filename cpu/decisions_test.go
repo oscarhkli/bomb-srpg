@@ -890,3 +890,46 @@ func TestDecide_ReturnsErrorWhenAllyDesynced(t *testing.T) {
 		}
 	}
 }
+
+func TestDecide_RepeatedUnitFailure_ReportedOnce(t *testing.T) {
+	tests := []struct {
+		name         string
+		failing      []engine.UnitID
+		allyKingFail bool
+		wantErrs     int
+		wantCmds     bool
+	}{
+		{name: "one failing fighter", failing: []engine.UnitID{engine.NewUnitID(2, 2)}, wantErrs: 1, wantCmds: true},
+		{name: "two failing fighters", failing: []engine.UnitID{engine.NewUnitID(2, 2), engine.NewUnitID(2, 3)}, wantErrs: 2, wantCmds: true},
+		{name: "every CPU unit fails", failing: []engine.UnitID{engine.NewUnitID(2, 2)}, allyKingFail: true, wantErrs: 2},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gs := newTestGameState(9, 9)
+			allyKing := addKing(gs, engine.NewUnitID(2, 1), engine.Coordinate{X: 0, Y: 0})
+			addKing(gs, engine.NewUnitID(1, 1), engine.Coordinate{X: 8, Y: 8})
+			if tt.allyKingFail {
+				allyKing.Team = 2
+			}
+			for i, id := range tt.failing {
+				addFighter(gs, id, engine.Coordinate{X: 0, Y: 2 + i}).Team = 2
+			}
+
+			got, err := Decide(gs)
+
+			if !errors.Is(err, engine.ErrNotActiveTeam) {
+				t.Fatalf("Decide() error = %v, want ErrNotActiveTeam", err)
+			}
+			joined, ok := err.(interface{ Unwrap() []error })
+			if !ok {
+				t.Fatalf("Decide() error %T does not unwrap to a list", err)
+			}
+			if n := len(joined.Unwrap()); n != tt.wantErrs {
+				t.Errorf("Decide() joined %d errors, want %d", n, tt.wantErrs)
+			}
+			if tt.wantCmds != slices.ContainsFunc(got, func(c engine.TurnCommand) bool { return c.Actor() == allyKing.ID }) {
+				t.Errorf("Decide() = %+v, want ally king command = %v", got, tt.wantCmds)
+			}
+		})
+	}
+}

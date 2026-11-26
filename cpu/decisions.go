@@ -77,7 +77,7 @@ func Decide(gs *engine.GameState) ([]engine.TurnCommand, error) {
 			sc.actorOrigin = unit.Position
 			c, err := bestCandidateFor(sc, sandbox)
 			if err != nil {
-				errs = append(errs, fmt.Errorf("unit %#x: %w", unit.ID, err))
+				errs = appendOnce(errs, fmt.Errorf("unit %#x: %w", unit.ID, err))
 				continue
 			}
 			if len(c.turnCommands) == 0 {
@@ -98,6 +98,13 @@ func Decide(gs *engine.GameState) ([]engine.TurnCommand, error) {
 		cmds = append(cmds, best.turnCommands...)
 	}
 	return cmds, errors.Join(errs...)
+}
+
+func appendOnce(errs []error, err error) []error {
+	if slices.ContainsFunc(errs, func(e error) bool { return e.Error() == err.Error() }) {
+		return errs
+	}
+	return append(errs, err)
 }
 
 func isKingRole(u *engine.Unit) bool {
