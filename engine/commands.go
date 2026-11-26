@@ -7,17 +7,31 @@ const (
 	TurnCmdPlaceBomb TurnCmdType = "placeBomb"
 )
 
-// TurnCommand's Type determines the action; UnitID and Target are always required.
-type TurnCommand struct {
-	Type   TurnCmdType
+//sumtype:decl
+type TurnCommand interface {
+	Actor() UnitID
+	isTurnCommand()
+}
+
+type MoveCommand struct {
 	UnitID UnitID
 	Target Coordinate
 }
 
-func NewMoveCommand(unitID UnitID, target Coordinate) TurnCommand {
-	return TurnCommand{Type: TurnCmdMove, UnitID: unitID, Target: target}
+type PlaceBombCommand struct {
+	UnitID UnitID
+	Target Coordinate
 }
 
-func NewPlaceBombCommand(unitID UnitID, target Coordinate) TurnCommand {
-	return TurnCommand{Type: TurnCmdPlaceBomb, UnitID: unitID, Target: target}
+func (c MoveCommand) Actor() UnitID      { return c.UnitID }
+func (c PlaceBombCommand) Actor() UnitID { return c.UnitID }
+func (MoveCommand) isTurnCommand()       {}
+func (PlaceBombCommand) isTurnCommand()  {}
+
+func NewMoveCommand(unitID UnitID, target Coordinate) MoveCommand {
+	return MoveCommand{UnitID: unitID, Target: target}
+}
+
+func NewPlaceBombCommand(unitID UnitID, target Coordinate) PlaceBombCommand {
+	return PlaceBombCommand{UnitID: unitID, Target: target}
 }

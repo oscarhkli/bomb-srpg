@@ -700,8 +700,7 @@ func TestGameStateDeepCopy_Isolation(t *testing.T) {
 	original.Bombs[1] = &Bomb{ID: 1, OwnerID: 1, Position: Coordinate{1, 1}, Range: 2, Countdown: 3}
 	original.SoftBlocks[1] = &SoftBlock{ID: 1, Position: Coordinate{2, 2}}
 	original.TurnCommands = []TurnCommand{NewMoveCommand(1, Coordinate{3, 3})}
-	original.TurnStartEvents = []GameEvent{newBombPlacedEvent(1, 1, Coordinate{4, 4}, 2, 3), NewUnitMovedEvent(1, Coordinate{1, 1}, Coordinate{2, 2})}
-	original.TurnStartEvents[1].AffectedPositions = []Coordinate{{5, 5}}
+	original.TurnStartEvents = []GameEvent{BombExploded{BombID: 1, Position: Coordinate{4, 4}, AffectedPositions: []Coordinate{{5, 5}}}}
 
 	clone := original.DeepCopy()
 
@@ -713,11 +712,12 @@ func TestGameStateDeepCopy_Isolation(t *testing.T) {
 	clone.Units[1].Position = Coordinate{5, 5}
 	clone.Bombs[1].Range = 10
 	clone.SoftBlocks[1].Position = Coordinate{10, 10}
-	clone.TurnCommands[0].Target = Coordinate{9, 9}
-	clone.TurnStartEvents[0].Position.X = 9
-	clone.TurnStartEvents[1].From.X = 9
-	clone.TurnStartEvents[1].To.X = 9
-	clone.TurnStartEvents[1].AffectedPositions[0].X = 9
+	clone.TurnCommands[0] = NewMoveCommand(1, Coordinate{9, 9})
+	cloneExploded, ok := clone.TurnStartEvents[0].(BombExploded)
+	if !ok {
+		t.Fatalf("clone TurnStartEvents[0] = %T, want BombExploded", clone.TurnStartEvents[0])
+	}
+	cloneExploded.AffectedPositions[0].X = 9
 
 	if original.Turn == clone.Turn {
 		t.Errorf("Expected original Turn to be unaffected by changes to clone, got %d", original.Turn)
@@ -743,15 +743,12 @@ func TestGameStateDeepCopy_Isolation(t *testing.T) {
 	if original.SoftBlocks[1].Position == clone.SoftBlocks[1].Position {
 		t.Errorf("Expected original soft block Position to be unaffected by changes to clone, got (%d,%d)", original.SoftBlocks[1].Position.X, original.SoftBlocks[1].Position.Y)
 	}
-	if original.TurnCommands[0].Target == clone.TurnCommands[0].Target {
-		t.Errorf("Expected original TurnCommands to be unaffected by changes to clone, got %v", original.TurnCommands[0].Target)
+	if original.TurnCommands[0] == clone.TurnCommands[0] {
+		t.Errorf("Expected original TurnCommands to be unaffected by changes to clone, got %v", original.TurnCommands[0])
 	}
-	if got, want := original.TurnStartEvents[0].Position.X, 4; got != want {
-		t.Errorf("Expected original TurnStartEvents to be unaffected by changes to clone, Position.X = %d, want %d", got, want)
-	}
-	moved := original.TurnStartEvents[1]
-	if moved.From.X != 1 || moved.To.X != 2 || moved.AffectedPositions[0].X != 5 {
-		t.Errorf("Expected original From, To and AffectedPositions to be unaffected by changes to clone, got %+v", moved)
+	exploded, ok := original.TurnStartEvents[0].(BombExploded)
+	if !ok || exploded.AffectedPositions[0].X != 5 {
+		t.Errorf("Expected original AffectedPositions to be unaffected by changes to clone, got %+v", original.TurnStartEvents[0])
 	}
 }
 

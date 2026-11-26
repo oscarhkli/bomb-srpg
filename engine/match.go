@@ -31,18 +31,18 @@ func (m *Match) Surrender(teamID int) []GameEvent {
 	m.TrueState.TurnStartEvents = nil
 
 	return []GameEvent{
-		NewMatchEndedEvent(m.WinnerTeamID),
+		MatchEnded{WinnerTeamID: m.WinnerTeamID},
 	}
 }
 
 func (m *Match) ApplyTurnCommand(cmd TurnCommand) ([]GameEvent, error) {
-	switch cmd.Type {
-	case TurnCmdMove:
+	switch cmd := cmd.(type) {
+	case MoveCommand:
 		return m.commandMoveUnit(cmd.UnitID, cmd.Target)
-	case TurnCmdPlaceBomb:
+	case PlaceBombCommand:
 		return m.CommandPlaceBomb(cmd.UnitID, cmd.Target)
 	default:
-		return nil, fmt.Errorf("%w: %s", ErrUnsupportedCommand, cmd.Type)
+		return nil, ErrUnsupportedCommand
 	}
 }
 
@@ -55,24 +55,24 @@ func (m *Match) commandMoveUnit(unitID UnitID, target Coordinate) ([]GameEvent, 
 	return []GameEvent{gameEvent}, nil
 }
 
-func (gs *GameState) MoveUnit(unitID UnitID, target Coordinate) (GameEvent, error) {
+func (gs *GameState) MoveUnit(unitID UnitID, target Coordinate) (UnitMoved, error) {
 	unit, err := gs.validateActiveUnit(unitID)
 	if err != nil {
-		return GameEvent{}, err
+		return UnitMoved{}, err
 	}
 
 	if unit.HasMoved {
-		return GameEvent{}, fmt.Errorf("%w: unit %#x already moved this turn", ErrAlreadyMoved, unitID)
+		return UnitMoved{}, fmt.Errorf("%w: unit %#x already moved this turn", ErrAlreadyMoved, unitID)
 	}
 
 	tiles := gs.FindReachableTiles(unit.Position, unit.NewMovementRule())
 
 	if _, ok := tiles[target]; !ok {
-		return GameEvent{}, ErrOutOfMoveRange
+		return UnitMoved{}, ErrOutOfMoveRange
 	}
 
 	if err = gs.IsLandingLegal(target, OccupantUnit); err != nil {
-		return GameEvent{}, fmt.Errorf("%w: %w", ErrInvalidLanding, err)
+		return UnitMoved{}, fmt.Errorf("%w: %w", ErrInvalidLanding, err)
 	}
 
 	oldPos := unit.Position
@@ -81,7 +81,7 @@ func (gs *GameState) MoveUnit(unitID UnitID, target Coordinate) (GameEvent, erro
 	unit.Position = target
 	unit.HasMoved = true
 
-	return NewUnitMovedEvent(unitID, oldPos, target), nil
+	return UnitMoved{UnitID: unitID, From: oldPos, To: target}, nil
 }
 
 func (gs *GameState) validateActiveUnit(unitID UnitID) (*Unit, error) {
@@ -115,14 +115,14 @@ func (m *Match) CommandPlaceBomb(unitID UnitID, target Coordinate) ([]GameEvent,
 }
 
 // PlaceBomb skips validation for SystemUnitID.
-func (gs *GameState) PlaceBomb(unitID UnitID, target Coordinate) (GameEvent, error) {
+func (gs *GameState) PlaceBomb(unitID UnitID, target Coordinate) (BombPlaced, error) {
 	if unitID == SystemUnitID {
 		return gs.dropBomb(unitID, target, bombDefaultPower), nil
 	}
 
 	unit, err := gs.validateBombPlacement(unitID, target)
 	if err != nil {
-		return GameEvent{}, err
+		return BombPlaced{}, err
 	}
 
 	unit.BombUsed++
@@ -158,7 +158,7 @@ func (gs *GameState) validateBombPlacement(unitID UnitID, target Coordinate) (*U
 	return unit, nil
 }
 
-func (gs *GameState) dropBomb(ownerID UnitID, target Coordinate, power int) GameEvent {
+func (gs *GameState) dropBomb(ownerID UnitID, target Coordinate, power int) BombPlaced {
 	gs.TurnBombCounter++
 	bomb := &Bomb{
 		ID:        NewBombID(gs.Turn, gs.TurnBombCounter, ownerID),
@@ -170,7 +170,7 @@ func (gs *GameState) dropBomb(ownerID UnitID, target Coordinate, power int) Game
 	gs.Bombs[bomb.ID] = bomb
 	gs.UpdateStageOccupant(target, OccupantBomb, int64(bomb.ID))
 
-	return newBombPlacedEvent(ownerID, bomb.ID, target, bomb.Range, bomb.Countdown)
+	return BombPlaced{UnitID: ownerID, BombID: bomb.ID, Position: target, Range: bomb.Range, Countdown: bomb.Countdown}
 }
 
 func (gs *GameState) IsLandingLegal(target Coordinate, _ OccupantType) error {
@@ -231,7 +231,7 @@ func (m *Match) injectSuddenDeathHazards() {
 }
 
 // ResolveTurn commits the turn and begins the next, so hazards are already placed on return.
-// Returns the events logged during planning and those produced by resolution; MatchEndedEvent lands in the latter.
+// Returns the events logged during planning and those produced by resolution; MatchEnded lands in the latter.
 func (m *Match) ResolveTurn() (planGameEvents, resolveTurnGameEvents []GameEvent) {
 	planGameEvents = make([]GameEvent, len(m.PlaybackLog))
 	copy(planGameEvents, m.PlaybackLog)
@@ -253,7 +253,7 @@ func (m *Match) ResolveTurn() (planGameEvents, resolveTurnGameEvents []GameEvent
 			m.WorkingState.ActiveTeam = ((m.WorkingState.Turn - 1) & 1) + 1
 		} else {
 			m.WinnerTeamID = winner
-			m.PlaybackLog = append(m.PlaybackLog, NewMatchEndedEvent(winner))
+			m.PlaybackLog = append(m.PlaybackLog, MatchEnded{WinnerTeamID: winner})
 		}
 	}
 
@@ -303,7 +303,7 @@ func (gs *GameState) tickCountdownsAndQueueFuses() ([]BombID, map[BombID]bool, [
 		}
 
 		bomb.Countdown--
-		gameEvents = append(gameEvents, newBombCountdownUpdatedEvent(id, bomb.Position, bomb.Countdown))
+		gameEvents = append(gameEvents, BombCountdownUpdated{BombID: id, Position: bomb.Position, Countdown: bomb.Countdown})
 		if bomb.Countdown == 0 {
 			queue = append(queue, id)
 			ignited[id] = true
@@ -364,7 +364,7 @@ func (gs *GameState) processChainDetonations(
 
 		gs.clearStageTile(currBomb.Position)
 		delete(gs.Bombs, currBombID)
-		gameEvents = append(gameEvents, newBombExplodedEvent(currBombID, currBomb.Position, affectedPos))
+		gameEvents = append(gameEvents, BombExploded{BombID: currBombID, Position: currBomb.Position, AffectedPositions: affectedPos})
 	}
 	return gameEvents
 }
@@ -400,11 +400,11 @@ func (gs *GameState) handleDelayedBatchDamage(
 		}
 
 		unit.HP -= 1
-		gameEvents = append(gameEvents, newUnitDamagedEvent(unitID, unit.Position, unit.HP))
+		gameEvents = append(gameEvents, UnitDamaged{UnitID: unitID, Position: unit.Position, NewHP: unit.HP})
 
 		if unit.HP <= 0 {
 			gs.clearStageTile(unit.Position)
-			gameEvents = append(gameEvents, NewUnitDiedEvent(unitID, unit.Position))
+			gameEvents = append(gameEvents, UnitDied{UnitID: unitID, Position: unit.Position})
 		}
 	}
 
@@ -416,7 +416,7 @@ func (gs *GameState) handleDelayedBatchDamage(
 
 		gs.clearStageTile(softBlock.Position)
 		delete(gs.SoftBlocks, softBlockID)
-		gameEvents = append(gameEvents, newSoftBlockDestroyedEvent(softBlockID, softBlock.Position))
+		gameEvents = append(gameEvents, SoftBlockDestroyed{SoftBlockID: softBlockID, Position: softBlock.Position})
 	}
 
 	return gameEvents

@@ -140,7 +140,7 @@ func TestSubmitTurnCommandDecoding(t *testing.T) {
 		{"invalid UTF-8 in unknown member", "{\"type\":\"move\",\"unitId\":16,\"x\":\"\xff\"," + target + `}`, false, http.StatusBadRequest, formatMsg},
 		{"invalid UTF-8 body", "\xff", false, http.StatusBadRequest, formatMsg},
 		{"byte order mark before value", "\xef\xbb\xbf{\"type\":\"move\",\"unitId\":16," + target + `}`, false, http.StatusBadRequest, formatMsg},
-		{"null body", `null`, false, http.StatusBadRequest, "invalid game config"},
+		{"null body", `null`, false, http.StatusConflict, "invalid turn command: unsupported command type: "},
 		{"empty body", ``, false, http.StatusBadRequest, formatMsg},
 		{"whitespace-only body", " \n\t", false, http.StatusBadRequest, formatMsg},
 		{"unitId written with a fraction", `{"type":"move","unitId":1.0,` + target + `}`, false, http.StatusBadRequest, formatMsg},

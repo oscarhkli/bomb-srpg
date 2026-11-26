@@ -17,6 +17,7 @@ linters:
     - errorlint
     - exhaustive
     - forcetypeassert
+    - gochecksumtype
     - nilerr
     - noctx
     - reassign
@@ -118,6 +119,9 @@ linters:
         - empty
         - stdlib
         - 'bomb-srpg/server/api\.\w+ResponseObject$'
+        - 'bomb-srpg/engine\.(GameEvent|TurnCommand)$'
+    gochecksumtype:
+      default-signifies-exhaustive: false
     errcheck:
       exclude-functions:
         - fmt.Fprint

@@ -43,14 +43,18 @@ func movePlansFor(unit *engine.Unit, gs *engine.GameState) [][]engine.TurnComman
 	if unit.HasMoved {
 		return nil
 	}
-	return singleCommandPlans(unit, gs, engine.TurnCmdMove, engine.NewMoveCommand)
+	return singleCommandPlans(unit, gs, engine.TurnCmdMove, func(id engine.UnitID, pos engine.Coordinate) engine.TurnCommand {
+		return engine.NewMoveCommand(id, pos)
+	})
 }
 
 func placeBombPlansFor(unit *engine.Unit, gs *engine.GameState) [][]engine.TurnCommand {
 	if unit.HasUsedSkill || unit.BombUsed >= unit.MaxBombCount {
 		return nil
 	}
-	return singleCommandPlans(unit, gs, engine.TurnCmdPlaceBomb, engine.NewPlaceBombCommand)
+	return singleCommandPlans(unit, gs, engine.TurnCmdPlaceBomb, func(id engine.UnitID, pos engine.Coordinate) engine.TurnCommand {
+		return engine.NewPlaceBombCommand(id, pos)
+	})
 }
 
 func singleCommandPlans(unit *engine.Unit, gs *engine.GameState, turnCmdType engine.TurnCmdType, newCmd func(engine.UnitID, engine.Coordinate) engine.TurnCommand) [][]engine.TurnCommand {
@@ -75,7 +79,12 @@ func planTag(plan []engine.TurnCommand) string {
 
 	parts := make([]string, len(plan))
 	for i, cmd := range plan {
-		parts[i] = fmt.Sprintf("%s(%d,%d)", cmd.Type, cmd.Target.X, cmd.Target.Y)
+		switch cmd := cmd.(type) {
+		case engine.MoveCommand:
+			parts[i] = fmt.Sprintf("%s(%d,%d)", engine.TurnCmdMove, cmd.Target.X, cmd.Target.Y)
+		case engine.PlaceBombCommand:
+			parts[i] = fmt.Sprintf("%s(%d,%d)", engine.TurnCmdPlaceBomb, cmd.Target.X, cmd.Target.Y)
+		}
 	}
 	return strings.Join(parts, "+")
 }

@@ -52,8 +52,8 @@ func aliveCount(gs *engine.GameState, ids []engine.UnitID, kingID engine.UnitID)
 }
 
 func (tr *turnResult) fold(sc scoreContext, evt engine.GameEvent) {
-	switch evt.Type {
-	case engine.GameEvtBombExploded:
+	switch evt := evt.(type) {
+	case engine.BombExploded:
 		_, _, ownerID := evt.BombID.Decode()
 		dest := tr.opponentAffectedTiles
 		if slices.Contains(sc.allyIDs, ownerID) {
@@ -63,18 +63,18 @@ func (tr *turnResult) fold(sc scoreContext, evt engine.GameEvent) {
 			tr.affectedTiles[pos] = struct{}{}
 			dest[pos] = struct{}{}
 		}
-	case engine.GameEvtSoftBlockDestroyed:
+	case engine.SoftBlockDestroyed:
 		tr.destroyedSoftBlocks++
-	case engine.GameEvtUnitDied:
+	case engine.UnitDied:
 		tr.diedUnits[evt.UnitID] = struct{}{}
 		isAlly := evt.UnitID == sc.allyKingID || slices.Contains(sc.allyIDs, evt.UnitID)
-		if isAlly && evt.Position != nil {
-			if _, ok := tr.allyAffectedTiles[*evt.Position]; ok {
+		if isAlly {
+			if _, ok := tr.allyAffectedTiles[evt.Position]; ok {
 				tr.suicides[evt.UnitID] = struct{}{}
 			}
 		}
-	case engine.GameEvtUnitMoved, engine.GameEvtUnitDamaged, engine.GameEvtBombPlaced,
-		engine.GameEvtBombCountdownUpdated, engine.GameEvtMatchEnded:
+	case engine.UnitMoved, engine.UnitDamaged, engine.BombPlaced,
+		engine.BombCountdownUpdated, engine.MatchEnded:
 	}
 }
 

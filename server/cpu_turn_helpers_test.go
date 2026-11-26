@@ -39,9 +39,10 @@ func vsCpuGameCfg() engine.GameCfg {
 	return gameCfg
 }
 
-func hasGameEvent(gameEvents []engine.GameEvent, evtType engine.GameEvtType, unitID engine.UnitID) bool {
+func hasUnitMoved(gameEvents []engine.GameEvent, unitID engine.UnitID) bool {
 	return slices.ContainsFunc(gameEvents, func(evt engine.GameEvent) bool {
-		return evt.Type == evtType && evt.UnitID == unitID
+		moved, ok := evt.(engine.UnitMoved)
+		return ok && moved.UnitID == unitID
 	})
 }
 

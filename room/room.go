@@ -269,7 +269,7 @@ func (r *Room) AllowedTiles(unitID engine.UnitID, turnCmdType engine.TurnCmdType
 }
 
 func (r *Room) Submit(cmd engine.TurnCommand, token string) ([]engine.GameEvent, error) {
-	teamID, _ := cmd.UnitID.Decode()
+	teamID, _ := cmd.Actor().Decode()
 	var gameEvents []engine.GameEvent
 	err := r.command(token, func(*engine.Match) int { return teamID }, rejectInCPUTurn, func(match *engine.Match) error {
 		events, err := match.ApplyTurnCommand(cmd)

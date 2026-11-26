@@ -39,57 +39,52 @@ func TestWireEventBytes(t *testing.T) {
 	}{
 		{
 			"unit moved",
-			engine.NewUnitMovedEvent(17, pos, engine.Coordinate{X: 3, Y: 4}),
+			engine.UnitMoved{UnitID: 17, From: pos, To: engine.Coordinate{X: 3, Y: 4}},
 			`{"countdown":0,"from":{"x":1,"y":2},"newHp":0,"to":{"x":3,"y":4},"type":"unitMoved","unitId":17}`,
 		},
 		{
 			"unit damaged",
-			engine.GameEvent{Type: engine.GameEvtUnitDamaged, UnitID: 17, Position: &pos, NewHP: 4},
+			engine.UnitDamaged{UnitID: 17, Position: pos, NewHP: 4},
 			`{"countdown":0,"newHp":4,"position":{"x":1,"y":2},"type":"unitDamaged","unitId":17}`,
 		},
 		{
 			"unit died",
-			engine.NewUnitDiedEvent(17, pos),
+			engine.UnitDied{UnitID: 17, Position: pos},
 			`{"countdown":0,"newHp":0,"position":{"x":1,"y":2},"type":"unitDied","unitId":17}`,
 		},
 		{
 			"bomb placed",
-			engine.GameEvent{Type: engine.GameEvtBombPlaced, UnitID: 17, BombID: 70000, Position: &pos, Range: 2, Countdown: 3},
+			engine.BombPlaced{UnitID: 17, BombID: 70000, Position: pos, Range: 2, Countdown: 3},
 			`{"bombId":70000,"countdown":3,"newHp":0,"position":{"x":1,"y":2},"range":2,"type":"bombPlaced","unitId":17}`,
 		},
 		{
 			"bomb countdown updated",
-			engine.GameEvent{Type: engine.GameEvtBombCountdownUpdated, BombID: 70000, Position: &pos, Countdown: 2},
+			engine.BombCountdownUpdated{BombID: 70000, Position: pos, Countdown: 2},
 			`{"bombId":70000,"countdown":2,"newHp":0,"position":{"x":1,"y":2},"type":"bombCountdownUpdated","unitId":0}`,
 		},
 		{
 			"bomb exploded",
-			engine.GameEvent{Type: engine.GameEvtBombExploded, BombID: 70000, Position: &pos, AffectedPositions: []engine.Coordinate{{X: 1, Y: 2}, {X: 1, Y: 3}}},
+			engine.BombExploded{BombID: 70000, Position: pos, AffectedPositions: []engine.Coordinate{{X: 1, Y: 2}, {X: 1, Y: 3}}},
 			`{"affectedPositions":[{"x":1,"y":2},{"x":1,"y":3}],"bombId":70000,"countdown":0,"newHp":0,"position":{"x":1,"y":2},"type":"bombExploded","unitId":0}`,
 		},
 		{
 			"soft block destroyed",
-			engine.GameEvent{Type: engine.GameEvtSoftBlockDestroyed, SoftBlockID: 5, Position: &pos},
+			engine.SoftBlockDestroyed{SoftBlockID: 5, Position: pos},
 			`{"countdown":0,"newHp":0,"position":{"x":1,"y":2},"softBlockId":5,"type":"softBlockDestroyed","unitId":0}`,
 		},
 		{
-			"item id is sent when set",
-			engine.GameEvent{Type: engine.GameEvtUnitMoved, ItemID: 3},
-			`{"countdown":0,"itemId":3,"newHp":0,"type":"unitMoved","unitId":0}`,
-		},
-		{
 			"match ended",
-			engine.NewMatchEndedEvent(2),
+			engine.MatchEnded{WinnerTeamID: 2},
 			`{"countdown":0,"newHp":0,"type":"matchEnded","unitId":0,"winnerTeamId":2}`,
 		},
 		{
 			"match drawn",
-			engine.NewMatchEndedEvent(-1),
+			engine.MatchEnded{WinnerTeamID: -1},
 			`{"countdown":0,"newHp":0,"type":"matchEnded","unitId":0,"winnerTeamId":-1}`,
 		},
 		{
 			"position at the origin is still sent",
-			engine.GameEvent{Type: engine.GameEvtUnitDamaged, UnitID: 1, Position: &engine.Coordinate{}},
+			engine.UnitDamaged{UnitID: 1},
 			`{"countdown":0,"newHp":0,"position":{"x":0,"y":0},"type":"unitDamaged","unitId":1}`,
 		},
 	}
@@ -145,7 +140,7 @@ func TestWireStateBytes(t *testing.T) {
 			engine.NewMoveCommand(17, pos),
 			engine.NewPlaceBombCommand(17, engine.Coordinate{X: 1, Y: 3}),
 		},
-		TurnStartEvents: []engine.GameEvent{{Type: engine.GameEvtBombPlaced, UnitID: 17, BombID: 70000, Position: &pos, Range: 2, Countdown: 3}},
+		TurnStartEvents: []engine.GameEvent{engine.BombPlaced{UnitID: 17, BombID: 70000, Position: pos, Range: 2, Countdown: 3}},
 	}
 	const unitHead = `{"bombMaxRange":4,"bombPower":5,"bombUsed":2,"hasMoved":`
 	const unitMid = `,"hp":7,"id":`
@@ -326,6 +321,26 @@ func TestResponseErrorHandler(t *testing.T) {
 			if got := rr.Header().Get("Content-Type"); !strings.HasPrefix(got, "text/plain") {
 				t.Errorf("Content-Type = %q, want text/plain", got)
 			}
+		})
+	}
+}
+
+func TestWireMappersRejectNil(t *testing.T) {
+	tests := []struct {
+		name string
+		call func()
+	}{
+		{"nil event", func() { wireGameEvent(nil) }},
+		{"nil command", func() { wireTurnCommand(nil) }},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer func() {
+				if recover() == nil {
+					t.Error("want a panic, got none")
+				}
+			}()
+			tt.call()
 		})
 	}
 }

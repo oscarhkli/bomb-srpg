@@ -38,9 +38,9 @@ func TestApplyCandidate(t *testing.T) {
 			},
 		},
 		{
-			name: "Unsupported command type",
+			name: "Nil command",
 			turnCommands: func(unit *engine.Unit) []engine.TurnCommand {
-				return []engine.TurnCommand{{Type: engine.TurnCmdType("bogus"), UnitID: unit.ID, Target: engine.Coordinate{X: 0, Y: 0}}}
+				return []engine.TurnCommand{nil}
 			},
 			wantErr: engine.ErrUnsupportedCommand,
 		},
@@ -175,7 +175,7 @@ func TestBestCandidateFor(t *testing.T) {
 			t.Fatalf("bestCandidateFor() unexpected err = %v", err)
 		}
 
-		if len(got.turnCommands) == 2 && got.turnCommands[0].Type == engine.TurnCmdMove {
+		if len(got.turnCommands) == 2 && isMove(got.turnCommands[0]) {
 			t.Errorf("bestCandidateFor() = %+v (tag %q), move+bomb must not win a tie (score %d)", got.turnCommands, got.tag, got.score)
 		}
 	})
@@ -244,11 +244,11 @@ func TestDecide_DeadAllyExcludedFromPlanning(t *testing.T) {
 
 	got := mustDecide(t, gs)
 
-	if len(got) == 0 || got[0].UnitID != allyKing.ID {
+	if len(got) == 0 || got[0].Actor() != allyKing.ID {
 		t.Fatalf("Decide() = %+v, want at least one command from the live ally King %v", got, allyKing.ID)
 	}
 	for _, cmd := range got {
-		if cmd.UnitID == deadAlly.ID {
+		if cmd.Actor() == deadAlly.ID {
 			t.Errorf("Decide() = %+v, want no command from dead ally %v", got, deadAlly.ID)
 		}
 	}
@@ -314,7 +314,7 @@ func TestDecide_FrozenFighterNeverSuicides(t *testing.T) {
 	got := mustDecide(t, gs)
 
 	for _, cmd := range got {
-		if cmd.Type == engine.TurnCmdPlaceBomb {
+		if _, ok := cmd.(engine.PlaceBombCommand); ok {
 			t.Errorf("Decide() = %+v, must not place a bomb that guarantees self-destruction", got)
 		}
 	}
@@ -336,11 +336,12 @@ func TestDecide_MobileFighterMovesThenBombsSafely(t *testing.T) {
 	for _, fighter := range []*engine.Unit{fighter1, fighter2} {
 		var moved, bombed bool
 		for _, cmd := range got {
-			if cmd.UnitID != fighter.ID {
+			if cmd.Actor() != fighter.ID {
 				continue
 			}
-			moved = moved || cmd.Type == engine.TurnCmdMove
-			bombed = bombed || cmd.Type == engine.TurnCmdPlaceBomb
+			moved = moved || isMove(cmd)
+			_, isBomb := cmd.(engine.PlaceBombCommand)
+			bombed = bombed || isBomb
 		}
 		if !moved || !bombed {
 			t.Errorf("Decide() = %+v, want a move and a placeBomb from %v", got, fighter.ID)
@@ -402,7 +403,7 @@ func TestDecide_MovesEvenWhenEveryPlanScoresBelowNeutral(t *testing.T) {
 
 	got := mustDecide(t, gs)
 
-	if len(got) != 1 || got[0].Type != engine.TurnCmdMove || got[0].UnitID != allyKing.ID {
+	if len(got) != 1 || !isMove(got[0]) || got[0].Actor() != allyKing.ID {
 		t.Fatalf("Decide() = %+v, want a single move from %v", got, allyKing.ID)
 	}
 	if !reflect.DeepEqual(gs, before) {
@@ -429,11 +430,15 @@ func TestDecide_PrefersFartherSafeTile(t *testing.T) {
 
 	got := mustDecide(t, gs)
 
-	if len(got) != 1 || got[0].Type != engine.TurnCmdMove || got[0].UnitID != boss.ID {
+	if len(got) != 1 {
 		t.Fatalf("Decide() = %+v, want a single move from %v", got, boss.ID)
 	}
-	if got[0].Target == (engine.Coordinate{X: 5, Y: 2}) {
-		t.Errorf("Decide() moved to %+v, want a tile farther from bombB's blast", got[0].Target)
+	move, ok := got[0].(engine.MoveCommand)
+	if !ok || move.UnitID != boss.ID {
+		t.Fatalf("Decide() = %+v, want a single move from %v", got, boss.ID)
+	}
+	if move.Target == (engine.Coordinate{X: 5, Y: 2}) {
+		t.Errorf("Decide() moved to %+v, want a tile farther from bombB's blast", move.Target)
 	}
 }
 
@@ -458,7 +463,11 @@ func TestDecide_MovesToFarthestSafeTile(t *testing.T) {
 
 	got := mustDecide(t, gs)
 
-	if len(got) != 1 || got[0].Type != engine.TurnCmdMove || got[0].UnitID != boss.ID || !slices.Contains(farTiles, got[0].Target) {
+	var move engine.MoveCommand
+	if len(got) == 1 {
+		move, _ = got[0].(engine.MoveCommand)
+	}
+	if len(got) != 1 || move.UnitID != boss.ID || !slices.Contains(farTiles, move.Target) {
 		t.Errorf("Decide() = %+v, want a single move from %v to one of %+v", got, boss.ID, farTiles)
 	}
 }
@@ -491,8 +500,8 @@ func TestDecide(t *testing.T) {
 				return gs
 			},
 			want: []engine.TurnCommand{
-				{Type: engine.TurnCmdMove, UnitID: engine.NewUnitID(2, 1)},
-				{Type: engine.TurnCmdPlaceBomb, UnitID: engine.NewUnitID(2, 1)},
+				engine.NewMoveCommand(engine.NewUnitID(2, 1), engine.Coordinate{}),
+				engine.NewPlaceBombCommand(engine.NewUnitID(2, 1), engine.Coordinate{}),
 			},
 		},
 		{
@@ -504,8 +513,8 @@ func TestDecide(t *testing.T) {
 				return gs
 			},
 			want: []engine.TurnCommand{
-				{Type: engine.TurnCmdMove, UnitID: engine.NewUnitID(2, 1)},
-				{Type: engine.TurnCmdPlaceBomb, UnitID: engine.NewUnitID(2, 1)},
+				engine.NewMoveCommand(engine.NewUnitID(2, 1), engine.Coordinate{}),
+				engine.NewPlaceBombCommand(engine.NewUnitID(2, 1), engine.Coordinate{}),
 			},
 		},
 		{
@@ -516,7 +525,7 @@ func TestDecide(t *testing.T) {
 				addKing(gs, engine.NewUnitID(1, 1), engine.Coordinate{X: 8, Y: 8})
 				return gs
 			},
-			want: []engine.TurnCommand{{Type: engine.TurnCmdMove, UnitID: engine.NewUnitID(2, 1)}},
+			want: []engine.TurnCommand{engine.NewMoveCommand(engine.NewUnitID(2, 1), engine.Coordinate{})},
 		},
 	}
 	for _, tt := range tests {
@@ -530,8 +539,8 @@ func TestDecide(t *testing.T) {
 				t.Fatalf("Decide() = %+v, want %+v", got, tt.want)
 			}
 			for i, cmd := range got {
-				if cmd.Type != tt.want[i].Type || cmd.UnitID != tt.want[i].UnitID {
-					t.Errorf("Decide()[%d] = %+v, want Type %v UnitID %v", i, cmd, tt.want[i].Type, tt.want[i].UnitID)
+				if reflect.TypeOf(cmd) != reflect.TypeOf(tt.want[i]) || cmd.Actor() != tt.want[i].Actor() {
+					t.Errorf("Decide()[%d] = %+v, want kind %T actor %v", i, cmd, tt.want[i], tt.want[i].Actor())
 				}
 			}
 			if !reflect.DeepEqual(gs, before) {
@@ -690,8 +699,8 @@ func TestDecide_Roster(t *testing.T) {
 				t.Fatalf("Decide() error = %v", err)
 			}
 			for _, cmd := range got {
-				if slices.Contains(tt.wantNone, cmd.UnitID) {
-					t.Errorf("Decide() = %+v, want no command from %v", got, cmd.UnitID)
+				if slices.Contains(tt.wantNone, cmd.Actor()) {
+					t.Errorf("Decide() = %+v, want no command from %v", got, cmd.Actor())
 				}
 			}
 		})
@@ -764,8 +773,8 @@ func TestDecide_HighestScoringAllyActsFirst(t *testing.T) {
 
 	got := mustDecide(t, gs)
 
-	if len(got) != 4 || got[0].UnitID != fighter1.ID || got[1].UnitID != fighter1.ID ||
-		got[2].UnitID != fighter2.ID || got[3].UnitID != fighter2.ID {
+	if len(got) != 4 || got[0].Actor() != fighter1.ID || got[1].Actor() != fighter1.ID ||
+		got[2].Actor() != fighter2.ID || got[3].Actor() != fighter2.ID {
 		t.Errorf("Decide() = %+v, want %v's plan first, then %v's", got, fighter1.ID, fighter2.ID)
 	}
 }
@@ -876,7 +885,7 @@ func TestDecide_ReturnsErrorWhenAllyDesynced(t *testing.T) {
 		t.Fatal("Decide() = no commands, want the healthy ally's plan")
 	}
 	for _, cmd := range cmds {
-		if cmd.UnitID != fighter2.ID {
+		if cmd.Actor() != fighter2.ID {
 			t.Errorf("Decide() command %+v, want only unit %#x", cmd, fighter2.ID)
 		}
 	}

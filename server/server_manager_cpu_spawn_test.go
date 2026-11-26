@@ -34,7 +34,7 @@ func TestServerStateManager_ConsumeCPUStatus_DefaultSpawn(t *testing.T) {
 	if phase != room.TurnPhaseReady {
 		t.Errorf("phase after the turn = %v, want %v", phase, room.TurnPhaseReady)
 	}
-	if !hasGameEvent(planGameEvents, engine.GameEvtUnitMoved, cpuUnitID) {
+	if !hasUnitMoved(planGameEvents, cpuUnitID) {
 		t.Errorf("Expected unit %#x to have moved, got %#v", cpuUnitID, planGameEvents)
 	}
 }
