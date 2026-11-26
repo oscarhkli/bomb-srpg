@@ -8,9 +8,9 @@ title: "Phase 4.10: Refine 2-phase GameEvents Handling in ResolveTurn"
 
 `Match.ResolveTurn()` produces two phases of events: the planning events submitted through `ApplyTurnCommand`, followed by the resolution events produced by bomb detonation. The engine returns them as two slices, but `ServerStateManager.ResolveTurn` concatenates them, so `/resolve` hands the client one flat array with no marked seam.
 
-`MatchScene` copes by classifying on the event `type`. `resolveTurnPlayer` handles only `bombCountdownUpdated`, `bombExploded`, `unitDamaged`, `unitDied` and `softBlockDestroyed`, so the Player's own `unitMoved`/`bombPlaced` prefix falls through the switch and is dropped correctly, because those were already animated when the command was submitted.
+`MatchScene` copes by classifying on `GameEvtType`. `resolveTurnPlayer` handles only `bombCountdownUpdated`, `bombExploded`, `unitDamaged`, `unitDied` and `softBlockDestroyed`, so the Player's own `unitMoved`/`bombPlaced` prefix falls through the switch and is dropped correctly, because those were already animated when the command was submitted.
 
-That classification holds only while each event `type` belongs to exactly one phase. It is true today, but will be invalid when Skills are introduced in future.
+That classification holds only while each `GameEvtType` belongs to exactly one phase. It is true today, but will be invalid when Skills are introduced in future.
 
 [p4-spec009-cpu](p4-spec009-cpu.md) already consumes the two slices on the VS CPU path via `/cpu-status/consume`. This spec brings the VS Human path to the same shape.
 
@@ -19,7 +19,7 @@ That classification holds only while each event `type` belongs to exactly one ph
 ## Goal
 
 - `MatchScene` drops the already-animated planning events by position, not by event type.
-- `resolveTurnPlayer` no longer infers phase from the event `type`.
+- `resolveTurnPlayer` no longer infers phase from `GameEvtType`.
 - VS Human and VS CPU consume the same response shape.
 
 ## Non-Goal
@@ -53,7 +53,8 @@ Error handling, the generation guard, and the `turnPanel` refresh are unchanged.
 
 `resolveTurnPlayer` keeps its per-type cases but stops relying on fall-through as classification:
 
-- Types it deliberately ignores are named in an explicit ignore-list, so the assumption is stated in code rather than implied by omission. The list holds `matchEnded`, `unitMoved` and `bombPlaced`. `MatchScene` handles `matchEnded` separately, and the other two are animated during planning.
+- Types it deliberately ignores are named in an explicit ignore-list, so the assumption is stated in code rather than implied by omission. Today that list holds only `matchEnded` — the one `GameEvtType` that legitimately reaches `resolveTurnGameEvents` without `resolveTurnPlayer` animating it, since `MatchScene` handles it separately. `unitMoved`/`bombPlaced` don't need a slot on the list: they never appear in `resolveTurnGameEvents` under the current phase split.
+- Any type outside both the handled set and the ignore-list logs a dev-mode warning naming the type. A future phase-spanning event then surfaces instead of misrendering.
 
 ## VS CPU
 
@@ -67,3 +68,4 @@ Unchanged. The CPU branch introduced in Phase 4.9 already consumes two arrays; a
 2. Given a Player turn placing a bomb that detonates in the same turn, when the turn is resolved, then the explosion animates and no planning-phase `unitMoved` is replayed.
 3. Given a turn whose resolution produces no events, when the turn is resolved, then `resolveTurnGameEvents` is an empty array and the Player advances to the next turn without error.
 4. Given a VS CPU match, when the CPU turn is consumed, then rendering is unchanged from p4-spec008.
+5. Given `resolveTurnPlayer` receives an event type in neither the handled set nor the ignore-list, when running in dev mode, then a warning is logged naming the type.
