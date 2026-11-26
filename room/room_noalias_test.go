@@ -12,19 +12,10 @@ import (
 func cloneEvents(gameEvents []engine.GameEvent) []engine.GameEvent {
 	out := make([]engine.GameEvent, len(gameEvents))
 	for i, evt := range gameEvents {
-		if evt.Position != nil {
-			pos := *evt.Position
-			evt.Position = &pos
+		if exploded, ok := evt.(engine.BombExploded); ok {
+			exploded.AffectedPositions = slices.Clone(exploded.AffectedPositions)
+			evt = exploded
 		}
-		if evt.From != nil {
-			from := *evt.From
-			evt.From = &from
-		}
-		if evt.To != nil {
-			to := *evt.To
-			evt.To = &to
-		}
-		evt.AffectedPositions = slices.Clone(evt.AffectedPositions)
 		out[i] = evt
 	}
 	return out
@@ -35,18 +26,13 @@ func scribbleEvents(t *testing.T, gameEvents []engine.GameEvent) {
 	if len(gameEvents) == 0 {
 		t.Fatal("no events to overwrite")
 	}
-	for i := range gameEvents {
-		evt := &gameEvents[i]
-		evt.Type = "scribbled"
-		evt.UnitID++
-		for _, pos := range []*engine.Coordinate{evt.Position, evt.From, evt.To} {
-			if pos != nil {
-				pos.X, pos.Y = -1, -1
+	for i, evt := range gameEvents {
+		if exploded, ok := evt.(engine.BombExploded); ok {
+			for j := range exploded.AffectedPositions {
+				exploded.AffectedPositions[j] = engine.Coordinate{X: -1, Y: -1}
 			}
 		}
-		for j := range evt.AffectedPositions {
-			evt.AffectedPositions[j] = engine.Coordinate{X: -1, Y: -1}
-		}
+		gameEvents[i] = engine.MatchEnded{WinnerTeamID: -1}
 	}
 }
 

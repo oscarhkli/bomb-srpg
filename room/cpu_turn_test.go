@@ -8,9 +8,17 @@ import (
 	"testing"
 )
 
-func hasGameEvent(gameEvents []engine.GameEvent, evtType engine.GameEvtType, unitID engine.UnitID) bool {
+func hasUnitMoved(gameEvents []engine.GameEvent, unitID engine.UnitID) bool {
 	return slices.ContainsFunc(gameEvents, func(evt engine.GameEvent) bool {
-		return evt.Type == evtType && evt.UnitID == unitID
+		moved, ok := evt.(engine.UnitMoved)
+		return ok && moved.UnitID == unitID
+	})
+}
+
+func hasBombPlaced(gameEvents []engine.GameEvent, unitID engine.UnitID) bool {
+	return slices.ContainsFunc(gameEvents, func(evt engine.GameEvent) bool {
+		placed, ok := evt.(engine.BombPlaced)
+		return ok && placed.UnitID == unitID
 	})
 }
 
@@ -48,10 +56,10 @@ func TestApplyPlan(t *testing.T) {
 			},
 			validate: func(t *testing.T, m *engine.Match) {
 				t.Helper()
-				if !hasGameEvent(m.PlaybackLog, engine.GameEvtUnitMoved, moverUnitID) {
+				if !hasUnitMoved(m.PlaybackLog, moverUnitID) {
 					t.Errorf("Expected unit %#x to have moved, got %#v", moverUnitID, m.PlaybackLog)
 				}
-				if !hasGameEvent(m.PlaybackLog, engine.GameEvtBombPlaced, bomberUnitID) {
+				if !hasBombPlaced(m.PlaybackLog, bomberUnitID) {
 					t.Errorf("Expected unit %#x to have placed a bomb, got %#v", bomberUnitID, m.PlaybackLog)
 				}
 			},
@@ -68,7 +76,7 @@ func TestApplyPlan(t *testing.T) {
 			wantErr: engine.ErrOutOfMoveRange,
 			validate: func(t *testing.T, m *engine.Match) {
 				t.Helper()
-				if hasGameEvent(m.PlaybackLog, engine.GameEvtBombPlaced, bomberUnitID) {
+				if hasBombPlaced(m.PlaybackLog, bomberUnitID) {
 					t.Errorf("Expected command after the rejected one to be skipped, got %#v", m.PlaybackLog)
 				}
 			},
@@ -77,7 +85,7 @@ func TestApplyPlan(t *testing.T) {
 			name: "Unsupported Command",
 			plan: func(t *testing.T, m *engine.Match) []engine.TurnCommand {
 				t.Helper()
-				return []engine.TurnCommand{{UnitID: moverUnitID, Target: engine.Coordinate{X: 1, Y: 1}}}
+				return []engine.TurnCommand{nil}
 			},
 			wantErr: engine.ErrUnsupportedCommand,
 		},

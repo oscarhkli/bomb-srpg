@@ -374,38 +374,72 @@ func wireCoordinates(cs []engine.Coordinate) []api.Coordinate {
 	return mapSlice(cs, wireCoordinate)
 }
 
-func wireCoordinatePtr(c *engine.Coordinate) *api.Coordinate {
-	if c == nil {
-		return nil
-	}
-	w := wireCoordinate(*c)
-	return &w
-}
-
 func wireSkills(names []string) []api.SkillType {
 	return mapSlice(names, func(name string) api.SkillType { return api.SkillType(name) })
 }
 
 func wireGameEvent(evt engine.GameEvent) api.GameEvent {
-	out := api.GameEvent{
-		Type:         api.GameEvtType(evt.Type),
-		UnitID:       int(evt.UnitID),
-		NewHp:        evt.NewHP,
-		Countdown:    evt.Countdown,
-		Position:     wireCoordinatePtr(evt.Position),
-		From:         wireCoordinatePtr(evt.From),
-		To:           wireCoordinatePtr(evt.To),
-		BombID:       nonZeroPtr(int64(evt.BombID)),
-		SoftBlockID:  nonZeroPtr(evt.SoftBlockID),
-		ItemID:       nonZeroPtr(evt.ItemID),
-		Range:        nonZeroPtr(evt.Range),
-		WinnerTeamID: nonZeroPtr(evt.WinnerTeamID),
+	switch evt := evt.(type) {
+	case engine.UnitMoved:
+		return api.GameEvent{
+			Type:   api.UnitMoved,
+			UnitID: int(evt.UnitID),
+			From:   new(wireCoordinate(evt.From)),
+			To:     new(wireCoordinate(evt.To)),
+		}
+	case engine.UnitDamaged:
+		return api.GameEvent{
+			Type:     api.UnitDamaged,
+			UnitID:   int(evt.UnitID),
+			NewHp:    evt.NewHP,
+			Position: new(wireCoordinate(evt.Position)),
+		}
+	case engine.UnitDied:
+		return api.GameEvent{
+			Type:     api.UnitDied,
+			UnitID:   int(evt.UnitID),
+			Position: new(wireCoordinate(evt.Position)),
+		}
+	case engine.BombPlaced:
+		return api.GameEvent{
+			Type:      api.BombPlaced,
+			UnitID:    int(evt.UnitID),
+			BombID:    nonZeroPtr(int64(evt.BombID)),
+			Position:  new(wireCoordinate(evt.Position)),
+			Range:     nonZeroPtr(evt.Range),
+			Countdown: evt.Countdown,
+		}
+	case engine.BombCountdownUpdated:
+		return api.GameEvent{
+			Type:      api.BombCountdownUpdated,
+			BombID:    nonZeroPtr(int64(evt.BombID)),
+			Position:  new(wireCoordinate(evt.Position)),
+			Countdown: evt.Countdown,
+		}
+	case engine.BombExploded:
+		out := api.GameEvent{
+			Type:     api.BombExploded,
+			BombID:   nonZeroPtr(int64(evt.BombID)),
+			Position: new(wireCoordinate(evt.Position)),
+		}
+		if len(evt.AffectedPositions) > 0 {
+			out.AffectedPositions = new(wireCoordinates(evt.AffectedPositions))
+		}
+		return out
+	case engine.SoftBlockDestroyed:
+		return api.GameEvent{
+			Type:        api.SoftBlockDestroyed,
+			SoftBlockID: nonZeroPtr(evt.SoftBlockID),
+			Position:    new(wireCoordinate(evt.Position)),
+		}
+	case engine.MatchEnded:
+		return api.GameEvent{
+			Type:         api.MatchEnded,
+			WinnerTeamID: nonZeroPtr(evt.WinnerTeamID),
+		}
+	default:
+		panic(fmt.Sprintf("wireGameEvent: unsupported event %T", evt))
 	}
-	if len(evt.AffectedPositions) > 0 {
-		affected := wireCoordinates(evt.AffectedPositions)
-		out.AffectedPositions = &affected
-	}
-	return out
 }
 
 func wireTile(t engine.Tile) api.Tile {
@@ -449,7 +483,14 @@ func wireSoftBlock(sb *engine.SoftBlock) api.SoftBlock {
 }
 
 func wireTurnCommand(cmd engine.TurnCommand) api.TurnCommand {
-	return api.TurnCommand{Type: api.TurnCmdType(cmd.Type), UnitID: int(cmd.UnitID), Target: wireCoordinate(cmd.Target)}
+	switch cmd := cmd.(type) {
+	case engine.MoveCommand:
+		return api.TurnCommand{Type: api.Move, UnitID: int(cmd.UnitID), Target: wireCoordinate(cmd.Target)}
+	case engine.PlaceBombCommand:
+		return api.TurnCommand{Type: api.PlaceBomb, UnitID: int(cmd.UnitID), Target: wireCoordinate(cmd.Target)}
+	default:
+		panic(fmt.Sprintf("wireTurnCommand: unsupported command %T", cmd))
+	}
 }
 
 func wireGameState(gs *engine.GameState) api.GameState {
@@ -499,13 +540,17 @@ func wireMatchCreated(tokens [2]string) api.CreateMatchResponse {
 func engineTurnCommand(cmd api.TurnCommand) (engine.TurnCommand, error) {
 	unitID, ok := engineUnitID(cmd.UnitID)
 	if !ok {
-		return engine.TurnCommand{}, badRequest(invalidTurnCmdText)
+		return nil, badRequest(invalidTurnCmdText)
 	}
-	return engine.TurnCommand{
-		Type:   engine.TurnCmdType(cmd.Type),
-		UnitID: unitID,
-		Target: engine.Coordinate{X: cmd.Target.X, Y: cmd.Target.Y},
-	}, nil
+	target := engine.Coordinate{X: cmd.Target.X, Y: cmd.Target.Y}
+	switch cmd.Type {
+	case api.Move:
+		return engine.NewMoveCommand(unitID, target), nil
+	case api.PlaceBomb:
+		return engine.NewPlaceBombCommand(unitID, target), nil
+	default:
+		return nil, fmt.Errorf("%w: %w: %s", room.ErrInvalidTurnCmd, engine.ErrUnsupportedCommand, cmd.Type)
+	}
 }
 
 func engineTeamSlots(slots []api.TeamSlot) ([]engine.TeamSlot, error) {

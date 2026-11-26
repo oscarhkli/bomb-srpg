@@ -133,14 +133,14 @@ func TestSubmitTurnCommandDecoding(t *testing.T) {
 		wantMsg    string
 	}{
 		{"exact keys", `{"type":"move","unitId":16,` + target + `}`, false, http.StatusOK, ""},
-		{"keys match case-sensitively", `{"Type":"move","unitId":16,` + target + `}`, false, http.StatusConflict, ""},
+		{"keys match case-sensitively", `{"Type":"move","unitId":16,` + target + `}`, false, http.StatusConflict, "invalid turn command: unsupported command type: "},
 		{"duplicate key", `{"type":"move","type":"placeBomb","unitId":16,` + target + `}`, false, http.StatusBadRequest, formatMsg},
 		{"trailing data after value", `{"type":"move","unitId":16,` + target + `} garbage`, false, http.StatusBadRequest, formatMsg},
 		{"second value after value", `{"type":"move","unitId":16,` + target + `}{"type":"move","unitId":16,` + target + `}`, false, http.StatusBadRequest, formatMsg},
 		{"invalid UTF-8 in unknown member", "{\"type\":\"move\",\"unitId\":16,\"x\":\"\xff\"," + target + `}`, false, http.StatusBadRequest, formatMsg},
 		{"invalid UTF-8 body", "\xff", false, http.StatusBadRequest, formatMsg},
 		{"byte order mark before value", "\xef\xbb\xbf{\"type\":\"move\",\"unitId\":16," + target + `}`, false, http.StatusBadRequest, formatMsg},
-		{"null body", `null`, false, http.StatusBadRequest, "invalid game config"},
+		{"null body", `null`, false, http.StatusConflict, "invalid turn command: unsupported command type: "},
 		{"empty body", ``, false, http.StatusBadRequest, formatMsg},
 		{"whitespace-only body", " \n\t", false, http.StatusBadRequest, formatMsg},
 		{"unitId written with a fraction", `{"type":"move","unitId":1.0,` + target + `}`, false, http.StatusBadRequest, formatMsg},
@@ -151,7 +151,9 @@ func TestSubmitTurnCommandDecoding(t *testing.T) {
 		{"target x beyond float64", `{"type":"move","unitId":16,"target":{"x":1e400,"y":7}}`, false, http.StatusBadRequest, formatMsg},
 		{"unitId above 255", `{"type":"move","unitId":256,` + target + `}`, false, http.StatusBadRequest, formatMsg},
 		{"negative unitId", `{"type":"move","unitId":-1,` + target + `}`, false, http.StatusBadRequest, formatMsg},
-		{"unknown type", `{"type":"fly","unitId":16,` + target + `}`, false, http.StatusConflict, ""},
+		{"unknown type", `{"type":"fly","unitId":16,` + target + `}`, false, http.StatusConflict, "invalid turn command: unsupported command type: fly"},
+		{"unknown type with an invalid unitId", `{"type":"fly","unitId":256,` + target + `}`, false, http.StatusBadRequest, formatMsg},
+		{"unknown type without a token", `{"type":"fly","unitId":16,` + target + `}`, true, http.StatusConflict, "invalid turn command: unsupported command type: fly"},
 		{"malformed body without a token", `{`, true, http.StatusBadRequest, formatMsg},
 		{"valid body without a token", `{"type":"move","unitId":16,` + target + `}`, true, http.StatusUnauthorized, "invalid player token"},
 	}

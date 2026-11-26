@@ -251,19 +251,10 @@ func cloneGameEvents(src []GameEvent) []GameEvent {
 }
 
 func cloneGameEvent(evt GameEvent) GameEvent {
-	if evt.Position != nil {
-		pos := *evt.Position
-		evt.Position = &pos
+	if exploded, ok := evt.(BombExploded); ok {
+		exploded.AffectedPositions = slices.Clone(exploded.AffectedPositions)
+		return exploded
 	}
-	if evt.From != nil {
-		from := *evt.From
-		evt.From = &from
-	}
-	if evt.To != nil {
-		to := *evt.To
-		evt.To = &to
-	}
-	evt.AffectedPositions = slices.Clone(evt.AffectedPositions)
 	return evt
 }
 

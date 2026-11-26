@@ -130,7 +130,7 @@ func TestEvaluate(t *testing.T) {
 			setup: func() (*engine.GameState, scoreContext, []engine.TurnCommand) {
 				gs := newTestGameState(5, 5)
 				actor := addFighter(gs, engine.NewUnitID(1, 1), engine.Coordinate{X: 0, Y: 0})
-				cmds := []engine.TurnCommand{{Type: engine.TurnCmdType("bogus"), UnitID: actor.ID, Target: engine.Coordinate{X: 0, Y: 0}}}
+				cmds := []engine.TurnCommand{nil}
 				return gs, scoreContext{actorID: actor.ID}, cmds
 			},
 			wantErr: engine.ErrUnsupportedCommand,

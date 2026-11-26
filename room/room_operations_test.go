@@ -231,7 +231,7 @@ func TestRoom_Submit(t *testing.T) {
 		}
 		resEvt := gameEvents[0]
 		validFrom := engine.Coordinate{X: 4, Y: 8}
-		if resEvt.Type != engine.GameEvtUnitMoved || resEvt.UnitID != unitID || *resEvt.From != validFrom || *resEvt.To != newPos {
+		if resEvt != (engine.UnitMoved{UnitID: unitID, From: validFrom, To: newPos}) {
 			t.Errorf("malformed UnitMoveEvent returned: %+v", resEvt)
 		}
 	})
@@ -323,20 +323,21 @@ func TestRoom_Resolve(t *testing.T) {
 		if got, want := planGameEvents, 1; len(got) != want {
 			t.Errorf("Expected %d planGameEvents returned, got %#v", want, got)
 		}
-		if !hasGameEvent(planGameEvents, engine.GameEvtBombPlaced, 16) {
+		if !hasBombPlaced(planGameEvents, 16) {
 			t.Errorf("Expected the placed bomb in planGameEvents, got %#v", planGameEvents)
 		}
 		if got, want := resolveTurnGameEvents, 5; len(got) != want {
 			t.Errorf("Expected %d resolveTurnGameEvents returned, got %#v", want, got)
 		}
-		if hasGameEvent(resolveTurnGameEvents, engine.GameEvtBombPlaced, 16) {
+		if hasBombPlaced(resolveTurnGameEvents, 16) {
 			t.Errorf("Expected no planning event in resolveTurnGameEvents, got %#v", resolveTurnGameEvents)
 		}
 		if got, want := mustState(t, r).Units[16].HP, 0; got != want {
 			t.Errorf("Expected Unit %#X HP %v, got %v", 16, want, got)
 		}
 		if !slices.ContainsFunc(resolveTurnGameEvents, func(evt engine.GameEvent) bool {
-			return evt.Type == engine.GameEvtMatchEnded && evt.WinnerTeamID == 2
+			ended, ok := evt.(engine.MatchEnded)
+			return ok && ended.WinnerTeamID == 2
 		}) {
 			t.Errorf("Expected a matchEnded event with winner 2, got %+v", resolveTurnGameEvents)
 		}
@@ -363,8 +364,8 @@ func TestRoom_Surrender(t *testing.T) {
 		if got, want := len(gameEvents), 1; got != want {
 			t.Fatalf("Expected %d gameEvents returned, got %#v", want, gameEvents)
 		}
-		if got, want := gameEvents[0].WinnerTeamID, 2; got != want {
-			t.Errorf("Expected gameEvent WinnerTeamID = %v, got %v", want, got)
+		if got, want := gameEvents[0], (engine.MatchEnded{WinnerTeamID: 2}); got != want {
+			t.Errorf("Expected gameEvent %v, got %v", want, got)
 		}
 	})
 

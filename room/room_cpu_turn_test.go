@@ -43,7 +43,7 @@ func TestRoom_ConsumeCPU_LaunchesCPUTurn(t *testing.T) {
 			wantActiveTeam: 1,
 			validate: func(t *testing.T, planGameEvents []engine.GameEvent, d *recordingDecider) {
 				t.Helper()
-				if !hasGameEvent(planGameEvents, engine.GameEvtUnitMoved, cpuUnitID) {
+				if !hasUnitMoved(planGameEvents, cpuUnitID) {
 					t.Errorf("Expected unit %#x to have moved, got %#v", cpuUnitID, planGameEvents)
 				}
 			},
@@ -82,7 +82,7 @@ func TestRoom_ConsumeCPU_LaunchesCPUTurn(t *testing.T) {
 			wantActiveTeam: 1,
 			validate: func(t *testing.T, planGameEvents []engine.GameEvent, d *recordingDecider) {
 				t.Helper()
-				if !hasGameEvent(planGameEvents, engine.GameEvtUnitMoved, cpuUnitID) {
+				if !hasUnitMoved(planGameEvents, cpuUnitID) {
 					t.Errorf("Expected replanned move to apply, got %#v", planGameEvents)
 				}
 			},
@@ -236,12 +236,13 @@ func TestRoom_ConsumeCPU_StaleReadyDropped(t *testing.T) {
 	}
 	found := false
 	for _, evt := range planGameEvents {
-		if evt.Type != engine.GameEvtUnitMoved || evt.UnitID != cpuUnitID {
+		moved, ok := evt.(engine.UnitMoved)
+		if !ok || moved.UnitID != cpuUnitID {
 			continue
 		}
 		found = true
-		if evt.To == nil || *evt.To != posB {
-			t.Errorf("move event To = %v, want %v", evt.To, posB)
+		if moved.To != posB {
+			t.Errorf("move event To = %v, want %v", moved.To, posB)
 		}
 	}
 	if !found {
@@ -492,7 +493,7 @@ func TestRoom_ConsumeCPU(t *testing.T) {
 				if got, want := turnPhase, TurnPhaseReady; got != want {
 					t.Errorf("Expected %v turnPhase return, got %v", want, got)
 				}
-				if !hasGameEvent(planGameEvents, engine.GameEvtUnitMoved, unitID) {
+				if !hasUnitMoved(planGameEvents, unitID) {
 					t.Errorf("Expected the move in planGameEvents, got %#v", planGameEvents)
 				}
 
@@ -628,7 +629,8 @@ func TestRoom_CPUTurnGate_NotGated(t *testing.T) {
 		t.Fatalf("Surrender() error = %v", err)
 	}
 	if !slices.ContainsFunc(surrenderEvents, func(evt engine.GameEvent) bool {
-		return evt.Type == engine.GameEvtMatchEnded && evt.WinnerTeamID == 2
+		ended, ok := evt.(engine.MatchEnded)
+		return ok && ended.WinnerTeamID == 2
 	}) {
 		t.Errorf("Expected a matchEnded event with winner 2, got %+v", surrenderEvents)
 	}
@@ -687,7 +689,7 @@ func TestRoom_CPUTurn_DecideError(t *testing.T) {
 			if got, want := mustState(t, f.r).ActiveTeam, 1; got != want {
 				t.Errorf("ActiveTeam = %d, want %d", got, want)
 			}
-			if got := hasGameEvent(planGameEvents, engine.GameEvtUnitMoved, cpuUnitID); got != tt.wantMove {
+			if got := hasUnitMoved(planGameEvents, cpuUnitID); got != tt.wantMove {
 				t.Errorf("move applied = %v, want %v, events %#v", got, tt.wantMove, planGameEvents)
 			}
 
@@ -757,7 +759,8 @@ func TestRoom_CPUTurn_EndsMatch(t *testing.T) {
 		t.Errorf("Expected first consume %v, got %v", want, got)
 	}
 	if !slices.ContainsFunc(resolveTurnGameEvents, func(evt engine.GameEvent) bool {
-		return evt.Type == engine.GameEvtMatchEnded && evt.WinnerTeamID == 1
+		ended, ok := evt.(engine.MatchEnded)
+		return ok && ended.WinnerTeamID == 1
 	}) {
 		t.Errorf("Expected a matchEnded event with winner 1, got %+v", resolveTurnGameEvents)
 	}
@@ -765,7 +768,7 @@ func TestRoom_CPUTurn_EndsMatch(t *testing.T) {
 		"plan":    planGameEvents,
 		"resolve": resolveTurnGameEvents,
 	} {
-		if hasGameEvent(gameEvents, engine.GameEvtBombPlaced, engine.SystemUnitID) {
+		if hasBombPlaced(gameEvents, engine.SystemUnitID) {
 			t.Errorf("Expected no hazard bombPlaced event in the %s events, got %+v", name, gameEvents)
 		}
 	}

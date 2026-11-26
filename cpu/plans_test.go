@@ -204,9 +204,12 @@ func TestSingleCommandPlans_errorPaths(t *testing.T) {
 		{"Failure: Unit is dead", deadUnit, engine.TurnCmdMove},
 		{"Failure: Unsupported command type", liveUnit, engine.TurnCmdType("bogus")},
 	}
+	newMove := func(id engine.UnitID, pos engine.Coordinate) engine.TurnCommand {
+		return engine.NewMoveCommand(id, pos)
+	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := singleCommandPlans(tt.unit, gs, tt.turnCmdType, engine.NewMoveCommand)
+			got := singleCommandPlans(tt.unit, gs, tt.turnCmdType, newMove)
 			if got != nil {
 				t.Errorf("singleCommandPlans() = %v, want nil", got)
 			}

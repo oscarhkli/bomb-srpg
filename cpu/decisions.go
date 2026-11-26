@@ -17,10 +17,15 @@ type candidate struct {
 }
 
 func (c candidate) priority() int {
-	if len(c.turnCommands) == 2 && c.turnCommands[0].Type == engine.TurnCmdMove {
+	if len(c.turnCommands) == 2 && isMove(c.turnCommands[0]) {
 		return 0
 	}
 	return 1
+}
+
+func isMove(cmd engine.TurnCommand) bool {
+	_, ok := cmd.(engine.MoveCommand)
+	return ok
 }
 
 var ErrNoKing = errors.New("no living king")
@@ -87,7 +92,7 @@ func Decide(gs *engine.GameState) ([]engine.TurnCommand, error) {
 			return cmp.Compare(a.score, b.score)
 		})
 		if err := applyCandidate(sandbox, best); err != nil {
-			errs = append(errs, fmt.Errorf("apply best candidate for unit %#x: %w", best.turnCommands[0].UnitID, err))
+			errs = append(errs, fmt.Errorf("apply best candidate for unit %#x: %w", best.turnCommands[0].Actor(), err))
 			break
 		}
 		cmds = append(cmds, best.turnCommands...)
@@ -119,13 +124,13 @@ func bestCandidateFor(sc scoreContext, gs *engine.GameState) (candidate, error) 
 func applyCandidate(gs *engine.GameState, c candidate) error {
 	for _, cmd := range c.turnCommands {
 		var err error
-		switch cmd.Type {
-		case engine.TurnCmdMove:
+		switch cmd := cmd.(type) {
+		case engine.MoveCommand:
 			_, err = gs.MoveUnit(cmd.UnitID, cmd.Target)
-		case engine.TurnCmdPlaceBomb:
+		case engine.PlaceBombCommand:
 			_, err = gs.PlaceBomb(cmd.UnitID, cmd.Target)
 		default:
-			err = fmt.Errorf("%w: %s", engine.ErrUnsupportedCommand, cmd.Type)
+			err = engine.ErrUnsupportedCommand
 		}
 		if err != nil {
 			return err
