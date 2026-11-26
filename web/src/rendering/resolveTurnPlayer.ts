@@ -49,9 +49,6 @@ function validate(events: GameEvent[], snapshot: GameState): string | null {
     switch (event.type) {
       case 'bombCountdownUpdated': {
         const { bombId, countdown } = event;
-        if (bombId === undefined || countdown === undefined) {
-          return 'bombCountdownUpdated event is missing bombId/countdown';
-        }
         if (!Number.isInteger(countdown) || countdown < 0) {
           return `bombCountdownUpdated event has an invalid countdown ${countdown}`;
         }
@@ -61,10 +58,7 @@ function validate(events: GameEvent[], snapshot: GameState): string | null {
         break;
       }
       case 'bombExploded': {
-        const { bombId, position, affectedPositions } = event;
-        if (bombId === undefined || !position || affectedPositions === undefined) {
-          return 'bombExploded event is missing bombId/position/affectedPositions';
-        }
+        const { position, affectedPositions } = event;
         if (!inBounds(snapshot, position)) {
           return `bombExploded event has an out-of-bounds position (${position.x}, ${position.y})`;
         }
@@ -77,9 +71,6 @@ function validate(events: GameEvent[], snapshot: GameState): string | null {
       }
       case 'unitDamaged': {
         const { unitId, newHp, position } = event;
-        if (unitId === undefined || newHp === undefined || !position) {
-          return 'unitDamaged event is missing unitId/newHp/position';
-        }
         if (!Number.isInteger(newHp) || newHp < 0) {
           return `unitDamaged event has an invalid newHp ${newHp}`;
         }
@@ -93,9 +84,6 @@ function validate(events: GameEvent[], snapshot: GameState): string | null {
       }
       case 'unitDied': {
         const { unitId, position } = event;
-        if (unitId === undefined || !position) {
-          return 'unitDied event is missing unitId/position';
-        }
         if (!snapshot.units.some(u => u.id === unitId)) {
           return `unitDied event references unknown unitId ${unitId}`;
         }
@@ -106,9 +94,6 @@ function validate(events: GameEvent[], snapshot: GameState): string | null {
       }
       case 'softBlockDestroyed': {
         const { softBlockId, position } = event;
-        if (softBlockId === undefined || !position) {
-          return 'softBlockDestroyed event is missing softBlockId/position';
-        }
         if (!snapshot.softBlocks.some(s => s.id === softBlockId)) {
           return `softBlockDestroyed event references unknown softBlockId ${softBlockId}`;
         }
@@ -119,10 +104,8 @@ function validate(events: GameEvent[], snapshot: GameState): string | null {
       }
       case 'matchEnded':
         break;
-      default:
-        if (import.meta.env.DEV) {
-          console.warn(`playResolveTurnEvents received an unhandled event type: ${event.type}`);
-        }
+      case 'unitMoved':
+      case 'bombPlaced':
         break;
     }
   }
@@ -197,9 +180,9 @@ export function playResolveTurnEvents(
     if (event.type === 'bombCountdownUpdated') {
       const { bombId, countdown } = event;
       deps.scene.time.delayedCall(0, () => {
-        const bg = deps.bombGraphicsById.get(bombId!);
+        const bg = deps.bombGraphicsById.get(bombId);
         if (bg) {
-          renderBombCountdownText(bg.countdownText, countdown!);
+          renderBombCountdownText(bg.countdownText, countdown);
         }
       });
     }
@@ -211,13 +194,8 @@ export function playResolveTurnEvents(
       continue;
     }
     const { bombId, position, affectedPositions } = event;
-    const offset = causerOffsetFor(position!, explodedList);
-    explodedList.push({
-      bombId: bombId!,
-      position: position!,
-      affectedPositions: affectedPositions!,
-      offset,
-    });
+    const offset = causerOffsetFor(position, explodedList);
+    explodedList.push({ bombId, position, affectedPositions, offset });
   }
 
   for (const info of explodedList) {
@@ -249,39 +227,39 @@ export function playResolveTurnEvents(
   for (const event of events) {
     if (event.type === 'unitDamaged') {
       const { unitId, newHp, position } = event;
-      const offset = causerOffsetFor(position!, explodedList);
+      const offset = causerOffsetFor(position, explodedList);
       deps.scene.time.delayedCall(offset, () => {
-        const fire = drawFireShape(deps.scene, position!);
-        fireByUnitId.set(unitId!, fire);
-        if (newHp! > 0) {
+        const fire = drawFireShape(deps.scene, position);
+        fireByUnitId.set(unitId, fire);
+        if (newHp > 0) {
           deps.scene.time.delayedCall(FIRE_DURATION_MS, () => {
             fire.destroy();
-            fireByUnitId.delete(unitId!);
+            fireByUnitId.delete(unitId);
           });
         }
       });
-      if (newHp! > 0) {
+      if (newHp > 0) {
         endTimes.push(offset + FIRE_DURATION_MS);
       }
     } else if (event.type === 'unitDied') {
       const { unitId, position } = event;
-      const offset = causerOffsetFor(position!, explodedList);
+      const offset = causerOffsetFor(position, explodedList);
       deps.scene.time.delayedCall(offset + FIRE_DURATION_MS, () => {
-        deps.unitSpritesById.get(unitId!)?.destroy();
-        deps.unitSpritesById.delete(unitId!);
-        fireByUnitId.get(unitId!)?.destroy();
-        fireByUnitId.delete(unitId!);
+        deps.unitSpritesById.get(unitId)?.destroy();
+        deps.unitSpritesById.delete(unitId);
+        fireByUnitId.get(unitId)?.destroy();
+        fireByUnitId.delete(unitId);
       });
       endTimes.push(offset + FIRE_DURATION_MS);
     } else if (event.type === 'softBlockDestroyed') {
       const { softBlockId, position } = event;
-      const offset = causerOffsetFor(position!, explodedList);
+      const offset = causerOffsetFor(position, explodedList);
       deps.scene.time.delayedCall(offset, () => {
-        const fire = drawFireShape(deps.scene, position!);
+        const fire = drawFireShape(deps.scene, position);
         deps.scene.time.delayedCall(FIRE_DURATION_MS, () => {
           fire.destroy();
-          deps.softBlockSpritesById.get(softBlockId!)?.destroy();
-          deps.softBlockSpritesById.delete(softBlockId!);
+          deps.softBlockSpritesById.get(softBlockId)?.destroy();
+          deps.softBlockSpritesById.delete(softBlockId);
         });
       });
       endTimes.push(offset + FIRE_DURATION_MS);

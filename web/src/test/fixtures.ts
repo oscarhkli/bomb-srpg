@@ -1,7 +1,7 @@
 import type {
   Bomb,
+  BombPlacedEvent,
   GameCfg,
-  GameEvent,
   GameState,
   SoftBlock,
   TerrainType,
@@ -75,7 +75,7 @@ export function makeState(overrides: Partial<GameState> = {}): GameState {
   };
 }
 
-export function makeBombPlacedEvent(overrides: Partial<GameEvent> = {}): GameEvent {
+export function makeBombPlacedEvent(overrides: Partial<BombPlacedEvent> = {}): BombPlacedEvent {
   return {
     type: 'bombPlaced',
     unitId: 0,
