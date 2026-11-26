@@ -65,7 +65,7 @@ func TestSurrenderRequestDecoding(t *testing.T) {
 			if err := json.UnmarshalRead(rr.Body, &gameEvents); err != nil {
 				t.Fatalf("decode response: %v", err)
 			}
-			if len(gameEvents) != 1 || wireWinner(gameEvents[0]) != 2 {
+			if len(gameEvents) != 1 || !hasWireWinner(gameEvents, 2) {
 				t.Errorf("gameEvents = %+v, want one event with WinnerTeamID 2", gameEvents)
 			}
 		})

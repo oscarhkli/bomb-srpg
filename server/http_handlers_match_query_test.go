@@ -4,6 +4,7 @@ import (
 	"bomb-srpg/engine"
 	"bomb-srpg/server/api"
 	"cmp"
+	"encoding/json/jsontext"
 	"encoding/json/v2"
 	"net/http"
 	"net/http/httptest"
@@ -92,8 +93,12 @@ func TestHandleGetMatchState(t *testing.T) {
 			t.Fatalf("hazard bombs = %d, want %d", len(hazards), len(firstEvents))
 		}
 		for _, evt := range firstEvents {
-			if pos, ok := hazards[wireBombID(evt)]; !ok || evt.Position == nil || pos != *evt.Position {
-				t.Errorf("event %+v has no hazard bomb at its position; hazards = %+v", evt, hazards)
+			placed, ok := wireBombPlaced(evt)
+			if !ok {
+				t.Fatalf("turnStartEvents entry %+v is not a bombPlaced event", evt)
+			}
+			if pos, ok := hazards[placed.BombID]; !ok || pos != placed.Position {
+				t.Errorf("event %+v has no hazard bomb at its position; hazards = %+v", placed, hazards)
 			}
 		}
 		if got := getState().TurnStartEvents; !reflect.DeepEqual(got, firstEvents) {
@@ -108,9 +113,37 @@ func TestHandleGetMatchState(t *testing.T) {
 			t.Fatalf("turnStartEvents after resolve = %+v, want %d", nextEvents, want)
 		}
 		for _, evt := range nextEvents {
-			if slices.ContainsFunc(firstEvents, func(old api.GameEvent) bool { return wireBombID(old) == wireBombID(evt) }) {
-				t.Errorf("turnStartEvents after resolve reuse bomb ID %v", wireBombID(evt))
+			placed, ok := wireBombPlaced(evt)
+			if !ok {
+				t.Fatalf("turnStartEvents entry %+v is not a bombPlaced event", evt)
 			}
+			if slices.ContainsFunc(firstEvents, func(old api.GameEvent) bool {
+				oldPlaced, _ := wireBombPlaced(old)
+				return oldPlaced.BombID == placed.BombID
+			}) {
+				t.Errorf("turnStartEvents after resolve reuse bomb ID %v", placed.BombID)
+			}
+		}
+	})
+
+	t.Run("repeated GETs return identical turn start events bytes", func(t *testing.T) {
+		roomID, _, _, h := createSuddenDeathRoom(t)
+		turnStartEvents := func() string {
+			t.Helper()
+			rr := doRequest(t, h, "GET", "/api/match-rooms/"+roomID+"/match/state", "", "")
+			var raw struct {
+				TurnStartEvents jsontext.Value `json:"turnStartEvents"`
+			}
+			if err := json.Unmarshal(rr.Body.Bytes(), &raw); err != nil {
+				t.Fatalf("decode state: %v", err)
+			}
+			return string(raw.TurnStartEvents)
+		}
+
+		first := turnStartEvents()
+
+		if second := turnStartEvents(); second != first {
+			t.Errorf("second GET turnStartEvents = %s, want %s", second, first)
 		}
 	})
 

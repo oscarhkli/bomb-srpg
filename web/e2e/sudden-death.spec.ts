@@ -77,7 +77,10 @@ test('hot-seat sudden death drops the hazards once per turn, after the cutscene 
   expect(first.turnStartEvents).toHaveLength(2);
   const bombIds = first.bombs.map(b => b.id);
   for (const evt of first.turnStartEvents) {
-    expect(bombIds).toContain(evt.bombId);
+    expect(evt.type).toBe('bombPlaced');
+    if (evt.type === 'bombPlaced') {
+      expect(bombIds).toContain(evt.bombId);
+    }
   }
 
   const unit = await teamUnit(request, room, 1);

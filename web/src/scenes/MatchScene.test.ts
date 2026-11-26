@@ -838,7 +838,7 @@ describe('MatchScene', () => {
     expect(initToken).toHaveBeenCalledWith('team2-token');
     vi.mocked(getMatchState).mockResolvedValue(makeState({ grid: [[plainTile()]], activeTeam: 1 }));
     const resolveTurnGameEvents: GameEvent[] = [
-      { type: 'bombCountdownUpdated', bombId: 1, countdown: 2 },
+      { type: 'bombCountdownUpdated', bombId: 1, position: { x: 0, y: 0 }, countdown: 2 },
     ];
     vi.mocked(resolveTurn).mockResolvedValue({ planGameEvents: [], resolveTurnGameEvents });
 
@@ -974,7 +974,12 @@ describe('MatchScene', () => {
         range: 2,
         countdown: 3,
       };
-      const otherEvent: GameEvent = { type: 'bombCountdownUpdated', bombId: 1, countdown: 2 };
+      const otherEvent: GameEvent = {
+        type: 'bombCountdownUpdated',
+        bombId: 1,
+        position: { x: 0, y: 0 },
+        countdown: 2,
+      };
       queueMatchStates(
         makeState({
           inSuddenDeath: true,
@@ -1096,7 +1101,9 @@ describe('MatchScene', () => {
 
       vi.mocked(resolveTurn).mockResolvedValue({
         planGameEvents: [],
-        resolveTurnGameEvents: [{ type: 'bombCountdownUpdated', bombId: 999, countdown: 2 }],
+        resolveTurnGameEvents: [
+          { type: 'bombCountdownUpdated', bombId: 999, position: { x: 0, y: 0 }, countdown: 2 },
+        ],
       });
       clickSummaryPanelButton('resolve');
       const [yesButtonContainer] = lastContainers(2);
@@ -1312,7 +1319,7 @@ describe('MatchScene', () => {
           makeBombPlacedEvent({ bombId: 4, position: { x: 1, y: 0 } }),
         ];
         const nextBombs = nextHazardEvents.map(evt =>
-          makeBomb({ id: evt.bombId!, ownerId: 0, position: evt.position! })
+          makeBomb({ id: evt.bombId, ownerId: 0, position: evt.position })
         );
         queueMatchStates(
           hazardState({ activeTeam: 2 }),
@@ -1451,7 +1458,12 @@ describe('MatchScene', () => {
       const nextTurnState = makeState({ grid: [[plainTile()]], activeTeam: 1, turn: 2 });
       queueMatchStates(preState, nextTurnState);
       const bombPlacedEvent = makeBombPlacedEvent({ bombId: 5 });
-      const countdownEvent: GameEvent = { type: 'bombCountdownUpdated', bombId: 5, countdown: 2 };
+      const countdownEvent: GameEvent = {
+        type: 'bombCountdownUpdated',
+        bombId: 5,
+        position: { x: 0, y: 0 },
+        countdown: 2,
+      };
       vi.mocked(consumeCpuStatus).mockResolvedValue(
         readyStatus({
           planGameEvents: [bombPlacedEvent],
@@ -1485,7 +1497,12 @@ describe('MatchScene', () => {
       });
       const nextTurnState = makeState({ grid: [[plainTile()]], activeTeam: 1, turn: 7 });
       queueMatchStates(preState, nextTurnState);
-      const countdownEvent: GameEvent = { type: 'bombCountdownUpdated', bombId: 9, countdown: 0 };
+      const countdownEvent: GameEvent = {
+        type: 'bombCountdownUpdated',
+        bombId: 9,
+        position: { x: 0, y: 0 },
+        countdown: 0,
+      };
       const explodedEvent: GameEvent = {
         type: 'bombExploded',
         bombId: 9,
@@ -1760,40 +1777,12 @@ describe('MatchScene', () => {
       expect(consumeCpuStatus).toHaveBeenCalledTimes(2);
       expect(turnBannerPlay).toHaveBeenCalledTimes(2);
     });
-
-    it('aborts the CPU turn without rendering resolveTurnGameEvents when a planGameEvents entry is malformed', async () => {
-      queueMatchStates(makeState({ grid: [[plainTile()]], activeTeam: 2, turn: 1 }));
-      const malformedMove: GameEvent = {
-        type: 'unitMoved',
-        unitId: 1,
-        from: { x: 0, y: 0 },
-      };
-      vi.mocked(consumeCpuStatus).mockResolvedValue(
-        readyStatus({
-          planGameEvents: [malformedMove],
-          resolveTurnGameEvents: [{ type: 'matchEnded', winnerTeamId: 2 }],
-        })
-      );
-
-      await bootScene();
-      await flush();
-
-      expect(mockScene.add.text).toHaveBeenCalledWith(
-        expect.any(Number),
-        expect.any(Number),
-        expect.stringContaining('Invalid unitMoved event'),
-        expect.anything()
-      );
-      expect(playResolveTurnEvents).not.toHaveBeenCalled();
-      expect(victoryCutscenePlay).not.toHaveBeenCalled();
-    });
   });
 
   describe('victory cutscene and rematch', () => {
-    async function resolveWithMatchEnded(winnerTeamId?: number): Promise<void> {
+    async function resolveWithMatchEnded(winnerTeamId: number): Promise<void> {
       await setUpEmptyBoardAndClickResolve();
-      const event: GameEvent =
-        winnerTeamId === undefined ? { type: 'matchEnded' } : { type: 'matchEnded', winnerTeamId };
+      const event: GameEvent = { type: 'matchEnded', winnerTeamId };
       vi.mocked(resolveTurn).mockResolvedValue({
         planGameEvents: [],
         resolveTurnGameEvents: [event],
@@ -1818,23 +1807,17 @@ describe('MatchScene', () => {
       }
     );
 
-    it.each([
-      ['out of range', 3],
-      ['missing', undefined],
-    ])(
-      'shows an error and does not render VictoryCutscene when winnerTeamId is %s',
-      async (_label, winnerTeamId) => {
-        await resolveWithMatchEnded(winnerTeamId);
+    it('shows an error and does not render VictoryCutscene when winnerTeamId is out of range', async () => {
+      await resolveWithMatchEnded(3);
 
-        expect(victoryCutscenePlay).not.toHaveBeenCalled();
-        expect(mockScene.add.text).toHaveBeenCalledWith(
-          expect.any(Number),
-          expect.any(Number),
-          'Invalid matchEnded event received from server',
-          expect.objectContaining({})
-        );
-      }
-    );
+      expect(victoryCutscenePlay).not.toHaveBeenCalled();
+      expect(mockScene.add.text).toHaveBeenCalledWith(
+        expect.any(Number),
+        expect.any(Number),
+        'Invalid matchEnded event received from server',
+        expect.objectContaining({})
+      );
+    });
 
     it('permanently disables unit-click and resolve-button interactions once the match has ended', async () => {
       const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });

@@ -96,24 +96,66 @@ func wirePlaceBombCmd(unitID engine.UnitID, x, y int) api.TurnCommand {
 	return api.TurnCommand{Type: api.PlaceBomb, UnitID: int(unitID), Target: api.Coordinate{X: x, Y: y}}
 }
 
-func hasWireEvent(events []api.GameEvent, evtType api.GameEvtType, unitID engine.UnitID) bool {
+func wireUnitMoved(evt api.GameEvent) (api.UnitMovedEvent, bool) {
+	if got, err := evt.Discriminator(); err != nil || got != "unitMoved" {
+		return api.UnitMovedEvent{}, false
+	}
+	v, err := evt.AsUnitMovedEvent()
+	return v, err == nil
+}
+
+func wireBombPlaced(evt api.GameEvent) (api.BombPlacedEvent, bool) {
+	if got, err := evt.Discriminator(); err != nil || got != "bombPlaced" {
+		return api.BombPlacedEvent{}, false
+	}
+	v, err := evt.AsBombPlacedEvent()
+	return v, err == nil
+}
+
+func wireMatchEnded(evt api.GameEvent) (api.MatchEndedEvent, bool) {
+	if got, err := evt.Discriminator(); err != nil || got != "matchEnded" {
+		return api.MatchEndedEvent{}, false
+	}
+	v, err := evt.AsMatchEndedEvent()
+	return v, err == nil
+}
+
+func hasWireUnitMoved(events []api.GameEvent, unitID engine.UnitID) bool {
 	return slices.ContainsFunc(events, func(evt api.GameEvent) bool {
-		return evt.Type == evtType && evt.UnitID == int(unitID)
+		moved, ok := wireUnitMoved(evt)
+		return ok && moved.UnitID == int(unitID)
 	})
 }
 
-func wireBombID(evt api.GameEvent) int64 {
-	if evt.BombID == nil {
-		return 0
-	}
-	return *evt.BombID
+func hasWireBombPlacedBy(events []api.GameEvent, unitID engine.UnitID) bool {
+	return slices.ContainsFunc(events, func(evt api.GameEvent) bool {
+		placed, ok := wireBombPlaced(evt)
+		return ok && placed.UnitID == int(unitID)
+	})
 }
 
-func wireWinner(evt api.GameEvent) int {
-	if evt.WinnerTeamID == nil {
-		return 0
+func hasWireWinner(events []api.GameEvent, teamID int) bool {
+	return slices.ContainsFunc(events, func(evt api.GameEvent) bool {
+		ended, ok := wireMatchEnded(evt)
+		return ok && ended.WinnerTeamID == teamID
+	})
+}
+
+func TestWireEventHelpersCheckTheKind(t *testing.T) {
+	var matchEnded api.GameEvent
+	if err := matchEnded.FromMatchEndedEvent(api.MatchEndedEvent{WinnerTeamID: 2}); err != nil {
+		t.Fatalf("building a matchEnded event: %v", err)
 	}
-	return *evt.WinnerTeamID
+
+	if _, ok := wireBombPlaced(matchEnded); ok {
+		t.Error("wireBombPlaced accepted a matchEnded event")
+	}
+	if _, ok := wireUnitMoved(matchEnded); ok {
+		t.Error("wireUnitMoved accepted a matchEnded event")
+	}
+	if ended, ok := wireMatchEnded(matchEnded); !ok || ended.WinnerTeamID != 2 {
+		t.Errorf("wireMatchEnded = %+v, %v, want winner 2", ended, ok)
+	}
 }
 
 func newTestRoom(t *testing.T, opts ...Option) (string, *ServerStateManager, *Handler) {

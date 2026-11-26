@@ -16,6 +16,51 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// Defines values for BombCountdownUpdatedEventType.
+const (
+	BombCountdownUpdated BombCountdownUpdatedEventType = "bombCountdownUpdated"
+)
+
+// Valid indicates whether the value is a known member of the BombCountdownUpdatedEventType enum.
+func (e BombCountdownUpdatedEventType) Valid() bool {
+	switch e {
+	case BombCountdownUpdated:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for BombExplodedEventType.
+const (
+	BombExploded BombExplodedEventType = "bombExploded"
+)
+
+// Valid indicates whether the value is a known member of the BombExplodedEventType enum.
+func (e BombExplodedEventType) Valid() bool {
+	switch e {
+	case BombExploded:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for BombPlacedEventType.
+const (
+	BombPlaced BombPlacedEventType = "bombPlaced"
+)
+
+// Valid indicates whether the value is a known member of the BombPlacedEventType enum.
+func (e BombPlacedEventType) Valid() bool {
+	switch e {
+	case BombPlaced:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for CPUTurnPhase.
 const (
 	TurnPhaseIdle     CPUTurnPhase = "TurnPhaseIdle"
@@ -37,36 +82,15 @@ func (e CPUTurnPhase) Valid() bool {
 	}
 }
 
-// Defines values for GameEvtType.
+// Defines values for MatchEndedEventType.
 const (
-	BombCountdownUpdated GameEvtType = "bombCountdownUpdated"
-	BombExploded         GameEvtType = "bombExploded"
-	BombPlaced           GameEvtType = "bombPlaced"
-	MatchEnded           GameEvtType = "matchEnded"
-	SoftBlockDestroyed   GameEvtType = "softBlockDestroyed"
-	UnitDamaged          GameEvtType = "unitDamaged"
-	UnitDied             GameEvtType = "unitDied"
-	UnitMoved            GameEvtType = "unitMoved"
+	MatchEnded MatchEndedEventType = "matchEnded"
 )
 
-// Valid indicates whether the value is a known member of the GameEvtType enum.
-func (e GameEvtType) Valid() bool {
+// Valid indicates whether the value is a known member of the MatchEndedEventType enum.
+func (e MatchEndedEventType) Valid() bool {
 	switch e {
-	case BombCountdownUpdated:
-		return true
-	case BombExploded:
-		return true
-	case BombPlaced:
-		return true
 	case MatchEnded:
-		return true
-	case SoftBlockDestroyed:
-		return true
-	case UnitDamaged:
-		return true
-	case UnitDied:
-		return true
-	case UnitMoved:
 		return true
 	default:
 		return false
@@ -118,6 +142,21 @@ func (e SkillType) Valid() bool {
 	}
 }
 
+// Defines values for SoftBlockDestroyedEventType.
+const (
+	SoftBlockDestroyed SoftBlockDestroyedEventType = "softBlockDestroyed"
+)
+
+// Valid indicates whether the value is a known member of the SoftBlockDestroyedEventType enum.
+func (e SoftBlockDestroyedEventType) Valid() bool {
+	switch e {
+	case SoftBlockDestroyed:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for TerrainType.
 const (
 	TerrainBlock TerrainType = "TerrainBlock"
@@ -163,6 +202,51 @@ func (e TurnCmdType) Valid() bool {
 	}
 }
 
+// Defines values for UnitDamagedEventType.
+const (
+	UnitDamaged UnitDamagedEventType = "unitDamaged"
+)
+
+// Valid indicates whether the value is a known member of the UnitDamagedEventType enum.
+func (e UnitDamagedEventType) Valid() bool {
+	switch e {
+	case UnitDamaged:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UnitDiedEventType.
+const (
+	UnitDied UnitDiedEventType = "unitDied"
+)
+
+// Valid indicates whether the value is a known member of the UnitDiedEventType enum.
+func (e UnitDiedEventType) Valid() bool {
+	switch e {
+	case UnitDied:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UnitMovedEventType.
+const (
+	UnitMoved UnitMovedEventType = "unitMoved"
+)
+
+// Valid indicates whether the value is a known member of the UnitMovedEventType enum.
+func (e UnitMovedEventType) Valid() bool {
+	switch e {
+	case UnitMoved:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for UnitRole.
 const (
 	Boss   UnitRole = "Boss"
@@ -200,6 +284,41 @@ type Bomb struct {
 	Position  Coordinate `json:"position"`
 	Range     int        `json:"range"`
 }
+
+// BombCountdownUpdatedEvent defines model for BombCountdownUpdatedEvent.
+type BombCountdownUpdatedEvent struct {
+	BombID    int64                         `json:"bombId"`
+	Countdown int                           `json:"countdown"`
+	Position  Coordinate                    `json:"position"`
+	Type      BombCountdownUpdatedEventType `json:"type"`
+}
+
+// BombCountdownUpdatedEventType defines model for BombCountdownUpdatedEvent.Type.
+type BombCountdownUpdatedEventType string
+
+// BombExplodedEvent defines model for BombExplodedEvent.
+type BombExplodedEvent struct {
+	AffectedPositions []Coordinate          `json:"affectedPositions"`
+	BombID            int64                 `json:"bombId"`
+	Position          Coordinate            `json:"position"`
+	Type              BombExplodedEventType `json:"type"`
+}
+
+// BombExplodedEventType defines model for BombExplodedEvent.Type.
+type BombExplodedEventType string
+
+// BombPlacedEvent defines model for BombPlacedEvent.
+type BombPlacedEvent struct {
+	BombID    int64               `json:"bombId"`
+	Countdown int                 `json:"countdown"`
+	Position  Coordinate          `json:"position"`
+	Range     int                 `json:"range"`
+	Type      BombPlacedEventType `json:"type"`
+	UnitID    int                 `json:"unitId"`
+}
+
+// BombPlacedEventType defines model for BombPlacedEvent.Type.
+type BombPlacedEventType string
 
 // CPUTurnPhase defines model for CPUTurnPhase.
 type CPUTurnPhase string
@@ -251,23 +370,8 @@ type GameCfg struct {
 
 // GameEvent defines model for GameEvent.
 type GameEvent struct {
-	AffectedPositions *[]Coordinate `json:"affectedPositions,omitempty"`
-	BombID            *int64        `json:"bombId,omitempty"`
-	Countdown         int           `json:"countdown"`
-	From              *Coordinate   `json:"from,omitempty"`
-	ItemID            *int          `json:"itemId,omitempty"`
-	NewHp             int           `json:"newHp"`
-	Position          *Coordinate   `json:"position,omitempty"`
-	Range             *int          `json:"range,omitempty"`
-	SoftBlockID       *int          `json:"softBlockId,omitempty"`
-	To                *Coordinate   `json:"to,omitempty"`
-	Type              GameEvtType   `json:"type"`
-	UnitID            int           `json:"unitId"`
-	WinnerTeamID      *int          `json:"winnerTeamId,omitempty"`
+	union json.RawMessage
 }
-
-// GameEvtType defines model for GameEvtType.
-type GameEvtType string
 
 // GameState defines model for GameState.
 type GameState struct {
@@ -289,6 +393,15 @@ type Health struct {
 	Status string `json:"status"`
 }
 
+// MatchEndedEvent defines model for MatchEndedEvent.
+type MatchEndedEvent struct {
+	Type         MatchEndedEventType `json:"type"`
+	WinnerTeamID int                 `json:"winnerTeamId"`
+}
+
+// MatchEndedEventType defines model for MatchEndedEvent.Type.
+type MatchEndedEventType string
+
 // OccupantType defines model for OccupantType.
 type OccupantType string
 
@@ -306,6 +419,16 @@ type SoftBlock struct {
 	ID       int        `json:"id"`
 	Position Coordinate `json:"position"`
 }
+
+// SoftBlockDestroyedEvent defines model for SoftBlockDestroyedEvent.
+type SoftBlockDestroyedEvent struct {
+	Position    Coordinate                  `json:"position"`
+	SoftBlockID int                         `json:"softBlockId"`
+	Type        SoftBlockDestroyedEventType `json:"type"`
+}
+
+// SoftBlockDestroyedEventType defines model for SoftBlockDestroyedEvent.Type.
+type SoftBlockDestroyedEventType string
 
 // StagePreset defines model for StagePreset.
 type StagePreset struct {
@@ -364,6 +487,38 @@ type Unit struct {
 	Type         string      `json:"type"`
 }
 
+// UnitDamagedEvent defines model for UnitDamagedEvent.
+type UnitDamagedEvent struct {
+	NewHp    int                  `json:"newHp"`
+	Position Coordinate           `json:"position"`
+	Type     UnitDamagedEventType `json:"type"`
+	UnitID   int                  `json:"unitId"`
+}
+
+// UnitDamagedEventType defines model for UnitDamagedEvent.Type.
+type UnitDamagedEventType string
+
+// UnitDiedEvent defines model for UnitDiedEvent.
+type UnitDiedEvent struct {
+	Position Coordinate        `json:"position"`
+	Type     UnitDiedEventType `json:"type"`
+	UnitID   int               `json:"unitId"`
+}
+
+// UnitDiedEventType defines model for UnitDiedEvent.Type.
+type UnitDiedEventType string
+
+// UnitMovedEvent defines model for UnitMovedEvent.
+type UnitMovedEvent struct {
+	From   Coordinate         `json:"from"`
+	To     Coordinate         `json:"to"`
+	Type   UnitMovedEventType `json:"type"`
+	UnitID int                `json:"unitId"`
+}
+
+// UnitMovedEventType defines model for UnitMovedEvent.Type.
+type UnitMovedEventType string
+
 // UnitRole defines model for UnitRole.
 type UnitRole string
 
@@ -384,6 +539,323 @@ type SurrenderJSONRequestBody = SurrenderRequest
 
 // SubmitTurnCommandJSONRequestBody defines body for SubmitTurnCommand for application/json ContentType.
 type SubmitTurnCommandJSONRequestBody = TurnCommand
+
+// AsUnitMovedEvent returns the union data inside the GameEvent as a UnitMovedEvent
+func (t GameEvent) AsUnitMovedEvent() (UnitMovedEvent, error) {
+	var body UnitMovedEvent
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromUnitMovedEvent overwrites any union data inside the GameEvent as the provided UnitMovedEvent
+func (t *GameEvent) FromUnitMovedEvent(v UnitMovedEvent) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"unitMoved"}`))
+	t.union = b
+	return err
+}
+
+// MergeUnitMovedEvent performs a merge with any union data inside the GameEvent, using the provided UnitMovedEvent
+func (t *GameEvent) MergeUnitMovedEvent(v UnitMovedEvent) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"unitMoved"}`))
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsUnitDamagedEvent returns the union data inside the GameEvent as a UnitDamagedEvent
+func (t GameEvent) AsUnitDamagedEvent() (UnitDamagedEvent, error) {
+	var body UnitDamagedEvent
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromUnitDamagedEvent overwrites any union data inside the GameEvent as the provided UnitDamagedEvent
+func (t *GameEvent) FromUnitDamagedEvent(v UnitDamagedEvent) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"unitDamaged"}`))
+	t.union = b
+	return err
+}
+
+// MergeUnitDamagedEvent performs a merge with any union data inside the GameEvent, using the provided UnitDamagedEvent
+func (t *GameEvent) MergeUnitDamagedEvent(v UnitDamagedEvent) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"unitDamaged"}`))
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsUnitDiedEvent returns the union data inside the GameEvent as a UnitDiedEvent
+func (t GameEvent) AsUnitDiedEvent() (UnitDiedEvent, error) {
+	var body UnitDiedEvent
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromUnitDiedEvent overwrites any union data inside the GameEvent as the provided UnitDiedEvent
+func (t *GameEvent) FromUnitDiedEvent(v UnitDiedEvent) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"unitDied"}`))
+	t.union = b
+	return err
+}
+
+// MergeUnitDiedEvent performs a merge with any union data inside the GameEvent, using the provided UnitDiedEvent
+func (t *GameEvent) MergeUnitDiedEvent(v UnitDiedEvent) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"unitDied"}`))
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsBombPlacedEvent returns the union data inside the GameEvent as a BombPlacedEvent
+func (t GameEvent) AsBombPlacedEvent() (BombPlacedEvent, error) {
+	var body BombPlacedEvent
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromBombPlacedEvent overwrites any union data inside the GameEvent as the provided BombPlacedEvent
+func (t *GameEvent) FromBombPlacedEvent(v BombPlacedEvent) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"bombPlaced"}`))
+	t.union = b
+	return err
+}
+
+// MergeBombPlacedEvent performs a merge with any union data inside the GameEvent, using the provided BombPlacedEvent
+func (t *GameEvent) MergeBombPlacedEvent(v BombPlacedEvent) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"bombPlaced"}`))
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsBombCountdownUpdatedEvent returns the union data inside the GameEvent as a BombCountdownUpdatedEvent
+func (t GameEvent) AsBombCountdownUpdatedEvent() (BombCountdownUpdatedEvent, error) {
+	var body BombCountdownUpdatedEvent
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromBombCountdownUpdatedEvent overwrites any union data inside the GameEvent as the provided BombCountdownUpdatedEvent
+func (t *GameEvent) FromBombCountdownUpdatedEvent(v BombCountdownUpdatedEvent) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"bombCountdownUpdated"}`))
+	t.union = b
+	return err
+}
+
+// MergeBombCountdownUpdatedEvent performs a merge with any union data inside the GameEvent, using the provided BombCountdownUpdatedEvent
+func (t *GameEvent) MergeBombCountdownUpdatedEvent(v BombCountdownUpdatedEvent) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"bombCountdownUpdated"}`))
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsBombExplodedEvent returns the union data inside the GameEvent as a BombExplodedEvent
+func (t GameEvent) AsBombExplodedEvent() (BombExplodedEvent, error) {
+	var body BombExplodedEvent
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromBombExplodedEvent overwrites any union data inside the GameEvent as the provided BombExplodedEvent
+func (t *GameEvent) FromBombExplodedEvent(v BombExplodedEvent) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"bombExploded"}`))
+	t.union = b
+	return err
+}
+
+// MergeBombExplodedEvent performs a merge with any union data inside the GameEvent, using the provided BombExplodedEvent
+func (t *GameEvent) MergeBombExplodedEvent(v BombExplodedEvent) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"bombExploded"}`))
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSoftBlockDestroyedEvent returns the union data inside the GameEvent as a SoftBlockDestroyedEvent
+func (t GameEvent) AsSoftBlockDestroyedEvent() (SoftBlockDestroyedEvent, error) {
+	var body SoftBlockDestroyedEvent
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSoftBlockDestroyedEvent overwrites any union data inside the GameEvent as the provided SoftBlockDestroyedEvent
+func (t *GameEvent) FromSoftBlockDestroyedEvent(v SoftBlockDestroyedEvent) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"softBlockDestroyed"}`))
+	t.union = b
+	return err
+}
+
+// MergeSoftBlockDestroyedEvent performs a merge with any union data inside the GameEvent, using the provided SoftBlockDestroyedEvent
+func (t *GameEvent) MergeSoftBlockDestroyedEvent(v SoftBlockDestroyedEvent) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"softBlockDestroyed"}`))
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsMatchEndedEvent returns the union data inside the GameEvent as a MatchEndedEvent
+func (t GameEvent) AsMatchEndedEvent() (MatchEndedEvent, error) {
+	var body MatchEndedEvent
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromMatchEndedEvent overwrites any union data inside the GameEvent as the provided MatchEndedEvent
+func (t *GameEvent) FromMatchEndedEvent(v MatchEndedEvent) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"matchEnded"}`))
+	t.union = b
+	return err
+}
+
+// MergeMatchEndedEvent performs a merge with any union data inside the GameEvent, using the provided MatchEndedEvent
+func (t *GameEvent) MergeMatchEndedEvent(v MatchEndedEvent) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"matchEnded"}`))
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GameEvent) Discriminator() (string, error) {
+	var discriminator struct {
+		Discriminator string `json:"type"`
+	}
+	err := json.Unmarshal(t.union, &discriminator)
+	return discriminator.Discriminator, err
+}
+
+func (t GameEvent) ValueByDiscriminator() (interface{}, error) {
+	discriminator, err := t.Discriminator()
+	if err != nil {
+		return nil, err
+	}
+	switch discriminator {
+	case "bombCountdownUpdated":
+		return t.AsBombCountdownUpdatedEvent()
+	case "bombExploded":
+		return t.AsBombExplodedEvent()
+	case "bombPlaced":
+		return t.AsBombPlacedEvent()
+	case "matchEnded":
+		return t.AsMatchEndedEvent()
+	case "softBlockDestroyed":
+		return t.AsSoftBlockDestroyedEvent()
+	case "unitDamaged":
+		return t.AsUnitDamagedEvent()
+	case "unitDied":
+		return t.AsUnitDiedEvent()
+	case "unitMoved":
+		return t.AsUnitMovedEvent()
+	default:
+		return nil, errors.New("unknown discriminator value: " + discriminator)
+	}
+}
+
+func (t GameEvent) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GameEvent) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
