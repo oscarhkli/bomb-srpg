@@ -40,11 +40,10 @@ func TestHandleSubmitTurnCommand(t *testing.T) {
 		if len(response) != 1 {
 			t.Fatalf("expected 1 GameEvent returned, got %d", len(response))
 		}
-		resEvt := response[0]
+		resEvt, ok := wireUnitMoved(response[0])
 		validFrom := api.Coordinate{X: 4, Y: 8}
-		if resEvt.Type != api.UnitMoved || resEvt.UnitID != int(unitID) || resEvt.From == nil || *resEvt.From != validFrom ||
-			resEvt.To == nil || *resEvt.To != (api.Coordinate{X: newPos.X, Y: newPos.Y}) {
-			t.Errorf("malformed UnitMoveEvent returned: %+v", resEvt)
+		if !ok || resEvt.UnitID != int(unitID) || resEvt.From != validFrom || resEvt.To != (api.Coordinate{X: newPos.X, Y: newPos.Y}) {
+			t.Errorf("malformed UnitMoveEvent returned: %+v", response[0])
 		}
 
 		u := mustMatchState(t, s, roomID).Units[unitID]
@@ -229,7 +228,7 @@ func TestHandleConsumeCPUStatus(t *testing.T) {
 		if got, want := string(response.TurnPhase), room.TurnPhaseReady.String(); got != want {
 			t.Errorf("Expected turnPhase %v, got %v", want, got)
 		}
-		if !hasWireEvent(response.PlanGameEvents, api.UnitMoved, cpuUnitID) {
+		if !hasWireUnitMoved(response.PlanGameEvents, cpuUnitID) {
 			t.Errorf("Expected the CPU unit's move in planGameEvents, got %#v", response.PlanGameEvents)
 		}
 
@@ -435,9 +434,7 @@ func TestHandleResolveTurn(t *testing.T) {
 		if got, want := mustMatchState(t, s, roomID).Units[unitID].HP, 0; got != want {
 			t.Errorf("Expected Unit %#X HP %v, got %v", 16, want, got)
 		}
-		if !slices.ContainsFunc(response.ResolveTurnGameEvents, func(evt api.GameEvent) bool {
-			return evt.Type == api.MatchEnded && wireWinner(evt) == 2
-		}) {
+		if !hasWireWinner(response.ResolveTurnGameEvents, 2) {
 			t.Errorf("Expected a matchEnded event with winner 2, got %+v", response.ResolveTurnGameEvents)
 		}
 	})
@@ -487,6 +484,26 @@ func TestHandleResolveTurn(t *testing.T) {
 			t.Errorf("unitDamaged newHp = %#v, want 1", eventOf("unitDamaged")["newHp"])
 		}
 	})
+	t.Run("Soft block 0 keeps its softBlockId on the wire", func(t *testing.T) {
+		roomID, s, h := newTestRoom(t, arrangedMatch(bombBesideSoftBlock(engine.Coordinate{X: 0, Y: 5})))
+		tokens := mustCreateMatch(t, s, roomID, dividedGameCfg())
+
+		rr := doRequest(t, h, "POST", "/api/match-rooms/"+roomID+"/match/resolve", "", tokens[0])
+
+		var raw struct {
+			ResolveTurnGameEvents []map[string]any `json:"resolveTurnGameEvents"`
+		}
+		if err := json.Unmarshal(rr.Body.Bytes(), &raw); err != nil {
+			t.Fatalf("decode response: %v", err)
+		}
+		i := slices.IndexFunc(raw.ResolveTurnGameEvents, func(evt map[string]any) bool { return evt["type"] == "softBlockDestroyed" })
+		if i < 0 {
+			t.Fatalf("no softBlockDestroyed event in %s", rr.Body.String())
+		}
+		if got, ok := raw.ResolveTurnGameEvents[i]["softBlockId"].(float64); !ok || got != 0 {
+			t.Errorf("softBlockId = %#v, want 0 sent", raw.ResolveTurnGameEvents[i]["softBlockId"])
+		}
+	})
 }
 
 func TestHandleSurrender(t *testing.T) {
@@ -513,8 +530,8 @@ func TestHandleSurrender(t *testing.T) {
 		if got, want := response, 1; len(got) != want {
 			t.Fatalf("Expected %d gameEvents returned, got %#v", want, got)
 		}
-		if got, want := wireWinner(response[0]), 2; got != want {
-			t.Errorf("Expected gameEvent WinnerTeamID = %v, got %v", want, got)
+		if ended, ok := wireMatchEnded(response[0]); !ok || ended.WinnerTeamID != 2 {
+			t.Errorf("Expected a matchEnded gameEvent with WinnerTeamID 2, got %+v", response[0])
 		}
 		if _, ok := s.rooms.Load(roomID); !ok {
 			t.Error("Expected room not to be deleted after surrender")
@@ -660,16 +677,14 @@ func TestHandleResolveTurn_SuddenDeathMatchEnd(t *testing.T) {
 		t.Fatalf("Failed to decode response JSON payload: %v", err)
 	}
 
-	if !slices.ContainsFunc(response.ResolveTurnGameEvents, func(evt api.GameEvent) bool {
-		return evt.Type == api.MatchEnded && wireWinner(evt) == 2
-	}) {
+	if !hasWireWinner(response.ResolveTurnGameEvents, 2) {
 		t.Errorf("Expected a matchEnded event with winner 2, got %+v", response.ResolveTurnGameEvents)
 	}
 	for name, gameEvents := range map[string][]api.GameEvent{
 		"plan":    response.PlanGameEvents,
 		"resolve": response.ResolveTurnGameEvents,
 	} {
-		if hasWireEvent(gameEvents, api.BombPlaced, engine.SystemUnitID) {
+		if hasWireBombPlacedBy(gameEvents, engine.SystemUnitID) {
 			t.Errorf("Expected no hazard bombPlaced event in the %s events, got %+v", name, gameEvents)
 		}
 	}

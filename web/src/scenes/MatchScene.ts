@@ -50,13 +50,16 @@ import {
   CPU_PLAN_EVENT_STEP_MS,
 } from '../constants';
 import type {
+  BombPlacedEvent,
   Coordinate,
   CpuStatusResponse,
   GameCfg,
   GameEvent,
   GameState,
+  MatchEndedEvent,
   TurnCmdType,
   TurnCommand,
+  UnitMovedEvent,
   Unit,
 } from '../api/types';
 
@@ -388,18 +391,18 @@ export default class MatchScene extends Phaser.Scene {
     this.showError('CPU turn did not complete');
   }
 
-  private dropSuddenDeathBomb(event: GameEvent): Promise<void> {
-    const { unitId, bombId, position, countdown } = event;
-    if (bombId === undefined || !position || countdown === undefined || !this.inBounds(position)) {
+  private dropSuddenDeathBomb(event: BombPlacedEvent): Promise<void> {
+    const { unitId, bombId, position, countdown, range } = event;
+    if (!this.inBounds(position)) {
       this.showError('Invalid bombPlaced event received from server');
       return Promise.resolve();
     }
 
     renderBomb(this.boardCtx(), {
       id: bombId,
-      ownerId: unitId ?? 0,
+      ownerId: unitId,
       position,
-      range: event.range ?? 0,
+      range,
       countdown,
     });
 
@@ -493,15 +496,20 @@ export default class MatchScene extends Phaser.Scene {
         return this.applyUnitMoved(event);
       case 'bombPlaced':
         return this.applyBombPlaced(event);
-      default:
+      case 'unitDamaged':
+      case 'unitDied':
+      case 'bombCountdownUpdated':
+      case 'bombExploded':
+      case 'softBlockDestroyed':
+      case 'matchEnded':
         return true;
     }
   }
 
-  private applyUnitMoved(event: GameEvent): boolean {
+  private applyUnitMoved(event: UnitMovedEvent): boolean {
     const { unitId, from, to } = event;
 
-    if (unitId === undefined || !from || !to || !this.inBounds(from) || !this.inBounds(to)) {
+    if (!this.inBounds(from) || !this.inBounds(to)) {
       this.showError('Invalid unitMoved event received from server');
       return false;
     }
@@ -523,16 +531,10 @@ export default class MatchScene extends Phaser.Scene {
     return true;
   }
 
-  private applyBombPlaced(event: GameEvent): boolean {
+  private applyBombPlaced(event: BombPlacedEvent): boolean {
     const { unitId, bombId, position, countdown, range } = event;
 
-    if (
-      unitId === undefined ||
-      bombId === undefined ||
-      !position ||
-      countdown === undefined ||
-      !this.inBounds(position)
-    ) {
+    if (!this.inBounds(position)) {
       this.showError('Invalid bombPlaced event received from server');
       return false;
     }
@@ -541,7 +543,7 @@ export default class MatchScene extends Phaser.Scene {
       id: bombId,
       ownerId: unitId,
       position,
-      range: range ?? 0,
+      range,
       countdown,
     });
 
@@ -552,9 +554,6 @@ export default class MatchScene extends Phaser.Scene {
     switch (event.type) {
       case 'unitMoved': {
         const { unitId, to } = event;
-        if (unitId === undefined || !to) {
-          return;
-        }
         const idx = snapshot.units.findIndex(u => u.id === unitId);
         if (idx !== -1) {
           snapshot.units[idx] = { ...snapshot.units[idx]!, position: to };
@@ -563,18 +562,22 @@ export default class MatchScene extends Phaser.Scene {
       }
       case 'bombPlaced': {
         const { unitId, bombId, position, countdown, range } = event;
-        if (unitId === undefined || bombId === undefined || !position || countdown === undefined) {
-          return;
-        }
         snapshot.bombs.push({
           id: bombId,
           ownerId: unitId,
           position,
-          range: range ?? 0,
+          range,
           countdown,
         });
         break;
       }
+      case 'unitDamaged':
+      case 'unitDied':
+      case 'bombCountdownUpdated':
+      case 'bombExploded':
+      case 'softBlockDestroyed':
+      case 'matchEnded':
+        break;
     }
   }
 
@@ -782,12 +785,9 @@ export default class MatchScene extends Phaser.Scene {
     }
   }
 
-  private handleMatchEnded(event: GameEvent): void {
+  private handleMatchEnded(event: MatchEndedEvent): void {
     const { winnerTeamId } = event;
-    if (
-      winnerTeamId === undefined ||
-      (winnerTeamId !== -1 && (winnerTeamId < 1 || winnerTeamId > 2))
-    ) {
+    if (winnerTeamId !== -1 && (winnerTeamId < 1 || winnerTeamId > 2)) {
       this.showError('Invalid matchEnded event received from server');
       return;
     }

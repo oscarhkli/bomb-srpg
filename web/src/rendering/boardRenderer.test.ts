@@ -402,7 +402,9 @@ describe('bombsToDraw', () => {
       name: 'hides nothing for a non-bombPlaced event with the same id',
       turn: 2,
       played: 1,
-      events: [{ type: 'bombExploded', bombId: 1 }],
+      events: [
+        { type: 'bombExploded', bombId: 1, position: { x: 0, y: 0 }, affectedPositions: [] },
+      ],
       want: [1, 2],
     },
   ])('$name', ({ turn, played, events, want }) => {
