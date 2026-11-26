@@ -73,8 +73,8 @@ func matchToken(a, b string) bool {
 }
 
 func (r *Room) validatePlayerTokenLocked(teamID int, token string) error {
-	idx := teamID - 1
-	if idx < 0 || idx > 1 {
+	idx := teamID - engine.Team1
+	if idx < 0 || idx >= len(r.tokens) {
 		return ErrInvalidConfig
 	}
 
@@ -92,7 +92,7 @@ func (r *Room) rejectDuringCPUTurnLocked() error {
 }
 
 func (r *Room) validateAnyMatchPlayerTokenLocked(token string) error {
-	if !matchToken(r.tokens[0], token) && !matchToken(r.tokens[1], token) {
+	if !slices.ContainsFunc(r.tokens[:], func(t string) bool { return matchToken(t, token) }) {
 		return ErrInvalidToken
 	}
 	return nil
