@@ -8,14 +8,14 @@ import {
   SUDDEN_DEATH_COLOR,
 } from '../constants';
 import { createFilledRect } from './gameObjectUtils';
-import type { GameEvent } from '../api/types';
+import type { BombPlacedEvent } from '../api/types';
 
 export default class SuddenDeathCutscene {
   constructor(private readonly scene: Phaser.Scene) {}
 
   play(
-    bombPlacedEvents: GameEvent[],
-    dropBomb: (event: GameEvent) => Promise<void>
+    bombPlacedEvents: BombPlacedEvent[],
+    dropBomb: (event: BombPlacedEvent) => Promise<void>
   ): Promise<void> {
     const { width, height } = this.scene.cameras.main;
 

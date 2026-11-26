@@ -38,7 +38,7 @@ describe('playResolveTurnEvents — bombCountdownUpdated', () => {
     ]);
 
     const result = playResolveTurnEvents(
-      [{ type: 'bombCountdownUpdated', bombId: 1, countdown: 3 }],
+      [{ type: 'bombCountdownUpdated', bombId: 1, position: { x: 0, y: 0 }, countdown: 3 }],
       {
         scene: mockScene as never,
         gameStateSnapshot: baseState(),
@@ -66,14 +66,17 @@ describe('playResolveTurnEvents — bombCountdownUpdated', () => {
       ],
     ]);
 
-    playResolveTurnEvents([{ type: 'bombCountdownUpdated', bombId: 1, countdown: 0 }], {
-      scene: mockScene as never,
-      gameStateSnapshot: baseState(),
-      unitSpritesById: new Map(),
-      bombGraphicsById,
-      softBlockSpritesById: new Map(),
-      onError: vi.fn(),
-    });
+    playResolveTurnEvents(
+      [{ type: 'bombCountdownUpdated', bombId: 1, position: { x: 0, y: 0 }, countdown: 0 }],
+      {
+        scene: mockScene as never,
+        gameStateSnapshot: baseState(),
+        unitSpritesById: new Map(),
+        bombGraphicsById,
+        softBlockSpritesById: new Map(),
+        onError: vi.fn(),
+      }
+    );
 
     delayedCallAt(0)();
     expect(countdownText.setText).toHaveBeenCalledWith('!');
@@ -81,42 +84,28 @@ describe('playResolveTurnEvents — bombCountdownUpdated', () => {
   });
 
   it('does not throw when the bomb graphics map has no entry for a validated bombId', () => {
-    playResolveTurnEvents([{ type: 'bombCountdownUpdated', bombId: 1, countdown: 3 }], {
-      scene: mockScene as never,
-      gameStateSnapshot: baseState(),
-      unitSpritesById: new Map(),
-      bombGraphicsById: new Map(),
-      softBlockSpritesById: new Map(),
-      onError: vi.fn(),
-    });
+    playResolveTurnEvents(
+      [{ type: 'bombCountdownUpdated', bombId: 1, position: { x: 0, y: 0 }, countdown: 3 }],
+      {
+        scene: mockScene as never,
+        gameStateSnapshot: baseState(),
+        unitSpritesById: new Map(),
+        bombGraphicsById: new Map(),
+        softBlockSpritesById: new Map(),
+        onError: vi.fn(),
+      }
+    );
 
     expect(() => delayedCallAt(0)()).not.toThrow();
   });
 });
 
 describe('playResolveTurnEvents — validation', () => {
-  it('flags a missing required field and schedules nothing', () => {
-    const onError = vi.fn();
-
-    const result = playResolveTurnEvents([{ type: 'bombCountdownUpdated', bombId: 1 }], {
-      scene: mockScene as never,
-      gameStateSnapshot: baseState(),
-      unitSpritesById: new Map(),
-      bombGraphicsById: new Map(),
-      softBlockSpritesById: new Map(),
-      onError,
-    });
-
-    expect(result.ok).toBe(false);
-    expect(onError).toHaveBeenCalledOnce();
-    expect(mockScene.time.delayedCall).not.toHaveBeenCalled();
-  });
-
   it('flags a bombCountdownUpdated referencing a bombId absent from the snapshot', () => {
     const onError = vi.fn();
 
     const result = playResolveTurnEvents(
-      [{ type: 'bombCountdownUpdated', bombId: 999, countdown: 1 }],
+      [{ type: 'bombCountdownUpdated', bombId: 999, position: { x: 0, y: 0 }, countdown: 1 }],
       {
         scene: mockScene as never,
         gameStateSnapshot: baseState(),
@@ -151,91 +140,11 @@ describe('playResolveTurnEvents — validation', () => {
     expect(onError).not.toHaveBeenCalled();
   });
 
-  it('flags a bombExploded event missing position and schedules nothing', () => {
-    const onError = vi.fn();
-
-    const result = playResolveTurnEvents(
-      [{ type: 'bombExploded', bombId: 1, affectedPositions: [] }],
-      {
-        scene: mockScene as never,
-        gameStateSnapshot: baseState({ grid: grid5x5() }),
-        unitSpritesById: new Map(),
-        bombGraphicsById: new Map(),
-        softBlockSpritesById: new Map(),
-        onError,
-      }
-    );
-
-    expect(result.ok).toBe(false);
-    expect(onError).toHaveBeenCalledOnce();
-    expect(mockScene.time.delayedCall).not.toHaveBeenCalled();
-  });
-
-  it('flags a unitDamaged event missing position and schedules nothing', () => {
-    const onError = vi.fn();
-    const state = baseState({
-      units: [makeUnit({ id: 0x21, type: 'Bandit', speed: 3, maxBombCount: 1, team: 2 })],
-    });
-
-    const result = playResolveTurnEvents([{ type: 'unitDamaged', unitId: 0x21, newHp: 1 }], {
-      scene: mockScene as never,
-      gameStateSnapshot: state,
-      unitSpritesById: new Map(),
-      bombGraphicsById: new Map(),
-      softBlockSpritesById: new Map(),
-      onError,
-    });
-
-    expect(result.ok).toBe(false);
-    expect(onError).toHaveBeenCalledOnce();
-    expect(mockScene.time.delayedCall).not.toHaveBeenCalled();
-  });
-
-  it('flags a unitDied event missing position and schedules nothing', () => {
-    const onError = vi.fn();
-    const state = baseState({
-      units: [makeUnit({ id: 0x21, type: 'Bandit', speed: 3, maxBombCount: 1, team: 2 })],
-    });
-
-    const result = playResolveTurnEvents([{ type: 'unitDied', unitId: 0x21 }], {
-      scene: mockScene as never,
-      gameStateSnapshot: state,
-      unitSpritesById: new Map(),
-      bombGraphicsById: new Map(),
-      softBlockSpritesById: new Map(),
-      onError,
-    });
-
-    expect(result.ok).toBe(false);
-    expect(onError).toHaveBeenCalledOnce();
-    expect(mockScene.time.delayedCall).not.toHaveBeenCalled();
-  });
-
-  it('flags a softBlockDestroyed event missing position and schedules nothing', () => {
-    const onError = vi.fn();
-    const state = baseState({
-      softBlocks: [makeSoftBlock({ id: 20 })],
-    });
-
-    const result = playResolveTurnEvents([{ type: 'softBlockDestroyed', softBlockId: 20 }], {
-      scene: mockScene as never,
-      gameStateSnapshot: state,
-      unitSpritesById: new Map(),
-      bombGraphicsById: new Map(),
-      softBlockSpritesById: new Map(),
-      onError,
-    });
-
-    expect(result.ok).toBe(false);
-    expect(onError).toHaveBeenCalledOnce();
-    expect(mockScene.time.delayedCall).not.toHaveBeenCalled();
-  });
-
   it('flags a negative countdown as an invalid value and schedules nothing', () => {
     const onError = vi.fn();
 
     const result = playResolveTurnEvents(
-      [{ type: 'bombCountdownUpdated', bombId: 1, countdown: -1 }],
+      [{ type: 'bombCountdownUpdated', bombId: 1, position: { x: 0, y: 0 }, countdown: -1 }],
       {
         scene: mockScene as never,
         gameStateSnapshot: baseState(),
@@ -257,14 +166,17 @@ describe('playResolveTurnEvents — validation', () => {
       units: [makeUnit({ id: 0x21, type: 'Bandit', speed: 3, maxBombCount: 1, team: 2 })],
     });
 
-    const result = playResolveTurnEvents([{ type: 'unitDamaged', unitId: 0x21, newHp: -1 }], {
-      scene: mockScene as never,
-      gameStateSnapshot: state,
-      unitSpritesById: new Map(),
-      bombGraphicsById: new Map(),
-      softBlockSpritesById: new Map(),
-      onError,
-    });
+    const result = playResolveTurnEvents(
+      [{ type: 'unitDamaged', unitId: 0x21, position: { x: 0, y: 0 }, newHp: -1 }],
+      {
+        scene: mockScene as never,
+        gameStateSnapshot: state,
+        unitSpritesById: new Map(),
+        bombGraphicsById: new Map(),
+        softBlockSpritesById: new Map(),
+        onError,
+      }
+    );
 
     expect(result.ok).toBe(false);
     expect(onError).toHaveBeenCalledOnce();
@@ -788,42 +700,5 @@ describe('playResolveTurnEvents — done promise', () => {
     delayedCallAt(BLAST_SPEED_MS_PER_TILE + BLAST_DURATION_MS)();
     await Promise.resolve();
     expect(settled).toBe(true);
-  });
-});
-
-describe('playResolveTurnEvents — unhandled event types', () => {
-  it('logs a dev-mode warning naming the type when it is neither handled nor ignored', () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-
-    playResolveTurnEvents(
-      [{ type: 'unitMoved', unitId: 1, from: { x: 0, y: 0 }, to: { x: 1, y: 0 } }],
-      {
-        scene: mockScene as never,
-        gameStateSnapshot: baseState(),
-        unitSpritesById: new Map(),
-        bombGraphicsById: new Map(),
-        softBlockSpritesById: new Map(),
-        onError: vi.fn(),
-      }
-    );
-
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('unitMoved'));
-    warnSpy.mockRestore();
-  });
-
-  it('does not warn for an ignore-listed type (matchEnded)', () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-
-    playResolveTurnEvents([{ type: 'matchEnded', winnerTeamId: 1 }], {
-      scene: mockScene as never,
-      gameStateSnapshot: baseState(),
-      unitSpritesById: new Map(),
-      bombGraphicsById: new Map(),
-      softBlockSpritesById: new Map(),
-      onError: vi.fn(),
-    });
-
-    expect(warnSpy).not.toHaveBeenCalled();
-    warnSpy.mockRestore();
   });
 });

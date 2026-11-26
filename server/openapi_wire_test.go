@@ -28,6 +28,7 @@ type openAPIRig struct {
 	mux    *http.ServeMux
 	hits   map[string]bool
 	kinds  map[string]bool
+	events map[string]string
 }
 
 func loadOpenAPISpec(t *testing.T) *openapi3.T {
@@ -49,7 +50,20 @@ func newOpenAPIRig(t *testing.T) *openAPIRig {
 	if err != nil {
 		t.Fatalf("build router: %v", err)
 	}
-	return &openAPIRig{t: t, doc: doc, router: router, hits: map[string]bool{}, kinds: map[string]bool{}}
+	return &openAPIRig{t: t, doc: doc, router: router, hits: map[string]bool{}, kinds: map[string]bool{}, events: eventMapping(t, doc)}
+}
+
+func eventMapping(t *testing.T, doc *openapi3.T) map[string]string {
+	t.Helper()
+	event := doc.Components.Schemas["GameEvent"]
+	if event == nil || event.Value.Discriminator == nil {
+		t.Fatal("GameEvent has no discriminator")
+	}
+	mapping := make(map[string]string, len(event.Value.Discriminator.Mapping))
+	for kind, ref := range event.Value.Discriminator.Mapping {
+		mapping[kind] = ref.Ref
+	}
+	return mapping
 }
 
 func (r *openAPIRig) serve(opts ...Option) {
@@ -105,8 +119,8 @@ func (r *openAPIRig) walk(at string, v any) error {
 	case nil:
 		return fmt.Errorf("JSON null at %s", at)
 	case map[string]any:
-		if _, isEvent := v["newHp"]; isEvent {
-			if kind, ok := v["type"].(string); ok {
+		if kind, ok := v["type"].(string); ok {
+			if _, isEvent := r.events[kind]; isEvent {
 				r.kinds[kind] = true
 			}
 		}
@@ -156,6 +170,8 @@ func TestOpenAPIValidatorRejects(t *testing.T) {
 		{"missing required property", "GET", statePath, 200, state(`"turn":1,`, ``), `"turn"`},
 		{"unknown extra property", "GET", statePath, 200, state(`"turn":1,`, `"turn":1,"extra":true,`), `"extra"`},
 		{"wrong integer type", "GET", statePath, 200, state(`"turn":1`, `"turn":"1"`), "/turn"},
+		{"event with another kind's key", "GET", statePath, 200, state(`"turnStartEvents":[]`, `"turnStartEvents":[{"type":"matchEnded","winnerTeamId":1,"newHp":3}]`), `"newHp"`},
+		{"event with an unknown type", "GET", statePath, 200, state(`"turnStartEvents":[]`, `"turnStartEvents":[{"type":"mystery"}]`), "mystery"},
 		{"undeclared status", "GET", "/api/health", 404, "match not found", "status is not supported"},
 		{"route absent from the spec", "GET", "/api/nope", 200, "{}", "no matching operation"},
 	}
@@ -482,6 +498,7 @@ func (r *openAPIRig) assertComplete() {
 		}
 	}
 
+	r.assertEventKinds()
 	r.assertEnums()
 	r.assertClosedAndNonNullable()
 	r.assertGuards()
@@ -492,11 +509,25 @@ func (r *openAPIRig) assertComplete() {
 			continue
 		}
 		want := slices.Sorted(maps.Keys(schema.Properties))
-		if name == "GameEvent" {
-			want = []string{"countdown", "newHp", "type", "unitId"}
-		}
 		if got := slices.Sorted(slices.Values(schema.Required)); !slices.Equal(got, want) {
 			t.Errorf("schema %s required = %v, want %v", name, got, want)
+		}
+	}
+}
+
+func (r *openAPIRig) assertEventKinds() {
+	t := r.t
+	t.Helper()
+	if got, want := slices.Sorted(maps.Keys(r.kinds)), slices.Sorted(maps.Keys(r.events)); !slices.Equal(got, want) {
+		t.Errorf("event kinds in real responses = %v, want the discriminator mapping %v", got, want)
+	}
+	inMapping := make(map[string]bool, len(r.events))
+	for _, ref := range r.events {
+		inMapping[ref] = true
+	}
+	for _, member := range r.doc.Components.Schemas["GameEvent"].Value.OneOf {
+		if !inMapping[member.Ref] {
+			t.Errorf("GameEvent oneOf member %s is missing from the discriminator mapping", member.Ref)
 		}
 	}
 }
@@ -557,7 +588,6 @@ func (r *openAPIRig) assertEnums() {
 		"CPUTurnPhase": textEnumNames[room.CPUTurnPhase](),
 		"SkillType":    engineSkillNames(t),
 		"TurnCmdType":  {string(engine.TurnCmdMove), string(engine.TurnCmdPlaceBomb)},
-		"GameEvtType":  slices.Sorted(maps.Keys(r.kinds)),
 	}
 	for _, name := range slices.Sorted(maps.Keys(r.doc.Components.Schemas)) {
 		if len(r.doc.Components.Schemas[name].Value.Enum) > 0 && want[name] == nil {

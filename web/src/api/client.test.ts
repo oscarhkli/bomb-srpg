@@ -313,7 +313,9 @@ describe('api.ts', () => {
     const fixture: CpuStatusResponse = {
       turnPhase: 'TurnPhaseReady',
       planGameEvents: [{ type: 'unitMoved', unitId: 1, from: { x: 1, y: 0 }, to: { x: 1, y: 1 } }],
-      resolveTurnGameEvents: [{ type: 'bombExploded', bombId: 1 }],
+      resolveTurnGameEvents: [
+        { type: 'bombExploded', bombId: 1, position: { x: 1, y: 1 }, affectedPositions: [] },
+      ],
     };
 
     it('should POST with auth and return events', async () => {
@@ -398,7 +400,9 @@ describe('api.ts', () => {
   describe('resolveTurn', () => {
     const fixture: ResolveTurnResponse = {
       planGameEvents: [{ type: 'unitMoved', unitId: 1, from: { x: 1, y: 0 }, to: { x: 1, y: 1 } }],
-      resolveTurnGameEvents: [{ type: 'bombExploded', bombId: 1 }],
+      resolveTurnGameEvents: [
+        { type: 'bombExploded', bombId: 1, position: { x: 1, y: 1 }, affectedPositions: [] },
+      ],
     };
 
     it('should POST with auth and return events', async () => {

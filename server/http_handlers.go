@@ -351,14 +351,6 @@ func mapSlice[S, D any](src []S, convert func(S) D) []D {
 	return out
 }
 
-func nonZeroPtr[T comparable](v T) *T {
-	var zero T
-	if v == zero {
-		return nil
-	}
-	return &v
-}
-
 func engineUnitID(n int) (engine.UnitID, bool) {
 	if n < 0 || n > maxWireUnitID {
 		return 0, false
@@ -379,67 +371,60 @@ func wireSkills(names []string) []api.SkillType {
 }
 
 func wireGameEvent(evt engine.GameEvent) api.GameEvent {
+	var out api.GameEvent
+	var err error
 	switch evt := evt.(type) {
 	case engine.UnitMoved:
-		return api.GameEvent{
-			Type:   api.UnitMoved,
+		err = out.FromUnitMovedEvent(api.UnitMovedEvent{
 			UnitID: int(evt.UnitID),
-			From:   new(wireCoordinate(evt.From)),
-			To:     new(wireCoordinate(evt.To)),
-		}
+			From:   wireCoordinate(evt.From),
+			To:     wireCoordinate(evt.To),
+		})
 	case engine.UnitDamaged:
-		return api.GameEvent{
-			Type:     api.UnitDamaged,
+		err = out.FromUnitDamagedEvent(api.UnitDamagedEvent{
 			UnitID:   int(evt.UnitID),
+			Position: wireCoordinate(evt.Position),
 			NewHp:    evt.NewHP,
-			Position: new(wireCoordinate(evt.Position)),
-		}
+		})
 	case engine.UnitDied:
-		return api.GameEvent{
-			Type:     api.UnitDied,
+		err = out.FromUnitDiedEvent(api.UnitDiedEvent{
 			UnitID:   int(evt.UnitID),
-			Position: new(wireCoordinate(evt.Position)),
-		}
+			Position: wireCoordinate(evt.Position),
+		})
 	case engine.BombPlaced:
-		return api.GameEvent{
-			Type:      api.BombPlaced,
+		err = out.FromBombPlacedEvent(api.BombPlacedEvent{
 			UnitID:    int(evt.UnitID),
-			BombID:    nonZeroPtr(int64(evt.BombID)),
-			Position:  new(wireCoordinate(evt.Position)),
-			Range:     nonZeroPtr(evt.Range),
+			BombID:    int64(evt.BombID),
+			Position:  wireCoordinate(evt.Position),
+			Range:     evt.Range,
 			Countdown: evt.Countdown,
-		}
+		})
 	case engine.BombCountdownUpdated:
-		return api.GameEvent{
-			Type:      api.BombCountdownUpdated,
-			BombID:    nonZeroPtr(int64(evt.BombID)),
-			Position:  new(wireCoordinate(evt.Position)),
+		err = out.FromBombCountdownUpdatedEvent(api.BombCountdownUpdatedEvent{
+			BombID:    int64(evt.BombID),
+			Position:  wireCoordinate(evt.Position),
 			Countdown: evt.Countdown,
-		}
+		})
 	case engine.BombExploded:
-		out := api.GameEvent{
-			Type:     api.BombExploded,
-			BombID:   nonZeroPtr(int64(evt.BombID)),
-			Position: new(wireCoordinate(evt.Position)),
-		}
-		if len(evt.AffectedPositions) > 0 {
-			out.AffectedPositions = new(wireCoordinates(evt.AffectedPositions))
-		}
-		return out
+		err = out.FromBombExplodedEvent(api.BombExplodedEvent{
+			BombID:            int64(evt.BombID),
+			Position:          wireCoordinate(evt.Position),
+			AffectedPositions: wireCoordinates(evt.AffectedPositions),
+		})
 	case engine.SoftBlockDestroyed:
-		return api.GameEvent{
-			Type:        api.SoftBlockDestroyed,
-			SoftBlockID: nonZeroPtr(evt.SoftBlockID),
-			Position:    new(wireCoordinate(evt.Position)),
-		}
+		err = out.FromSoftBlockDestroyedEvent(api.SoftBlockDestroyedEvent{
+			SoftBlockID: evt.SoftBlockID,
+			Position:    wireCoordinate(evt.Position),
+		})
 	case engine.MatchEnded:
-		return api.GameEvent{
-			Type:         api.MatchEnded,
-			WinnerTeamID: nonZeroPtr(evt.WinnerTeamID),
-		}
+		err = out.FromMatchEndedEvent(api.MatchEndedEvent{WinnerTeamID: evt.WinnerTeamID})
 	default:
 		panic(fmt.Sprintf("wireGameEvent: unsupported event %T", evt))
 	}
+	if err != nil {
+		panic(fmt.Sprintf("wireGameEvent: %v", err))
+	}
+	return out
 }
 
 func wireTile(t engine.Tile) api.Tile {

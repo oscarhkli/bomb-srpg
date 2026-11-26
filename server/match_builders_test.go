@@ -82,6 +82,17 @@ func bombAboutToExplode(unitID engine.UnitID) matchArrangement {
 	}
 }
 
+func bombBesideSoftBlock(pos engine.Coordinate) matchArrangement {
+	return func(match *engine.Match) error {
+		placed, err := match.WorkingState.PlaceBomb(engine.SystemUnitID, pos)
+		if err != nil {
+			return err
+		}
+		match.WorkingState.Bombs[placed.BombID].Countdown = 1
+		return nil
+	}
+}
+
 func findFreeNeighbour(gs *engine.GameState, pos engine.Coordinate) (engine.Coordinate, bool) {
 	for _, step := range []engine.Coordinate{{X: 0, Y: -1}, {X: 0, Y: 1}, {X: -1, Y: 0}, {X: 1, Y: 0}} {
 		target := engine.Coordinate{X: pos.X + step.X, Y: pos.Y + step.Y}

@@ -173,7 +173,7 @@ Do not force-end the match on a poll timeout. The CPU's moves are committed to `
 
 Treat it as a bug signal: stop polling, run the `getMatchState()` recovery above, and log it. Never render a `TurnPhaseIdle` response's events; they are always empty. The practical guard is to ensure only one poll loop is ever in flight per turn.
 
-> Note: `/resolve` concatenates the two slices from `ServerStateManager.ResolveTurn`, so its response shape and the VS Human turn flow are unchanged by this spec — the shared renderer changes for both paths, but what the Player sees does not. `MatchScene`'s human branch still drops its own planning events through `resolveTurnPlayer`'s per-type filter, which is valid only while each `GameEvtType` belongs to exactly one phase. Splitting that path is tracked in [p4-spec010-match](p4-spec010-match.md) and is trigger-gated, not scheduled.
+> Note: `/resolve` concatenates the two slices from `ServerStateManager.ResolveTurn`, so its response shape and the VS Human turn flow are unchanged by this spec — the shared renderer changes for both paths, but what the Player sees does not. `MatchScene`'s human branch still drops its own planning events through `resolveTurnPlayer`'s per-type filter, which is valid only while each event `type` belongs to exactly one phase. Splitting that path is tracked in [p4-spec010-match](p4-spec010-match.md) and is trigger-gated, not scheduled.
 
 ## Victory Cutscene for Prologue Match
 

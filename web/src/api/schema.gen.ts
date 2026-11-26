@@ -242,8 +242,6 @@ export interface components {
         SkillType: "Jump" | "Fly";
         /** @enum {string} */
         TurnCmdType: "move" | "placeBomb";
-        /** @enum {string} */
-        GameEvtType: "unitMoved" | "unitDamaged" | "unitDied" | "bombPlaced" | "bombCountdownUpdated" | "bombExploded" | "softBlockDestroyed" | "matchEnded";
         Tile: {
             type: components["schemas"]["TerrainType"];
             occupantType: components["schemas"]["OccupantType"];
@@ -282,21 +280,87 @@ export interface components {
             unitId: number;
             target: components["schemas"]["Coordinate"];
         };
-        GameEvent: {
-            type: components["schemas"]["GameEvtType"];
+        GameEvent: components["schemas"]["UnitMovedEvent"] | components["schemas"]["UnitDamagedEvent"] | components["schemas"]["UnitDiedEvent"] | components["schemas"]["BombPlacedEvent"] | components["schemas"]["BombCountdownUpdatedEvent"] | components["schemas"]["BombExplodedEvent"] | components["schemas"]["SoftBlockDestroyedEvent"] | components["schemas"]["MatchEndedEvent"];
+        UnitMovedEvent: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "unitMoved";
+            unitId: number;
+            from: components["schemas"]["Coordinate"];
+            to: components["schemas"]["Coordinate"];
+        };
+        UnitDamagedEvent: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "unitDamaged";
+            unitId: number;
+            position: components["schemas"]["Coordinate"];
+            newHp: number;
+        };
+        UnitDiedEvent: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "unitDied";
+            unitId: number;
+            position: components["schemas"]["Coordinate"];
+        };
+        BombPlacedEvent: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "bombPlaced";
             unitId: number;
             /** Format: int64 */
-            bombId?: number;
-            softBlockId?: number;
-            itemId?: number;
-            position?: components["schemas"]["Coordinate"];
-            from?: components["schemas"]["Coordinate"];
-            to?: components["schemas"]["Coordinate"];
-            newHp: number;
-            range?: number;
+            bombId: number;
+            position: components["schemas"]["Coordinate"];
+            range: number;
             countdown: number;
-            affectedPositions?: components["schemas"]["Coordinate"][];
-            winnerTeamId?: number;
+        };
+        BombCountdownUpdatedEvent: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "bombCountdownUpdated";
+            /** Format: int64 */
+            bombId: number;
+            position: components["schemas"]["Coordinate"];
+            countdown: number;
+        };
+        BombExplodedEvent: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "bombExploded";
+            /** Format: int64 */
+            bombId: number;
+            position: components["schemas"]["Coordinate"];
+            affectedPositions: components["schemas"]["Coordinate"][];
+        };
+        SoftBlockDestroyedEvent: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "softBlockDestroyed";
+            softBlockId: number;
+            position: components["schemas"]["Coordinate"];
+        };
+        MatchEndedEvent: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "matchEnded";
+            winnerTeamId: number;
         };
         GameState: {
             turn: number;
