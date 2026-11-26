@@ -148,9 +148,7 @@ func TestMatch_CommandMoveUnit(t *testing.T) {
 	validTarget := Coordinate{1, 2}
 
 	t.Run("Success: delegates to WorkingState.MoveUnit and logs the event", func(t *testing.T) {
-		m := newTestMatch(3, 3)
-		m.WorkingState.Turn = 1
-		m.WorkingState.ActiveTeam = 1
+		m := newActiveMatch(3, 3)
 		m.WorkingState.Units[validUnitID] = &Unit{
 			ID:       validUnitID,
 			HP:       1,
@@ -233,9 +231,7 @@ func TestGameState_MoveUnit(t *testing.T) {
 			unitID: validUnitID,
 			target: validTarget,
 			setupState: func() *GameState {
-				gs := newTestMatch(2, 2).WorkingState
-				gs.Turn = 1
-				gs.ActiveTeam = 1
+				gs := newActiveMatch(2, 2).WorkingState
 				gs.Units[validUnitID] = &Unit{
 					ID:       validUnitID,
 					HP:       1,
@@ -252,9 +248,7 @@ func TestGameState_MoveUnit(t *testing.T) {
 			unitID: validUnitID,
 			target: validTarget,
 			setupState: func() *GameState {
-				gs := newTestMatch(3, 3).WorkingState
-				gs.Turn = 1
-				gs.ActiveTeam = 1
+				gs := newActiveMatch(3, 3).WorkingState
 
 				gs.Units[validUnitID] = &Unit{
 					ID:       validUnitID,
@@ -273,9 +267,7 @@ func TestGameState_MoveUnit(t *testing.T) {
 			unitID: validUnitID,
 			target: validTarget,
 			setupState: func() *GameState {
-				gs := newTestMatch(2, 2).WorkingState
-				gs.Turn = 1
-				gs.ActiveTeam = 1
+				gs := newActiveMatch(2, 2).WorkingState
 				gs.Units[validUnitID] = &Unit{
 					ID:       validUnitID,
 					HP:       1,
@@ -293,9 +285,7 @@ func TestGameState_MoveUnit(t *testing.T) {
 			unitID: validUnitID,
 			target: outOfRangeTarget,
 			setupState: func() *GameState {
-				gs := newTestMatch(10, 10).WorkingState
-				gs.Turn = 1
-				gs.ActiveTeam = 1
+				gs := newActiveMatch(10, 10).WorkingState
 				gs.Units[validUnitID] = &Unit{
 					ID:       validUnitID,
 					HP:       1,
@@ -314,9 +304,7 @@ func TestGameState_MoveUnit(t *testing.T) {
 			unitID: validUnitID,
 			target: validTarget,
 			setupState: func() *GameState {
-				gs := newTestMatch(3, 3).WorkingState
-				gs.Turn = 1
-				gs.ActiveTeam = 1
+				gs := newActiveMatch(3, 3).WorkingState
 				gs.Units[validUnitID] = &Unit{
 					ID:       validUnitID,
 					HP:       1,
@@ -336,9 +324,7 @@ func TestGameState_MoveUnit(t *testing.T) {
 			unitID: validUnitID,
 			target: validTarget,
 			setupState: func() *GameState {
-				gs := newTestMatch(3, 3).WorkingState
-				gs.Turn = 1
-				gs.ActiveTeam = 1
+				gs := newActiveMatch(3, 3).WorkingState
 				gs.Units[validUnitID] = &Unit{
 					ID:       validUnitID,
 					HP:       1,
@@ -358,9 +344,7 @@ func TestGameState_MoveUnit(t *testing.T) {
 			unitID: validUnitID,
 			target: validTarget,
 			setupState: func() *GameState {
-				gs := newTestMatch(3, 3).WorkingState
-				gs.Turn = 1
-				gs.ActiveTeam = 1
+				gs := newActiveMatch(3, 3).WorkingState
 				gs.Units[validUnitID] = &Unit{
 					ID:       validUnitID,
 					HP:       1,
@@ -425,9 +409,8 @@ func TestMatch_CommandPlaceBomb(t *testing.T) {
 	validTarget := Coordinate{1, 2}
 
 	t.Run("Success: delegates to WorkingState.PlaceBomb and logs the event", func(t *testing.T) {
-		m := newTestMatch(3, 3)
+		m := newActiveMatch(3, 3)
 		m.WorkingState.Turn = 3
-		m.WorkingState.ActiveTeam = 1
 		m.WorkingState.Units[validUnitID] = &Unit{
 			ID:           validUnitID,
 			HP:           1,
@@ -512,9 +495,7 @@ func TestGameState_PlaceBomb(t *testing.T) {
 			unitID: validUnitID,
 			target: validTarget,
 			setupState: func() *GameState {
-				gs := newTestMatch(2, 2).WorkingState
-				gs.Turn = 1
-				gs.ActiveTeam = 1
+				gs := newActiveMatch(2, 2).WorkingState
 				gs.Units[validUnitID] = &Unit{
 					ID:       validUnitID,
 					HP:       1,
@@ -531,9 +512,7 @@ func TestGameState_PlaceBomb(t *testing.T) {
 			unitID: validUnitID,
 			target: validTarget,
 			setupState: func() *GameState {
-				gs := newTestMatch(3, 3).WorkingState
-				gs.Turn = 1
-				gs.ActiveTeam = 1
+				gs := newActiveMatch(3, 3).WorkingState
 				gs.Units[validUnitID] = &Unit{
 					ID:       validUnitID,
 					HP:       1,
@@ -550,9 +529,7 @@ func TestGameState_PlaceBomb(t *testing.T) {
 			unitID: validUnitID,
 			target: validTarget,
 			setupState: func() *GameState {
-				gs := newTestMatch(2, 2).WorkingState
-				gs.Turn = 1
-				gs.ActiveTeam = 1
+				gs := newActiveMatch(2, 2).WorkingState
 				gs.Units[validUnitID] = &Unit{
 					ID:       validUnitID,
 					HP:       1,
@@ -570,9 +547,7 @@ func TestGameState_PlaceBomb(t *testing.T) {
 			unitID: validUnitID,
 			target: validTarget,
 			setupState: func() *GameState {
-				gs := newTestMatch(3, 3).WorkingState
-				gs.Turn = 1
-				gs.ActiveTeam = 1
+				gs := newActiveMatch(3, 3).WorkingState
 				gs.Units[validUnitID] = &Unit{
 					ID:           validUnitID,
 					HP:           1,
@@ -592,9 +567,7 @@ func TestGameState_PlaceBomb(t *testing.T) {
 			unitID: validUnitID,
 			target: outOfRangeTarget,
 			setupState: func() *GameState {
-				gs := newTestMatch(10, 10).WorkingState
-				gs.Turn = 1
-				gs.ActiveTeam = 1
+				gs := newActiveMatch(10, 10).WorkingState
 				gs.Units[validUnitID] = &Unit{
 					ID:           validUnitID,
 					HP:           1,
@@ -615,9 +588,8 @@ func TestGameState_PlaceBomb(t *testing.T) {
 			unitID: validUnitID,
 			target: validTarget,
 			setupState: func() *GameState {
-				gs := newTestMatch(3, 3).WorkingState
+				gs := newActiveMatch(3, 3).WorkingState
 				gs.Turn = 3
-				gs.ActiveTeam = 1
 				gs.TurnBombCounter = 0
 				gs.Bombs = make(map[BombID]*Bomb)
 				gs.Units[validUnitID] = &Unit{
@@ -642,9 +614,8 @@ func TestGameState_PlaceBomb(t *testing.T) {
 			unitID: validUnitID,
 			target: validTarget,
 			setupState: func() *GameState {
-				gs := newTestMatch(3, 3).WorkingState
+				gs := newActiveMatch(3, 3).WorkingState
 				gs.Turn = 3
-				gs.ActiveTeam = 1
 				gs.TurnBombCounter = 0
 				gs.Bombs = make(map[BombID]*Bomb)
 				gs.Units[validUnitID] = &Unit{
@@ -669,9 +640,8 @@ func TestGameState_PlaceBomb(t *testing.T) {
 			unitID: validUnitID,
 			target: validTarget,
 			setupState: func() *GameState {
-				gs := newTestMatch(3, 3).WorkingState
+				gs := newActiveMatch(3, 3).WorkingState
 				gs.Turn = 3
-				gs.ActiveTeam = 1
 				gs.TurnBombCounter = 0
 				gs.Bombs = make(map[BombID]*Bomb)
 				gs.Units[validUnitID] = &Unit{
@@ -800,13 +770,27 @@ func newTestMatch(width, height int) *Match {
 	return m
 }
 
+func newActiveMatch(width, height int) *Match {
+	m := newTestMatch(width, height)
+	m.WorkingState.ActiveTeam = 1
+	return m
+}
+
+func mustArchetype(t *testing.T, name string) Archetype {
+	t.Helper()
+
+	archetype, ok := GetArchetype(name)
+	if !ok {
+		t.Fatalf("archetype %q does not exist", name)
+	}
+	return archetype
+}
+
 func TestMatch_ApplyTurnCommand(t *testing.T) {
 	unitID := NewUnitID(1, 0)
 
 	t.Run("apply MoveCommand", func(t *testing.T) {
-		m := newTestMatch(2, 2)
-		m.WorkingState.Turn = 1
-		m.WorkingState.ActiveTeam = 1
+		m := newActiveMatch(2, 2)
 		m.WorkingState.Units[unitID] = &Unit{ID: unitID, Team: 1, HP: 1, Speed: 100, Position: Coordinate{0, 0}}
 		m.WorkingState.Grid[0][0] = Tile{Type: TerrainPlain, OccupantType: OccupantUnit, OccupantID: int64(unitID)}
 
@@ -824,9 +808,7 @@ func TestMatch_ApplyTurnCommand(t *testing.T) {
 	})
 
 	t.Run("apply PlaceBombCommand", func(t *testing.T) {
-		m := newTestMatch(2, 2)
-		m.WorkingState.Turn = 1
-		m.WorkingState.ActiveTeam = 1
+		m := newActiveMatch(2, 2)
 		m.WorkingState.Units[unitID] = &Unit{ID: unitID, Team: 1, HP: 1, BombMaxRange: 100, MaxBombCount: 100, Position: Coordinate{0, 0}}
 		m.WorkingState.Grid[0][0] = Tile{Type: TerrainPlain, OccupantType: OccupantUnit, OccupantID: int64(unitID)}
 
@@ -844,9 +826,7 @@ func TestMatch_ApplyTurnCommand(t *testing.T) {
 	})
 
 	t.Run("apply unsupported command type", func(t *testing.T) {
-		m := newTestMatch(2, 2)
-		m.WorkingState.Turn = 1
-		m.WorkingState.ActiveTeam = 1
+		m := newActiveMatch(2, 2)
 		m.WorkingState.Units[unitID] = &Unit{ID: unitID, Team: 1, HP: 1, BombMaxRange: 100, MaxBombCount: 100, Position: Coordinate{0, 0}}
 		m.WorkingState.Grid[0][0] = Tile{Type: TerrainPlain, OccupantType: OccupantUnit, OccupantID: int64(unitID)}
 
@@ -919,15 +899,9 @@ func TestGameState_IsLandingLegal_OccupantBomb(t *testing.T) {
 }
 
 func TestMatch_BeginTurn_NotTriggeringSuddenDeath(t *testing.T) {
-	king, ok := GetArchetype("King")
-	if !ok {
-		t.Fatalf("Archetype King does not exist")
-	}
+	king := mustArchetype(t, "King")
 
-	fighter, ok := GetArchetype("Fighter")
-	if !ok {
-		t.Fatalf("Archetype Fighter does not exist")
-	}
+	fighter := mustArchetype(t, "Fighter")
 
 	u1 := NewUnitID(1, 0)
 	u2 := NewUnitID(2, 0)
@@ -984,15 +958,9 @@ func TestMatch_BeginTurn_NotTriggeringSuddenDeath(t *testing.T) {
 }
 
 func TestMatch_BeginTurn_SuddenDeath(t *testing.T) {
-	king, ok := GetArchetype("King")
-	if !ok {
-		t.Fatalf("Archetype King does not exist")
-	}
+	king := mustArchetype(t, "King")
 
-	fighter, ok := GetArchetype("Fighter")
-	if !ok {
-		t.Fatalf("Archetype Fighter does not exist")
-	}
+	fighter := mustArchetype(t, "Fighter")
 
 	u1 := NewUnitID(1, 0)
 	u2 := NewUnitID(2, 0)
@@ -1109,13 +1077,9 @@ func TestMatch_BeginTurn_SuddenDeath(t *testing.T) {
 }
 
 func TestMatch_ResolveTurn_SplitsPlanningFromResolution(t *testing.T) {
-	king, ok := GetArchetype("King")
-	if !ok {
-		t.Fatalf("Archetype King does not exist")
-	}
+	king := mustArchetype(t, "King")
 
-	m := newTestMatch(9, 9)
-	m.WorkingState.ActiveTeam = 1
+	m := newActiveMatch(9, 9)
 	unitID := NewUnitID(1, 0)
 	m.WorkingState.Units[unitID] = &Unit{
 		ID: unitID, Team: 1, HP: 1, Type: king, Role: RoleKing,
@@ -1159,15 +1123,9 @@ func TestMatch_ResolveTurn_SplitsPlanningFromResolution(t *testing.T) {
 }
 
 func TestMatch_ResolveTurn_ExplosionAndBlast(t *testing.T) {
-	king, ok := GetArchetype("King")
-	if !ok {
-		t.Fatalf("Archetype King does not exist")
-	}
+	king := mustArchetype(t, "King")
 
-	fighter, ok := GetArchetype("Fighter")
-	if !ok {
-		t.Fatalf("Archetype Fighter does not exist")
-	}
+	fighter := mustArchetype(t, "Fighter")
 
 	t.Run("Natural countdown tick reduces for countdown bombs and does not detonate early", func(t *testing.T) {
 		m := newTestMatch(16, 16)
@@ -1392,15 +1350,9 @@ func TestMatch_ResolveTurn_CascadingChainReactions(t *testing.T) {
 }
 
 func TestMatch_ResolveTurn_TimelineSystemTransitions(t *testing.T) {
-	king, ok := GetArchetype("King")
-	if !ok {
-		t.Fatalf("Archetype King does not exist")
-	}
+	king := mustArchetype(t, "King")
 
-	fighter, ok := GetArchetype("Fighter")
-	if !ok {
-		t.Fatalf("Archetype Fighter does not exist")
-	}
+	fighter := mustArchetype(t, "Fighter")
 
 	u1 := NewUnitID(1, 0)
 	u2 := NewUnitID(2, 0)
@@ -1437,10 +1389,7 @@ func TestMatch_ResolveTurn_TimelineSystemTransitions(t *testing.T) {
 	})
 
 	t.Run("Successful turn resolution advances true match clock and deep copies sandbox workspace", func(t *testing.T) {
-		m := newTestMatch(16, 16)
-		m.TrueState.Turn = 1
-		m.WorkingState.Turn = 1
-		m.WorkingState.ActiveTeam = 1
+		m := newActiveMatch(16, 16)
 
 		m.WorkingState.Units[u1] = &Unit{ID: u1, Team: 1, HP: 2, Type: king, Role: RoleKing}
 		m.WorkingState.Units[u2] = &Unit{ID: u2, Team: 2, HP: 2, Type: king, Role: RoleKing}
@@ -1533,50 +1482,34 @@ type teamFormation struct {
 func newTestMatchWithTeams(t *testing.T, p1, p2 teamFormation) *Match {
 	t.Helper()
 
-	m := newTestMatch(6, 2)
-	m.WorkingState.Turn = 1
-	m.WorkingState.ActiveTeam = 1
+	m := newActiveMatch(6, 2)
 
-	king, ok := GetArchetype("King")
-	if !ok {
-		t.Fatalf("Archetype King does not exist")
-	}
+	king := mustArchetype(t, "King")
 
-	boss, ok := GetArchetype("Prologue")
-	if !ok {
-		t.Fatalf("Archetype Prologue (Boss) does not exist")
-	}
+	boss := mustArchetype(t, "Prologue")
 
-	fighter, ok := GetArchetype("Fighter")
-	if !ok {
-		t.Fatalf("Archetype Fighter does not exist")
+	fighter := mustArchetype(t, "Fighter")
+
+	hpOf := func(alive bool) int {
+		if alive {
+			return 1
+		}
+		return 0
 	}
 
 	buildTeam := func(team, row int, tf teamFormation) {
 		x := 0
 		if tf.King != nil {
-			hp := 0
-			if *tf.King {
-				hp = 1
-			}
-			m.addUnit(team, x, king, RoleKing, Coordinate{x, row}, hp)
+			m.addUnit(team, x, king, RoleKing, Coordinate{x, row}, hpOf(*tf.King))
 			x++
 		} else {
 			for _, alive := range tf.BossesAlive {
-				hp := 0
-				if alive {
-					hp = 1
-				}
-				m.addUnit(team, x, boss, RoleBoss, Coordinate{x, row}, hp)
+				m.addUnit(team, x, boss, RoleBoss, Coordinate{x, row}, hpOf(alive))
 				x++
 			}
 		}
 		for _, alive := range tf.OrdinaryUnitsAlive {
-			hp := 0
-			if alive {
-				hp = 1
-			}
-			m.addUnit(team, x, fighter, RoleNormal, Coordinate{x, row}, hp)
+			m.addUnit(team, x, fighter, RoleNormal, Coordinate{x, row}, hpOf(alive))
 			x++
 		}
 	}
@@ -2127,8 +2060,7 @@ func TestGameState_PlaceBomb_ErrorOrder(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gs := newTestMatch(8, 8).WorkingState
-			gs.Turn, gs.ActiveTeam = 1, 1
+			gs := newActiveMatch(8, 8).WorkingState
 			unit := &Unit{ID: unitID, HP: 1, Team: 1, Position: origin, BombPower: 3, BombMaxRange: 3, MaxBombCount: 2}
 			gs.Units[unitID] = unit
 			gs.Grid[origin.Y][origin.X] = Tile{Type: TerrainPlain, OccupantType: OccupantUnit, OccupantID: int64(unitID)}
