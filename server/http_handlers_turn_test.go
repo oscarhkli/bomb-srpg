@@ -153,6 +153,7 @@ func TestSubmitTurnCommandDecoding(t *testing.T) {
 		{"negative unitId", `{"type":"move","unitId":-1,` + target + `}`, false, http.StatusBadRequest, formatMsg},
 		{"unknown type", `{"type":"fly","unitId":16,` + target + `}`, false, http.StatusConflict, "invalid turn command: unsupported command type: fly"},
 		{"unknown type with an invalid unitId", `{"type":"fly","unitId":256,` + target + `}`, false, http.StatusBadRequest, formatMsg},
+		{"unknown type without a token", `{"type":"fly","unitId":16,` + target + `}`, true, http.StatusConflict, "invalid turn command: unsupported command type: fly"},
 		{"malformed body without a token", `{`, true, http.StatusBadRequest, formatMsg},
 		{"valid body without a token", `{"type":"move","unitId":16,` + target + `}`, true, http.StatusUnauthorized, "invalid player token"},
 	}
