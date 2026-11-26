@@ -930,6 +930,9 @@ func TestDecide_RepeatedUnitFailure_ReportedOnce(t *testing.T) {
 			if tt.wantCmds != slices.ContainsFunc(got, func(c engine.TurnCommand) bool { return c.Actor() == allyKing.ID }) {
 				t.Errorf("Decide() = %+v, want ally king command = %v", got, tt.wantCmds)
 			}
+			if !tt.wantCmds && len(got) != 0 {
+				t.Errorf("Decide() = %+v, want no commands", got)
+			}
 		})
 	}
 }
