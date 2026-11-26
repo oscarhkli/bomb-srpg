@@ -230,7 +230,6 @@ func (m *Match) injectSuddenDeathHazards() {
 	}
 }
 
-// ResolveTurn commits the turn and begins the next, so hazards are already placed on return.
 func (m *Match) ResolveTurn() (planGameEvents, resolveTurnGameEvents []GameEvent) {
 	planGameEvents = make([]GameEvent, len(m.PlaybackLog))
 	copy(planGameEvents, m.PlaybackLog)

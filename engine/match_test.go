@@ -2257,7 +2257,7 @@ func TestMatch_BeginTurn(t *testing.T) {
 			build: initGame(5),
 		},
 		{
-			name:          "ResolveTurn from Turn = MaxTurns enters sudden death",
+			name:          "ResolveTurn from Turn = MaxTurns has the next turn's hazards placed on return",
 			build:         teamsAt(3, 3),
 			act:           resolve,
 			wantBombs:     SuddenDeathBombs,
