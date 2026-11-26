@@ -40,10 +40,13 @@ type CPUStatus struct {
 	Resolve []engine.GameEvent
 }
 
+func cpuToMove(match *engine.Match) bool {
+	return match.GameCfg.VSCpu && match.WinnerTeamID == 0 && match.WorkingState.ActiveTeam == engine.Team2
+}
+
 func (r *Room) launchCPUTurnIfDueLocked() (run func()) {
 	match := r.match
-	if !match.GameCfg.VSCpu || match.WinnerTeamID != 0 || match.WorkingState.ActiveTeam != engine.Team2 ||
-		r.cpu.phase == TurnPhasePlanning {
+	if !cpuToMove(match) || r.cpu.phase == TurnPhasePlanning {
 		return nil
 	}
 	r.cpu = cpuTurn{phase: TurnPhasePlanning}
