@@ -37,7 +37,7 @@ The backend already has the taxonomy this spec needs: `mapError()` (`server/serv
 | **Domain** | Server rejected a legal-looking action for a game-rule reason (`ApiError.status === 409`) | `ErrorPanel`, server text as-is | unit already moved, out of bomb range, match already ended |
 | **Session** | Client is out of sync with server state (`status` 400/401/404) | `ErrorPanel`, generic session message + `console.warn` with the real status/text | stale token, room not found, malformed request body |
 | **Infra** | Unexpected failure: 500, network drop, JSON parse failure, malformed/unrecognized event shape from the server | `ErrorPanel` generic fallback (never raw text) + `console.error` with full detail | `Failed to fetch`, `"internal error"`, `'Invalid bombPlaced event received from server'` |
-| **Diagnostic** | Renderer/animation desync that degrades gracefully — no player action needed, no player message | `console.warn` only | missing stage texture, unhandled resolve-turn event type, bomb graphics missing on resolve |
+| **Diagnostic** | Renderer/animation desync that degrades gracefully — no player action needed, no player message | `console.warn` only | missing stage texture, bomb graphics missing on resolve |
 | **Operational** | Best-effort background operation whose failure doesn't block the user flow | `console.error` only, flow continues | `deleteMatch()` failing during scene teardown |
 
 ## Routing Contract
@@ -76,7 +76,7 @@ Existing sites this spec's implementation must re-route, per the audit:
 | `startMatch.ts:51` | `` errorPanel.show(`Failed to create match: ${result.message}`) `` | Domain/Infra via `reportError` (currently no logging at all — gap) |
 | `MatchSettingsScene.ts:89-93` | `.catch(() => errorPanel.show('Failed to load match catalog'))` | Infra — **currently swallows `err` entirely, must log it** |
 | `MatchScene.ts:301,818` | `console.error(...)` only | Diagnostic/Operational — already correct, no change |
-| `boardRenderer.ts:75,118`, `resolveTurnPlayer.ts:125,235` | `console.warn(...)` | Diagnostic — already correct, no change |
+| `boardRenderer.ts` (missing stage texture, unit texture key), `resolveTurnPlayer.ts` (`bombExploded` with no live graphics) | `console.warn(...)` | Diagnostic — already correct, no change |
 
 ## Acceptance Criteria
 
@@ -84,7 +84,7 @@ Existing sites this spec's implementation must re-route, per the audit:
 2. Given a `bombPlaced` event with an unrecognized shape, when handled, then `console.error` logs the event payload and `ErrorPanel` shows a generic message — never the raw `'Invalid ... event received from server'` string.
 3. Given `getCatalog()` rejects for any reason, when the catch handler runs, then `console.error` is always called — no catch block silently discards `err`.
 4. Given any 500, network, or parse failure, when shown to the player, then `ErrorPanel` never displays the raw error text or stack.
-5. Given a Diagnostic or Operational failure (missing texture, unhandled event type, best-effort `deleteMatch()`), when it occurs, then no `ErrorPanel` message is shown and the flow continues unaffected.
+5. Given a Diagnostic or Operational failure (missing texture, best-effort `deleteMatch()`), when it occurs, then no `ErrorPanel` message is shown and the flow continues unaffected.
 6. Given any tier logs via `console.error`/`console.warn` in a dev build, when it fires, then `server/.debug/client-log.jsonl` gains one matching line with `tier`, `op`, `message`, `detail`, and `timestamp` — readable from disk without touching the browser.
 7. Given a production build, when any error/warning fires, then no request reaches `/debug/log` and the route itself is not registered server-side.
 8. Given `/debug/log` is unreachable (route missing, network drop), when the sink fires, then no exception escapes it and `ErrorPanel`/the rest of the flow is unaffected.
