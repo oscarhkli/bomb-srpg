@@ -325,9 +325,6 @@ components:
     TurnCmdType:
       type: string
       enum: [move, placeBomb]
-    GameEvtType:
-      type: string
-      enum: [unitMoved, unitDamaged, unitDied, bombPlaced, bombCountdownUpdated, bombExploded, softBlockDestroyed, matchEnded]
     Tile:
       type: object
       additionalProperties: false
@@ -417,11 +414,79 @@ components:
           $ref: '#/components/schemas/Coordinate'
       required: [type, unitId, target]
     GameEvent:
+      oneOf:
+        - $ref: '#/components/schemas/UnitMovedEvent'
+        - $ref: '#/components/schemas/UnitDamagedEvent'
+        - $ref: '#/components/schemas/UnitDiedEvent'
+        - $ref: '#/components/schemas/BombPlacedEvent'
+        - $ref: '#/components/schemas/BombCountdownUpdatedEvent'
+        - $ref: '#/components/schemas/BombExplodedEvent'
+        - $ref: '#/components/schemas/SoftBlockDestroyedEvent'
+        - $ref: '#/components/schemas/MatchEndedEvent'
+      discriminator:
+        propertyName: type
+        mapping:
+          unitMoved: '#/components/schemas/UnitMovedEvent'
+          unitDamaged: '#/components/schemas/UnitDamagedEvent'
+          unitDied: '#/components/schemas/UnitDiedEvent'
+          bombPlaced: '#/components/schemas/BombPlacedEvent'
+          bombCountdownUpdated: '#/components/schemas/BombCountdownUpdatedEvent'
+          bombExploded: '#/components/schemas/BombExplodedEvent'
+          softBlockDestroyed: '#/components/schemas/SoftBlockDestroyedEvent'
+          matchEnded: '#/components/schemas/MatchEndedEvent'
+    UnitMovedEvent:
       type: object
       additionalProperties: false
       properties:
         type:
-          $ref: '#/components/schemas/GameEvtType'
+          type: string
+          enum: [unitMoved]
+        unitId:
+          type: integer
+          minimum: 0
+          maximum: 255
+        from:
+          $ref: '#/components/schemas/Coordinate'
+        to:
+          $ref: '#/components/schemas/Coordinate'
+      required: [type, unitId, from, to]
+    UnitDamagedEvent:
+      type: object
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+          enum: [unitDamaged]
+        unitId:
+          type: integer
+          minimum: 0
+          maximum: 255
+        position:
+          $ref: '#/components/schemas/Coordinate'
+        newHp:
+          type: integer
+      required: [type, unitId, position, newHp]
+    UnitDiedEvent:
+      type: object
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+          enum: [unitDied]
+        unitId:
+          type: integer
+          minimum: 0
+          maximum: 255
+        position:
+          $ref: '#/components/schemas/Coordinate'
+      required: [type, unitId, position]
+    BombPlacedEvent:
+      type: object
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+          enum: [bombPlaced]
         unitId:
           type: integer
           minimum: 0
@@ -430,29 +495,69 @@ components:
           type: integer
           format: int64
           minimum: 0
-        softBlockId:
-          type: integer
-        itemId:
-          type: integer
         position:
           $ref: '#/components/schemas/Coordinate'
-        from:
-          $ref: '#/components/schemas/Coordinate'
-        to:
-          $ref: '#/components/schemas/Coordinate'
-        newHp:
-          type: integer
         range:
           type: integer
         countdown:
           type: integer
+      required: [type, unitId, bombId, position, range, countdown]
+    BombCountdownUpdatedEvent:
+      type: object
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+          enum: [bombCountdownUpdated]
+        bombId:
+          type: integer
+          format: int64
+          minimum: 0
+        position:
+          $ref: '#/components/schemas/Coordinate'
+        countdown:
+          type: integer
+      required: [type, bombId, position, countdown]
+    BombExplodedEvent:
+      type: object
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+          enum: [bombExploded]
+        bombId:
+          type: integer
+          format: int64
+          minimum: 0
+        position:
+          $ref: '#/components/schemas/Coordinate'
         affectedPositions:
           type: array
           items:
             $ref: '#/components/schemas/Coordinate'
+      required: [type, bombId, position, affectedPositions]
+    SoftBlockDestroyedEvent:
+      type: object
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+          enum: [softBlockDestroyed]
+        softBlockId:
+          type: integer
+        position:
+          $ref: '#/components/schemas/Coordinate'
+      required: [type, softBlockId, position]
+    MatchEndedEvent:
+      type: object
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+          enum: [matchEnded]
         winnerTeamId:
           type: integer
-      required: [type, unitId, newHp, countdown]
+      required: [type, winnerTeamId]
     GameState:
       type: object
       additionalProperties: false

@@ -40,52 +40,72 @@ func TestWireEventBytes(t *testing.T) {
 		{
 			"unit moved",
 			engine.UnitMoved{UnitID: 17, From: pos, To: engine.Coordinate{X: 3, Y: 4}},
-			`{"countdown":0,"from":{"x":1,"y":2},"newHp":0,"to":{"x":3,"y":4},"type":"unitMoved","unitId":17}`,
+			`{"from":{"x":1,"y":2},"to":{"x":3,"y":4},"type":"unitMoved","unitId":17}`,
 		},
 		{
 			"unit damaged",
 			engine.UnitDamaged{UnitID: 17, Position: pos, NewHP: 4},
-			`{"countdown":0,"newHp":4,"position":{"x":1,"y":2},"type":"unitDamaged","unitId":17}`,
+			`{"newHp":4,"position":{"x":1,"y":2},"type":"unitDamaged","unitId":17}`,
 		},
 		{
 			"unit died",
 			engine.UnitDied{UnitID: 17, Position: pos},
-			`{"countdown":0,"newHp":0,"position":{"x":1,"y":2},"type":"unitDied","unitId":17}`,
+			`{"position":{"x":1,"y":2},"type":"unitDied","unitId":17}`,
 		},
 		{
 			"bomb placed",
 			engine.BombPlaced{UnitID: 17, BombID: 70000, Position: pos, Range: 2, Countdown: 3},
-			`{"bombId":70000,"countdown":3,"newHp":0,"position":{"x":1,"y":2},"range":2,"type":"bombPlaced","unitId":17}`,
+			`{"bombId":70000,"countdown":3,"position":{"x":1,"y":2},"range":2,"type":"bombPlaced","unitId":17}`,
 		},
 		{
 			"bomb countdown updated",
 			engine.BombCountdownUpdated{BombID: 70000, Position: pos, Countdown: 2},
-			`{"bombId":70000,"countdown":2,"newHp":0,"position":{"x":1,"y":2},"type":"bombCountdownUpdated","unitId":0}`,
+			`{"bombId":70000,"countdown":2,"position":{"x":1,"y":2},"type":"bombCountdownUpdated"}`,
 		},
 		{
 			"bomb exploded",
 			engine.BombExploded{BombID: 70000, Position: pos, AffectedPositions: []engine.Coordinate{{X: 1, Y: 2}, {X: 1, Y: 3}}},
-			`{"affectedPositions":[{"x":1,"y":2},{"x":1,"y":3}],"bombId":70000,"countdown":0,"newHp":0,"position":{"x":1,"y":2},"type":"bombExploded","unitId":0}`,
+			`{"affectedPositions":[{"x":1,"y":2},{"x":1,"y":3}],"bombId":70000,"position":{"x":1,"y":2},"type":"bombExploded"}`,
 		},
 		{
 			"soft block destroyed",
 			engine.SoftBlockDestroyed{SoftBlockID: 5, Position: pos},
-			`{"countdown":0,"newHp":0,"position":{"x":1,"y":2},"softBlockId":5,"type":"softBlockDestroyed","unitId":0}`,
+			`{"position":{"x":1,"y":2},"softBlockId":5,"type":"softBlockDestroyed"}`,
 		},
 		{
 			"match ended",
 			engine.MatchEnded{WinnerTeamID: 2},
-			`{"countdown":0,"newHp":0,"type":"matchEnded","unitId":0,"winnerTeamId":2}`,
+			`{"type":"matchEnded","winnerTeamId":2}`,
 		},
 		{
 			"match drawn",
 			engine.MatchEnded{WinnerTeamID: -1},
-			`{"countdown":0,"newHp":0,"type":"matchEnded","unitId":0,"winnerTeamId":-1}`,
+			`{"type":"matchEnded","winnerTeamId":-1}`,
+		},
+		{
+			"bomb exploded with no affected positions sends an empty array",
+			engine.BombExploded{BombID: 70000, Position: pos},
+			`{"affectedPositions":[],"bombId":70000,"position":{"x":1,"y":2},"type":"bombExploded"}`,
+		},
+		{
+			"soft block 0 keeps its id",
+			engine.SoftBlockDestroyed{SoftBlockID: 0, Position: pos},
+			`{"position":{"x":1,"y":2},"softBlockId":0,"type":"softBlockDestroyed"}`,
+		},
+		{
+			"system unit owner of a bomb is sent",
+			engine.BombPlaced{UnitID: engine.SystemUnitID, BombID: 70000, Position: pos, Range: 2, Countdown: 3},
+			`{"bombId":70000,"countdown":3,"position":{"x":1,"y":2},"range":2,"type":"bombPlaced","unitId":0}`,
+		},
+		{
+			"zero bomb id and range are sent",
+			engine.BombPlaced{UnitID: 17, Position: pos},
+			`{"bombId":0,"countdown":0,"position":{"x":1,"y":2},"range":0,"type":"bombPlaced","unitId":17}`,
 		},
 		{
 			"position at the origin is still sent",
 			engine.UnitDamaged{UnitID: 1},
-			`{"countdown":0,"newHp":0,"position":{"x":0,"y":0},"type":"unitDamaged","unitId":1}`,
+			`{"newHp":0,"position":{"x":0,"y":0},"type":"unitDamaged","unitId":1}`,
 		},
 	}
 
@@ -155,7 +175,7 @@ func TestWireStateBytes(t *testing.T) {
 		`"turnCommands":[` +
 		`{"target":{"x":1,"y":2},"type":"move","unitId":17},` +
 		`{"target":{"x":1,"y":3},"type":"placeBomb","unitId":17}],` +
-		`"turnStartEvents":[{"bombId":70000,"countdown":3,"newHp":0,"position":{"x":1,"y":2},"range":2,"type":"bombPlaced","unitId":17}],` +
+		`"turnStartEvents":[{"bombId":70000,"countdown":3,"position":{"x":1,"y":2},"range":2,"type":"bombPlaced","unitId":17}],` +
 		`"units":[` +
 		unitHead + `true,"hasUsedSkill":false` + unitMid + `17` + unitTail + `[],"speed":3,"team":1,"type":"King"},` +
 		unitHead + `false,"hasUsedSkill":true` + unitMid + `18` + unitTail + `["Jump","Fly"],"speed":3,"team":2,"type":"Witch"},` +

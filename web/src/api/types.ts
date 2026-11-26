@@ -6,7 +6,6 @@ export type TerrainType = S['TerrainType'];
 export type OccupantType = S['OccupantType'];
 export type SkillType = S['SkillType'];
 export type TurnCmdType = S['TurnCmdType'];
-export type GameEvtType = S['GameEvtType'];
 export type UnitRole = S['UnitRole'];
 export type CPUTurnPhase = S['CPUTurnPhase'];
 
@@ -30,21 +29,11 @@ export type AllowedTilesRequest =
   paths['/api/match-rooms/{roomID}/match/allowed-tiles']['get']['parameters']['query'];
 export type AllowedTilesResponse = Coordinate[];
 
-type AlwaysSentOptionalEventKeys = 'unitId' | 'newHp' | 'countdown';
+export type GameEvent = S['GameEvent'];
+export type UnitMovedEvent = S['UnitMovedEvent'];
+export type BombPlacedEvent = S['BombPlacedEvent'];
+export type MatchEndedEvent = S['MatchEndedEvent'];
 
-export type GameEvent = Omit<S['GameEvent'], AlwaysSentOptionalEventKeys> &
-  Partial<Pick<S['GameEvent'], AlwaysSentOptionalEventKeys>>;
-
-export type GameState = Omit<S['GameState'], 'turnStartEvents'> & {
-  turnStartEvents: GameEvent[];
-};
-
-export type CpuStatusResponse = Omit<
-  S['CpuStatusResponse'],
-  'planGameEvents' | 'resolveTurnGameEvents'
-> & { planGameEvents: GameEvent[]; resolveTurnGameEvents: GameEvent[] };
-
-export type ResolveTurnResponse = Omit<
-  S['ResolveTurnResponse'],
-  'planGameEvents' | 'resolveTurnGameEvents'
-> & { planGameEvents: GameEvent[]; resolveTurnGameEvents: GameEvent[] };
+export type GameState = S['GameState'];
+export type CpuStatusResponse = S['CpuStatusResponse'];
+export type ResolveTurnResponse = S['ResolveTurnResponse'];
