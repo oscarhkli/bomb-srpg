@@ -89,11 +89,19 @@ func doRequest(t *testing.T, h *Handler, method, path, body, token string) *http
 }
 
 func wireMoveCmd(unitID engine.UnitID, x, y int) api.TurnCommand {
-	return api.TurnCommand{Type: api.Move, UnitID: int(unitID), Target: api.Coordinate{X: x, Y: y}}
+	var cmd api.TurnCommand
+	if err := cmd.FromMoveCommand(api.MoveCommand{Type: api.MoveCommandTypeMove, UnitID: int(unitID), Target: api.Coordinate{X: x, Y: y}}); err != nil {
+		panic(err)
+	}
+	return cmd
 }
 
 func wirePlaceBombCmd(unitID engine.UnitID, x, y int) api.TurnCommand {
-	return api.TurnCommand{Type: api.PlaceBomb, UnitID: int(unitID), Target: api.Coordinate{X: x, Y: y}}
+	var cmd api.TurnCommand
+	if err := cmd.FromPlaceBombCommand(api.PlaceBombCommand{Type: api.PlaceBombCommandTypePlaceBomb, UnitID: int(unitID), Target: api.Coordinate{X: x, Y: y}}); err != nil {
+		panic(err)
+	}
+	return cmd
 }
 
 func wireUnitMoved(evt api.GameEvent) (api.UnitMovedEvent, bool) {

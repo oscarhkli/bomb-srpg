@@ -401,11 +401,35 @@ components:
           $ref: '#/components/schemas/Coordinate'
       required: [id, position]
     TurnCommand:
+      oneOf:
+        - $ref: '#/components/schemas/MoveCommand'
+        - $ref: '#/components/schemas/PlaceBombCommand'
+      discriminator:
+        propertyName: type
+        mapping:
+          move: '#/components/schemas/MoveCommand'
+          placeBomb: '#/components/schemas/PlaceBombCommand'
+    MoveCommand:
       type: object
       additionalProperties: false
       properties:
         type:
-          $ref: '#/components/schemas/TurnCmdType'
+          type: string
+          enum: [move]
+        unitId:
+          type: integer
+          minimum: 0
+          maximum: 255
+        target:
+          $ref: '#/components/schemas/Coordinate'
+      required: [type, unitId, target]
+    PlaceBombCommand:
+      type: object
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+          enum: [placeBomb]
         unitId:
           type: integer
           minimum: 0

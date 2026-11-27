@@ -97,6 +97,21 @@ func (e MatchEndedEventType) Valid() bool {
 	}
 }
 
+// Defines values for MoveCommandType.
+const (
+	MoveCommandTypeMove MoveCommandType = "move"
+)
+
+// Valid indicates whether the value is a known member of the MoveCommandType enum.
+func (e MoveCommandType) Valid() bool {
+	switch e {
+	case MoveCommandTypeMove:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for OccupantType.
 const (
 	OccupantBomb      OccupantType = "OccupantBomb"
@@ -118,6 +133,21 @@ func (e OccupantType) Valid() bool {
 	case OccupantSoftBlock:
 		return true
 	case OccupantUnit:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PlaceBombCommandType.
+const (
+	PlaceBombCommandTypePlaceBomb PlaceBombCommandType = "placeBomb"
+)
+
+// Valid indicates whether the value is a known member of the PlaceBombCommandType enum.
+func (e PlaceBombCommandType) Valid() bool {
+	switch e {
+	case PlaceBombCommandTypePlaceBomb:
 		return true
 	default:
 		return false
@@ -186,16 +216,16 @@ func (e TerrainType) Valid() bool {
 
 // Defines values for TurnCmdType.
 const (
-	Move      TurnCmdType = "move"
-	PlaceBomb TurnCmdType = "placeBomb"
+	TurnCmdTypeMove      TurnCmdType = "move"
+	TurnCmdTypePlaceBomb TurnCmdType = "placeBomb"
 )
 
 // Valid indicates whether the value is a known member of the TurnCmdType enum.
 func (e TurnCmdType) Valid() bool {
 	switch e {
-	case Move:
+	case TurnCmdTypeMove:
 		return true
-	case PlaceBomb:
+	case TurnCmdTypePlaceBomb:
 		return true
 	default:
 		return false
@@ -402,8 +432,28 @@ type MatchEndedEvent struct {
 // MatchEndedEventType defines model for MatchEndedEvent.Type.
 type MatchEndedEventType string
 
+// MoveCommand defines model for MoveCommand.
+type MoveCommand struct {
+	Target Coordinate      `json:"target"`
+	Type   MoveCommandType `json:"type"`
+	UnitID int             `json:"unitId"`
+}
+
+// MoveCommandType defines model for MoveCommand.Type.
+type MoveCommandType string
+
 // OccupantType defines model for OccupantType.
 type OccupantType string
+
+// PlaceBombCommand defines model for PlaceBombCommand.
+type PlaceBombCommand struct {
+	Target Coordinate           `json:"target"`
+	Type   PlaceBombCommandType `json:"type"`
+	UnitID int                  `json:"unitId"`
+}
+
+// PlaceBombCommandType defines model for PlaceBombCommand.Type.
+type PlaceBombCommandType string
 
 // ResolveTurnResponse defines model for ResolveTurnResponse.
 type ResolveTurnResponse struct {
@@ -465,9 +515,7 @@ type TurnCmdType string
 
 // TurnCommand defines model for TurnCommand.
 type TurnCommand struct {
-	Target Coordinate  `json:"target"`
-	Type   TurnCmdType `json:"type"`
-	UnitID int         `json:"unitId"`
+	union json.RawMessage
 }
 
 // Unit defines model for Unit.
@@ -853,6 +901,107 @@ func (t GameEvent) MarshalJSON() ([]byte, error) {
 }
 
 func (t *GameEvent) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsMoveCommand returns the union data inside the TurnCommand as a MoveCommand
+func (t TurnCommand) AsMoveCommand() (MoveCommand, error) {
+	var body MoveCommand
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromMoveCommand overwrites any union data inside the TurnCommand as the provided MoveCommand
+func (t *TurnCommand) FromMoveCommand(v MoveCommand) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"move"}`))
+	t.union = b
+	return err
+}
+
+// MergeMoveCommand performs a merge with any union data inside the TurnCommand, using the provided MoveCommand
+func (t *TurnCommand) MergeMoveCommand(v MoveCommand) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"move"}`))
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPlaceBombCommand returns the union data inside the TurnCommand as a PlaceBombCommand
+func (t TurnCommand) AsPlaceBombCommand() (PlaceBombCommand, error) {
+	var body PlaceBombCommand
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPlaceBombCommand overwrites any union data inside the TurnCommand as the provided PlaceBombCommand
+func (t *TurnCommand) FromPlaceBombCommand(v PlaceBombCommand) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"placeBomb"}`))
+	t.union = b
+	return err
+}
+
+// MergePlaceBombCommand performs a merge with any union data inside the TurnCommand, using the provided PlaceBombCommand
+func (t *TurnCommand) MergePlaceBombCommand(v PlaceBombCommand) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"placeBomb"}`))
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t TurnCommand) Discriminator() (string, error) {
+	var discriminator struct {
+		Discriminator string `json:"type"`
+	}
+	err := json.Unmarshal(t.union, &discriminator)
+	return discriminator.Discriminator, err
+}
+
+func (t TurnCommand) ValueByDiscriminator() (interface{}, error) {
+	discriminator, err := t.Discriminator()
+	if err != nil {
+		return nil, err
+	}
+	switch discriminator {
+	case "move":
+		return t.AsMoveCommand()
+	case "placeBomb":
+		return t.AsPlaceBombCommand()
+	default:
+		return nil, errors.New("unknown discriminator value: " + discriminator)
+	}
+}
+
+func (t TurnCommand) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *TurnCommand) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }

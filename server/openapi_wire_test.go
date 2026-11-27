@@ -50,17 +50,17 @@ func newOpenAPIRig(t *testing.T) *openAPIRig {
 	if err != nil {
 		t.Fatalf("build router: %v", err)
 	}
-	return &openAPIRig{t: t, doc: doc, router: router, hits: map[string]bool{}, kinds: map[string]bool{}, events: eventMapping(t, doc)}
+	return &openAPIRig{t: t, doc: doc, router: router, hits: map[string]bool{}, kinds: map[string]bool{}, events: unionMapping(t, doc, "GameEvent")}
 }
 
-func eventMapping(t *testing.T, doc *openapi3.T) map[string]string {
+func unionMapping(t *testing.T, doc *openapi3.T, schema string) map[string]string {
 	t.Helper()
-	event := doc.Components.Schemas["GameEvent"]
-	if event == nil || event.Value.Discriminator == nil {
-		t.Fatal("GameEvent has no discriminator")
+	union := doc.Components.Schemas[schema]
+	if union == nil || union.Value.Discriminator == nil {
+		t.Fatalf("%s has no discriminator", schema)
 	}
-	mapping := make(map[string]string, len(event.Value.Discriminator.Mapping))
-	for kind, ref := range event.Value.Discriminator.Mapping {
+	mapping := make(map[string]string, len(union.Value.Discriminator.Mapping))
+	for kind, ref := range union.Value.Discriminator.Mapping {
 		mapping[kind] = ref.Ref
 	}
 	return mapping
