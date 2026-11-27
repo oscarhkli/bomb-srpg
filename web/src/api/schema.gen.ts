@@ -275,8 +275,22 @@ export interface components {
             id: number;
             position: components["schemas"]["Coordinate"];
         };
-        TurnCommand: {
-            type: components["schemas"]["TurnCmdType"];
+        TurnCommand: components["schemas"]["MoveCommand"] | components["schemas"]["PlaceBombCommand"];
+        MoveCommand: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "move";
+            unitId: number;
+            target: components["schemas"]["Coordinate"];
+        };
+        PlaceBombCommand: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "placeBomb";
             unitId: number;
             target: components["schemas"]["Coordinate"];
         };

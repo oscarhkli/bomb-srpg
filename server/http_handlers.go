@@ -5,6 +5,7 @@ import (
 	"bomb-srpg/room"
 	"bomb-srpg/server/api"
 	"context"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -468,14 +469,20 @@ func wireSoftBlock(sb *engine.SoftBlock) api.SoftBlock {
 }
 
 func wireTurnCommand(cmd engine.TurnCommand) api.TurnCommand {
+	var out api.TurnCommand
+	var err error
 	switch cmd := cmd.(type) {
 	case engine.MoveCommand:
-		return api.TurnCommand{Type: api.Move, UnitID: int(cmd.UnitID), Target: wireCoordinate(cmd.Target)}
+		err = out.FromMoveCommand(api.MoveCommand{Type: api.MoveCommandTypeMove, UnitID: int(cmd.UnitID), Target: wireCoordinate(cmd.Target)})
 	case engine.PlaceBombCommand:
-		return api.TurnCommand{Type: api.PlaceBomb, UnitID: int(cmd.UnitID), Target: wireCoordinate(cmd.Target)}
+		err = out.FromPlaceBombCommand(api.PlaceBombCommand{Type: api.PlaceBombCommandTypePlaceBomb, UnitID: int(cmd.UnitID), Target: wireCoordinate(cmd.Target)})
 	default:
 		panic(fmt.Sprintf("wireTurnCommand: unsupported command %T", cmd))
 	}
+	if err != nil {
+		panic(fmt.Sprintf("wireTurnCommand: %v", err))
+	}
+	return out
 }
 
 func wireGameState(gs *engine.GameState) api.GameState {
@@ -523,18 +530,30 @@ func wireMatchCreated(tokens [2]string) api.CreateMatchResponse {
 }
 
 func engineTurnCommand(cmd api.TurnCommand) (engine.TurnCommand, error) {
-	unitID, ok := engineUnitID(cmd.UnitID)
+	raw, err := cmd.MarshalJSON()
+	if err != nil {
+		return nil, badRequest(invalidTurnCmdText)
+	}
+	var head struct {
+		Type   string         `json:"type"`
+		UnitID int            `json:"unitId"`
+		Target api.Coordinate `json:"target"`
+	}
+	if err := json.Unmarshal(raw, &head); err != nil {
+		return nil, badRequest(invalidTurnCmdText)
+	}
+	unitID, ok := engineUnitID(head.UnitID)
 	if !ok {
 		return nil, badRequest(invalidTurnCmdText)
 	}
-	target := engine.Coordinate{X: cmd.Target.X, Y: cmd.Target.Y}
-	switch cmd.Type {
-	case api.Move:
+	target := engine.Coordinate{X: head.Target.X, Y: head.Target.Y}
+	switch head.Type {
+	case string(api.TurnCmdTypeMove):
 		return engine.NewMoveCommand(unitID, target), nil
-	case api.PlaceBomb:
+	case string(api.TurnCmdTypePlaceBomb):
 		return engine.NewPlaceBombCommand(unitID, target), nil
 	default:
-		return nil, fmt.Errorf("%w: %w: %s", room.ErrInvalidTurnCmd, engine.ErrUnsupportedCommand, cmd.Type)
+		return nil, fmt.Errorf("%w: %w: %s", room.ErrInvalidTurnCmd, engine.ErrUnsupportedCommand, head.Type)
 	}
 }
 
