@@ -4,6 +4,7 @@ import { makeBomb, makeState } from '../test/fixtures';
 import {
   SYSTEM_OWNER_ID,
   type BombID,
+  type AllowedTilesRequest,
   type CpuStatusResponse,
   type GameEvent,
   type GameState,
@@ -40,6 +41,10 @@ function commandIDs(cmd: TurnCommand): number[] {
   return [takesUnit(cmd.unitId)];
 }
 
+function allowedTilesIDs(req: AllowedTilesRequest): number[] {
+  return [takesUnit(req.unitId)];
+}
+
 function stateIDs(gs: GameState): number[] {
   return [
     ...gs.units.map(u => takesUnit(u.id)),
@@ -69,6 +74,7 @@ describe('branded IDs', () => {
     expect(stateIDs(gs)).toEqual([1, 2]);
     expect(planIDs({ planGameEvents: [evt], resolveTurnGameEvents: [evt] })).toEqual([1, 2, 1, 2]);
     expect(takesSoftBlock(softBlockID(3))).toBe(3);
+    expect(allowedTilesIDs({ unitId: unitID(5), turnCmdType: 'move' })).toEqual([5]);
   });
 
   it('accepts a branded ID where a number is expected, and the system owner as a unit', () => {
