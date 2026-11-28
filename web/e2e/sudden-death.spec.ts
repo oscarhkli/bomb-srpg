@@ -14,11 +14,16 @@ import {
   waitForText,
   watchBombs,
 } from './canvas';
+import { bombID } from '../src/test/ids';
 import { endTurn, startTwoPlayerMatch, startVsCpuRoom } from './flows';
 import { MATCH_SUMMARY_BUTTON_LABEL, RESET_BUTTON_LABEL } from '../src/constants';
-import type { Bomb, CpuStatusResponse, GameEvent, GameState } from '../src/api/types';
-
-const SYSTEM_OWNER_ID = 0;
+import {
+  SYSTEM_OWNER_ID,
+  type Bomb,
+  type CpuStatusResponse,
+  type GameEvent,
+  type GameState,
+} from '../src/api/types';
 
 test('VS CPU sudden death: hazards are drawn once per turn through the first CPU turn', async ({
   page,
@@ -175,7 +180,7 @@ test('hot-seat: bombs listed in turnStartEvents are not drawn while the cutscene
       )
     );
     const bombs: Bomb[] = [9001, 9002].map((id, i) => ({
-      id,
+      id: bombID(id),
       ownerId: SYSTEM_OWNER_ID,
       position: free[i]!,
       range: 2,

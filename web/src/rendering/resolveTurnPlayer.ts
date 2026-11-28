@@ -1,5 +1,5 @@
 import type Phaser from 'phaser';
-import type { Coordinate, GameEvent, GameState } from '../api/types';
+import type { BombID, Coordinate, GameEvent, GameState, SoftBlockID, UnitID } from '../api/types';
 import {
   BOMB_COUNTDOWN_ZERO_COLOR,
   BOMB_COUNTDOWN_TEXT_COLOR,
@@ -19,9 +19,9 @@ export interface BombGraphics {
 export interface ResolveTurnPlayerOptions {
   scene: Phaser.Scene;
   gameStateSnapshot: GameState;
-  unitSpritesById: Map<number, Phaser.GameObjects.Sprite>;
-  bombGraphicsById: Map<number, BombGraphics>;
-  softBlockSpritesById: Map<number, Phaser.GameObjects.Sprite>;
+  unitSpritesById: Map<UnitID, Phaser.GameObjects.Sprite>;
+  bombGraphicsById: Map<BombID, BombGraphics>;
+  softBlockSpritesById: Map<SoftBlockID, Phaser.GameObjects.Sprite>;
   onError: (message: string) => void;
 }
 
@@ -113,7 +113,7 @@ function validate(events: GameEvent[], snapshot: GameState): string | null {
 }
 
 interface ExplodedInfo {
-  bombId: number;
+  bombId: BombID;
   position: Coordinate;
   affectedPositions: Coordinate[];
   offset: number;
@@ -222,7 +222,7 @@ export function playResolveTurnEvents(
     }
   }
 
-  const fireByUnitId = new Map<number, Phaser.GameObjects.Text>();
+  const fireByUnitId = new Map<UnitID, Phaser.GameObjects.Text>();
 
   for (const event of events) {
     if (event.type === 'unitDamaged') {

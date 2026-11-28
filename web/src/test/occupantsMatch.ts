@@ -1,12 +1,12 @@
 import type Phaser from 'phaser';
-import type { GameState } from '../api/types';
+import type { BombID, GameState, SoftBlockID, UnitID } from '../api/types';
 import type { BombGraphics } from '../rendering/resolveTurnPlayer';
 
 export function occupantsMatch(
   state: GameState,
-  unitSpritesById: Map<number, Phaser.GameObjects.Sprite>,
-  bombGraphicsById: Map<number, BombGraphics>,
-  softBlockSpritesById: Map<number, Phaser.GameObjects.Sprite>
+  unitSpritesById: Map<UnitID, Phaser.GameObjects.Sprite>,
+  bombGraphicsById: Map<BombID, BombGraphics>,
+  softBlockSpritesById: Map<SoftBlockID, Phaser.GameObjects.Sprite>
 ): boolean {
   const liveUnits = state.units.filter(u => u.hp > 0);
   if (liveUnits.length !== unitSpritesById.size) {

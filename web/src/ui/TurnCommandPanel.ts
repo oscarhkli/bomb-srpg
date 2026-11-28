@@ -22,10 +22,10 @@ import SpriteButton, { buttonFrameSize } from './spriteButton';
 import { verticalButtonY } from './pillButton';
 import { destroyAll } from './gameObjectUtils';
 import { boardOffset } from '../rendering/boardOffset';
-import type { Coordinate, TurnCmdType, TurnCommand, Unit } from '../api/types';
+import type { Coordinate, TurnCmdType, TurnCommand, Unit, UnitID } from '../api/types';
 
 export interface TurnCommandPanelCallbacks {
-  getAllowedTiles: (unitId: number, turnCmdType: TurnCmdType) => Promise<Coordinate[]>;
+  getAllowedTiles: (unitId: UnitID, turnCmdType: TurnCmdType) => Promise<Coordinate[]>;
   onError: (message: string) => void;
   onConfirmedSubmit: (cmd: TurnCommand) => void;
   showConfirm: (onYes: () => void, onNo: () => void) => void;

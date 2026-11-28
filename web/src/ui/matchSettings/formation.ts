@@ -1,8 +1,6 @@
-import type { TeamSlot } from '../../api/types';
+import { KING_SLOT, type TeamSlot } from '../../api/types';
 
 export const NO_UNIT = 'NO_UNIT';
-
-const KING_SLOT = 0;
 
 export const SLOT_DISPLAY_ORDER_P1 = [3, 1, 0, 2, 4] as const;
 

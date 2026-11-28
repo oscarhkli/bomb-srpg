@@ -1,3 +1,5 @@
+import { bombID, softBlockID, unitID } from './ids';
+import { SYSTEM_OWNER_ID } from '../api/types';
 import type {
   Bomb,
   BombPlacedEvent,
@@ -23,7 +25,7 @@ export function plainGrid(rows: number, cols: number): Tile[][] {
 
 export function makeUnit(overrides: Partial<Unit> = {}): Unit {
   return {
-    id: 1,
+    id: unitID(1),
     type: 'Fighter',
     position: { x: 0, y: 0 },
     speed: 2,
@@ -41,11 +43,18 @@ export function makeUnit(overrides: Partial<Unit> = {}): Unit {
 }
 
 export function makeBomb(overrides: Partial<Bomb> = {}): Bomb {
-  return { id: 1, ownerId: 1, position: { x: 0, y: 0 }, range: 2, countdown: 3, ...overrides };
+  return {
+    id: bombID(1),
+    ownerId: unitID(1),
+    position: { x: 0, y: 0 },
+    range: 2,
+    countdown: 3,
+    ...overrides,
+  };
 }
 
 export function makeSoftBlock(overrides: Partial<SoftBlock> = {}): SoftBlock {
-  return { id: 1, position: { x: 0, y: 0 }, ...overrides };
+  return { id: softBlockID(1), position: { x: 0, y: 0 }, ...overrides };
 }
 
 export function makeCfg(overrides: Partial<GameCfg> = {}): GameCfg {
@@ -78,8 +87,8 @@ export function makeState(overrides: Partial<GameState> = {}): GameState {
 export function makeBombPlacedEvent(overrides: Partial<BombPlacedEvent> = {}): BombPlacedEvent {
   return {
     type: 'bombPlaced',
-    unitId: 0,
-    bombId: 1,
+    unitId: SYSTEM_OWNER_ID,
+    bombId: bombID(1),
     position: { x: 0, y: 0 },
     range: 2,
     countdown: 3,

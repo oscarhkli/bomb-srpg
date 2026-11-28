@@ -1,3 +1,4 @@
+import { bombID, unitID } from '../test/ids';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   initRoom,
@@ -312,9 +313,16 @@ describe('api.ts', () => {
   describe('consumeCpuStatus', () => {
     const fixture: CpuStatusResponse = {
       turnPhase: 'TurnPhaseReady',
-      planGameEvents: [{ type: 'unitMoved', unitId: 1, from: { x: 1, y: 0 }, to: { x: 1, y: 1 } }],
+      planGameEvents: [
+        { type: 'unitMoved', unitId: unitID(1), from: { x: 1, y: 0 }, to: { x: 1, y: 1 } },
+      ],
       resolveTurnGameEvents: [
-        { type: 'bombExploded', bombId: 1, position: { x: 1, y: 1 }, affectedPositions: [] },
+        {
+          type: 'bombExploded',
+          bombId: bombID(1),
+          position: { x: 1, y: 1 },
+          affectedPositions: [],
+        },
       ],
     };
 
@@ -344,9 +352,9 @@ describe('api.ts', () => {
   });
 
   describe('submitTurnCommand', () => {
-    const cmdFixture: TurnCommand = { type: 'move', unitId: 1, target: { x: 1, y: 1 } };
+    const cmdFixture: TurnCommand = { type: 'move', unitId: unitID(1), target: { x: 1, y: 1 } };
     const fixture: GameEvent[] = [
-      { type: 'unitMoved', unitId: 1, from: { x: 1, y: 0 }, to: { x: 1, y: 1 } },
+      { type: 'unitMoved', unitId: unitID(1), from: { x: 1, y: 0 }, to: { x: 1, y: 1 } },
     ];
 
     it('should POST command with auth and return game events', async () => {
@@ -399,9 +407,16 @@ describe('api.ts', () => {
 
   describe('resolveTurn', () => {
     const fixture: ResolveTurnResponse = {
-      planGameEvents: [{ type: 'unitMoved', unitId: 1, from: { x: 1, y: 0 }, to: { x: 1, y: 1 } }],
+      planGameEvents: [
+        { type: 'unitMoved', unitId: unitID(1), from: { x: 1, y: 0 }, to: { x: 1, y: 1 } },
+      ],
       resolveTurnGameEvents: [
-        { type: 'bombExploded', bombId: 1, position: { x: 1, y: 1 }, affectedPositions: [] },
+        {
+          type: 'bombExploded',
+          bombId: bombID(1),
+          position: { x: 1, y: 1 },
+          affectedPositions: [],
+        },
       ],
     };
 
@@ -497,7 +512,7 @@ describe('api.ts', () => {
       ];
       reply(200, fixture);
 
-      const result = await getAllowedTiles({ unitId: 1, turnCmdType: 'move' });
+      const result = await getAllowedTiles({ unitId: unitID(1), turnCmdType: 'move' });
 
       expect(result).toEqual(fixture);
       expect(await sent()).toEqual({
@@ -513,7 +528,7 @@ describe('api.ts', () => {
     it('should throw ApiError on failure', async () => {
       reply(400, 'missing required query parameters');
 
-      const error = await getAllowedTiles({ unitId: 1, turnCmdType: 'move' }).catch(
+      const error = await getAllowedTiles({ unitId: unitID(1), turnCmdType: 'move' }).catch(
         (e: unknown) => e
       );
       expect(error).toBeInstanceOf(ApiError);

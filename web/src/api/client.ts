@@ -74,11 +74,11 @@ interface Answer<T> {
   response: Response;
 }
 
-function unwrap<T>({ data, error, response }: Answer<T>): T {
+function unwrap<W, T extends W>({ data, error, response }: Answer<W>): T {
   if (error !== undefined || data === undefined) {
     throw new ApiError(response.status, String(error ?? ''));
   }
-  return data;
+  return data as T;
 }
 
 function unwrapVoid({ error, response }: Answer<undefined>): void {

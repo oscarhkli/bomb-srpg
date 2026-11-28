@@ -1,3 +1,4 @@
+import { bombID, unitID } from '../test/ids';
 import { describe, it, expect, beforeEach, vi, type MockInstance } from 'vitest';
 import { mockScene } from '../test/setup';
 import {
@@ -44,13 +45,14 @@ import TurnBanner from '../ui/TurnBanner';
 import SuddenDeathCutscene from '../ui/SuddenDeathCutscene';
 import VictoryCutscene from '../ui/VictoryCutscene';
 import MatchScene, { type MatchSceneData } from './MatchScene';
-import type {
-  Coordinate,
-  CpuStatusResponse,
-  GameCfg,
-  GameEvent,
-  GameState,
-  Tile,
+import {
+  SYSTEM_OWNER_ID,
+  type Coordinate,
+  type CpuStatusResponse,
+  type GameCfg,
+  type GameEvent,
+  type GameState,
+  type Tile,
 } from '../api/types';
 import {
   DEPTH_SUDDEN_DEATH_BOMB,
@@ -103,7 +105,7 @@ function clickSummaryPanelButton(button: 'resolve' | 'reset' | 'surrender' | 'ba
 async function expectActionStackClearedBy(
   button: 'resolve' | 'reset' | 'surrender'
 ): Promise<void> {
-  const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
+  const unit = makeUnit({ id: unitID(7), team: 1, position: { x: 0, y: 0 } });
   queueMatchStates(makeState({ grid: [[plainTile()]], activeTeam: 1, units: [unit] }));
   vi.mocked(getAllowedTiles).mockResolvedValue([{ x: 0, y: 0 }]);
 
@@ -206,7 +208,7 @@ describe('MatchScene', () => {
   });
 
   it('calls initToken exactly once at turn start (beginTurn), not on unit click', async () => {
-    const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
+    const unit = makeUnit({ id: unitID(7), team: 1, position: { x: 0, y: 0 } });
     queueMatchStates(makeState({ grid: [[plainTile()]], activeTeam: 1, units: [unit] }));
 
     await bootScene({ playerTokens: ['team1-token', 'team2-token'] });
@@ -222,7 +224,7 @@ describe('MatchScene', () => {
 
   it('does not open TurnCommandPanel or call initToken again when clicking a unit off the active team', async () => {
     const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
-    const unit = makeUnit({ id: 7, team: 2, position: { x: 0, y: 0 } });
+    const unit = makeUnit({ id: unitID(7), team: 2, position: { x: 0, y: 0 } });
     queueMatchStates(makeState({ grid: [[plainTile()]], activeTeam: 1, units: [unit] }));
 
     await bootScene();
@@ -238,7 +240,7 @@ describe('MatchScene', () => {
   });
 
   it('caches getAllowedTiles per (unitId, turnCmdType): repeat moveButton clicks skip the network call', async () => {
-    const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
+    const unit = makeUnit({ id: unitID(7), team: 1, position: { x: 0, y: 0 } });
     queueMatchStates(makeState({ grid: [[plainTile()]], activeTeam: 1, units: [unit] }));
     vi.mocked(getAllowedTiles).mockResolvedValue([{ x: 1, y: 0 }]);
 
@@ -262,7 +264,7 @@ describe('MatchScene', () => {
   });
 
   it('shows an error when getAllowedTiles rejects', async () => {
-    const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
+    const unit = makeUnit({ id: unitID(7), team: 1, position: { x: 0, y: 0 } });
     queueMatchStates(makeState({ grid: [[plainTile()]], activeTeam: 1, units: [unit] }));
     vi.mocked(getAllowedTiles).mockRejectedValue(new Error('tiles unavailable'));
 
@@ -309,12 +311,12 @@ describe('MatchScene', () => {
   });
 
   it('handles a confirmed Move: submits the command, tweens the unit, and refreshes state', async () => {
-    const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
+    const unit = makeUnit({ id: unitID(7), team: 1, position: { x: 0, y: 0 } });
     const initialGrid: Tile[][] = [
       [{ type: 'TerrainPlain', occupantType: 'OccupantUnit', occupantId: 7 }, plainTile()],
     ];
     const target: Coordinate = { x: 1, y: 0 };
-    const movedUnit = makeUnit({ id: 7, team: 1, position: target });
+    const movedUnit = makeUnit({ id: unitID(7), team: 1, position: target });
     const refreshedGrid: Tile[][] = [
       [
         tileOf('TerrainPlain'),
@@ -328,7 +330,7 @@ describe('MatchScene', () => {
     );
     vi.mocked(getAllowedTiles).mockResolvedValue([target]);
     const events: GameEvent[] = [
-      { type: 'unitMoved', unitId: 7, from: { x: 0, y: 0 }, to: target },
+      { type: 'unitMoved', unitId: unitID(7), from: { x: 0, y: 0 }, to: target },
     ];
     vi.mocked(submitTurnCommand).mockResolvedValue(events);
 
@@ -345,7 +347,7 @@ describe('MatchScene', () => {
   });
 
   it('handles a confirmed PlaceBomb: submits the command and renders the new bomb', async () => {
-    const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
+    const unit = makeUnit({ id: unitID(7), team: 1, position: { x: 0, y: 0 } });
     const initialGrid: Tile[][] = [[plainTile(), plainTile()]];
     const target: Coordinate = { x: 1, y: 0 };
     const refreshedGrid: Tile[][] = [
@@ -361,12 +363,19 @@ describe('MatchScene', () => {
         grid: refreshedGrid,
         activeTeam: 2,
         units: [unit],
-        bombs: [makeBomb({ id: 42, ownerId: 7, position: target, countdown: 3 })],
+        bombs: [makeBomb({ id: bombID(42), ownerId: unitID(7), position: target, countdown: 3 })],
       })
     );
     vi.mocked(getAllowedTiles).mockResolvedValue([target]);
     const events: GameEvent[] = [
-      { type: 'bombPlaced', unitId: 7, bombId: 42, position: target, range: 2, countdown: 3 },
+      {
+        type: 'bombPlaced',
+        unitId: unitID(7),
+        bombId: bombID(42),
+        position: target,
+        range: 2,
+        countdown: 3,
+      },
     ];
     vi.mocked(submitTurnCommand).mockResolvedValue(events);
 
@@ -383,14 +392,14 @@ describe('MatchScene', () => {
 
   it('disables the Bomb button on a second click after a successful bomb placement, even without an occupant rebuild', async () => {
     const unit = makeUnit({
-      id: 7,
+      id: unitID(7),
       team: 1,
       position: { x: 0, y: 0 },
       maxBombCount: 2,
       hasUsedSkill: false,
     });
     const updatedUnit = makeUnit({
-      id: 7,
+      id: unitID(7),
       team: 1,
       position: { x: 0, y: 0 },
       maxBombCount: 2,
@@ -406,12 +415,19 @@ describe('MatchScene', () => {
         grid: initialGrid,
         activeTeam: 1,
         units: [updatedUnit],
-        bombs: [makeBomb({ id: 42, ownerId: 7, position: target, countdown: 3 })],
+        bombs: [makeBomb({ id: bombID(42), ownerId: unitID(7), position: target, countdown: 3 })],
       })
     );
     vi.mocked(getAllowedTiles).mockResolvedValue([target]);
     vi.mocked(submitTurnCommand).mockResolvedValue([
-      { type: 'bombPlaced', unitId: 7, bombId: 42, position: target, range: 2, countdown: 3 },
+      {
+        type: 'bombPlaced',
+        unitId: unitID(7),
+        bombId: bombID(42),
+        position: target,
+        range: 2,
+        countdown: 3,
+      },
     ]);
 
     await bootScene();
@@ -427,7 +443,7 @@ describe('MatchScene', () => {
   });
 
   it('shows the actual error and resyncs by rebuilding occupants (terrain untouched) when submitTurnCommand rejects', async () => {
-    const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
+    const unit = makeUnit({ id: unitID(7), team: 1, position: { x: 0, y: 0 } });
     const initialGrid: Tile[][] = [[plainTile(), plainTile()]];
     const target: Coordinate = { x: 1, y: 0 };
 
@@ -453,14 +469,14 @@ describe('MatchScene', () => {
   });
 
   it('shows an error and stops processing when the unitMoved event is malformed (out-of-bounds target)', async () => {
-    const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
+    const unit = makeUnit({ id: unitID(7), team: 1, position: { x: 0, y: 0 } });
     const initialGrid: Tile[][] = [[plainTile(), plainTile()]];
     const target: Coordinate = { x: 1, y: 0 };
 
     queueMatchStates(makeState({ grid: initialGrid, activeTeam: 1, units: [unit] }));
     vi.mocked(getAllowedTiles).mockResolvedValue([target]);
     const events: GameEvent[] = [
-      { type: 'unitMoved', unitId: 7, from: { x: 0, y: 0 }, to: { x: 99, y: 99 } },
+      { type: 'unitMoved', unitId: unitID(7), from: { x: 0, y: 0 }, to: { x: 99, y: 99 } },
     ];
     vi.mocked(submitTurnCommand).mockResolvedValue(events);
 
@@ -482,10 +498,10 @@ describe('MatchScene', () => {
   });
 
   it('accepts a unitMoved event even when the client grid did not show the unit at `from` (no client-side legality re-derivation)', async () => {
-    const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
+    const unit = makeUnit({ id: unitID(7), team: 1, position: { x: 0, y: 0 } });
     const initialGrid: Tile[][] = [[plainTile(), plainTile()]];
     const target: Coordinate = { x: 1, y: 0 };
-    const movedUnit = makeUnit({ id: 7, team: 1, position: target });
+    const movedUnit = makeUnit({ id: unitID(7), team: 1, position: target });
 
     queueMatchStates(
       makeState({ grid: initialGrid, activeTeam: 1, units: [unit] }),
@@ -493,7 +509,7 @@ describe('MatchScene', () => {
     );
     vi.mocked(getAllowedTiles).mockResolvedValue([target]);
     const events: GameEvent[] = [
-      { type: 'unitMoved', unitId: 7, from: { x: 0, y: 0 }, to: target },
+      { type: 'unitMoved', unitId: unitID(7), from: { x: 0, y: 0 }, to: target },
     ];
     vi.mocked(submitTurnCommand).mockResolvedValue(events);
 
@@ -515,11 +531,11 @@ describe('MatchScene', () => {
   });
 
   it('tweens the unit to the server-reported tile, not the requested one, when they differ (e.g. a future push/swap move)', async () => {
-    const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
+    const unit = makeUnit({ id: unitID(7), team: 1, position: { x: 0, y: 0 } });
     const initialGrid: Tile[][] = [[plainTile(), plainTile(), plainTile()]];
     const requestedTarget: Coordinate = { x: 1, y: 0 };
     const actualTo: Coordinate = { x: 2, y: 0 };
-    const pushedUnit = makeUnit({ id: 7, team: 1, position: actualTo });
+    const pushedUnit = makeUnit({ id: unitID(7), team: 1, position: actualTo });
 
     queueMatchStates(
       makeState({ grid: initialGrid, activeTeam: 1, units: [unit] }),
@@ -527,7 +543,7 @@ describe('MatchScene', () => {
     );
     vi.mocked(getAllowedTiles).mockResolvedValue([requestedTarget]);
     const events: GameEvent[] = [
-      { type: 'unitMoved', unitId: 7, from: { x: 0, y: 0 }, to: actualTo },
+      { type: 'unitMoved', unitId: unitID(7), from: { x: 0, y: 0 }, to: actualTo },
     ];
     vi.mocked(submitTurnCommand).mockResolvedValue(events);
 
@@ -549,10 +565,10 @@ describe('MatchScene', () => {
   });
 
   it('updates in place on a successful move: no occupant rebuild, terrain survives, state refetched', async () => {
-    const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
+    const unit = makeUnit({ id: unitID(7), team: 1, position: { x: 0, y: 0 } });
     const initialGrid: Tile[][] = [[plainTile(), plainTile()]];
     const target: Coordinate = { x: 1, y: 0 };
-    const movedUnit = makeUnit({ id: 7, team: 1, position: target });
+    const movedUnit = makeUnit({ id: unitID(7), team: 1, position: target });
 
     queueMatchStates(
       makeState({ grid: initialGrid, activeTeam: 1, units: [unit] }),
@@ -560,7 +576,7 @@ describe('MatchScene', () => {
     );
     vi.mocked(getAllowedTiles).mockResolvedValue([target]);
     vi.mocked(submitTurnCommand).mockResolvedValue([
-      { type: 'unitMoved', unitId: 7, from: { x: 0, y: 0 }, to: target },
+      { type: 'unitMoved', unitId: unitID(7), from: { x: 0, y: 0 }, to: target },
     ]);
 
     await bootScene();
@@ -578,7 +594,7 @@ describe('MatchScene', () => {
   });
 
   it('ignores a unit click while a confirm dialog is already open', async () => {
-    const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
+    const unit = makeUnit({ id: unitID(7), team: 1, position: { x: 0, y: 0 } });
     const initialGrid: Tile[][] = [
       [{ type: 'TerrainPlain', occupantType: 'OccupantUnit', occupantId: 7 }, plainTile()],
     ];
@@ -607,7 +623,7 @@ describe('MatchScene', () => {
   });
 
   it('ignores a second confirm-Yes click while the first submission is still in flight', async () => {
-    const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
+    const unit = makeUnit({ id: unitID(7), team: 1, position: { x: 0, y: 0 } });
     const initialGrid: Tile[][] = [
       [{ type: 'TerrainPlain', occupantType: 'OccupantUnit', occupantId: 7 }, plainTile()],
     ];
@@ -637,7 +653,7 @@ describe('MatchScene', () => {
   });
 
   it('tweens a unit cumulatively across two sequential moves', async () => {
-    const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
+    const unit = makeUnit({ id: unitID(7), team: 1, position: { x: 0, y: 0 } });
     const initialGrid: Tile[][] = [
       [
         { type: 'TerrainPlain', occupantType: 'OccupantUnit', occupantId: 7 },
@@ -667,12 +683,12 @@ describe('MatchScene', () => {
       makeState({
         grid: gridAfterFirstMove,
         activeTeam: 1,
-        units: [makeUnit({ id: 7, team: 1, position: firstTarget })],
+        units: [makeUnit({ id: unitID(7), team: 1, position: firstTarget })],
       }),
       makeState({
         grid: gridAfterSecondMove,
         activeTeam: 1,
-        units: [makeUnit({ id: 7, team: 1, position: secondTarget })],
+        units: [makeUnit({ id: unitID(7), team: 1, position: secondTarget })],
       })
     );
     vi.mocked(getAllowedTiles)
@@ -680,10 +696,10 @@ describe('MatchScene', () => {
       .mockResolvedValueOnce([secondTarget]);
     vi.mocked(submitTurnCommand)
       .mockResolvedValueOnce([
-        { type: 'unitMoved', unitId: 7, from: { x: 0, y: 0 }, to: firstTarget },
+        { type: 'unitMoved', unitId: unitID(7), from: { x: 0, y: 0 }, to: firstTarget },
       ])
       .mockResolvedValueOnce([
-        { type: 'unitMoved', unitId: 7, from: firstTarget, to: secondTarget },
+        { type: 'unitMoved', unitId: unitID(7), from: firstTarget, to: secondTarget },
       ]);
 
     await bootScene();
@@ -796,7 +812,7 @@ describe('MatchScene', () => {
   });
 
   it('opens the resolve confirm even when a TurnCommandPanel confirm is already open, so a stale action never blocks it', async () => {
-    const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
+    const unit = makeUnit({ id: unitID(7), team: 1, position: { x: 0, y: 0 } });
     const initialGrid: Tile[][] = [
       [{ type: 'TerrainPlain', occupantType: 'OccupantUnit', occupantId: 7 }, plainTile()],
     ];
@@ -838,7 +854,7 @@ describe('MatchScene', () => {
     expect(initToken).toHaveBeenCalledWith('team2-token');
     vi.mocked(getMatchState).mockResolvedValue(makeState({ grid: [[plainTile()]], activeTeam: 1 }));
     const resolveTurnGameEvents: GameEvent[] = [
-      { type: 'bombCountdownUpdated', bombId: 1, position: { x: 0, y: 0 }, countdown: 2 },
+      { type: 'bombCountdownUpdated', bombId: bombID(1), position: { x: 0, y: 0 }, countdown: 2 },
     ];
     vi.mocked(resolveTurn).mockResolvedValue({ planGameEvents: [], resolveTurnGameEvents });
 
@@ -859,10 +875,10 @@ describe('MatchScene', () => {
   it('discards planGameEvents from the resolve response instead of replaying them', async () => {
     await setUpEmptyBoardAndClickResolve();
     const planGameEvents: GameEvent[] = [
-      { type: 'unitMoved', unitId: 1, from: { x: 0, y: 0 }, to: { x: 1, y: 0 } },
+      { type: 'unitMoved', unitId: unitID(1), from: { x: 0, y: 0 }, to: { x: 1, y: 0 } },
     ];
     const resolveTurnGameEvents: GameEvent[] = [
-      { type: 'bombExploded', bombId: 1, position: { x: 1, y: 0 }, affectedPositions: [] },
+      { type: 'bombExploded', bombId: bombID(1), position: { x: 1, y: 0 }, affectedPositions: [] },
     ];
     vi.mocked(resolveTurn).mockResolvedValue({ planGameEvents, resolveTurnGameEvents });
 
@@ -894,7 +910,7 @@ describe('MatchScene', () => {
   });
 
   it('keeps the animated end-state on a successful resolve (no occupant rebuild) but refreshes turnPanel', async () => {
-    const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
+    const unit = makeUnit({ id: unitID(7), team: 1, position: { x: 0, y: 0 } });
     queueMatchStates(
       makeState({ grid: [[plainTile()]], activeTeam: 1, units: [unit] }),
       makeState({ grid: [[plainTile()]], turn: 5, activeTeam: 2, units: [unit] })
@@ -920,7 +936,7 @@ describe('MatchScene', () => {
   });
 
   it('clears previous error messages once a new turn command begins, so they do not accumulate across turns', async () => {
-    const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
+    const unit = makeUnit({ id: unitID(7), team: 1, position: { x: 0, y: 0 } });
     const initialGrid: Tile[][] = [
       [{ type: 'TerrainPlain', occupantType: 'OccupantUnit', occupantId: 7 }, plainTile()],
     ];
@@ -942,7 +958,7 @@ describe('MatchScene', () => {
 
     vi.mocked(getAllowedTiles).mockResolvedValue([target]);
     vi.mocked(submitTurnCommand).mockResolvedValue([
-      { type: 'unitMoved', unitId: 7, from: { x: 0, y: 0 }, to: target },
+      { type: 'unitMoved', unitId: unitID(7), from: { x: 0, y: 0 }, to: target },
     ]);
     await submitViaUI(occupantSprite(0), MOVE_BUTTON);
     await flush();
@@ -968,15 +984,15 @@ describe('MatchScene', () => {
     it('plays the SuddenDeathCutscene with only the bombPlaced-typed gameEvents, then the TurnBanner, when inSuddenDeath is true', async () => {
       const bombEvent: GameEvent = {
         type: 'bombPlaced',
-        unitId: 0,
-        bombId: 1,
+        unitId: unitID(0),
+        bombId: bombID(1),
         position: { x: 0, y: 0 },
         range: 2,
         countdown: 3,
       };
       const otherEvent: GameEvent = {
         type: 'bombCountdownUpdated',
-        bombId: 1,
+        bombId: bombID(1),
         position: { x: 0, y: 0 },
         countdown: 2,
       };
@@ -1001,8 +1017,8 @@ describe('MatchScene', () => {
     it('drops a sudden-death bomb as a single tweened container, not two independently-positioned objects', async () => {
       const bombEvent: GameEvent = {
         type: 'bombPlaced',
-        unitId: 0,
-        bombId: 1,
+        unitId: unitID(0),
+        bombId: bombID(1),
         position: { x: 1, y: 0 },
         range: 2,
         countdown: 3,
@@ -1047,8 +1063,8 @@ describe('MatchScene', () => {
     it('starts the sudden-death bomb drop a fixed margin above its own rest tile, not a fixed camera-height offset, so it starts off-screen regardless of the tile', async () => {
       const bombEvent: GameEvent = {
         type: 'bombPlaced',
-        unitId: 0,
-        bombId: 1,
+        unitId: unitID(0),
+        bombId: bombID(1),
         position: { x: 1, y: 0 },
         range: 2,
         countdown: 3,
@@ -1077,8 +1093,8 @@ describe('MatchScene', () => {
     it('keeps the hazard bomb in gameState, so a later resolveTurn validates that bombId', async () => {
       const bombEvent: GameEvent = {
         type: 'bombPlaced',
-        unitId: 0,
-        bombId: 999,
+        unitId: unitID(0),
+        bombId: bombID(999),
         position: { x: 0, y: 0 },
         range: 2,
         countdown: 3,
@@ -1089,7 +1105,13 @@ describe('MatchScene', () => {
           grid: [[plainTile()]],
           activeTeam: 1,
           bombs: [
-            makeBomb({ id: 999, ownerId: 0, position: { x: 0, y: 0 }, range: 2, countdown: 3 }),
+            makeBomb({
+              id: bombID(999),
+              ownerId: SYSTEM_OWNER_ID,
+              position: { x: 0, y: 0 },
+              range: 2,
+              countdown: 3,
+            }),
           ],
           turnStartEvents: [bombEvent],
         })
@@ -1102,7 +1124,12 @@ describe('MatchScene', () => {
       vi.mocked(resolveTurn).mockResolvedValue({
         planGameEvents: [],
         resolveTurnGameEvents: [
-          { type: 'bombCountdownUpdated', bombId: 999, position: { x: 0, y: 0 }, countdown: 2 },
+          {
+            type: 'bombCountdownUpdated',
+            bombId: bombID(999),
+            position: { x: 0, y: 0 },
+            countdown: 2,
+          },
         ],
       });
       clickSummaryPanelButton('resolve');
@@ -1116,7 +1143,7 @@ describe('MatchScene', () => {
     });
 
     it('disables unit-click and resolve-button interactions while the turn starts, and re-enables them once TurnBanner finishes', async () => {
-      const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
+      const unit = makeUnit({ id: unitID(7), team: 1, position: { x: 0, y: 0 } });
       queueMatchStates(makeState({ grid: [[plainTile()]], activeTeam: 1, units: [unit] }));
       let resolveBanner: () => void = () => undefined;
       turnBannerPlay.mockReturnValue(
@@ -1170,7 +1197,13 @@ describe('MatchScene', () => {
       { x: 1, y: 0 },
     ];
     const hazardBombs = hazardCells.map((position, i) =>
-      makeBomb({ id: i + 1, ownerId: 0, position, range: 2, countdown: 3 })
+      makeBomb({
+        id: bombID(i + 1),
+        ownerId: SYSTEM_OWNER_ID,
+        position,
+        range: 2,
+        countdown: 3,
+      })
     );
     const hazardEvents = hazardBombs.map(b =>
       makeBombPlacedEvent({ bombId: b.id, position: b.position })
@@ -1315,11 +1348,11 @@ describe('MatchScene', () => {
       it('draws no hazard before the cutscene, and plays it once, after a CPU poll recovery lands on the next turn', async () => {
         vi.mocked(getMatchConfig).mockResolvedValue(makeCfg({ vsCpu: true }));
         const nextHazardEvents = [
-          makeBombPlacedEvent({ bombId: 3, position: { x: 0, y: 0 } }),
-          makeBombPlacedEvent({ bombId: 4, position: { x: 1, y: 0 } }),
+          makeBombPlacedEvent({ bombId: bombID(3), position: { x: 0, y: 0 } }),
+          makeBombPlacedEvent({ bombId: bombID(4), position: { x: 1, y: 0 } }),
         ];
         const nextBombs = nextHazardEvents.map(evt =>
-          makeBomb({ id: evt.bombId, ownerId: 0, position: evt.position })
+          makeBomb({ id: evt.bombId, ownerId: SYSTEM_OWNER_ID, position: evt.position })
         );
         queueMatchStates(
           hazardState({ activeTeam: 2 }),
@@ -1424,13 +1457,13 @@ describe('MatchScene', () => {
       );
       const moveEvent: GameEvent = {
         type: 'unitMoved',
-        unitId: 0x21,
+        unitId: unitID(0x21),
         from: { x: 0, y: 0 },
         to: { x: 0, y: 0 },
       };
       const damagedEvent: GameEvent = {
         type: 'unitDamaged',
-        unitId: 0x21,
+        unitId: unitID(0x21),
         newHp: 1,
         position: { x: 0, y: 0 },
       };
@@ -1457,10 +1490,10 @@ describe('MatchScene', () => {
       const preState = makeState({ grid: [[plainTile()]], activeTeam: 2, turn: 1 });
       const nextTurnState = makeState({ grid: [[plainTile()]], activeTeam: 1, turn: 2 });
       queueMatchStates(preState, nextTurnState);
-      const bombPlacedEvent = makeBombPlacedEvent({ bombId: 5 });
+      const bombPlacedEvent = makeBombPlacedEvent({ bombId: bombID(5) });
       const countdownEvent: GameEvent = {
         type: 'bombCountdownUpdated',
-        bombId: 5,
+        bombId: bombID(5),
         position: { x: 0, y: 0 },
         countdown: 2,
       };
@@ -1488,7 +1521,7 @@ describe('MatchScene', () => {
     });
 
     it("keeps a bomb from an earlier turn in gameStateSnapshot even though it explodes during this turn's resolution", async () => {
-      const oldBomb = makeBomb({ id: 9 });
+      const oldBomb = makeBomb({ id: bombID(9) });
       const preState = makeState({
         grid: [[plainTile()]],
         activeTeam: 2,
@@ -1499,13 +1532,13 @@ describe('MatchScene', () => {
       queueMatchStates(preState, nextTurnState);
       const countdownEvent: GameEvent = {
         type: 'bombCountdownUpdated',
-        bombId: 9,
+        bombId: bombID(9),
         position: { x: 0, y: 0 },
         countdown: 0,
       };
       const explodedEvent: GameEvent = {
         type: 'bombExploded',
-        bombId: 9,
+        bombId: bombID(9),
         position: { x: 0, y: 0 },
         affectedPositions: [],
       };
@@ -1522,8 +1555,8 @@ describe('MatchScene', () => {
     });
 
     it('animates planGameEvents one at a time, holding CPU_PLAN_EVENT_STEP_MS between each (AC 2)', async () => {
-      const unitA = makeUnit({ id: 0x21, team: 2, position: { x: 0, y: 0 } });
-      const unitB = makeUnit({ id: 0x22, team: 2, position: { x: 0, y: 0 } });
+      const unitA = makeUnit({ id: unitID(0x21), team: 2, position: { x: 0, y: 0 } });
+      const unitB = makeUnit({ id: unitID(0x22), team: 2, position: { x: 0, y: 0 } });
       queueMatchStates(
         makeState({
           grid: [[plainTile()]],
@@ -1535,13 +1568,13 @@ describe('MatchScene', () => {
       );
       const firstMove: GameEvent = {
         type: 'unitMoved',
-        unitId: 0x21,
+        unitId: unitID(0x21),
         from: { x: 0, y: 0 },
         to: { x: 0, y: 0 },
       };
       const secondMove: GameEvent = {
         type: 'unitMoved',
-        unitId: 0x22,
+        unitId: unitID(0x22),
         from: { x: 0, y: 0 },
         to: { x: 0, y: 0 },
       };
@@ -1607,7 +1640,7 @@ describe('MatchScene', () => {
     });
 
     it('locks unit-click interactions through the whole CPU turn and only releases after the Player TurnBanner finishes (AC 6)', async () => {
-      const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
+      const unit = makeUnit({ id: unitID(7), team: 1, position: { x: 0, y: 0 } });
       queueMatchStates(
         makeState({ grid: [[plainTile()]], activeTeam: 2, turn: 1, units: [unit] }),
         makeState({ grid: [[plainTile()]], activeTeam: 1, turn: 2, units: [unit] })
@@ -1723,7 +1756,7 @@ describe('MatchScene', () => {
       vi.mocked(consumeCpuStatus).mockResolvedValue({
         turnPhase: 'TurnPhaseIdle',
         planGameEvents: [
-          { type: 'unitMoved', unitId: 1, from: { x: 0, y: 0 }, to: { x: 0, y: 0 } },
+          { type: 'unitMoved', unitId: unitID(1), from: { x: 0, y: 0 }, to: { x: 0, y: 0 } },
         ],
         resolveTurnGameEvents: [],
       });
@@ -1820,7 +1853,7 @@ describe('MatchScene', () => {
     });
 
     it('permanently disables unit-click and resolve-button interactions once the match has ended', async () => {
-      const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
+      const unit = makeUnit({ id: unitID(7), team: 1, position: { x: 0, y: 0 } });
       queueMatchStates(makeState({ grid: [[plainTile()]], activeTeam: 1, units: [unit] }));
       await bootScene();
       vi.mocked(resolveTurn).mockResolvedValue({
@@ -2114,7 +2147,7 @@ describe('MatchScene', () => {
 
   describe('Reset flow (ResetTurnButton)', () => {
     it('fades the camera out then in (like Rematch), calls resetTurn() then getMatchState(), and rebuilds only the occupant layer', async () => {
-      const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
+      const unit = makeUnit({ id: unitID(7), team: 1, position: { x: 0, y: 0 } });
       queueMatchStates(makeState({ grid: [[plainTile()]], activeTeam: 1, units: [unit] }));
       vi.mocked(resetTurn).mockResolvedValue(undefined);
 
@@ -2141,7 +2174,7 @@ describe('MatchScene', () => {
     });
 
     it('re-enables interactions once resetTurn()+getMatchState() settle, independent of the undim tween finishing', async () => {
-      const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
+      const unit = makeUnit({ id: unitID(7), team: 1, position: { x: 0, y: 0 } });
       queueMatchStates(makeState({ grid: [[plainTile()]], activeTeam: 1, units: [unit] }));
       vi.mocked(resetTurn).mockResolvedValue(undefined);
 
@@ -2162,7 +2195,7 @@ describe('MatchScene', () => {
     });
 
     it('shows an error and still re-enables interactions when resetTurn() rejects', async () => {
-      const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
+      const unit = makeUnit({ id: unitID(7), team: 1, position: { x: 0, y: 0 } });
       queueMatchStates(makeState({ grid: [[plainTile()]], activeTeam: 1, units: [unit] }));
       vi.mocked(resetTurn).mockRejectedValue(new Error('reset failed'));
 
@@ -2187,7 +2220,7 @@ describe('MatchScene', () => {
     });
 
     it('still schedules the dim overlay to fade out and destroy itself if the scene is shut down while resetTurn() is in flight', async () => {
-      const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
+      const unit = makeUnit({ id: unitID(7), team: 1, position: { x: 0, y: 0 } });
       queueMatchStates(makeState({ grid: [[plainTile()]], activeTeam: 1, units: [unit] }));
       let resolveReset: () => void = () => undefined;
       vi.mocked(resetTurn).mockReturnValue(
@@ -2288,7 +2321,7 @@ describe('MatchScene', () => {
     });
 
     it('does not block a lifecycle button click caused only by a stale TurnCommandPanel confirm', async () => {
-      const unit = makeUnit({ id: 7, team: 1, position: { x: 0, y: 0 } });
+      const unit = makeUnit({ id: unitID(7), team: 1, position: { x: 0, y: 0 } });
       const initialGrid: Tile[][] = [
         [{ type: 'TerrainPlain', occupantType: 'OccupantUnit', occupantId: 7 }, plainTile()],
       ];

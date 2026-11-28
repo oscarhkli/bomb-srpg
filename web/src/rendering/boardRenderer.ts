@@ -10,15 +10,25 @@ import {
   DEPTH_STAGE_BACKGROUND,
   DEPTH_OCCUPANT,
 } from '../constants';
-import type { Bomb, Coordinate, GameState, SoftBlock, Tile, Unit } from '../api/types';
+import type {
+  Bomb,
+  BombID,
+  Coordinate,
+  GameState,
+  SoftBlock,
+  SoftBlockID,
+  Tile,
+  Unit,
+  UnitID,
+} from '../api/types';
 
 export interface BoardRenderContext {
   scene: Phaser.Scene;
   terrainObjects: Phaser.GameObjects.GameObject[];
   occupantObjects: Phaser.GameObjects.GameObject[];
-  unitSpritesById: Map<number, Phaser.GameObjects.Sprite>;
-  bombGraphicsById: Map<number, BombGraphics>;
-  softBlockSpritesById: Map<number, Phaser.GameObjects.Sprite>;
+  unitSpritesById: Map<UnitID, Phaser.GameObjects.Sprite>;
+  bombGraphicsById: Map<BombID, BombGraphics>;
+  softBlockSpritesById: Map<SoftBlockID, Phaser.GameObjects.Sprite>;
   onUnitClicked: (unit: Unit) => void;
 }
 
