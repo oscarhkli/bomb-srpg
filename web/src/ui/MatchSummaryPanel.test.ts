@@ -1,3 +1,4 @@
+import { unitID } from '../test/ids';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mockScene } from '../test/setup';
 import {
@@ -171,9 +172,9 @@ describe('MatchSummaryPanel.open', () => {
     const { panel } = makePanel();
     const state = makeState({
       units: [
-        makeUnit({ id: 1, team: 1, hp: 1, maxBombCount: 3, bombUsed: 1 }),
-        makeUnit({ id: 2, team: 1, hp: 0, maxBombCount: 3, bombUsed: 0 }),
-        makeUnit({ id: 3, team: 2, hp: 1, maxBombCount: 2, bombUsed: 0 }),
+        makeUnit({ id: unitID(1), team: 1, hp: 1, maxBombCount: 3, bombUsed: 1 }),
+        makeUnit({ id: unitID(2), team: 1, hp: 0, maxBombCount: 3, bombUsed: 0 }),
+        makeUnit({ id: unitID(3), team: 2, hp: 1, maxBombCount: 2, bombUsed: 0 }),
       ],
     });
 

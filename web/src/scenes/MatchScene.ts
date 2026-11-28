@@ -50,6 +50,7 @@ import {
   CPU_PLAN_EVENT_STEP_MS,
 } from '../constants';
 import type {
+  BombID,
   BombPlacedEvent,
   Coordinate,
   CpuStatusResponse,
@@ -57,10 +58,12 @@ import type {
   GameEvent,
   GameState,
   MatchEndedEvent,
+  SoftBlockID,
   TurnCmdType,
   TurnCommand,
   UnitMovedEvent,
   Unit,
+  UnitID,
 } from '../api/types';
 
 type CpuPollResult =
@@ -82,10 +85,10 @@ export default class MatchScene extends Phaser.Scene {
   private gameCfgLoaded = false;
   private terrainObjects: Phaser.GameObjects.GameObject[] = [];
   private occupantObjects: Phaser.GameObjects.GameObject[] = [];
-  private unitSpritesById = new Map<number, Phaser.GameObjects.Sprite>();
-  private bombGraphicsById = new Map<number, BombGraphics>();
+  private unitSpritesById = new Map<UnitID, Phaser.GameObjects.Sprite>();
+  private bombGraphicsById = new Map<BombID, BombGraphics>();
   private hazardsPlayedTurn = 0;
-  private softBlockSpritesById = new Map<number, Phaser.GameObjects.Sprite>();
+  private softBlockSpritesById = new Map<SoftBlockID, Phaser.GameObjects.Sprite>();
   private allowedTilesCache = new Map<string, Coordinate[]>();
   private turnCommandPanel!: TurnCommandPanel;
   private confirmDialog!: ConfirmDialog;
@@ -431,7 +434,7 @@ export default class MatchScene extends Phaser.Scene {
   }
 
   private async getAllowedTilesCached(
-    unitId: number,
+    unitId: UnitID,
     turnCmdType: TurnCmdType
   ): Promise<Coordinate[]> {
     const key = `${unitId}:${turnCmdType}`;

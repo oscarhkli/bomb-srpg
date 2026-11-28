@@ -15,7 +15,7 @@
     "test:run": "vitest run",
     "build:e2e": "VITE_E2E=true npm run build",
     "e2e": "playwright test -c e2e",
-    "gen": "openapi-typescript ../server/api/openapi.yaml -o src/api/schema.gen.ts"
+    "gen": "node gen-api.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

@@ -1,3 +1,4 @@
+import { bombID, softBlockID, unitID } from '../test/ids';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mockScene } from '../test/setup';
 import { occupantSprite, stageBackgroundImage, pointerDownOf } from '../test/sceneHelpers';
@@ -9,7 +10,16 @@ import {
   makeBombPlacedEvent,
 } from '../test/fixtures';
 import { TILE_SIZE, SPRITE_GROUND_MARGIN, DEPTH_STAGE_BACKGROUND } from '../constants';
-import type { Bomb, GameEvent, GameState, SoftBlock, Tile, Unit } from '../api/types';
+import {
+  SYSTEM_OWNER_ID,
+  type BombID,
+  type Bomb,
+  type GameEvent,
+  type GameState,
+  type SoftBlock,
+  type Tile,
+  type Unit,
+} from '../api/types';
 import type { BombGraphics } from './resolveTurnPlayer';
 import {
   establishBoardLayout,
@@ -33,7 +43,7 @@ function ctx(overrides: Partial<BoardRenderContext> = {}): BoardRenderContext {
     terrainObjects: [],
     occupantObjects: [],
     unitSpritesById: new Map(),
-    bombGraphicsById: new Map<number, BombGraphics>(),
+    bombGraphicsById: new Map<BombID, BombGraphics>(),
     softBlockSpritesById: new Map(),
     onUnitClicked: vi.fn(),
     ...overrides,
@@ -211,13 +221,13 @@ describe('renderOccupants — units', () => {
 
   it('registers the unit sprite in the map', () => {
     const c = ctx();
-    renderAll(c, state([[plainTile()]], { units: [unit({ id: 7 })] }));
-    expect(c.unitSpritesById.has(7)).toBe(true);
+    renderAll(c, state([[plainTile()]], { units: [unit({ id: unitID(7) })] }));
+    expect(c.unitSpritesById.has(unitID(7))).toBe(true);
   });
 
   it('makes a unit clickable over its tile footprint (local space, independent of grid position) and invokes onUnitClicked on pointerdown', () => {
     const onUnitClicked = vi.fn();
-    const u = unit({ id: 7, position: { x: 1, y: 0 } });
+    const u = unit({ id: unitID(7), position: { x: 1, y: 0 } });
     renderAll(ctx({ onUnitClicked }), state([[plainTile(), plainTile()]], { units: [u] }));
 
     const sprite = occupantSprite(0);
@@ -236,7 +246,7 @@ describe('renderOccupants — softBlocks & bombs', () => {
     renderAll(
       c,
       state([[plainTile(), plainTile()]], {
-        softBlocks: [softBlock({ id: 3, position: { x: 1, y: 0 } })],
+        softBlocks: [softBlock({ id: softBlockID(3), position: { x: 1, y: 0 } })],
       })
     );
 
@@ -248,12 +258,12 @@ describe('renderOccupants — softBlocks & bombs', () => {
       'soft_block-frame'
     );
     expect(sprite.setOrigin).toHaveBeenCalledWith(0.5, 1);
-    expect(c.softBlockSpritesById.has(3)).toBe(true);
+    expect(c.softBlockSpritesById.has(softBlockID(3))).toBe(true);
   });
 
   it('logs on softBlock click', () => {
     const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
-    const block = softBlock({ id: 3 });
+    const block = softBlock({ id: softBlockID(3) });
     renderAll(ctx(), state([[plainTile()]], { softBlocks: [block] }));
     pointerDownOf(occupantSprite(0))();
     expect(consoleSpy).toHaveBeenCalledWith('SoftBlock 3 is clicked', block);
@@ -265,7 +275,7 @@ describe('renderOccupants — softBlocks & bombs', () => {
     renderAll(
       c,
       state([[plainTile(), plainTile()]], {
-        bombs: [bomb({ id: 9, position: { x: 1, y: 0 }, countdown: 5 })],
+        bombs: [bomb({ id: bombID(9), position: { x: 1, y: 0 }, countdown: 5 })],
       })
     );
 
@@ -280,14 +290,14 @@ describe('renderOccupants — softBlocks & bombs', () => {
       expect.anything(),
       expect.anything(),
     ]);
-    expect(c.bombGraphicsById.has(9)).toBe(true);
+    expect(c.bombGraphicsById.has(bombID(9))).toBe(true);
   });
 });
 
 describe('renderBomb', () => {
   it('adds a single bomb without touching the rest of the board and registers it', () => {
     const c = ctx();
-    renderBomb(c, bomb({ id: 42, position: { x: 0, y: 0 }, countdown: 2 }));
+    renderBomb(c, bomb({ id: bombID(42), position: { x: 0, y: 0 }, countdown: 2 }));
 
     expect(mockScene.add.graphics).not.toHaveBeenCalled();
     expect(mockScene.add.sprite).toHaveBeenCalledWith(
@@ -300,7 +310,7 @@ describe('renderBomb', () => {
       expect.anything(),
       expect.anything(),
     ]);
-    expect(c.bombGraphicsById.has(42)).toBe(true);
+    expect(c.bombGraphicsById.has(bombID(42))).toBe(true);
     expect(c.occupantObjects.length).toBeGreaterThan(0);
   });
 });
@@ -327,21 +337,21 @@ describe('resolveUnitTextureKey', () => {
 describe('renderOccupants — teardown', () => {
   it('destroys prior occupant objects and clears the graphics maps on re-render', () => {
     const c = ctx();
-    renderAll(c, state([[plainTile()]], { units: [unit({ id: 7 })] }));
+    renderAll(c, state([[plainTile()]], { units: [unit({ id: unitID(7) })] }));
     const firstUnitSprite = occupantSprite(0);
-    expect(c.unitSpritesById.has(7)).toBe(true);
+    expect(c.unitSpritesById.has(unitID(7))).toBe(true);
 
     renderOccupants(c, state([[plainTile()]]));
 
     expect(firstUnitSprite.destroy).toHaveBeenCalled();
-    expect(c.unitSpritesById.has(7)).toBe(false);
+    expect(c.unitSpritesById.has(unitID(7))).toBe(false);
   });
 
   it('leaves the terrain layer untouched on an occupant swap', () => {
     const c = ctx();
     renderStageBackground(c, [[plainTile()]], 'Plain');
     const bg = stageBackgroundImage();
-    renderOccupants(c, state([[plainTile()]], { units: [unit({ id: 7 })] }));
+    renderOccupants(c, state([[plainTile()]], { units: [unit({ id: unitID(7) })] }));
 
     renderOccupants(c, state([[plainTile()]]));
 
@@ -361,14 +371,14 @@ describe('hazardsUnplayed', () => {
 });
 
 describe('bombsToDraw', () => {
-  const hazard = bomb({ id: 1, ownerId: 0 });
-  const older = bomb({ id: 2, ownerId: 0 });
+  const hazard = bomb({ id: bombID(1), ownerId: SYSTEM_OWNER_ID });
+  const older = bomb({ id: bombID(2), ownerId: SYSTEM_OWNER_ID });
   const withEvents = (turn: number, turnStartEvents: GameEvent[]): GameState => ({
     ...state([[plainTile()]], { bombs: [hazard, older] }),
     turn,
     turnStartEvents,
   });
-  const placed = [makeBombPlacedEvent({ bombId: 1 })];
+  const placed = [makeBombPlacedEvent({ bombId: bombID(1) })];
 
   it.each<{
     name: string;
@@ -403,7 +413,12 @@ describe('bombsToDraw', () => {
       turn: 2,
       played: 1,
       events: [
-        { type: 'bombExploded', bombId: 1, position: { x: 0, y: 0 }, affectedPositions: [] },
+        {
+          type: 'bombExploded',
+          bombId: bombID(1),
+          position: { x: 0, y: 0 },
+          affectedPositions: [],
+        },
       ],
       want: [1, 2],
     },

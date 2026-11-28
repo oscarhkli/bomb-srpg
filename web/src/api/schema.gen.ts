@@ -249,7 +249,9 @@ export interface components {
             occupantId: number;
         };
         Unit: {
-            id: number;
+            id: number & {
+                readonly __brand: "UnitID";
+            };
             type: string;
             position: components["schemas"]["Coordinate"];
             speed: number;
@@ -265,14 +267,20 @@ export interface components {
         };
         Bomb: {
             /** Format: int64 */
-            id: number;
-            ownerId: number;
+            id: number & {
+                readonly __brand: "BombID";
+            };
+            ownerId: number & {
+                readonly __brand: "UnitID";
+            };
             position: components["schemas"]["Coordinate"];
             range: number;
             countdown: number;
         };
         SoftBlock: {
-            id: number;
+            id: number & {
+                readonly __brand: "SoftBlockID";
+            };
             position: components["schemas"]["Coordinate"];
         };
         TurnCommand: components["schemas"]["MoveCommand"] | components["schemas"]["PlaceBombCommand"];
@@ -282,7 +290,9 @@ export interface components {
              * @enum {string}
              */
             type: "move";
-            unitId: number;
+            unitId: number & {
+                readonly __brand: "UnitID";
+            };
             target: components["schemas"]["Coordinate"];
         };
         PlaceBombCommand: {
@@ -291,7 +301,9 @@ export interface components {
              * @enum {string}
              */
             type: "placeBomb";
-            unitId: number;
+            unitId: number & {
+                readonly __brand: "UnitID";
+            };
             target: components["schemas"]["Coordinate"];
         };
         GameEvent: components["schemas"]["UnitMovedEvent"] | components["schemas"]["UnitDamagedEvent"] | components["schemas"]["UnitDiedEvent"] | components["schemas"]["BombPlacedEvent"] | components["schemas"]["BombCountdownUpdatedEvent"] | components["schemas"]["BombExplodedEvent"] | components["schemas"]["SoftBlockDestroyedEvent"] | components["schemas"]["MatchEndedEvent"];
@@ -301,7 +313,9 @@ export interface components {
              * @enum {string}
              */
             type: "unitMoved";
-            unitId: number;
+            unitId: number & {
+                readonly __brand: "UnitID";
+            };
             from: components["schemas"]["Coordinate"];
             to: components["schemas"]["Coordinate"];
         };
@@ -311,7 +325,9 @@ export interface components {
              * @enum {string}
              */
             type: "unitDamaged";
-            unitId: number;
+            unitId: number & {
+                readonly __brand: "UnitID";
+            };
             position: components["schemas"]["Coordinate"];
             newHp: number;
         };
@@ -321,7 +337,9 @@ export interface components {
              * @enum {string}
              */
             type: "unitDied";
-            unitId: number;
+            unitId: number & {
+                readonly __brand: "UnitID";
+            };
             position: components["schemas"]["Coordinate"];
         };
         BombPlacedEvent: {
@@ -330,9 +348,13 @@ export interface components {
              * @enum {string}
              */
             type: "bombPlaced";
-            unitId: number;
+            unitId: number & {
+                readonly __brand: "UnitID";
+            };
             /** Format: int64 */
-            bombId: number;
+            bombId: number & {
+                readonly __brand: "BombID";
+            };
             position: components["schemas"]["Coordinate"];
             range: number;
             countdown: number;
@@ -344,7 +366,9 @@ export interface components {
              */
             type: "bombCountdownUpdated";
             /** Format: int64 */
-            bombId: number;
+            bombId: number & {
+                readonly __brand: "BombID";
+            };
             position: components["schemas"]["Coordinate"];
             countdown: number;
         };
@@ -355,7 +379,9 @@ export interface components {
              */
             type: "bombExploded";
             /** Format: int64 */
-            bombId: number;
+            bombId: number & {
+                readonly __brand: "BombID";
+            };
             position: components["schemas"]["Coordinate"];
             affectedPositions: components["schemas"]["Coordinate"][];
         };
@@ -365,7 +391,9 @@ export interface components {
              * @enum {string}
              */
             type: "softBlockDestroyed";
-            softBlockId: number;
+            softBlockId: number & {
+                readonly __brand: "SoftBlockID";
+            };
             position: components["schemas"]["Coordinate"];
         };
         MatchEndedEvent: {
@@ -784,7 +812,9 @@ export interface operations {
     getAllowedTiles: {
         parameters: {
             query: {
-                unitId: number;
+                unitId: number & {
+                    readonly __brand: "UnitID";
+                };
                 turnCmdType: components["schemas"]["TurnCmdType"];
             };
             header?: never;

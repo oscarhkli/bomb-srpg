@@ -1,3 +1,4 @@
+import { bombID, softBlockID, unitID } from './ids';
 import { describe, it, expect } from 'vitest';
 import { createMockGraphics } from './setup';
 import { makeBombGraphics as bombGraphics } from './sceneHelpers';
@@ -15,11 +16,11 @@ describe('occupantsMatch', () => {
     const match = occupantsMatch(
       fresh,
       new Map([
-        [1, createMockGraphics() as never],
-        [2, createMockGraphics() as never],
+        [unitID(1), createMockGraphics() as never],
+        [unitID(2), createMockGraphics() as never],
       ]),
-      new Map([[10, bombGraphics()]]),
-      new Map([[20, createMockGraphics() as never]])
+      new Map([[bombID(10), bombGraphics()]]),
+      new Map([[softBlockID(20), createMockGraphics() as never]])
     );
 
     expect(match).toBe(true);
@@ -31,7 +32,12 @@ describe('occupantsMatch', () => {
     });
 
     expect(
-      occupantsMatch(fresh, new Map([[1, createMockGraphics() as never]]), new Map(), new Map())
+      occupantsMatch(
+        fresh,
+        new Map([[unitID(1), createMockGraphics() as never]]),
+        new Map(),
+        new Map()
+      )
     ).toBe(true);
   });
 
@@ -46,7 +52,12 @@ describe('occupantsMatch', () => {
 
   it('is false when the graphics map holds an occupant that truth no longer has', () => {
     expect(
-      occupantsMatch(state(), new Map([[1, createMockGraphics() as never]]), new Map(), new Map())
+      occupantsMatch(
+        state(),
+        new Map([[unitID(1), createMockGraphics() as never]]),
+        new Map(),
+        new Map()
+      )
     ).toBe(false);
   });
 });

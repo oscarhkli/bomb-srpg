@@ -1,5 +1,5 @@
 import { expect, type APIRequestContext, type Page } from '@playwright/test';
-import type { GameState, Unit } from '../src/api/types';
+import type { GameState, Unit, UnitID } from '../src/api/types';
 import {
   BUTTON_LABEL_BOMB,
   BUTTON_LABEL_MOVE,
@@ -183,7 +183,7 @@ export async function clickText(page: Page, label: string): Promise<void> {
   await clickTarget(page, { kind: 'text', label }, `visible text "${label}" in the active scene`);
 }
 
-export async function clickUnit(page: Page, unitId: number): Promise<void> {
+export async function clickUnit(page: Page, unitId: UnitID): Promise<void> {
   await clickTarget(page, { kind: 'unit', id: unitId }, `unit ${unitId} sprite`);
 }
 
@@ -203,7 +203,7 @@ export async function clickConfirmYes(page: Page): Promise<void> {
   await clickTarget(page, { kind: 'spriteButton', labelKey: BUTTON_LABEL_YES }, 'Yes button');
 }
 
-export async function unitCenter(page: Page, unitId: number): Promise<Point> {
+export async function unitCenter(page: Page, unitId: UnitID): Promise<Point> {
   return waitForTarget(page, { kind: 'unit', id: unitId }, `unit ${unitId} sprite`);
 }
 
@@ -213,7 +213,7 @@ export async function clickAllowedTile(page: Page, index: number): Promise<Point
   return tile;
 }
 
-export async function clickAllowedTileNextTo(page: Page, unitId: number): Promise<Point> {
+export async function clickAllowedTileNextTo(page: Page, unitId: UnitID): Promise<Point> {
   const from = await unitCenter(page, unitId);
   const tilePx = (await pixelScale(page)) * TILE_SIZE;
   const tolerance = tilePx / 4;

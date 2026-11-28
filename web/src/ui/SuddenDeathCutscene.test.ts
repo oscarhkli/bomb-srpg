@@ -1,3 +1,4 @@
+import { bombID } from '../test/ids';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mockScene } from '../test/setup';
 import {
@@ -69,7 +70,10 @@ describe('SuddenDeathCutscene', () => {
 
   it('invokes dropBomb once per bombPlaced event, only after the drop-delay elapses', () => {
     const dropBomb = vi.fn().mockResolvedValue(undefined);
-    const events = [makeBombPlacedEvent({ bombId: 1 }), makeBombPlacedEvent({ bombId: 2 })];
+    const events = [
+      makeBombPlacedEvent({ bombId: bombID(1) }),
+      makeBombPlacedEvent({ bombId: bombID(2) }),
+    ];
     const cutscene = new SuddenDeathCutscene(mockScene as never);
 
     void cutscene.play(events, dropBomb);

@@ -1,3 +1,4 @@
+import { unitID } from '../test/ids';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mockScene } from '../test/setup';
 import { allContainers, allGraphics, clickPointerdown, lastContainers } from '../test/sceneHelpers';
@@ -195,10 +196,10 @@ describe('TurnCommandPanel', () => {
 
   it('re-opening for a different unit closes the previous panel first', () => {
     const { panel } = makePanel();
-    panel.openFor(makeUnit({ id: 1 }));
+    panel.openFor(makeUnit({ id: unitID(1) }));
     const firstButtons = allContainers();
 
-    panel.openFor(makeUnit({ id: 2 }));
+    panel.openFor(makeUnit({ id: unitID(2) }));
 
     firstButtons.forEach(c => expect(c.destroy).toHaveBeenCalled());
   });
@@ -211,7 +212,7 @@ describe('TurnCommandPanel', () => {
     const { panel, getAllowedTiles } = makePanel({
       getAllowedTiles: vi.fn().mockResolvedValue(tiles),
     });
-    const unit = makeUnit({ id: 5 });
+    const unit = makeUnit({ id: unitID(5) });
     panel.openFor(unit);
 
     const [moveButtonContainer] = allContainers();
@@ -253,7 +254,7 @@ describe('TurnCommandPanel', () => {
     const { panel, getAllowedTiles } = makePanel({
       getAllowedTiles: vi.fn().mockResolvedValue(tiles),
     });
-    const unit = makeUnit({ id: 5 });
+    const unit = makeUnit({ id: unitID(5) });
     panel.openFor(unit);
 
     const [, placeBombButtonContainer] = allContainers();
@@ -289,7 +290,7 @@ describe('TurnCommandPanel', () => {
     const { panel, showConfirm, onConfirmedSubmit } = makePanel({
       getAllowedTiles: vi.fn().mockResolvedValue([target]),
     });
-    const unit = makeUnit({ id: 9 });
+    const unit = makeUnit({ id: unitID(9) });
     panel.openFor(unit);
 
     const [moveButtonContainer] = allContainers();
@@ -317,7 +318,7 @@ describe('TurnCommandPanel', () => {
       getAllowedTiles: vi.fn().mockResolvedValue(tiles),
       isConfirmOpen,
     });
-    panel.openFor(makeUnit({ id: 9 }));
+    panel.openFor(makeUnit({ id: unitID(9) }));
 
     const [moveButtonContainer] = allContainers();
     clickPointerdown(moveButtonContainer!);
@@ -338,7 +339,7 @@ describe('TurnCommandPanel', () => {
     const target: Coordinate = { x: 1, y: 0 };
     const getAllowedTiles = vi.fn().mockResolvedValue([target]);
     const { panel, showConfirm } = makePanel({ getAllowedTiles });
-    const unit = makeUnit({ id: 9 });
+    const unit = makeUnit({ id: unitID(9) });
     panel.openFor(unit);
 
     const [moveButtonContainer] = allContainers();

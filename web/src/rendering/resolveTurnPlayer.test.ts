@@ -1,9 +1,10 @@
+import { bombID, softBlockID, unitID } from '../test/ids';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mockScene, createMockGraphics, createMockText, createMockContainer } from '../test/setup';
 import { delayedCallAt, makeBombGraphics, drainDelayedCalls } from '../test/sceneHelpers';
 import { makeState, makeUnit, makeSoftBlock, plainGrid } from '../test/fixtures';
 import { occupantsMatch } from '../test/occupantsMatch';
-import type { GameEvent, GameState } from '../api/types';
+import type { BombID, GameEvent, GameState } from '../api/types';
 import { BLAST_SPEED_MS_PER_TILE, BLAST_DURATION_MS, FIRE_DURATION_MS } from './constants';
 import { TILE_SIZE } from '../constants';
 import { playResolveTurnEvents, type BombGraphics } from './resolveTurnPlayer';
@@ -15,7 +16,9 @@ beforeEach(() => {
 function baseState(overrides: Partial<GameState> = {}): GameState {
   return makeState({
     grid: [[{ type: 'TerrainPlain', occupantType: 'OccupantBomb', occupantId: 1 }]],
-    bombs: [{ id: 1, ownerId: 0x11, position: { x: 0, y: 0 }, range: 1, countdown: 2 }],
+    bombs: [
+      { id: bombID(1), ownerId: unitID(0x11), position: { x: 0, y: 0 }, range: 1, countdown: 2 },
+    ],
     ...overrides,
   });
 }
@@ -27,9 +30,9 @@ function grid5x5(): GameState['grid'] {
 describe('playResolveTurnEvents — bombCountdownUpdated', () => {
   it('updates the bomb countdown text immediately (offset 0) when countdown > 0', () => {
     const countdownText = createMockText();
-    const bombGraphicsById = new Map<number, BombGraphics>([
+    const bombGraphicsById = new Map<BombID, BombGraphics>([
       [
-        1,
+        bombID(1),
         {
           container: createMockContainer() as never,
           countdownText: countdownText as never,
@@ -38,7 +41,7 @@ describe('playResolveTurnEvents — bombCountdownUpdated', () => {
     ]);
 
     const result = playResolveTurnEvents(
-      [{ type: 'bombCountdownUpdated', bombId: 1, position: { x: 0, y: 0 }, countdown: 3 }],
+      [{ type: 'bombCountdownUpdated', bombId: bombID(1), position: { x: 0, y: 0 }, countdown: 3 }],
       {
         scene: mockScene as never,
         gameStateSnapshot: baseState(),
@@ -56,9 +59,9 @@ describe('playResolveTurnEvents — bombCountdownUpdated', () => {
 
   it('renders a red "!" when countdown reaches 0', () => {
     const countdownText = createMockText();
-    const bombGraphicsById = new Map<number, BombGraphics>([
+    const bombGraphicsById = new Map<BombID, BombGraphics>([
       [
-        1,
+        bombID(1),
         {
           container: createMockContainer() as never,
           countdownText: countdownText as never,
@@ -67,7 +70,7 @@ describe('playResolveTurnEvents — bombCountdownUpdated', () => {
     ]);
 
     playResolveTurnEvents(
-      [{ type: 'bombCountdownUpdated', bombId: 1, position: { x: 0, y: 0 }, countdown: 0 }],
+      [{ type: 'bombCountdownUpdated', bombId: bombID(1), position: { x: 0, y: 0 }, countdown: 0 }],
       {
         scene: mockScene as never,
         gameStateSnapshot: baseState(),
@@ -85,7 +88,7 @@ describe('playResolveTurnEvents — bombCountdownUpdated', () => {
 
   it('does not throw when the bomb graphics map has no entry for a validated bombId', () => {
     playResolveTurnEvents(
-      [{ type: 'bombCountdownUpdated', bombId: 1, position: { x: 0, y: 0 }, countdown: 3 }],
+      [{ type: 'bombCountdownUpdated', bombId: bombID(1), position: { x: 0, y: 0 }, countdown: 3 }],
       {
         scene: mockScene as never,
         gameStateSnapshot: baseState(),
@@ -105,7 +108,14 @@ describe('playResolveTurnEvents — validation', () => {
     const onError = vi.fn();
 
     const result = playResolveTurnEvents(
-      [{ type: 'bombCountdownUpdated', bombId: 999, position: { x: 0, y: 0 }, countdown: 1 }],
+      [
+        {
+          type: 'bombCountdownUpdated',
+          bombId: bombID(999),
+          position: { x: 0, y: 0 },
+          countdown: 1,
+        },
+      ],
       {
         scene: mockScene as never,
         gameStateSnapshot: baseState(),
@@ -125,7 +135,14 @@ describe('playResolveTurnEvents — validation', () => {
     const onError = vi.fn();
 
     const result = playResolveTurnEvents(
-      [{ type: 'bombExploded', bombId: 999, position: { x: 1, y: 1 }, affectedPositions: [] }],
+      [
+        {
+          type: 'bombExploded',
+          bombId: bombID(999),
+          position: { x: 1, y: 1 },
+          affectedPositions: [],
+        },
+      ],
       {
         scene: mockScene as never,
         gameStateSnapshot: baseState({ grid: grid5x5() }),
@@ -144,7 +161,14 @@ describe('playResolveTurnEvents — validation', () => {
     const onError = vi.fn();
 
     const result = playResolveTurnEvents(
-      [{ type: 'bombCountdownUpdated', bombId: 1, position: { x: 0, y: 0 }, countdown: -1 }],
+      [
+        {
+          type: 'bombCountdownUpdated',
+          bombId: bombID(1),
+          position: { x: 0, y: 0 },
+          countdown: -1,
+        },
+      ],
       {
         scene: mockScene as never,
         gameStateSnapshot: baseState(),
@@ -163,11 +187,11 @@ describe('playResolveTurnEvents — validation', () => {
   it('flags a negative newHp as an invalid value and schedules nothing', () => {
     const onError = vi.fn();
     const state = baseState({
-      units: [makeUnit({ id: 0x21, type: 'Bandit', speed: 3, maxBombCount: 1, team: 2 })],
+      units: [makeUnit({ id: unitID(0x21), type: 'Bandit', speed: 3, maxBombCount: 1, team: 2 })],
     });
 
     const result = playResolveTurnEvents(
-      [{ type: 'unitDamaged', unitId: 0x21, position: { x: 0, y: 0 }, newHp: -1 }],
+      [{ type: 'unitDamaged', unitId: unitID(0x21), position: { x: 0, y: 0 }, newHp: -1 }],
       {
         scene: mockScene as never,
         gameStateSnapshot: state,
@@ -187,14 +211,16 @@ describe('playResolveTurnEvents — validation', () => {
     const onError = vi.fn();
     const state = baseState({
       grid: grid5x5(),
-      bombs: [{ id: 1, ownerId: 0x11, position: { x: 2, y: 2 }, range: 2, countdown: 0 }],
+      bombs: [
+        { id: bombID(1), ownerId: unitID(0x11), position: { x: 2, y: 2 }, range: 2, countdown: 0 },
+      ],
     });
 
     const result = playResolveTurnEvents(
       [
         {
           type: 'bombExploded',
-          bombId: 1,
+          bombId: bombID(1),
           position: { x: 2, y: 2 },
           affectedPositions: [{ x: 99, y: 99 }],
         },
@@ -216,17 +242,19 @@ describe('playResolveTurnEvents — validation', () => {
 
   it('accepts an in-bounds bombExploded affected position that is not cardinally aligned with the bomb, rendering no beam for it', () => {
     const onError = vi.fn();
-    const bombGraphicsById = new Map<number, BombGraphics>([[1, makeBombGraphics()]]);
+    const bombGraphicsById = new Map<BombID, BombGraphics>([[bombID(1), makeBombGraphics()]]);
     const state = baseState({
       grid: grid5x5(),
-      bombs: [{ id: 1, ownerId: 0x11, position: { x: 2, y: 2 }, range: 2, countdown: 0 }],
+      bombs: [
+        { id: bombID(1), ownerId: unitID(0x11), position: { x: 2, y: 2 }, range: 2, countdown: 0 },
+      ],
     });
 
     const result = playResolveTurnEvents(
       [
         {
           type: 'bombExploded',
-          bombId: 1,
+          bombId: bombID(1),
           position: { x: 2, y: 2 },
           affectedPositions: [{ x: 3, y: 3 }],
         },
@@ -252,9 +280,9 @@ describe('playResolveTurnEvents — bombExploded (non-chain)', () => {
   it('destroys the bomb graphics immediately and grows a beam toward the affected tiles', () => {
     const container = createMockContainer();
     const countdownText = createMockText();
-    const bombGraphicsById = new Map<number, BombGraphics>([
+    const bombGraphicsById = new Map<BombID, BombGraphics>([
       [
-        1,
+        bombID(1),
         {
           container: container as never,
           countdownText: countdownText as never,
@@ -263,14 +291,16 @@ describe('playResolveTurnEvents — bombExploded (non-chain)', () => {
     ]);
     const state = baseState({
       grid: grid5x5(),
-      bombs: [{ id: 1, ownerId: 0x11, position: { x: 2, y: 2 }, range: 2, countdown: 0 }],
+      bombs: [
+        { id: bombID(1), ownerId: unitID(0x11), position: { x: 2, y: 2 }, range: 2, countdown: 0 },
+      ],
     });
 
     const result = playResolveTurnEvents(
       [
         {
           type: 'bombExploded',
-          bombId: 1,
+          bombId: bombID(1),
           position: { x: 2, y: 2 },
           affectedPositions: [
             { x: 3, y: 2 },
@@ -292,7 +322,7 @@ describe('playResolveTurnEvents — bombExploded (non-chain)', () => {
 
     delayedCallAt(0)();
     expect(container.destroy).toHaveBeenCalled();
-    expect(bombGraphicsById.has(1)).toBe(false);
+    expect(bombGraphicsById.has(bombID(1))).toBe(false);
 
     expect(mockScene.tweens.add).toHaveBeenCalledOnce();
     const tweenCfg = mockScene.tweens.add.mock.calls[0]![0] as { len: number; duration: number };
@@ -302,17 +332,19 @@ describe('playResolveTurnEvents — bombExploded (non-chain)', () => {
 
   it("accepts the bomb's own origin tile in affectedPositions (the backend always includes it) and still renders", () => {
     const onError = vi.fn();
-    const bombGraphicsById = new Map<number, BombGraphics>([[1, makeBombGraphics()]]);
+    const bombGraphicsById = new Map<BombID, BombGraphics>([[bombID(1), makeBombGraphics()]]);
     const state = baseState({
       grid: grid5x5(),
-      bombs: [{ id: 1, ownerId: 0x11, position: { x: 2, y: 2 }, range: 2, countdown: 0 }],
+      bombs: [
+        { id: bombID(1), ownerId: unitID(0x11), position: { x: 2, y: 2 }, range: 2, countdown: 0 },
+      ],
     });
 
     const result = playResolveTurnEvents(
       [
         {
           type: 'bombExploded',
-          bombId: 1,
+          bombId: bombID(1),
           position: { x: 2, y: 2 },
           affectedPositions: [
             { x: 2, y: 2 },
@@ -347,7 +379,7 @@ describe('playResolveTurnEvents — bombExploded with no live graphics (AC 9)', 
       [
         {
           type: 'bombExploded',
-          bombId: 999,
+          bombId: bombID(999),
           position: { x: 2, y: 2 },
           affectedPositions: [{ x: 3, y: 2 }],
         },
@@ -371,15 +403,15 @@ describe('playResolveTurnEvents — bombExploded with no live graphics (AC 9)', 
 
 describe('playResolveTurnEvents — chain reactions', () => {
   it('delays a chain-reacted bomb by reachTime from the causing bomb whose blast reached it', () => {
-    const bombGraphicsById = new Map<number, BombGraphics>([
-      [1, makeBombGraphics()],
-      [2, makeBombGraphics()],
+    const bombGraphicsById = new Map<BombID, BombGraphics>([
+      [bombID(1), makeBombGraphics()],
+      [bombID(2), makeBombGraphics()],
     ]);
     const state = baseState({
       grid: grid5x5(),
       bombs: [
-        { id: 1, ownerId: 0x11, position: { x: 0, y: 0 }, range: 2, countdown: 0 },
-        { id: 2, ownerId: 0x11, position: { x: 2, y: 0 }, range: 1, countdown: 2 },
+        { id: bombID(1), ownerId: unitID(0x11), position: { x: 0, y: 0 }, range: 2, countdown: 0 },
+        { id: bombID(2), ownerId: unitID(0x11), position: { x: 2, y: 0 }, range: 1, countdown: 2 },
       ],
     });
 
@@ -387,7 +419,7 @@ describe('playResolveTurnEvents — chain reactions', () => {
       [
         {
           type: 'bombExploded',
-          bombId: 1,
+          bombId: bombID(1),
           position: { x: 0, y: 0 },
           affectedPositions: [
             { x: 1, y: 0 },
@@ -396,7 +428,7 @@ describe('playResolveTurnEvents — chain reactions', () => {
         },
         {
           type: 'bombExploded',
-          bombId: 2,
+          bombId: bombID(2),
           position: { x: 2, y: 0 },
           affectedPositions: [{ x: 3, y: 0 }],
         },
@@ -418,17 +450,17 @@ describe('playResolveTurnEvents — chain reactions', () => {
   });
 
   it('picks the smallest resulting delay when a position is covered by more than one earlier blast, even if that blast is not the earliest in the array', () => {
-    const bombGraphicsById = new Map<number, BombGraphics>([
-      [1, makeBombGraphics()],
-      [2, makeBombGraphics()],
-      [3, makeBombGraphics()],
+    const bombGraphicsById = new Map<BombID, BombGraphics>([
+      [bombID(1), makeBombGraphics()],
+      [bombID(2), makeBombGraphics()],
+      [bombID(3), makeBombGraphics()],
     ]);
     const state = baseState({
       grid: grid5x5(),
       bombs: [
-        { id: 1, ownerId: 0x11, position: { x: 0, y: 0 }, range: 3, countdown: 0 },
-        { id: 2, ownerId: 0x11, position: { x: 2, y: 0 }, range: 1, countdown: 0 },
-        { id: 3, ownerId: 0x11, position: { x: 3, y: 0 }, range: 1, countdown: 2 },
+        { id: bombID(1), ownerId: unitID(0x11), position: { x: 0, y: 0 }, range: 3, countdown: 0 },
+        { id: bombID(2), ownerId: unitID(0x11), position: { x: 2, y: 0 }, range: 1, countdown: 0 },
+        { id: bombID(3), ownerId: unitID(0x11), position: { x: 3, y: 0 }, range: 1, countdown: 2 },
       ],
     });
 
@@ -436,7 +468,7 @@ describe('playResolveTurnEvents — chain reactions', () => {
       [
         {
           type: 'bombExploded',
-          bombId: 1,
+          bombId: bombID(1),
           position: { x: 0, y: 0 },
           affectedPositions: [
             { x: 1, y: 0 },
@@ -445,13 +477,13 @@ describe('playResolveTurnEvents — chain reactions', () => {
         },
         {
           type: 'bombExploded',
-          bombId: 2,
+          bombId: bombID(2),
           position: { x: 2, y: 0 },
           affectedPositions: [{ x: 3, y: 0 }],
         },
         {
           type: 'bombExploded',
-          bombId: 3,
+          bombId: bombID(3),
           position: { x: 3, y: 0 },
           affectedPositions: [{ x: 4, y: 0 }],
         },
@@ -477,10 +509,12 @@ describe('playResolveTurnEvents — occupant events', () => {
     const unitGraphics = createMockGraphics();
     const state = baseState({
       grid: grid5x5(),
-      bombs: [{ id: 1, ownerId: 0x11, position: { x: 0, y: 0 }, range: 2, countdown: 0 }],
+      bombs: [
+        { id: bombID(1), ownerId: unitID(0x11), position: { x: 0, y: 0 }, range: 2, countdown: 0 },
+      ],
       units: [
         makeUnit({
-          id: 0x21,
+          id: unitID(0x21),
           type: 'Bandit',
           position: { x: 9, y: 9 },
           speed: 3,
@@ -494,20 +528,20 @@ describe('playResolveTurnEvents — occupant events', () => {
       [
         {
           type: 'bombExploded',
-          bombId: 1,
+          bombId: bombID(1),
           position: { x: 0, y: 0 },
           affectedPositions: [
             { x: 1, y: 0 },
             { x: 2, y: 0 },
           ],
         },
-        { type: 'unitDamaged', unitId: 0x21, newHp: 0, position: { x: 2, y: 0 } },
+        { type: 'unitDamaged', unitId: unitID(0x21), newHp: 0, position: { x: 2, y: 0 } },
       ],
       {
         scene: mockScene as never,
         gameStateSnapshot: state,
-        unitSpritesById: new Map([[0x21, unitGraphics as never]]),
-        bombGraphicsById: new Map([[1, makeBombGraphics()]]),
+        unitSpritesById: new Map([[unitID(0x21), unitGraphics as never]]),
+        bombGraphicsById: new Map([[bombID(1), makeBombGraphics()]]),
         softBlockSpritesById: new Map(),
         onError: vi.fn(),
       }
@@ -523,7 +557,7 @@ describe('playResolveTurnEvents — occupant events', () => {
       grid: grid5x5(),
       units: [
         makeUnit({
-          id: 0x21,
+          id: unitID(0x21),
           type: 'Bandit',
           position: { x: 1, y: 1 },
           speed: 3,
@@ -536,13 +570,13 @@ describe('playResolveTurnEvents — occupant events', () => {
 
     playResolveTurnEvents(
       [
-        { type: 'unitDamaged', unitId: 0x21, newHp: 0, position: { x: 1, y: 1 } },
-        { type: 'unitDied', unitId: 0x21, position: { x: 1, y: 1 } },
+        { type: 'unitDamaged', unitId: unitID(0x21), newHp: 0, position: { x: 1, y: 1 } },
+        { type: 'unitDied', unitId: unitID(0x21), position: { x: 1, y: 1 } },
       ],
       {
         scene: mockScene as never,
         gameStateSnapshot: state,
-        unitSpritesById: new Map([[0x21, unitGraphics as never]]),
+        unitSpritesById: new Map([[unitID(0x21), unitGraphics as never]]),
         bombGraphicsById: new Map(),
         softBlockSpritesById: new Map(),
         onError: vi.fn(),
@@ -571,27 +605,35 @@ describe('playResolveTurnEvents — render fidelity oracle', () => {
       name: 'a bomb explosion that kills a unit and destroys a softBlock leaves all three maps empty',
       initial: makeState({
         grid,
-        units: [makeUnit({ id: 0x21, position: { x: 1, y: 0 }, team: 2, hp: 1 })],
-        bombs: [{ id: 1, ownerId: 0x11, position: { x: 0, y: 0 }, range: 3, countdown: 0 }],
-        softBlocks: [makeSoftBlock({ id: 20, position: { x: 2, y: 0 } })],
+        units: [makeUnit({ id: unitID(0x21), position: { x: 1, y: 0 }, team: 2, hp: 1 })],
+        bombs: [
+          {
+            id: bombID(1),
+            ownerId: unitID(0x11),
+            position: { x: 0, y: 0 },
+            range: 3,
+            countdown: 0,
+          },
+        ],
+        softBlocks: [makeSoftBlock({ id: softBlockID(20), position: { x: 2, y: 0 } })],
       }),
       events: [
         {
           type: 'bombExploded',
-          bombId: 1,
+          bombId: bombID(1),
           position: { x: 0, y: 0 },
           affectedPositions: [
             { x: 1, y: 0 },
             { x: 2, y: 0 },
           ],
         },
-        { type: 'unitDamaged', unitId: 0x21, newHp: 0, position: { x: 1, y: 0 } },
-        { type: 'unitDied', unitId: 0x21, position: { x: 1, y: 0 } },
-        { type: 'softBlockDestroyed', softBlockId: 20, position: { x: 2, y: 0 } },
+        { type: 'unitDamaged', unitId: unitID(0x21), newHp: 0, position: { x: 1, y: 0 } },
+        { type: 'unitDied', unitId: unitID(0x21), position: { x: 1, y: 0 } },
+        { type: 'softBlockDestroyed', softBlockId: softBlockID(20), position: { x: 2, y: 0 } },
       ],
       expected: makeState({
         grid,
-        units: [makeUnit({ id: 0x21, position: { x: 1, y: 0 }, team: 2, hp: 0 })],
+        units: [makeUnit({ id: unitID(0x21), position: { x: 1, y: 0 }, team: 2, hp: 0 })],
         bombs: [],
         softBlocks: [],
       }),
@@ -600,21 +642,29 @@ describe('playResolveTurnEvents — render fidelity oracle', () => {
       name: 'a unit that only takes damage survives in the map while the spent bomb is removed',
       initial: makeState({
         grid,
-        units: [makeUnit({ id: 0x21, position: { x: 1, y: 0 }, team: 2, hp: 2 })],
-        bombs: [{ id: 1, ownerId: 0x11, position: { x: 0, y: 0 }, range: 3, countdown: 0 }],
+        units: [makeUnit({ id: unitID(0x21), position: { x: 1, y: 0 }, team: 2, hp: 2 })],
+        bombs: [
+          {
+            id: bombID(1),
+            ownerId: unitID(0x11),
+            position: { x: 0, y: 0 },
+            range: 3,
+            countdown: 0,
+          },
+        ],
       }),
       events: [
         {
           type: 'bombExploded',
-          bombId: 1,
+          bombId: bombID(1),
           position: { x: 0, y: 0 },
           affectedPositions: [{ x: 1, y: 0 }],
         },
-        { type: 'unitDamaged', unitId: 0x21, newHp: 1, position: { x: 1, y: 0 } },
+        { type: 'unitDamaged', unitId: unitID(0x21), newHp: 1, position: { x: 1, y: 0 } },
       ],
       expected: makeState({
         grid,
-        units: [makeUnit({ id: 0x21, position: { x: 1, y: 0 }, team: 2, hp: 1 })],
+        units: [makeUnit({ id: unitID(0x21), position: { x: 1, y: 0 }, team: 2, hp: 1 })],
         bombs: [],
       }),
     },
@@ -622,7 +672,7 @@ describe('playResolveTurnEvents — render fidelity oracle', () => {
 
   it.each(cases)('$name', ({ initial, events, expected }) => {
     const unitSpritesById = new Map(initial.units.map(u => [u.id, createMockGraphics() as never]));
-    const bombGraphicsById = new Map<number, BombGraphics>(
+    const bombGraphicsById = new Map<BombID, BombGraphics>(
       initial.bombs.map(b => [b.id, makeBombGraphics()])
     );
     const softBlockSpritesById = new Map(
@@ -649,9 +699,11 @@ describe('playResolveTurnEvents — render fidelity oracle', () => {
   it('discriminates: a leftover graphics entry that truth no longer has fails the oracle', () => {
     const initial = makeState({
       grid,
-      bombs: [{ id: 1, ownerId: 0x11, position: { x: 0, y: 0 }, range: 1, countdown: 0 }],
+      bombs: [
+        { id: bombID(1), ownerId: unitID(0x11), position: { x: 0, y: 0 }, range: 1, countdown: 0 },
+      ],
     });
-    const bombGraphicsById = new Map<number, BombGraphics>([[1, makeBombGraphics()]]);
+    const bombGraphicsById = new Map<BombID, BombGraphics>([[bombID(1), makeBombGraphics()]]);
 
     playResolveTurnEvents([], {
       scene: mockScene as never,
@@ -670,14 +722,16 @@ describe('playResolveTurnEvents — done promise', () => {
   it('resolves once the longest scheduled effect (blast growth + lingering tail) fires', async () => {
     const state = baseState({
       grid: grid5x5(),
-      bombs: [{ id: 1, ownerId: 0x11, position: { x: 0, y: 0 }, range: 1, countdown: 0 }],
+      bombs: [
+        { id: bombID(1), ownerId: unitID(0x11), position: { x: 0, y: 0 }, range: 1, countdown: 0 },
+      ],
     });
 
     const result = playResolveTurnEvents(
       [
         {
           type: 'bombExploded',
-          bombId: 1,
+          bombId: bombID(1),
           position: { x: 0, y: 0 },
           affectedPositions: [{ x: 1, y: 0 }],
         },
@@ -686,7 +740,7 @@ describe('playResolveTurnEvents — done promise', () => {
         scene: mockScene as never,
         gameStateSnapshot: state,
         unitSpritesById: new Map(),
-        bombGraphicsById: new Map([[1, makeBombGraphics()]]),
+        bombGraphicsById: new Map([[bombID(1), makeBombGraphics()]]),
         softBlockSpritesById: new Map(),
         onError: vi.fn(),
       }
